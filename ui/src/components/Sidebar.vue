@@ -37,6 +37,7 @@
 .sidebar .sidebar-list-container {
     height: 100%;
     overflow: auto;
+    padding-bottom: 1rem;
 }
 
 .sidebar .sidebar-item {

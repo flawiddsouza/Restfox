@@ -13,7 +13,9 @@
         <button>Send</button>
     </div>
     <div class="request-panel-tabs">
-        <div class="request-panel-tab request-panel-tab-active">Body</div>
+        <div class="request-panel-tab request-panel-tab-active">
+            Body
+        </div>
         <div class="request-panel-tab">Query</div>
         <div class="request-panel-tab">Header</div>
         <div class="request-panel-tab-fill"></div>
@@ -28,6 +30,10 @@
     height: 2rem;
 }
 
+.request-panel-address-bar > select {
+    text-align: center;
+}
+
 .request-panel-address-bar > input {
     width: 100%;
 }
@@ -39,6 +45,18 @@
 .request-panel-address-bar input, .request-panel-address-bar select {
     padding: 5px;
     outline: 0;
+    background: inherit;
+}
+
+.request-panel-address-bar button {
+    background-color: #7f4fd5;
+    color: white;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.request-panel-address-bar button:hover {
+    background-color: #673ab7;
 }
 
 .request-panel-tabs {

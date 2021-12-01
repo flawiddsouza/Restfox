@@ -19,3 +19,14 @@ body {
     font-family: var(--font-default);
     font-size: 13px;
 }
+
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+    background-color: #f3f2f2;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #dfdfdf;
+    height: 160px;
+}

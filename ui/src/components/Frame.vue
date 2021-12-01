@@ -57,6 +57,7 @@ header {
     grid-area: tab-bar;
     display: flex;
     user-select: none;
+    border-bottom: 1px solid var(--default-border-color);
 }
 
 .sidebar {
