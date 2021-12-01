@@ -1,0 +1,21 @@
+* {
+    box-sizing: border-box;
+}
+
+html, body, #app {
+    height: 100%;
+}
+
+html {
+    --font-monospace: Menlo, Monaco, Consolas, 'Droid Sans Mono', 'Courier New', monospace,
+    'Droid Sans Fallback';
+    --font-default: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light',
+    'Ubuntu', 'Droid Sans', sans-serif;
+    --font-ligatures: normal;
+    --default-border-color: lightgrey;
+}
+
+body {
+    font-family: var(--font-default);
+    font-size: 13px;
+}

@@ -1,0 +1,17 @@
+{
+    "name": "restfox-ui",
+    "version": "0.0.0",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "serve": "vite preview"
+    },
+    "dependencies": {
+        "sass": "^1.43.4",
+        "vue": "^3.2.16"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-vue": "^1.9.3",
+        "vite": "^2.6.4"
+    }
+}
