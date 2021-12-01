@@ -36,7 +36,7 @@ import ResponsePanel from '@/components/ResponsePanel.vue'
 
     grid-template-areas:
       "header header header"
-      "tab-bar tab-bar tab-bar"
+      "sidebar tab-bar tab-bar"
       "sidebar request-panel response-panel";
 
     grid-template-columns: 300px 1fr 1fr;
@@ -65,6 +65,7 @@ header {
     user-select: none;
     display: flex;
     flex-direction: column;
+    border-right: 1px solid var(--default-border-color);
 }
 
 .request-panel {
