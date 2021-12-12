@@ -26,7 +26,7 @@ export default {
             :class="{ 'tab-active': activeTab && activeTab._id === tab._id }"
             v-for="tab in tabs"
             @click="setActiveTab(tab)"
-            @click.middle="closeTab(tab)"
+            @mousedown.middle.prevent="closeTab(tab)"
         >
             {{ tab.name }}
             <span style="margin-left: 0.5rem" @click.prevent="closeTab(tab)">x</span>
