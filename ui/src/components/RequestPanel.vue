@@ -15,38 +15,68 @@
         </div>
         <div class="request-panel-tabs-context">
             <template v-if="activeRequestPanelTab === 'Body'">
-                {{ activeTab.body.mimeType }}
-                <table>
-                    <tr v-for="param in activeTab.body.params">
+                <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem">
+                    <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
+                    <option value="text/plain">Plain Text</option>
+                </select>
+                <table v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
+                    <tr v-for="(param, index) in activeTab.body.params">
                         <td>
-                            <input type="text" v-model="param.name">
+                            <input type="text" v-model="param.name" spellcheck="false">
                         </td>
                         <td>
-                            <input type="text" v-model="param.value">
+                            <input type="text" v-model="param.value" spellcheck="false">
+                        </td>
+                        <td @click="activeTab.body.params.splice(index, 1)">
+                            <i class="fa fa-trash"></i>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" style="text-align: center; user-select: none" @click="activeTab.body.params.push({ name: '', value: '' })">
+                            + Add Item
                         </td>
                     </tr>
                 </table>
+                <div v-if="activeTab.body.mimeType === 'text/plain'">
+                    <textarea v-model="activeTab.body.text" style="width: 100%" spellcheck="false"></textarea>
+                </div>
             </template>
             <template v-if="activeRequestPanelTab === 'Query'">
                 <table>
-                    <tr v-for="param in activeTab.parameters">
+                    <tr v-for="(param, index) in activeTab.parameters">
                         <td>
-                            <input type="text" v-model="param.name">
+                            <input type="text" v-model="param.name" spellcheck="false">
                         </td>
                         <td>
-                            <input type="text" v-model="param.value">
+                            <input type="text" v-model="param.value" spellcheck="false">
+                        </td>
+                        <td @click="activeTab.parameters.splice(index, 1)">
+                            <i class="fa fa-trash"></i>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" style="text-align: center; user-select: none" @click="activeTab.parameters.push({ name: '', value: '' })">
+                            + Add Item
                         </td>
                     </tr>
                 </table>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
                 <table>
-                    <tr v-for="header in activeTab.headers">
+                    <tr v-for="(header, index) in activeTab.headers">
                         <td>
-                            <input type="text" v-model="header.name">
+                            <input type="text" v-model="header.name" spellcheck="false">
                         </td>
                         <td>
-                            <input type="text" v-model="header.value">
+                            <input type="text" v-model="header.value" spellcheck="false">
+                        </td>
+                        <td @click="activeTab.headers.splice(index, 1)">
+                            <i class="fa fa-trash"></i>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" style="text-align: center; user-select: none" @click="activeTab.headers.push({ name: '', value: '' })">
+                            + Add Item
                         </td>
                     </tr>
                 </table>
@@ -150,5 +180,35 @@ export default {
 .request-panel-tabs .request-panel-tab-fill {
     width: 100%;
     border-bottom: 1px solid var(--default-border-color);
+}
+
+.request-panel-tabs-context {
+    padding: 1rem;
+}
+
+.request-panel-tabs-context select {
+    border-color: var(--default-border-color);
+    outline: 0;
+    padding: 0.3rem;
+}
+
+.request-panel-tabs-context table {
+    border-collapse: collapse;
+}
+
+.request-panel-tabs-context table th, .request-panel-tabs-context table td {
+    border: 1px solid var(--default-border-color);
+    padding: 0.5rem;
+}
+
+.request-panel-tabs-context table input {
+    border: 0;
+    outline: 0;
+}
+
+.request-panel-tabs-context textarea {
+    border: 1px solid var(--default-border-color);
+    outline: 0;
+    resize: none;
 }
 </style>
