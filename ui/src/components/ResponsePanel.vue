@@ -1,3 +1,3 @@
 <template>
-    <div v-for="i in 1000">Sidebar Item {{ i }}</div>
+    <div v-for="i in 1000">Line {{ i }}</div>
 </template>

@@ -7,8 +7,10 @@
         "serve": "vite preview"
     },
     "dependencies": {
+        "nanoid": "^3.1.30",
         "sass": "^1.43.4",
-        "vue": "^3.2.16"
+        "vue": "^3.2.16",
+        "vuex": "^4.0.2"
     },
     "devDependencies": {
         "@vitejs/plugin-vue": "^1.9.3",

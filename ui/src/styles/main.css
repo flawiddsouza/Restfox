@@ -21,12 +21,12 @@ body {
 }
 
 ::-webkit-scrollbar {
-    width: 5px;
+    width: 9px;
     height: 5px;
     background-color: #f3f2f2;
 }
 
 ::-webkit-scrollbar-thumb {
     background: #dfdfdf;
-    height: 160px;
+    height: 70%;
 }

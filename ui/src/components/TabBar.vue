@@ -1,25 +1,19 @@
 <script>
 export default {
-    data() {
-        return {
-            tabs: [],
-            activeTabId: null
+    computed: {
+        tabs() {
+            return this.$store.state.tabs
+        },
+        activeTab() {
+            return this.$store.state.activeTab
         }
     },
     methods: {
-        addTab() {
-            const tabId = this.tabs.length + 1
-            this.tabs.push({
-                id: tabId,
-                title: 'Tab ' + tabId
-            })
-            this.setActiveTab(tabId)
+        setActiveTab(tab) {
+            this.$store.commit('setActiveTab', tab)
         },
-        setActiveTab(tabId) {
-            this.activeTabId = tabId
-        },
-        closeTab(tabIndex) {
-            this.tabs.splice(tabIndex, 1)
+        closeTab(tab) {
+            this.$store.commit('closeTab', tab)
         }
     }
 }
@@ -29,15 +23,16 @@ export default {
     <div class="tabs-container">
         <div
             class="tab"
-            :class="{ 'tab-active': activeTabId === tab.id }"
-            v-for="(tab, tabIndex) in tabs"
-            @click="setActiveTab(tab.id)"
+            :class="{ 'tab-active': activeTab && activeTab._id === tab._id }"
+            v-for="tab in tabs"
+            @click="setActiveTab(tab)"
+            @click.middle="closeTab(tab)"
         >
-            {{ tab.title }}
-            <span style="margin-left: 0.5rem" @click="closeTab(tabIndex)">x</span>
+            {{ tab.name }}
+            <span style="margin-left: 0.5rem" @click.prevent="closeTab(tab)">x</span>
         </div>
     </div>
-    <div class="tab-add" @click="addTab">+</div>
+    <div class="tab-add" @click="addTab" style="visibility: hidden">+</div>
 </template>
 
 <style scoped>

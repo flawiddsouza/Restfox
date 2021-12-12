@@ -8,7 +8,7 @@ import ResponsePanel from '@/components/ResponsePanel.vue'
 <template>
     <div class="container">
         <header>
-            <h3>
+            <h3 class="heading">
                 <a href="#">Dashboard</a> > <span>My Collection</span>
             </h3>
         </header>
@@ -78,5 +78,13 @@ header {
 .response-panel {
     grid-area: response-panel;
     overflow: auto;
+}
+
+.heading {
+    font-weight: 500;
+}
+
+.heading a:not(:hover) {
+    text-decoration: none;
 }
 </style>

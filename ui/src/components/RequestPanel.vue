@@ -1,27 +1,94 @@
 <template>
-    <div class="request-panel-address-bar">
-        <select>
-            <option>GET</option>
-            <option>POST</option>
-            <option>PUT</option>
-            <option>PATCH</option>
-            <option>DELETE</option>
-            <option>OPTIONS</option>
-            <option>HEAD</option>
-        </select>
-        <input type="text" spellcheck="false">
-        <button>Send</button>
-    </div>
-    <div class="request-panel-tabs">
-        <div class="request-panel-tab request-panel-tab-active">
-            Body
+    <template v-if="activeTab">
+        <div class="request-panel-address-bar">
+            <select v-model="activeTab.method">
+                <option v-for="method in methods">{{ method }}</option>
+            </select>
+            <input type="text" spellcheck="false" v-model="activeTab.url">
+            <button>Send</button>
         </div>
-        <div class="request-panel-tab">Query</div>
-        <div class="request-panel-tab">Header</div>
-        <div class="request-panel-tab-fill"></div>
-    </div>
-    <div class="request-panel-tabs-context"></div>
+        <div class="request-panel-tabs">
+            <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs">
+                {{ requestPanelTab.name }}
+            </div>
+            <div class="request-panel-tab-fill"></div>
+        </div>
+        <div class="request-panel-tabs-context">
+            <template v-if="activeRequestPanelTab === 'Body'">
+                {{ activeTab.body.mimeType }}
+                <table>
+                    <tr v-for="param in activeTab.body.params">
+                        <td>
+                            <input type="text" v-model="param.name">
+                        </td>
+                        <td>
+                            <input type="text" v-model="param.value">
+                        </td>
+                    </tr>
+                </table>
+            </template>
+            <template v-if="activeRequestPanelTab === 'Query'">
+                <table>
+                    <tr v-for="param in activeTab.parameters">
+                        <td>
+                            <input type="text" v-model="param.name">
+                        </td>
+                        <td>
+                            <input type="text" v-model="param.value">
+                        </td>
+                    </tr>
+                </table>
+            </template>
+            <template v-if="activeRequestPanelTab === 'Header'">
+                <table>
+                    <tr v-for="header in activeTab.headers">
+                        <td>
+                            <input type="text" v-model="header.name">
+                        </td>
+                        <td>
+                            <input type="text" v-model="header.value">
+                        </td>
+                    </tr>
+                </table>
+            </template>
+        </div>
+    </template>
 </template>
+
+<script>
+export default {
+    data() {
+        return {
+            requestPanelTabs: [
+                {
+                    name: 'Body'
+                },
+                {
+                    name: 'Query'
+                },
+                {
+                    name: 'Header'
+                }
+            ],
+            activeRequestPanelTab: 'Body',
+            methods: [
+                'GET',
+                'POST',
+                'PUT',
+                'PATCH',
+                'DELETE',
+                'OPTIONS',
+                'HEAD'
+            ]
+        }
+    },
+    computed: {
+        activeTab() {
+            return this.$store.state.activeTab
+        }
+    }
+}
+</script>
 
 <style scoped>
 .request-panel-address-bar {
@@ -61,16 +128,23 @@
 
 .request-panel-tabs {
     display: flex;
+    user-select: none;
 }
 
 .request-panel-tabs .request-panel-tab {
     padding: 10px 15px;
     border-bottom: 1px solid var(--default-border-color);
+    border-left: 1px solid transparent;
+    border-right: 1px solid transparent;
 }
 
 .request-panel-tabs .request-panel-tab-active {
     border-bottom: 1px solid transparent;
     border-right: 1px solid var(--default-border-color);
+}
+
+.request-panel-tabs .request-panel-tab-active:not(:first-child) {
+    border-left: 1px solid var(--default-border-color);
 }
 
 .request-panel-tabs .request-panel-tab-fill {
