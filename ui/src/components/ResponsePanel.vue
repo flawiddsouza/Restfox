@@ -8,7 +8,7 @@
             <button class="btn btn--clicky">Cancel Request</button>
         </div>
     </div>
-    <div v-else>
+    <div>
         {{ response }}
     </div>
 </template>
