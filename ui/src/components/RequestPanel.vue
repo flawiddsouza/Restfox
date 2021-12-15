@@ -5,7 +5,7 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <input type="text" spellcheck="false" v-model="activeTab.url">
-            <button>Send</button>
+            <button @click="sendRequest">Send</button>
         </div>
         <div class="request-panel-tabs">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs">
@@ -115,6 +115,11 @@ export default {
     computed: {
         activeTab() {
             return this.$store.state.activeTab
+        }
+    },
+    methods: {
+        sendRequest() {
+            this.$store.commit('sendRequest', this.activeTab)
         }
     }
 }

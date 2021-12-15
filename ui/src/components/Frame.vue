@@ -40,7 +40,7 @@ import ResponsePanel from '@/components/ResponsePanel.vue'
       "sidebar request-panel response-panel";
 
     grid-template-columns: 300px 1fr 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
 
     height: 100%;
 }
@@ -78,6 +78,7 @@ header {
 .response-panel {
     grid-area: response-panel;
     overflow: auto;
+    position: relative;
 }
 
 .heading {

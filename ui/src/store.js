@@ -1,18 +1,6 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-
-function toTree(data, pid = null) {
-    return data.reduce((r, e) => {
-        if (e.parentId == pid) {
-            const obj = { ...e }
-            const children = toTree(data, e._id)
-            if (children.length) obj.children = children
-            r.push(obj)
-        }
-        return r
-    }, [])
-}
-
+import { toTree, handleRequest } from './helpers'
 import insomniaExport from '@/Insomnia_Export.json'
 const collection = insomniaExport.resources
 
@@ -21,7 +9,9 @@ const store = createStore({
         return {
             collection: collection,
             tabs: [],
-            activeTab: null
+            activeTab: null,
+            requestResponseStatus: {},
+            requestResponses: {},
         }
     },
     getters: {
@@ -39,12 +29,23 @@ const store = createStore({
         },
         setActiveTab(state, tab) {
             state.activeTab = tab
+            if(state.activeTab._id in state.requestResponseStatus === false) {
+                state.requestResponseStatus[state.activeTab._id] = 'pending'
+                state.requestResponses[state.activeTab._id] = null
+            }
         },
         closeTab(state, tab) {
             state.tabs = state.tabs.filter(tabItem => tabItem._id !== tab._id)
             if(state.activeTab && state.activeTab._id === tab._id) {
+                delete state.requestResponseStatus[state.activeTab._id]
+                delete state.requestResponses[state.activeTab._id]
                 state.activeTab = null
             }
+        },
+        async sendRequest(state, activeTab) {
+            state.requestResponseStatus[activeTab._id] = 'loading'
+            state.requestResponses[activeTab._id] = await handleRequest(activeTab)
+            state.requestResponseStatus[activeTab._id] = 'loaded'
         }
     }
 })
