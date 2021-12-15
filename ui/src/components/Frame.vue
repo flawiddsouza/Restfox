@@ -73,6 +73,8 @@ header {
     grid-area: request-panel;
     overflow: auto;
     border-right: 1px solid var(--default-border-color);
+    display: grid;
+    grid-template-rows: auto auto 1fr;
 }
 
 .response-panel {

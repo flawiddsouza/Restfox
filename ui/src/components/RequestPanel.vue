@@ -189,6 +189,7 @@ export default {
 
 .request-panel-tabs-context {
     padding: 1rem;
+    overflow-y: auto;
 }
 
 .request-panel-tabs-context select {
