@@ -37,7 +37,7 @@ export async function handleRequest(request) {
         const response = await fetch(url, {
             method: request.method,
             headers,
-            body
+            body: request.method !== 'GET' ? body : undefined
         })
 
         const responseText = await response.text()
