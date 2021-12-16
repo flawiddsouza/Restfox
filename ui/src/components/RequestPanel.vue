@@ -14,48 +14,56 @@
             <div class="request-panel-tab-fill"></div>
         </div>
         <div class="request-panel-tabs-context">
-            <template v-if="activeRequestPanelTab === 'Body'">
+            <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
                 <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem">
                     <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
                     <option value="text/plain">Plain Text</option>
                 </select>
-                <table v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
-                    <tr v-for="(param, index) in activeTab.body.params">
-                        <td>
-                            <input type="text" v-model="param.name" spellcheck="false">
-                        </td>
-                        <td>
-                            <input type="text" v-model="param.value" spellcheck="false">
-                        </td>
-                        <td @click="activeTab.body.params.splice(index, 1)">
-                            <i class="fa fa-trash"></i>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" style="text-align: center; user-select: none" @click="activeTab.body.params.push({ name: '', value: '' })">
-                            + Add Item
-                        </td>
-                    </tr>
-                </table>
+                <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
+                    <table>
+                        <tr v-for="(param, index) in activeTab.body.params">
+                            <td>
+                                <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                            </td>
+                            <td>
+                                <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                            </td>
+                            <td>
+                                <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
+                            </td>
+                            <td @click="activeTab.body.params.splice(index, 1)">
+                                <i class="fa fa-trash"></i>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" style="text-align: center; user-select: none" @click="activeTab.body.params.push({ name: '', value: '' })">
+                                + Add Item
+                            </td>
+                        </tr>
+                    </table>
+                </div>
                 <div v-if="activeTab.body.mimeType === 'text/plain'">
                     <textarea v-model="activeTab.body.text" style="width: 100%" spellcheck="false"></textarea>
                 </div>
-            </template>
+            </div>
             <template v-if="activeRequestPanelTab === 'Query'">
                 <table>
                     <tr v-for="(param, index) in activeTab.parameters">
                         <td>
-                            <input type="text" v-model="param.name" spellcheck="false">
+                            <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
                         </td>
                         <td>
-                            <input type="text" v-model="param.value" spellcheck="false">
+                            <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                        </td>
+                        <td>
+                            <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
                         </td>
                         <td @click="activeTab.parameters.splice(index, 1)">
                             <i class="fa fa-trash"></i>
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="3" style="text-align: center; user-select: none" @click="activeTab.parameters.push({ name: '', value: '' })">
+                        <td colspan="4" style="text-align: center; user-select: none" @click="activeTab.parameters.push({ name: '', value: '' })">
                             + Add Item
                         </td>
                     </tr>
@@ -65,17 +73,20 @@
                 <table>
                     <tr v-for="(header, index) in activeTab.headers">
                         <td>
-                            <input type="text" v-model="header.name" spellcheck="false">
+                            <input type="text" v-model="header.name" spellcheck="false" placeholder="name" :disabled="header.disabled">
                         </td>
                         <td>
-                            <input type="text" v-model="header.value" spellcheck="false">
+                            <input type="text" v-model="header.value" spellcheck="false" placeholder="value" :disabled="header.disabled">
+                        </td>
+                        <td>
+                            <input type="checkbox" :checked="header.disabled === undefined || header.disabled === false" @change="header.disabled = $event.target.checked ? false : true">
                         </td>
                         <td @click="activeTab.headers.splice(index, 1)">
                             <i class="fa fa-trash"></i>
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="3" style="text-align: center; user-select: none" @click="activeTab.headers.push({ name: '', value: '' })">
+                        <td colspan="4" style="text-align: center; user-select: none" @click="activeTab.headers.push({ name: '', value: '' })">
                             + Add Item
                         </td>
                     </tr>
@@ -200,6 +211,7 @@ export default {
 
 .request-panel-tabs-context table {
     border-collapse: collapse;
+    width: 100%;
 }
 
 .request-panel-tabs-context table th, .request-panel-tabs-context table td {
@@ -207,14 +219,32 @@ export default {
     padding: 0.5rem;
 }
 
+.request-panel-tabs-context table td:last-child {
+    width: 1px;
+}
+
 .request-panel-tabs-context table input {
     border: 0;
     outline: 0;
+    width: 100%;
+}
+.request-panel-tabs-context table input:disabled {
+    opacity: 0.5;
 }
 
 .request-panel-tabs-context textarea {
     border: 1px solid var(--default-border-color);
     outline: 0;
     resize: none;
+}
+
+.request-panel-tabs-context-container {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100%;
+}
+
+.request-panel-tabs-context-container > div, .request-panel-tabs-context-container > div > textarea {
+    height: 100%;
 }
 </style>
