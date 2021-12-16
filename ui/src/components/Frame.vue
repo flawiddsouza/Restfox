@@ -9,7 +9,8 @@ import ResponsePanel from '@/components/ResponsePanel.vue'
     <div class="container">
         <header>
             <h3 class="heading">
-                <a href="#">Dashboard</a> > <span>My Collection</span>
+                <!-- <a href="#">Dashboard</a> > <span>My Collection</span> -->
+                Restfox
             </h3>
         </header>
         <section class="tab-bar">
