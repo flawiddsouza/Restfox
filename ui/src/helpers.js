@@ -72,3 +72,135 @@ export async function handleRequest(request) {
         }
     }
 }
+
+export function convertInsomniaExportToRestfoxCollection(json) {
+    let collection = []
+
+    json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment'].includes(item._type) == false).forEach(item => {
+        if(item._type === 'workspace' || item._type === 'request_group') {
+            collection.push({
+                _id: item._id,
+                _type: 'request_group',
+                name: item.name,
+                parentId: item.parentId
+            })
+        } else {
+            let body = {}
+
+            if(item.body.mimeType === 'application/x-www-form-urlencoded') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    params: item.body.params
+                }
+            }
+
+            if(item.body.mimeType === 'text/plain') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    text: item.body.text
+                }
+            }
+
+            collection.push({
+                _id: item._id,
+                _type: item._type === 'workspace' ? 'request_group' : item._type,
+                name: item.name,
+                url: item.url,
+                method: item.method,
+                body: item.body,
+                headers: item.headers ? item.headers.map(header => ({ name: header.name, value: header.value, description: header.description })) : [],
+                parameters: item.parameters ? item.parameters.map(parameter => ({ name: parameter.name, value: parameter.value, description: parameter.description })) : [],
+                parentId: item.parentId
+            })
+        }
+    })
+
+    return toTree(collection)
+}
+
+export function convertPostmanExportToRestfoxCollection(json) {
+    let collection = []
+
+    json.collections.forEach(item => {
+        let requests = []
+
+        item.requests.forEach(request => {
+            let body = {}
+
+            if(request.dataMode === 'urlencoded' || request.dataMode === null) {
+                let params = []
+                const requestData = request.data !== null ? request.data : []
+                requestData.forEach(requestDataItem => {
+                    params.push({
+                        name: requestDataItem.key,
+                        value: requestDataItem.value,
+                        description: requestDataItem.description,
+                        disabled: !requestDataItem.enabled
+                    })
+                })
+                body = {
+                    mimeType: 'application/x-www-form-urlencoded',
+                    params
+                }
+            }
+
+            if(request.dataMode === 'raw') {
+                body = {
+                    mimeType: 'text/plain',
+                    text: request.rawModeData
+                }
+            }
+
+            let headers = []
+            request.headerData.forEach(header => {
+                headers.push({
+                    name: header.key,
+                    value: header.value,
+                    description: header.description,
+                    disabled: !header.enabled
+                })
+            })
+
+            let parameters = []
+            const queryParams = request.queryParams !== null ? request.queryParams : []
+            queryParams.forEach(queryParam => {
+                parameters.push({
+                    name: queryParam.key,
+                    value: queryParam.value,
+                    description: queryParam.description,
+                    disabled: !queryParam.enabled
+                })
+            })
+
+            requests.push({
+                _id: request.id,
+                _type: 'request',
+                method: request.method,
+                url: request.url,
+                name: request.name,
+                body,
+                headers,
+                parameters
+            })
+        })
+
+        collection.push({
+            _id: item.id,
+            _type: 'request_group',
+            name: item.name,
+            children: requests
+        })
+    })
+
+    return collection
+}
+
+// From: https://stackoverflow.com/a/66387148/4932305
+export async function fileToJSON(file) {
+    return new Promise((resolve, reject) => {
+        const fileReader = new FileReader()
+        fileReader.onload = event => resolve(JSON.parse(event.target.result))
+        fileReader.onerror = error => reject(error)
+        fileReader.readAsText(file)
+    })
+}

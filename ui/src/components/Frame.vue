@@ -1,18 +1,18 @@
 <script setup>
+import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
+import ImportModal from '@/components/ImportModal.vue'
 </script>
 
 <template>
     <div class="container">
         <header>
-            <h3 class="heading">
-                <!-- <a href="#">Dashboard</a> > <span>My Collection</span> -->
-                Restfox
-            </h3>
+            <NavBar />
         </header>
+
         <section class="tab-bar">
             <TabBar />
         </section>
@@ -28,6 +28,8 @@ import ResponsePanel from '@/components/ResponsePanel.vue'
         <section class="response-panel">
             <ResponsePanel />
         </section>
+
+        <ImportModal />
     </div>
 </template>
 
@@ -48,9 +50,6 @@ import ResponsePanel from '@/components/ResponsePanel.vue'
 
 header {
     grid-area: header;
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
-    padding-left: 1em;
     border-bottom: 1px solid var(--default-border-color);
 }
 

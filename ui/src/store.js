@@ -1,22 +1,16 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { toTree, handleRequest } from './helpers'
-import insomniaExport from '@/Insomnia_Export.json'
-const collection = insomniaExport.resources
+import { handleRequest } from './helpers'
 
 const store = createStore({
     state() {
         return {
-            collection: collection,
+            collection: [],
             tabs: [],
             activeTab: null,
             requestResponseStatus: {},
             requestResponses: {},
-        }
-    },
-    getters: {
-        collectionTree(state) {
-            return toTree(state.collection.filter(item => ['cookie_jar', 'api_spec', 'environment'].includes(item._type) == false))
+            showImportModal: false,
         }
     },
     mutations: {
@@ -46,6 +40,12 @@ const store = createStore({
             state.requestResponseStatus[activeTab._id] = 'loading'
             state.requestResponses[activeTab._id] = await handleRequest(activeTab)
             state.requestResponseStatus[activeTab._id] = 'loaded'
+        },
+        showImportModal(state, value) {
+            state.showImportModal = value
+        },
+        setCollection(state, collection) {
+            state.collection = collection
         }
     }
 })
