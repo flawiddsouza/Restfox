@@ -219,7 +219,7 @@ export default {
     padding: 0.5rem;
 }
 
-.request-panel-tabs-context table td:last-child {
+.request-panel-tabs-context table td:nth-last-child(-n+2) {
     width: 1px;
 }
 
@@ -228,6 +228,12 @@ export default {
     outline: 0;
     width: 100%;
 }
+
+.request-panel-tabs-context table input[type="checkbox"] {
+    width: auto;
+    vertical-align: middle;
+}
+
 .request-panel-tabs-context table input:disabled {
     opacity: 0.5;
 }
