@@ -4,7 +4,7 @@ import Modal from '@/components/Modal.vue'
 
 <template>
     <form @submit.prevent="importFile" v-if="showImportModal">
-        <modal title="Import" v-model="showImportModal">
+        <modal title="Import" :modelValue="showImportModal" @update:modelValue="showImportModal = $event">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Import From</div>
                 <select style="width: 100%; border-color: var(--default-border-color); outline: 0; padding: 0.3rem;" v-model="importFrom">
