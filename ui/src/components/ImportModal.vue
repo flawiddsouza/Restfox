@@ -47,12 +47,17 @@ export default {
     methods: {
         async importFile() {
             try {
-                const json = await fileToJSON(this.fileToImport)
+                let json = null
+
+                if(this.fileToImport.name.endsWith('.json')) {
+                    json = await fileToJSON(this.fileToImport)
+                } else {
+                    json = this.fileToImport
+                }
 
                 if(this.importFrom === 'Postman') {
-                    const collection = convertPostmanExportToRestfoxCollection(json)
+                    const collection = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'))
                     this.$store.commit('setCollection', collection)
-
                 }
 
                 if(this.importFrom === 'Insomnia') {
@@ -65,6 +70,7 @@ export default {
 
                 alert('File imported successfully')
             } catch(e) {
+                console.log(e)
                 alert('Invalid import file given')
             }
         }

@@ -1,3 +1,5 @@
+import JSZip from 'jszip'
+
 export function toTree(data, pid = null) {
     return data.reduce((r, e) => {
         if (e.parentId == pid) {
@@ -118,10 +120,37 @@ export function convertInsomniaExportToRestfoxCollection(json) {
     return toTree(collection)
 }
 
-export function convertPostmanExportToRestfoxCollection(json) {
+export async function convertPostmanExportToRestfoxCollection(json, isZip=false) {
+    if(isZip) {
+        const zip = new JSZip()
+        const extractedZip = await zip.loadAsync(json)
+        const filePaths = Object.keys(extractedZip.files)
+        const filePathMap = {}
+        const basePath = filePaths[filePaths.length - 1].replace('archive.json', '')
+        filePaths.forEach(filePath => {
+            filePathMap[filePath.replace(basePath, '')] = filePath
+        })
+
+        let archive = await extractedZip.files[filePathMap['archive.json']].async('text')
+        archive = JSON.parse(archive)
+        let archiveCollection = archive.collection
+
+        let collections = []
+
+        for(const collectionId of Object.keys(archiveCollection)) {
+            collections.push(JSON.parse(await extractedZip.files[filePathMap[`collection/${collectionId}.json`]].async('text')))
+        }
+
+        return importPostmanV2(collections)
+    } else {
+        return importPostmanV1(json.collections)
+    }
+}
+
+function importPostmanV1(collections) {
     let collection = []
 
-    json.collections.forEach(item => {
+    collections.forEach(item => {
         let requests = []
 
         item.requests.forEach(request => {
@@ -189,6 +218,103 @@ export function convertPostmanExportToRestfoxCollection(json) {
             _type: 'request_group',
             name: item.name,
             children: requests
+        })
+    })
+
+    return collection
+}
+
+function handlePostmanV2CollectionItem(postmanCollectionItem) {
+    let requests = []
+
+    postmanCollectionItem.item.forEach(request => {
+        if('item' in request) {
+            requests.push({
+                _id: request.id,
+                _type: 'request_group',
+                name: request.name,
+                children: handlePostmanV2CollectionItem(request)
+            })
+            return
+        }
+
+        let body = {
+            mimeType: 'application/x-www-form-urlencoded',
+            params: []
+        }
+
+        if('body' in request.request && 'mode' in request.request.body) {
+            if(request.request.body.mode === 'urlencoded') {
+                let params = []
+                const requestData = request.request.body.urlencoded
+                requestData.forEach(requestDataItem => {
+                    params.push({
+                        name: requestDataItem.key,
+                        value: requestDataItem.value,
+                        description: requestDataItem.description,
+                        disabled: false
+                    })
+                })
+                body = {
+                    mimeType: 'application/x-www-form-urlencoded',
+                    params
+                }
+            }
+
+            if(request.request.body.mode === 'raw') {
+                body = {
+                    mimeType: 'text/plain',
+                    text: request.request.body.raw
+                }
+            }
+        }
+
+        let headers = []
+        request.request.header.forEach(header => {
+            headers.push({
+                name: header.key,
+                value: header.value,
+                description: header.description,
+                disabled: false
+            })
+        })
+
+        let parameters = []
+        const queryParams = typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
+        queryParams.forEach(queryParam => {
+            parameters.push({
+                name: queryParam.key,
+                value: queryParam.value,
+                description: queryParam.description,
+                disabled: false
+            })
+        })
+
+        requests.push({
+            _id: request.id,
+            _type: 'request',
+            method: request.request.method,
+            url: typeof request.request.url === 'string' ? request.request.url : request.request.url.raw,
+            name: request.name,
+            body,
+            headers,
+            parameters,
+            originRequest: request
+        })
+    })
+
+    return requests
+}
+
+function importPostmanV2(collections) {
+    let collection = []
+
+    collections.forEach(postmanCollectionItem => {
+        collection.push({
+            _id: postmanCollectionItem.info._postman_id,
+            _type: 'request_group',
+            name: postmanCollectionItem.info.name,
+            children: handlePostmanV2CollectionItem(postmanCollectionItem)
         })
     })
 
