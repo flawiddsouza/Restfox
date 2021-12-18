@@ -7,6 +7,7 @@
         "serve": "vite preview"
     },
     "dependencies": {
+        "dexie": "^3.2.0",
         "jszip": "^3.7.1",
         "nanoid": "^3.1.30",
         "sass": "^1.43.4",

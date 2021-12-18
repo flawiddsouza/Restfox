@@ -12,6 +12,22 @@ export function toTree(data, pid = null) {
     }, [])
 }
 
+export function flattenTree(array) {
+    const level = []
+
+    array.forEach(item => {
+        let newItem = Object.assign({}, item)
+        delete newItem.children
+        level.push(newItem)
+
+        if(item.children) {
+            level.push(...flattenTree(item.children))
+        }
+    })
+
+    return level
+}
+
 export async function handleRequest(request) {
     let body = null
 
@@ -224,7 +240,7 @@ function importPostmanV1(collections) {
     return collection
 }
 
-function handlePostmanV2CollectionItem(postmanCollectionItem) {
+function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
     let requests = []
 
     postmanCollectionItem.item.forEach(request => {
@@ -233,7 +249,8 @@ function handlePostmanV2CollectionItem(postmanCollectionItem) {
                 _id: request.id,
                 _type: 'request_group',
                 name: request.name,
-                children: handlePostmanV2CollectionItem(request)
+                children: handlePostmanV2CollectionItem(request, request.id),
+                parentId
             })
             return
         }
@@ -299,7 +316,8 @@ function handlePostmanV2CollectionItem(postmanCollectionItem) {
             body,
             headers,
             parameters,
-            originRequest: request
+            originRequest: request,
+            parentId
         })
     })
 
@@ -314,7 +332,8 @@ function importPostmanV2(collections) {
             _id: postmanCollectionItem.info._postman_id,
             _type: 'request_group',
             name: postmanCollectionItem.info.name,
-            children: handlePostmanV2CollectionItem(postmanCollectionItem)
+            children: handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id),
+            parentId: null
         })
     })
 

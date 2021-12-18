@@ -1,6 +1,7 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { handleRequest } from './helpers'
+import { toTree, flattenTree, handleRequest } from './helpers'
+import { db } from './db'
 
 const store = createStore({
     state() {
@@ -11,6 +12,11 @@ const store = createStore({
             requestResponseStatus: {},
             requestResponses: {},
             showImportModal: false,
+        }
+    },
+    getters: {
+        collectionTree(state) {
+            return toTree(state.collection)
         }
     },
     mutations: {
@@ -44,8 +50,18 @@ const store = createStore({
         showImportModal(state, value) {
             state.showImportModal = value
         },
+        setCollectionTree(state, collectionTree) {
+            state.collection = state.collection.concat(flattenTree(collectionTree))
+            state.collection.forEach(item => {
+                db.collections.put(JSON.parse(JSON.stringify(item)), [item._id])
+            })
+        },
         setCollection(state, collection) {
             state.collection = collection
+        },
+        clearCollection(state) {
+            state.collection = []
+            db.collections.clear()
         }
     }
 })

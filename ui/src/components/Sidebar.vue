@@ -19,7 +19,7 @@ import SidebarItem from './SidebarItem.vue'
 export default {
     computed: {
         sidebarItems() {
-            return this.$store.state.collection
+            return this.$store.getters.collectionTree
         }
     }
 }

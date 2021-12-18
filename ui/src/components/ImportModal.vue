@@ -57,12 +57,12 @@ export default {
 
                 if(this.importFrom === 'Postman') {
                     const collection = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'))
-                    this.$store.commit('setCollection', collection)
+                    this.$store.commit('setCollectionTree', collection)
                 }
 
                 if(this.importFrom === 'Insomnia') {
                     const collection = convertInsomniaExportToRestfoxCollection(json)
-                    this.$store.commit('setCollection', collection)
+                    this.$store.commit('setCollectionTree', collection)
                 }
 
                 this.fileToImport = null

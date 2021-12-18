@@ -6,9 +6,23 @@
         </div>
         <div>
             <a href="#" @click.prevent="this.$store.commit('showImportModal', true)">Import</a>
+            <span class="spacer"></span>
+            <a href="#" @click.prevent="clearCollection">Clear Collection</a>
         </div>
     </div>
 </template>
+
+<script>
+export default {
+    methods: {
+        clearCollection() {
+            if(confirm('Are you sure?')) {
+                this.$store.commit('clearCollection')
+            }
+        }
+    }
+}
+</script>
 
 <style scoped>
 .navbar {
@@ -18,5 +32,9 @@
     padding-right: 1em;
     display: flex;
     justify-content: space-between;
+}
+
+.spacer {
+    margin-left: 1rem;
 }
 </style>
