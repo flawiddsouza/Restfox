@@ -6,7 +6,7 @@ function createWindow() {
     win.on('show', () => { win.focus() })
     win.maximize()
     win.show()
-    win.loadFile(resolve(__dirname, '../../ui/dist/index.html'))
+    win.loadURL(`file://${resolve(__dirname, '../../ui/dist/index.html')}`)
 }
 
 app.whenReady().then(() => {
