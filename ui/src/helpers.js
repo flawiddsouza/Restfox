@@ -225,7 +225,8 @@ function importPostmanV1(collections) {
                 name: request.name,
                 body,
                 headers,
-                parameters
+                parameters,
+                parentId: item.id
             })
         })
 
@@ -233,7 +234,8 @@ function importPostmanV1(collections) {
             _id: item.id,
             _type: 'request_group',
             name: item.name,
-            children: requests
+            children: requests,
+            parentId: null
         })
     })
 
