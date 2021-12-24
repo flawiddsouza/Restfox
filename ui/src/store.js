@@ -1,22 +1,28 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { toTree, flattenTree, handleRequest } from './helpers'
+import { toTree, flattenTree, handleRequest, filterTree } from './helpers'
 import { db } from './db'
 
 const store = createStore({
     state() {
         return {
             collection: [],
+            collectionTree: [],
             tabs: [],
             activeTab: null,
             requestResponseStatus: {},
             requestResponses: {},
             showImportModal: false,
+            collectionFilter: ''
         }
     },
     getters: {
-        collectionTree(state) {
-            return toTree(state.collection)
+        collectionTreeFiltered(state) {
+            if(state.collectionFilter) {
+                return filterTree(state.collectionTree, state.collectionFilter)
+            }
+
+            return state.collectionTree
         }
     },
     mutations: {
@@ -55,13 +61,19 @@ const store = createStore({
             state.collection.forEach(item => {
                 db.collections.put(JSON.parse(JSON.stringify(item)), [item._id])
             })
+            state.collectionTree = collectionTree
         },
         setCollection(state, collection) {
             state.collection = collection
+            state.collectionTree = toTree(state.collection)
         },
         clearCollection(state) {
             state.collection = []
             db.collections.clear()
+            state.collectionTree = []
+        },
+        setCollectionFilter(state, filter) {
+            state.collectionFilter = filter
         }
     }
 })

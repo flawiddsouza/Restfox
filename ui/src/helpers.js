@@ -351,3 +351,18 @@ export async function fileToJSON(file) {
         fileReader.readAsText(file)
     })
 }
+
+// From: https://stackoverflow.com/a/57218589/4932305 but modified to return children on parent matches
+export function filterTree(array, name) {
+    return array.reduce((r, { children = [], ...o }) => {
+        if(o.name.toLowerCase().includes(name.toLowerCase())) {
+            r.push(Object.assign(o, { children }))
+            return r
+        }
+        children = filterTree(children, name)
+        if(children.length) {
+            r.push(Object.assign(o, { children }))
+        }
+        return r
+    }, [])
+}

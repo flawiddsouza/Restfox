@@ -4,7 +4,7 @@ import SidebarItem from './SidebarItem.vue'
 
 <template>
     <div class="sidebar-filter">
-        <input type="search" placeholder="Filter" spellcheck="false">
+        <input type="search" placeholder="Filter" spellcheck="false" v-model="collectionFilter">
     </div>
     <div class="sidebar-list-container">
         <div class="sidebar-list">
@@ -19,7 +19,15 @@ import SidebarItem from './SidebarItem.vue'
 export default {
     computed: {
         sidebarItems() {
-            return this.$store.getters.collectionTree
+            return this.$store.getters.collectionTreeFiltered
+        },
+        collectionFilter: {
+            get() {
+                return this.$store.state.collectionFilter
+            },
+            set(value) {
+                this.$store.commit('setCollectionFilter', value)
+            }
         }
     }
 }
