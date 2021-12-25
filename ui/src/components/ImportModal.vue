@@ -1,10 +1,6 @@
-<script setup>
-import Modal from '@/components/Modal.vue'
-</script>
-
 <template>
     <form @submit.prevent="importFile" v-if="showImportModal">
-        <modal title="Import" :modelValue="showImportModal" @update:modelValue="showImportModal = $event">
+        <modal title="Import" v-model="showImportModal">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Import From</div>
                 <select style="width: 100%; border-color: var(--default-border-color); outline: 0; padding: 0.3rem;" v-model="importFrom">
@@ -26,8 +22,12 @@ import Modal from '@/components/Modal.vue'
 
 <script>
 import { fileToJSON, convertInsomniaExportToRestfoxCollection, convertPostmanExportToRestfoxCollection } from '@/helpers'
+import Modal from '@/components/Modal.vue'
 
 export default {
+    components: {
+        Modal
+    },
     data() {
         return {
             fileToImport: null,

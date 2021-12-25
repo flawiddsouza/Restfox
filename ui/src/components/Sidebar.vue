@@ -1,7 +1,3 @@
-<script setup>
-import SidebarItem from './SidebarItem.vue'
-</script>
-
 <template>
     <div class="sidebar-filter">
         <input type="search" placeholder="Filter" spellcheck="false" v-model="collectionFilter">
@@ -16,7 +12,12 @@ import SidebarItem from './SidebarItem.vue'
 </template>
 
 <script>
+import SidebarItem from './SidebarItem.vue'
+
 export default {
+    components: {
+        SidebarItem
+    },
     computed: {
         sidebarItems() {
             return this.$store.getters.collectionTreeFiltered
