@@ -12,6 +12,7 @@ function createState(vueInstance) {
         extensions: [
             EditorView.updateListener.of(v => {
                 if(v.docChanged) {
+                    vueInstance.emitted = true
                     vueInstance.$emit('update:modelValue', v.state.doc.toString())
                 }
             }),
@@ -27,12 +28,17 @@ export default {
     },
     data() {
         return {
-            editor: null
+            editor: null,
+            emitted: false
         }
     },
     watch: {
         modelValue() {
-            this.editor.setState(createState(this))
+            if(!this.emitted) {
+                this.editor.setState(createState(this))
+            } else {
+                this.emitted = false
+            }
         }
     },
     mounted() {
