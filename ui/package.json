@@ -7,6 +7,9 @@
         "serve": "vite preview"
     },
     "dependencies": {
+        "@codemirror/lang-json": "^0.19.1",
+        "@codemirror/state": "^0.19.6",
+        "@codemirror/view": "^0.19.37",
         "dexie": "^3.2.0",
         "jszip": "^3.7.1",
         "nanoid": "^3.1.30",

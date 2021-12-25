@@ -4,7 +4,9 @@
             <select v-model="activeTab.method">
                 <option v-for="method in methods">{{ method }}</option>
             </select>
-            <input type="text" spellcheck="false" v-model="activeTab.url">
+            <div class="code-mirror-input-container">
+                <CodeMirrorSingleLine v-model="activeTab.url" />
+            </div>
             <button @click="sendRequest">Send</button>
         </div>
         <div class="request-panel-tabs">
@@ -97,7 +99,12 @@
 </template>
 
 <script>
+import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
+
 export default {
+    components: {
+        CodeMirrorSingleLine
+    },
     data() {
         return {
             requestPanelTabs: [
@@ -141,21 +148,24 @@ export default {
     display: flex;
     border-bottom: 1px solid var(--default-border-color);
     height: 2rem;
+    align-items: center;
+    min-width: 0;
 }
 
 .request-panel-address-bar > select {
     text-align: center;
 }
 
-.request-panel-address-bar > input {
-    width: 100%;
+.request-panel-address-bar > .code-mirror-input-container {
+    flex: 1;
+    min-width: 0;
 }
 
-.request-panel-address-bar > input, .request-panel-address-bar > select, .request-panel-address-bar > button {
+.request-panel-address-bar > select, .request-panel-address-bar > button {
     border: 0;
 }
 
-.request-panel-address-bar input, .request-panel-address-bar select {
+.request-panel-address-bar select {
     padding: 5px;
     outline: 0;
     background: inherit;
@@ -166,6 +176,7 @@ export default {
     color: white;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
+    height: 100%;
 }
 
 .request-panel-address-bar button:hover {
