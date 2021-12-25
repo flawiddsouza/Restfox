@@ -60,21 +60,12 @@ export async function handleRequest(request) {
 
         const responseText = await response.text()
 
-        let responseToReturn = null
-        let isJSON = true;
-
-        try {
-            responseToReturn = JSON.parse(responseText)
-        } catch {
-            responseToReturn = responseText
-            isJSON = false;
-        }
+        let responseToReturn = responseText
 
         return {
             status: response.status,
             statusText: response.statusText,
-            response: responseToReturn,
-            json: isJSON
+            response: responseToReturn
         }
     } catch(e) {
         let error = `Error: Couldn't resolve host name`

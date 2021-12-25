@@ -1,22 +1,25 @@
 <template>
-    <div class="code-mirror-single-line"></div>
+    <div class="code-mirror-response-panel-preview"></div>
 </template>
 
 <script>
 import { EditorView } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
+import { json } from '@codemirror/lang-json'
+import { lineNumbers } from '@codemirror/gutter'
+import { foldGutter } from '@codemirror/fold'
+import { defaultHighlightStyle } from "@codemirror/highlight"
 
 function createState(vueInstance) {
     return EditorState.create({
         doc: vueInstance.modelValue,
         extensions: [
-            EditorView.updateListener.of(v => {
-                if(v.docChanged) {
-                    vueInstance.$emit('update:modelValue', v.state.doc.toString())
-                }
-            }),
-            // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
-            EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr)
+            EditorView.editable.of(false),
+            EditorState.readOnly.of(true),
+            lineNumbers(),
+            foldGutter(),
+            defaultHighlightStyle.fallback,
+            json()
         ]
     })
 }
@@ -45,14 +48,7 @@ export default {
 </script>
 
 <style>
-.code-mirror-single-line .cm-editor.cm-focused {
+.code-mirror-response-panel-preview .cm-editor.cm-focused {
     outline: 0 !important;
-}
-
-.code-mirror-single-line .cm-scroller {
-    font-family: inherit !important;
-    margin-left: 0.2rem;
-    margin-right: 0.5rem;
-    overflow-x: hidden !important;
 }
 </style>

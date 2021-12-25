@@ -81,6 +81,8 @@ header {
     grid-area: response-panel;
     overflow: auto;
     position: relative;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
 }
 
 .heading {

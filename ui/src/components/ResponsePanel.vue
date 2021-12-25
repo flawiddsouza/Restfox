@@ -8,37 +8,51 @@
             <button class="btn btn--clicky">Cancel Request</button>
         </div>
     </div>
-    <div>
-        {{ response }}
-    </div>
+    <template v-if="status !== 'not loaded'">
+        <div class="response-panel-address-bar">
+            <div class="tag" :class="{ 'green': response.status >= 200 && response.status <= 299, 'red': response.status >= 500 || response.statusText === 'Error' }">
+                <span class="bold">{{ response.status }}</span>
+                {{ response.statusText }}
+            </div>
+        </div>
+        <div class="response-panel-tabs">
+            <div class="response-panel-tab" :class="{ 'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name }" @click="activeResponsePanelTab = responsePanelTab.name" v-for="responsePanelTab in responsePanelTabs">
+                {{ responsePanelTab.name }}
+            </div>
+            <div class="response-panel-tab-fill"></div>
+        </div>
+        <div class="response-panel-tabs-context">
+            <template v-if="activeResponsePanelTab === 'Preview'">
+                <template v-if="response.statusText !== 'Error'">
+                    <CodeMirrorResponsePanelPreview v-model="response.response" />
+                </template>
+                <div class="content-box" v-else>{{ response.response }}</div>
+            </template>
+            <template v-if="activeResponsePanelTab === 'Header'">
+                <div class="content-box">Response headers will be displayed here</div>
+            </template>
+        </div>
+    </template>
 </template>
 
-
 <script>
+import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
+
 export default {
+    components: {
+        CodeMirrorResponsePanelPreview
+    },
     data() {
         return {
-            requestPanelTabs: [
+            responsePanelTabs: [
                 {
-                    name: 'Body'
-                },
-                {
-                    name: 'Query'
+                    name: 'Preview'
                 },
                 {
                     name: 'Header'
                 }
             ],
-            activeRequestPanelTab: 'Body',
-            methods: [
-                'GET',
-                'POST',
-                'PUT',
-                'PATCH',
-                'DELETE',
-                'OPTIONS',
-                'HEAD'
-            ]
+            activeResponsePanelTab: 'Preview'
         }
     },
     computed: {
@@ -57,7 +71,11 @@ export default {
                 return this.$store.state.requestResponses[this.activeTab._id]
             }
 
-            return null
+            return {
+                status: null,
+                statusText: null,
+                response: null
+            }
         }
     },
     methods: {
@@ -94,5 +112,66 @@ export default {
 
 .loading-overlay .fas {
     font-size: 4rem;
+}
+
+.response-panel-address-bar {
+    display: flex;
+    border-bottom: 1px solid var(--default-border-color);
+    height: 2rem;
+    align-items: center;
+    min-width: 0;
+    padding-left: 0.5rem;
+}
+
+.response-panel-address-bar .tag {
+    padding: 0.2rem 0.6rem;
+}
+
+.response-panel-address-bar .tag .bold {
+    font-weight: 500;
+}
+
+.response-panel-address-bar .tag.green {
+    background: #75ba24;
+    color: white;
+}
+
+.response-panel-address-bar .tag.red {
+    background: #e15251;
+    color: white;
+}
+
+.response-panel-tabs {
+    display: flex;
+    user-select: none;
+}
+
+.response-panel-tabs .response-panel-tab {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--default-border-color);
+    border-left: 1px solid transparent;
+    border-right: 1px solid transparent;
+}
+
+.response-panel-tabs .response-panel-tab-active {
+    border-bottom: 1px solid transparent;
+    border-right: 1px solid var(--default-border-color);
+}
+
+.response-panel-tabs .response-panel-tab-active:not(:first-child) {
+    border-left: 1px solid var(--default-border-color);
+}
+
+.response-panel-tabs .response-panel-tab-fill {
+    width: 100%;
+    border-bottom: 1px solid var(--default-border-color);
+}
+
+.response-panel-tabs-context {
+    overflow-y: auto;
+}
+
+.response-panel-tabs-context .content-box {
+    padding: 1rem;
 }
 </style>
