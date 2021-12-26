@@ -282,7 +282,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
                         name: requestDataItem.key,
                         value: requestDataItem.value,
                         description: requestDataItem.description,
-                        disabled: false
+                        disabled: requestDataItem.disabled
                     })
                 })
                 body = {
@@ -305,7 +305,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
                 name: header.key,
                 value: header.value,
                 description: header.description,
-                disabled: false
+                disabled: header.disabled
             })
         })
 
@@ -316,7 +316,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
                 name: queryParam.key,
                 value: queryParam.value,
                 description: queryParam.description,
-                disabled: false
+                disabled: queryParam.disabled
             })
         })
 
