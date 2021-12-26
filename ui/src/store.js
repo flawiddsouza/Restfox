@@ -76,6 +76,9 @@ const store = createStore({
         },
         setCollectionFilter(state, filter) {
             state.collectionFilter = filter
+        },
+        persistActiveTab(state) {
+            db.collections.update(state.activeTab._id, JSON.parse(JSON.stringify(state.activeTab)))
         }
     }
 })

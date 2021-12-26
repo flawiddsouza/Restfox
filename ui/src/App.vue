@@ -10,6 +10,19 @@ import Frame from '@/components/Frame.vue'
 import { db } from './db'
 
 export default {
+    computed: {
+        activeTab() {
+            return this.$store.state.activeTab
+        }
+    },
+    watch: {
+        activeTab: {
+            handler() {
+                this.$store.commit('persistActiveTab')
+            },
+            deep: true
+        }
+    },
     async created() {
         const collections = await db.collections.toArray()
 
