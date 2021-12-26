@@ -1,143 +1,74 @@
 <template>
-    <div class="dropdown__menu theme--dropdown__menu dropdown__menu--open" aria-hidden="false">
-        <div class="dropdown__backdrop theme--transparent-overlay"></div>
-        <div tabindex="-1" class="dropdown__list" style="left: 303.422px; right: initial; top: 140.672px; bottom: initial; min-width: initial; max-width: 197px; max-height: 316.328px;">
+    <div class="dropdown__menu theme--dropdown__menu" :class="{ 'dropdown__menu--open': show }" aria-hidden="false">
+        <div class="dropdown__backdrop theme--transparent-overlay" @click="$emit('update:show', false)"></div>
+        <div tabindex="-1" class="dropdown__list" :style="{
+            left: x,
+            right: 'initial',
+            top: y,
+            bottom: 'initial',
+            minWidth: 'initial',
+            maxHeight: '316.328px'
+        }">
             <div class="form-control dropdown__filter">
                 <i class="fa fa-search"></i>
                 <input type="text">
             </div>
-            <ul class="">
-                <li>
-                    <div class="dropdown__divider">
-                        <span class="dropdown__divider__label">
-                            <span>
-                                <i class="fa fa-bars"></i> Structured </span>
-                        </span>
-                    </div>
-                </li>
-                <li data-filter-index="2" class="">
-                    <button type="button" value="multipart/form-data">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>Multipart Form
-                            </div>
+            <ul>
+                <template v-for="option in options">
+                    <li>
+                        <div class="dropdown__divider">
+                            <span class="dropdown__divider__label">
+                                <span>
+                                    <i :class="option.icon"></i> {{ option.label }} </span>
+                            </span>
                         </div>
-                    </button>
-                </li>
-                <li data-filter-index="3" class="">
-                    <button type="button" value="application/x-www-form-urlencoded">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-check"></i>Form URL Encoded
+                    </li>
+                    <li v-for="innerOption in option.options">
+                        <button type="button" :value="innerOption.value" @click="$emit('update:modelValue', innerOption); $emit('update:show', false);">
+                            <div class="dropdown__inner">
+                                <div class="dropdown__text">
+                                    <i :class="`fa ${JSON.stringify(modelValue) === JSON.stringify(innerOption) ? 'fa-check' : 'fa-empty'}`"></i>{{ innerOption.label }}
+                                </div>
                             </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="4" class="">
-                    <button type="button" value="application/graphql">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>GraphQL Query
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li>
-                    <div class="dropdown__divider">
-                        <span class="dropdown__divider__label">
-                            <span>
-                                <i class="fa fa-code"></i> Text </span>
-                        </span>
-                    </div>
-                </li>
-                <li data-filter-index="6" class="">
-                    <button type="button" value="application/json">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>JSON
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="7" class="">
-                    <button type="button" value="application/xml">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>XML
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="8" class="">
-                    <button type="button" value="text/yaml">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>YAML
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="9" class="">
-                    <button type="button" value="application/edn">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>EDN
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="10" class="">
-                    <button type="button" value="text/plain">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>Plain
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="11" class="">
-                    <button type="button" value="">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>Other
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li>
-                    <div class="dropdown__divider">
-                        <span class="dropdown__divider__label">
-                            <span>
-                                <i class="fa fa-ellipsis-h"></i> Other </span>
-                        </span>
-                    </div>
-                </li>
-                <li data-filter-index="13" class="">
-                    <button type="button" value="application/octet-stream">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>Binary File
-                            </div>
-                        </div>
-                    </button>
-                </li>
-                <li data-filter-index="14" class="">
-                    <button type="button">
-                        <div class="dropdown__inner">
-                            <div class="dropdown__text">
-                                <i class="fa fa-empty"></i>No Body
-                            </div>
-                        </div>
-                    </button>
-                </li>
+                        </button>
+                    </li>
+                </template>
             </ul>
         </div>
     </div>
 </template>
 
+<script>
+export default {
+    props: {
+        options: Array,
+        modelValue: Object,
+        x: String,
+        y: String,
+        show: {
+            type: Boolean,
+            default: false
+        }
+    }
+}
+</script>
+
 <style scoped>
 ul {
     list-style: none;
+    padding: 0;
+}
+
+li {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    vertical-align: baseline;
+}
+
+.fa {
+    min-width: 1.1rem;
+    text-align: center;
 }
 
 .dropdown {
@@ -172,35 +103,36 @@ ul {
   position: fixed;
   top: 0;
   left: 0;
-  border: 1px solid var(--hl-sm);
+  border: 1px solid #82828240;
   box-shadow: 0 0 1rem 0 rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
-  background: var(--color-bg);
-  margin: var(--padding-xxs) 3px;
-  padding-top: var(--radius-md);
-  padding-bottom: var(--radius-md);
-  border-radius: var(--radius-md);
+  background: #ffffff;
+  margin: calc(1rem * 0.2) 3px;
+  padding-top: calc(1rem * 0.3);
+  padding-bottom: calc(1rem * 0.3);
+  border-radius: calc(1rem * 0.3);
   overflow: auto;
+  user-select: none;
 }
 
 .dropdown__menu .dropdown__list .dropdown__filter {
-  border: 1px solid var(--hl-md);
-  margin: var(--padding-xs);
+  border: 1px solid #82828259;
+  margin: calc(1rem * 0.4);
   width: auto;
-  border-radius: var(--radius-sm);
+  border-radius: calc(1rem * 0.2);
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding-left: var(--padding-sm);
+  padding-left: calc(1rem * 0.6);
   position: absolute;
   left: -9999999px;
-  color: var(--hl);
+  color: #828282;
 }
 
 .dropdown__menu .dropdown__list .dropdown__filter input {
   margin: 0;
-  padding: var(--padding-xs) var(--padding-sm);
-  color: var(--color-font);
+  padding: calc( 1rem * 0.4) calc(1rem * 0.6);
+  color: #333333;
 }
 
 .dropdown__menu .dropdown__list.dropdown__list--filtering .dropdown__filter {
@@ -228,23 +160,32 @@ ul {
 
 .dropdown__menu .dropdown__list .dropdown__text .dropdown__hint,
 .dropdown__menu .dropdown__list .dropdown__text .dropdown__right {
-  color: var(--hl-xl);
+  color: #828282cc;
   margin-left: auto;
-  padding-left: var(--padding-lg);
+  padding-left: calc(1rem * 2.5);
 }
 
 .dropdown__menu .dropdown__list li > button {
-  min-width: 15rem;
-  font-size: var(--font-size-md);
-  text-align: left;
-  padding-right: var(--padding-md);
-  padding-left: var(--padding-sm);
-  height: var(--line-height-xs);
-  width: 100%;
-  display: block;
-  color: var(--color-font) !important;
-  white-space: nowrap;
-  margin: 0;
+    transition: all 130ms ease-out;
+    box-sizing: border-box;
+    text-align: left;
+    font-size: inherit;
+    text-decoration: inherit;
+    background: none;
+    border: 0;
+    outline: 0;
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    min-width: 12rem;
+    text-align: left;
+    padding-right: calc(1rem * 1.2);
+    padding-left: calc(1rem * 0.6);
+    height: 2.1rem;
+    width: 100%;
+    display: block;
+    color: #333333 !important;
+    white-space: nowrap;
 }
 
 .dropdown__menu .dropdown__list li > button i.fa:first-child {
@@ -255,33 +196,33 @@ ul {
 
 .dropdown__menu .dropdown__list li > button:hover:not(:disabled),
 .dropdown__menu .dropdown__list li.active > button:not(:disabled) {
-  background: var(--hl-sm);
+  background: #82828240;
 }
 
 .dropdown__menu .dropdown__list li > button:active:not(:disabled) {
-  background: var(--hl-md);
+  background: #82828259;
 }
 
 .dropdown__menu .dropdown__list .dropdown__divider {
-  border-bottom: 1px solid var(--hl-lg);
+  border-bottom: 1px solid #82828280;
   overflow: visible !important;
   height: 0;
-  margin: var(--padding-md) var(--padding-md) var(--padding-md) var(--padding-md);
+  margin: 1.2rem;
 }
 
 .dropdown__menu .dropdown__list .dropdown__divider .dropdown__divider__label {
   position: relative;
-  left: calc(-1 * var(--padding-sm));
-  top: -0.7rem;
-  color: var(--hl);
+  left: calc(-1 * calc(1rem * 0.6));
+  top: -0.4rem;
+  color: #828282;
   padding-right: 1em;
-  background: var(--color-bg);
-  font-size: var(--font-size-xs);
+  background: #ffffff;
+  font-size: 0.6692rem;
   text-transform: uppercase;
 }
 
 .dropdown__menu .dropdown__list .dropdown__divider.dropdown__divider--no-name {
-  margin: var(--padding-xs) 0;
+  margin: calc(1rem * 0.4) 0;
 }
 
 .dropdown__menu .dropdown__list .dropdown__divider.dropdown__divider--no-name .dropdown__divider__label {
