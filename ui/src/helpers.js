@@ -28,7 +28,7 @@ export function flattenTree(array) {
     return level
 }
 
-export async function handleRequest(request) {
+export async function handleRequest(request, environment) {
     let body = null
 
     if(request.body.mimeType === 'application/x-www-form-urlencoded') {
@@ -44,7 +44,11 @@ export async function handleRequest(request) {
     }
 
     try {
-        const url = new URL(request.url)
+        let urlWithEnvironmentVariablesSubtituted = request.url
+        Object.keys(environment).forEach(variable => {
+            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ _.${variable} }}`, environment[variable])
+        })
+        const url = new URL(urlWithEnvironmentVariablesSubtituted)
 
         request.parameters.filter(item => !item.disabled).forEach(param => {
             url.searchParams.append(param.name, param.value)
