@@ -91,6 +91,7 @@ export function convertInsomniaExportToRestfoxCollection(json) {
                 _id: item._id,
                 _type: 'request_group',
                 name: item.name,
+                environment: item.environment,
                 parentId: item.parentId
             })
         } else {
@@ -99,7 +100,12 @@ export function convertInsomniaExportToRestfoxCollection(json) {
             if(item.body.mimeType === 'application/x-www-form-urlencoded') {
                 body = {
                     mimeType: item.body.mimeType,
-                    params: item.body.params
+                    params: item.body.params.map(parameter => ({
+                        name: parameter.name,
+                        value: parameter.value,
+                        description: parameter.description,
+                        disabled: parameter.disabled
+                    }))
                 }
             }
 
@@ -112,13 +118,23 @@ export function convertInsomniaExportToRestfoxCollection(json) {
 
             collection.push({
                 _id: item._id,
-                _type: item._type === 'workspace' ? 'request_group' : item._type,
+                _type: item._type,
                 name: item.name,
                 url: item.url,
                 method: item.method,
-                body: item.body,
-                headers: item.headers ? item.headers.map(header => ({ name: header.name, value: header.value, description: header.description })) : [],
-                parameters: item.parameters ? item.parameters.map(parameter => ({ name: parameter.name, value: parameter.value, description: parameter.description })) : [],
+                body: body,
+                headers: item.headers ? item.headers.map(header => ({
+                    name: header.name,
+                    value: header.value,
+                    description: header.description,
+                    disabled: header.disabled
+                })) : [],
+                parameters: item.parameters ? item.parameters.map(parameter => ({
+                    name: parameter.name,
+                    value: parameter.value,
+                    description: parameter.description,
+                    disabled: parameter.disabled
+                })) : [],
                 parentId: item.parentId
             })
         }
