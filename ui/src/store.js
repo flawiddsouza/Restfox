@@ -1,6 +1,6 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree } from './helpers'
+import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree, sortTree } from './helpers'
 import { db } from './db'
 
 const store = createStore({
@@ -68,7 +68,9 @@ const store = createStore({
         },
         setCollection(state, collection) {
             state.collection = collection
-            state.collectionTree = toTree(state.collection)
+            let collectionTree = toTree(state.collection)
+            sortTree(collectionTree)
+            state.collectionTree = collectionTree
         },
         clearCollection(state) {
             state.collection = []
