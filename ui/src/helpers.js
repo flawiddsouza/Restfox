@@ -86,7 +86,7 @@ export async function handleRequest(request, environment) {
         return {
             status: null,
             statusText: 'Error',
-            response: error
+            responseOriginal: error
         }
     }
 }
