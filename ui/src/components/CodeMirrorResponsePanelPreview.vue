@@ -55,4 +55,8 @@ export default {
 .code-mirror-response-panel-preview .cm-editor.cm-focused {
     outline: 0 !important;
 }
+
+.code-mirror-response-panel-preview .cm-gutters {
+    user-select: none;
+}
 </style>
