@@ -64,12 +64,17 @@ export async function handleRequest(request, environment) {
 
         const responseText = await response.text()
 
-        let responseToReturn = responseText
+        let responseParsed = responseText
+
+        try {
+            responseParsed = JSON.stringify(JSON.parse(responseParsed), null, 4)
+        } catch {}
 
         return {
             status: response.status,
             statusText: response.statusText,
-            response: responseToReturn
+            responseOriginal: responseText,
+            responseParsed: responseParsed
         }
     } catch(e) {
         let error = `Error: Couldn't resolve host name`

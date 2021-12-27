@@ -24,9 +24,9 @@
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
                 <template v-if="response.statusText !== 'Error'">
-                    <CodeMirrorResponsePanelPreview v-model="response.response" />
+                    <CodeMirrorResponsePanelPreview v-model="response.responseParsed" />
                 </template>
-                <div class="content-box" v-else>{{ response.response }}</div>
+                <div class="content-box" v-else>{{ response.responseOriginal }}</div>
             </template>
             <template v-if="activeResponsePanelTab === 'Header'">
                 <div class="content-box">Response headers will be displayed here</div>
