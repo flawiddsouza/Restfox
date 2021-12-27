@@ -73,6 +73,7 @@ export async function handleRequest(request, environment) {
         return {
             status: response.status,
             statusText: response.statusText,
+            headers: [...response.headers.entries()],
             responseOriginal: responseText,
             responseParsed: responseParsed
         }

@@ -29,7 +29,14 @@
                 <div class="content-box" v-else>{{ response.responseOriginal }}</div>
             </template>
             <template v-if="activeResponsePanelTab === 'Header'">
-                <div class="content-box">Response headers will be displayed here</div>
+                <div class="content-box">
+                    <table>
+                        <tr v-for="header in response.headers">
+                            <td>{{ header[0] }}</td>
+                            <td>{{ header[1] }}</td>
+                        </tr>
+                    </table>
+                </div>
             </template>
         </div>
     </template>
@@ -173,5 +180,15 @@ export default {
 
 .response-panel-tabs-context .content-box {
     padding: 1rem;
+}
+
+.response-panel-tabs-context table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.response-panel-tabs-context table th, .response-panel-tabs-context table td {
+    border: 1px solid var(--default-border-color);
+    padding: 0.5rem;
 }
 </style>
