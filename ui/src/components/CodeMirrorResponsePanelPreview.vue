@@ -10,17 +10,19 @@ import { lineNumbers } from '@codemirror/gutter'
 import { foldGutter } from '@codemirror/fold'
 import { defaultHighlightStyle } from "@codemirror/highlight"
 
-function createState(vueInstance) {
+const extensions = [
+    json(),
+    defaultHighlightStyle,
+    lineNumbers(),
+    foldGutter(),
+    EditorView.editable.of(false),
+    EditorState.readOnly.of(true)
+]
+
+function createState(documentText) {
     return EditorState.create({
-        doc: vueInstance.modelValue,
-        extensions: [
-            EditorView.editable.of(false),
-            EditorState.readOnly.of(true),
-            lineNumbers(),
-            foldGutter(),
-            defaultHighlightStyle.fallback,
-            json()
-        ]
+        doc: documentText,
+        extensions: extensions
     })
 }
 
@@ -35,12 +37,12 @@ export default {
     },
     watch: {
         modelValue() {
-            this.editor.setState(createState(this))
+            this.editor.setState(createState(this.modelValue))
         }
     },
     mounted() {
         this.editor = new EditorView({
-            state: createState(this),
+            state: createState(this.modelValue),
             parent: this.$el
         })
     }
