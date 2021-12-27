@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 
 export function toTree(data, pid = null) {
-    return data.reduce((r, e) => {
+    return data.sort((a, b) => a.sort_order - b.sort_order).reduce((r, e) => {
         if (e.parentId == pid) {
             const obj = { ...e }
             const children = toTree(data, e._id)
@@ -382,4 +382,13 @@ export function filterTree(array, name) {
         }
         return r
     }, [])
+}
+
+export function addSortOrderToTree(array) {
+    array.forEach((item, index) => {
+        item.sort_order = index
+        if('children' in item) {
+            addSortOrderToTree(item.children)
+        }
+    })
 }

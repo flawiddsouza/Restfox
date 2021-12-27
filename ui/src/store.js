@@ -1,6 +1,6 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { toTree, flattenTree, handleRequest, filterTree } from './helpers'
+import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree } from './helpers'
 import { db } from './db'
 
 const store = createStore({
@@ -59,6 +59,7 @@ const store = createStore({
             state.showImportModal = value
         },
         setCollectionTree(state, collectionTree) {
+            addSortOrderToTree(collectionTree)
             state.collection = state.collection.concat(flattenTree(collectionTree))
             state.collection.forEach(item => {
                 db.collections.put(JSON.parse(JSON.stringify(item)), [item._id])
