@@ -8,7 +8,7 @@
             <button class="btn btn--clicky">Cancel Request</button>
         </div>
     </div>
-    <template v-if="status !== 'not loaded'">
+    <template v-if="status !== 'not loaded' && response !== null">
         <div class="response-panel-address-bar">
             <div class="tag" :class="{ 'green': response.status >= 200 && response.status <= 299, 'red': response.status >= 500 || response.statusText === 'Error' }">
                 <span class="bold">{{ response.status }}</span>
