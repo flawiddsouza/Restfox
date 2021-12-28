@@ -9,13 +9,15 @@ defineProps({
 <template>
     <div class="sidebar-item" :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }" @click="handleSidebarItemClick(sidebarItem)">
         <template v-if="sidebarItem._type === 'request_group'">
-            <i class="fa space-right fa-folder-open" v-if="hideChildren === false"></i>
-            <i class="fa space-right fa-folder" v-else></i>
+            <div style="margin-right: 0.3rem">
+                <i class="fa space-right fa-folder-open" v-if="hideChildren === false"></i>
+                <i class="fa space-right fa-folder" v-else></i>
+            </div>
         </template>
         <template v-if="sidebarItem._type === 'request'">
-            <span style="font-size: 0.7rem; margin-right: 0.4rem">{{ sidebarItem.method }}</span>
+            <div class="sidebar-item-method" :class="`request-method--${sidebarItem.method}`">{{ sidebarItem.method.slice(0, 4) }}</div>
         </template>
-        {{ sidebarItem.name }}
+        <div>{{ sidebarItem.name }}</div>
     </div>
     <div class="sidebar-list" v-if="'children' in sidebarItem && sidebarItem.children.length && hideChildren === false">
         <template v-for="sidebarItem1 in sidebarItem.children">

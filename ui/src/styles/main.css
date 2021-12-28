@@ -13,6 +13,10 @@ html {
     'Ubuntu', 'Droid Sans', sans-serif;
     --font-ligatures: normal;
     --default-border-color: lightgrey;
+    --base-color-success: #0cbb52;
+    --base-color-info: #097bed;
+    --base-color-warning: #ffb400;
+    --base-color-error: #eb2013;
 }
 
 body {
@@ -29,4 +33,20 @@ body {
 ::-webkit-scrollbar-thumb {
     background: #dfdfdf;
     height: 70%;
+}
+
+.request-method--GET {
+    color: var(--base-color-success);
+}
+
+.request-method--PUT {
+    color: var(--base-color-info);
+}
+
+.request-method--POST {
+    color: var(--base-color-warning);
+}
+
+.request-method--DELETE {
+    color: var(--base-color-error);
 }

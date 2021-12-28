@@ -28,7 +28,7 @@ export default {
             @click="setActiveTab(tab)"
             @mousedown.middle.prevent="closeTab(tab)"
         >
-            {{ tab.name }}
+            <span :class="`request-method--${tab.method}`">{{ tab.method }}</span> {{ tab.name }}
             <span style="margin-left: 0.5rem" @click.prevent="closeTab(tab)">x</span>
         </div>
     </div>

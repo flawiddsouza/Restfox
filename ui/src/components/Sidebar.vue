@@ -56,6 +56,8 @@ export default {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
 }
 
 .sidebar .sidebar-item-active {
@@ -73,5 +75,11 @@ export default {
 /* handle nested sidebar lists */
 .sidebar .sidebar-list > .sidebar-list {
     padding-left: calc(1rem * 1.2);
+}
+
+.sidebar .sidebar-item-method {
+    width: 1.5rem;
+    font-size: 0.7rem;
+    margin-right: 0.4rem;
 }
 </style>
