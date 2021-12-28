@@ -27,6 +27,7 @@ export default {
             v-for="tab in tabs"
             @click="setActiveTab(tab)"
             @mousedown.middle.prevent="closeTab(tab)"
+            :data-id="tab._id"
         >
             <span :class="`request-method--${tab.method}`">{{ tab.method }}</span> {{ tab.name }}
             <span style="margin-left: 0.5rem" @click.prevent="closeTab(tab)">x</span>

@@ -2,6 +2,7 @@ import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
 import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree, sortTree } from './helpers'
 import { db } from './db'
+import { nextTick } from 'vue'
 
 const store = createStore({
     state() {
@@ -32,6 +33,10 @@ const store = createStore({
                 state.tabs.push(tab)
             }
             state.activeTab = tab
+            nextTick(() => {
+                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tab._id}"]`)
+                activeTabElement.scrollIntoView()
+            })
         },
         setActiveTab(state, tab) {
             state.activeTab = tab
