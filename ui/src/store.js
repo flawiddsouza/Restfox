@@ -41,12 +41,16 @@ const store = createStore({
             }
         },
         closeTab(state, tab) {
-            state.tabs = state.tabs.filter(tabItem => tabItem._id !== tab._id)
+            const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === tab._id)
+            const tabIndexLeft = tabIndex - 1
+
             if(state.activeTab && state.activeTab._id === tab._id) {
                 delete state.requestResponseStatus[state.activeTab._id]
                 delete state.requestResponses[state.activeTab._id]
-                state.activeTab = null
+                state.activeTab = tabIndexLeft >= 0 ? state.tabs[tabIndexLeft] : null
             }
+
+            state.tabs.splice(tabIndex, 1)
         },
         async sendRequest(state, activeTab) {
             state.requestResponseStatus[activeTab._id] = 'loading'
