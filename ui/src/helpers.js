@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import { nanoid } from 'nanoid'
 
 export function toTree(data, pid = null) {
     return data.reduce((r, e) => {
@@ -386,7 +387,7 @@ export function filterTree(array, name) {
 
 export function addSortOrderToTree(array) {
     array.forEach((item, index) => {
-        item.sort_order = index
+        item.sortOrder = index
         if('children' in item) {
             addSortOrderToTree(item.children)
         }
@@ -394,7 +395,7 @@ export function addSortOrderToTree(array) {
 }
 
 export function sortTree(array) {
-    array.sort((a, b) => a.sort_order - b.sort_order)
+    array.sort((a, b) => a.sortOrder - b.sortOrder)
     array.forEach(item => {
         if('children' in item) {
             sortTree(item.children)
@@ -445,4 +446,27 @@ export function getChildIds(arr, id) {
         }
     }
     return ret
+}
+
+export function findItemInTreeById(array, id) {
+    for(const item of array) {
+        if(item._id === id) {
+            return item
+        } else {
+            if('children' in item) {
+                findItemInTreeById(item.children, id)
+            }
+        }
+    }
+}
+
+export function generateNewIdsForTreeItemChildren(treeItem) {
+    const parentId = treeItem._id
+    treeItem.children.forEach(item => {
+        item._id = nanoid()
+        item.parentId = parentId
+        if('children' in item) {
+            generateNewIdsForTreeItemChildren(item)
+        }
+    })
 }

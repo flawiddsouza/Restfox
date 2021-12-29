@@ -1,6 +1,17 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree, sortTree, removeFromTree, getChildIds } from './helpers'
+import {
+    toTree,
+    flattenTree,
+    handleRequest,
+    filterTree,
+    addSortOrderToTree,
+    sortTree,
+    removeFromTree,
+    getChildIds,
+    findItemInTreeById,
+    generateNewIdsForTreeItemChildren
+} from './helpers'
 import { db } from './db'
 import { nextTick } from 'vue'
 
@@ -122,6 +133,39 @@ const store = createStore({
                 context.commit('closeTab', childId)
             })
             context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
+        },
+        async duplicateCollectionItem(context, collectionItem) {
+            const newCollectionItem = JSON.parse(JSON.stringify(collectionItem))
+            newCollectionItem._id = nanoid()
+
+            if(collectionItem._type === 'request_group') {
+                generateNewIdsForTreeItemChildren(newCollectionItem)
+            }
+
+            const collectionItemsToSave = flattenTree([newCollectionItem])
+            for(const collectionItemToSave of collectionItemsToSave) {
+                await db.collections.put(collectionItemToSave, [collectionItemToSave._id])
+            }
+            context.state.collection = context.state.collection.concat(collectionItemsToSave)
+
+            if(collectionItem.parentId) {
+                let parentCollection = findItemInTreeById(context.state.collectionTree, collectionItem.parentId)
+                const childIndex = parentCollection.children.findIndex(item => item._id === collectionItem._id)
+                parentCollection.children.splice(childIndex, 0, newCollectionItem)
+                // new sort order for new item and its siblings
+                parentCollection.children.forEach((item, index) => {
+                    item.sortOrder = index
+                    db.collections.update(item._id, { sortOrder: index })
+                })
+            } else {
+                const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
+                context.state.collectionTree.splice(childIndex, 0, newCollectionItem)
+                // new sort order for new item and its siblings
+                context.state.collectionTree.forEach((item, index) => {
+                    item.sortOrder = index
+                    db.collections.update(item._id, { sortOrder: index })
+                })
+            }
         }
     }
 })

@@ -138,6 +138,9 @@ export default {
                     this.$store.dispatch('deleteCollectionItem', this.activeSidebarItemForContextMenu)
                 }
             }
+            if(clickedSidebarItem === 'Duplicate') {
+                this.$store.dispatch('duplicateCollectionItem', this.activeSidebarItemForContextMenu)
+            }
             this.showContextMenu = false
         }
     }
