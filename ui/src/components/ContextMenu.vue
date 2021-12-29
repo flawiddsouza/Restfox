@@ -1,10 +1,7 @@
 <template>
     <div class="context-menu-container" v-if="show">
         <div class="context-menu-background" @click.stop="$emit('update:show', false)"></div>
-        <div class="context-menu" :style="{
-            left: x,
-            top: y
-        }">
+        <div class="context-menu" :style="contextMenuStyle">
             <div v-for="option in options">
                 <template v-if="option.type === 'option'">
                     <button type="button" class="context-menu-item" :disabled="option.disabled"  @click.stop="$emit('click', option.value); $emit('update:show', false);">
@@ -23,11 +20,25 @@
 export default {
     props: {
         options: Array,
-        x: String,
-        y: String,
+        element: Element,
         show: {
             type: Boolean,
             default: false
+        }
+    },
+    computed: {
+        elementRect() {
+            if(this.element) {
+                return this.element.getBoundingClientRect()
+            }
+
+            return null
+        },
+        contextMenuStyle() {
+            return {
+                left: (this.elementRect.left + 20) + 'px',
+                top: this.elementRect.bottom + 'px'
+            }
         }
     }
 }
@@ -53,6 +64,7 @@ export default {
     padding-top: 5px;
     padding-bottom: 5px;
     background: #ffffff;
+    overflow-y: auto;
 }
 
 button.context-menu-item {

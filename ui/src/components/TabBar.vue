@@ -13,7 +13,7 @@ export default {
             this.$store.commit('setActiveTab', tab)
         },
         closeTab(tab) {
-            this.$store.commit('closeTab', tab)
+            this.$store.commit('closeTab', tab._id)
         }
     }
 }

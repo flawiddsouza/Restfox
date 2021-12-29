@@ -401,3 +401,48 @@ export function sortTree(array) {
         }
     })
 }
+
+export function removeFromTree(array, key, keyValue) {
+    const index = array.findIndex(x => x[key] === keyValue)
+    if (index > -1) {
+        array.splice(index, 1)
+        return true
+    } else {
+        return array.some(item => {
+            if (item.children) {
+                return removeFromTree(item.children, key, keyValue)
+            } else {
+                return false
+            }
+        })
+    }
+}
+
+// From: https://stackoverflow.com/a/34720792/4932305
+// Note: the final array includes the initially passed id as well
+export function getChildIds(arr, id) {
+    arr = arr || data
+    var ret = []
+    for (var i = 0; i < arr.length; i++) {
+        var item = arr[i]
+        if (item.parentId == id || item._id == id) {
+            if (ret.indexOf(item._id) < 0) {
+                ret.push(item._id)
+                var newret = []
+                for (var x = 0; x < arr.length; x++) {
+                    if (x != i) newret.push(arr[x])
+                }
+                var children = getChildIds(newret, item._id)
+                if (children.length > 0) {
+                    for (var j = 0; j < children.length; j++) {
+                        if (!(ret.indexOf(children[j]) >= 0)) {
+                            ret.push(children[j])
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+    return ret
+}

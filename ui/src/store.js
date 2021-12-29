@@ -1,6 +1,6 @@
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
-import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree, sortTree } from './helpers'
+import { toTree, flattenTree, handleRequest, filterTree, addSortOrderToTree, sortTree, removeFromTree, getChildIds } from './helpers'
 import { db } from './db'
 import { nextTick } from 'vue'
 
@@ -14,7 +14,9 @@ const store = createStore({
             requestResponseStatus: {},
             requestResponses: {},
             showImportModal: false,
-            collectionFilter: ''
+            collectionFilter: '',
+            activeSidebarItemForContextMenu: '',
+            sidebarContextMenuElement: null
         }
     },
     getters: {
@@ -45,11 +47,16 @@ const store = createStore({
                 state.requestResponses[state.activeTab._id] = null
             }
         },
-        closeTab(state, tab) {
-            const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === tab._id)
+        closeTab(state, collectionItemId) {
+            const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === collectionItemId)
+
+            if(tabIndex === -1) {
+                return
+            }
+
             const tabIndexLeft = tabIndex - 1
 
-            if(state.activeTab && state.activeTab._id === tab._id) {
+            if(state.activeTab && state.activeTab._id === collectionItemId) {
                 delete state.requestResponseStatus[state.activeTab._id]
                 delete state.requestResponses[state.activeTab._id]
                 state.activeTab = tabIndexLeft >= 0 ? state.tabs[tabIndexLeft] : null
@@ -95,6 +102,26 @@ const store = createStore({
             if(state.activeTab) {
                 db.collections.update(state.activeTab._id, JSON.parse(JSON.stringify(state.activeTab)))
             }
+        },
+        setActiveSidebarItemForContextMenu(state, payload) {
+            state.activeSidebarItemForContextMenu = payload.sidebarItem
+            const sidebarItemElement = payload.element.closest('.sidebar-item')
+            state.sidebarContextMenuElement = sidebarItemElement
+        },
+        clearActiveSidebarItemForContextMenu(state) {
+            state.activeSidebarItemForContextMenu = null
+            state.sidebarContextMenuElement = null
+        }
+    },
+    actions: {
+        async deleteCollectionItem(context, collectionItem) {
+            const childIds = getChildIds(context.state.collection, collectionItem._id)
+            await db.collections.where(':id').anyOf(childIds).delete()
+            await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
+            childIds.forEach(childId => {
+                context.commit('closeTab', childId)
+            })
+            context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
         }
     }
 })

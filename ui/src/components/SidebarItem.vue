@@ -7,7 +7,7 @@ defineProps({
 </script>
 
 <template>
-    <div class="sidebar-item" :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }" @click="handleSidebarItemClick(sidebarItem)">
+    <div class="sidebar-item" :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }" @click="handleSidebarItemClick(sidebarItem)" @contextmenu.prevent="handleContextMenu(sidebarItem, $event)">
         <template v-if="sidebarItem._type === 'request_group'">
             <div style="margin-right: 0.3rem">
                 <i class="fa space-right fa-folder-open" v-if="hideChildren === false"></i>
@@ -42,6 +42,9 @@ export default {
             if(sidebarItem._type === 'request_group') {
                 this.hideChildren = !(this.hideChildren)
             }
+        },
+        handleContextMenu(sidebarItem, event) {
+            this.$store.commit('setActiveSidebarItemForContextMenu', { sidebarItem, element: event.target })
         }
     },
     computed: {
