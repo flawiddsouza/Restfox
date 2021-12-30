@@ -215,9 +215,10 @@ export default {
 }
 
 .request-panel-tabs-context select {
-    border-color: var(--default-border-color);
+    border: 1px solid var(--default-border-color);
     outline: 0;
     padding: 0.3rem;
+    background: inherit;
 }
 
 .request-panel-tabs-context table {
