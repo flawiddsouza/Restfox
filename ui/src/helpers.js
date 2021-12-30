@@ -448,15 +448,20 @@ export function getChildIds(arr, id) {
 }
 
 export function findItemInTreeById(array, id) {
-    for(const item of array) {
-        if(item._id === id) {
-            return item
-        } else {
-            if('children' in item) {
-                findItemInTreeById(item.children, id)
+    let result = null
+    function findItemInTreeByIdRecurse(array2, id2) {
+        for(let i=0; i<array2.length; i++) {
+            if(array2[i]._id === id2) {
+                result = array2[i]
+            }
+
+            if('children' in array2[i]) {
+                findItemInTreeByIdRecurse(array2[i].children, id2)
             }
         }
     }
+    findItemInTreeByIdRecurse(array, id)
+    return result
 }
 
 export function generateNewIdsForTreeItemChildren(treeItem) {
