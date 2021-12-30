@@ -87,10 +87,9 @@ const store = createStore({
         },
         setCollectionTree(state, collectionTree) {
             addSortOrderToTree(collectionTree)
-            state.collection = state.collection.concat(flattenTree(collectionTree))
-            state.collection.forEach(item => {
-                db.collections.put(JSON.parse(JSON.stringify(item)), [item._id])
-            })
+            const flattenedCollectionTree = flattenTree(collectionTree)
+            state.collection = state.collection.concat(flattenedCollectionTree)
+            db.collections.bulkPut(flattenedCollectionTree)
             state.collectionTree = collectionTree
         },
         setCollection(state, collection) {
