@@ -59,4 +59,8 @@ export default {
 .code-mirror-response-panel-preview .cm-gutters {
     user-select: none;
 }
+
+.code-mirror-response-panel-preview .cm-scroller {
+    font-family: var(--font-monospace);
+}
 </style>
