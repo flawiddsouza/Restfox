@@ -58,6 +58,7 @@ header {
     display: flex;
     user-select: none;
     border-bottom: 1px solid var(--default-border-color);
+    width: 100%;
 }
 
 .sidebar {
