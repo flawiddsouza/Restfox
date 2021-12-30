@@ -142,9 +142,7 @@ const store = createStore({
             }
 
             const collectionItemsToSave = flattenTree([newCollectionItem])
-            for(const collectionItemToSave of collectionItemsToSave) {
-                await db.collections.put(collectionItemToSave, [collectionItemToSave._id])
-            }
+            await db.collections.bulkPut(collectionItemsToSave)
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
 
             if(collectionItem.parentId) {
