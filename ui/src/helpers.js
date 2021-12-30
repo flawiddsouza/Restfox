@@ -336,7 +336,6 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
             body,
             headers,
             parameters,
-            originRequest: request,
             parentId
         })
     })
