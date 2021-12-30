@@ -30,7 +30,7 @@ export default {
             :data-id="tab._id"
         >
             <span :class="`request-method--${tab.method}`">{{ tab.method }}</span> {{ tab.name }}
-            <span style="margin-left: 0.5rem" @click.prevent="closeTab(tab)">x</span>
+            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)">x</span>
         </div>
     </div>
     <div class="tab-add" @click="addTab" style="visibility: hidden">+</div>
