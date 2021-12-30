@@ -50,3 +50,10 @@ body {
 .request-method--DELETE {
     color: var(--base-color-error);
 }
+
+/* firefox fixes */
+@-moz-document url-prefix() {
+    * {
+        scrollbar-width: thin;
+    }
+}
