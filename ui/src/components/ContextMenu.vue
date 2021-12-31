@@ -131,6 +131,7 @@ export default {
     padding-bottom: 5px;
     background: #ffffff;
     overflow-y: auto;
+    left: -9999px;
 }
 
 button.context-menu-item {
