@@ -33,7 +33,9 @@ export async function handleRequest(request, environment) {
     let body = null
 
     if(request.body.mimeType === 'application/x-www-form-urlencoded') {
-        body = new URLSearchParams(Object.fromEntries(request.body.params.filter(item => !item.disabled).map(item => ([item.name, item.value]))))
+        if('params' in request.body) {
+            body = new URLSearchParams(Object.fromEntries(request.body.params.filter(item => !item.disabled).map(item => ([item.name, item.value]))))
+        }
     }
 
     if(request.body.mimeType === 'application/json') {
@@ -51,11 +53,13 @@ export async function handleRequest(request, environment) {
         })
         const url = new URL(urlWithEnvironmentVariablesSubtituted)
 
-        request.parameters.filter(item => !item.disabled).forEach(param => {
-            url.searchParams.append(param.name, param.value)
-        })
+        if('parameters' in request) {
+            request.parameters.filter(item => !item.disabled).forEach(param => {
+                url.searchParams.append(param.name, param.value)
+            })
+        }
 
-        const headers = Object.fromEntries(request.headers.filter(item => !item.disabled).map(item => ([item.name, item.value])))
+        const headers = 'headers' in request ? Object.fromEntries(request.headers.filter(item => !item.disabled).map(item => ([item.name, item.value]))) : {}
 
         const response = await fetch(url, {
             method: request.method,

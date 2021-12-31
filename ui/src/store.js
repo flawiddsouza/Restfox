@@ -77,8 +77,11 @@ const store = createStore({
         },
         async sendRequest(state, activeTab) {
             state.requestResponseStatus[activeTab._id] = 'loading'
-            const parent = await db.collections.where({ ':id': activeTab.parentId }).first()
-            const environment = parent.environment ?? {}
+            const parent = activeTab.parentId ? await db.collections.where({ ':id': activeTab.parentId }).first() : null
+            let environment = {}
+            if(parent) {
+                environment = parent.environment ?? {}
+            }
             state.requestResponses[activeTab._id] = await handleRequest(activeTab, environment)
             state.requestResponseStatus[activeTab._id] = 'loaded'
         },
