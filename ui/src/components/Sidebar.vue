@@ -2,29 +2,42 @@
     <div class="sidebar-filter">
         <input type="search" placeholder="Filter" spellcheck="false" v-model="collectionFilter">
     </div>
-    <div class="sidebar-list-container">
+    <div class="sidebar-list-container" @contextmenu.prevent="handleSidebarEmptyAreaContextMenu">
         <div class="sidebar-list">
             <template v-for="sidebarItem in sidebarItems">
                 <sidebar-item :sidebar-item="sidebarItem" />
             </template>
         </div>
     </div>
-    <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" />
+    <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" />
+    <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
+    <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
 </template>
 
 <script>
 import SidebarItem from './SidebarItem.vue'
 import ContextMenu from './ContextMenu.vue'
+import AddRequestModal from './modals/AddRequestModal.vue'
+import AddFolderModal from './modals/AddFolderModal.vue'
 import { mapState } from 'vuex'
 
 export default {
     components: {
         SidebarItem,
-        ContextMenu
+        ContextMenu,
+        AddRequestModal,
+        AddFolderModal
     },
     data() {
         return {
-            showContextMenu: false
+            showContextMenu: false,
+            addRequestModalShow: false,
+            addRequestModalParentId: null,
+            addFolderModalShow: false,
+            addFolderModalParentId: null,
+            contextMenuX: null,
+            contextMenuY: null,
+            enableOptionsForEmptyContextMenu: false
         }
     },
     computed: {
@@ -41,6 +54,23 @@ export default {
         },
         ...mapState(['activeSidebarItemForContextMenu', 'sidebarContextMenuElement']),
         options() {
+            if(this.enableOptionsForEmptyContextMenu) {
+                return [
+                    {
+                        'type': 'option',
+                        'label': 'New Request',
+                        'value': 'New Request',
+                        'icon': 'fa fa-plus-circle',
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'New Folder',
+                        'value': 'New Folder',
+                        'icon': 'fa fa-folder',
+                    }
+                ]
+            }
+
             if(this.activeSidebarItemForContextMenu === null) {
                 return []
             }
@@ -128,6 +158,9 @@ export default {
         showContextMenu() {
             if(this.showContextMenu === false) {
                 this.$store.commit('clearActiveSidebarItemForContextMenu')
+                this.contextMenuX = null
+                this.contextMenuY = null
+                this.enableOptionsForEmptyContextMenu = false
             }
         }
     },
@@ -138,10 +171,31 @@ export default {
                     this.$store.dispatch('deleteCollectionItem', this.activeSidebarItemForContextMenu)
                 }
             }
+
             if(clickedSidebarItem === 'Duplicate') {
                 this.$store.dispatch('duplicateCollectionItem', this.activeSidebarItemForContextMenu)
             }
+
+            if(clickedSidebarItem === 'New Request') {
+                this.addRequestModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
+                this.addRequestModalShow = true
+            }
+
+            if(clickedSidebarItem === 'New Folder') {
+                this.addFolderModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
+                this.addFolderModalShow = true
+            }
+
             this.showContextMenu = false
+        },
+        handleSidebarEmptyAreaContextMenu(event) {
+            if(event.target.classList.contains('sidebar-list-container') === false) {
+                return
+            }
+            this.contextMenuX = event.pageX
+            this.contextMenuY = event.pageY
+            this.enableOptionsForEmptyContextMenu = true
+            this.showContextMenu = true
         }
     }
 }

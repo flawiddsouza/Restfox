@@ -38,7 +38,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td colspan="4" style="text-align: center; user-select: none" @click="activeTab.body.params.push({ name: '', value: '' })">
+                            <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab.body, 'params', { name: '', value: '' })">
                                 + Add Item
                             </td>
                         </tr>
@@ -65,7 +65,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="4" style="text-align: center; user-select: none" @click="activeTab.parameters.push({ name: '', value: '' })">
+                        <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab, 'parameters', { name: '', value: '' })">
                             + Add Item
                         </td>
                     </tr>
@@ -88,7 +88,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="4" style="text-align: center; user-select: none" @click="activeTab.headers.push({ name: '', value: '' })">
+                        <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab, 'headers', { name: '', value: '' })">
                             + Add Item
                         </td>
                     </tr>
@@ -138,6 +138,13 @@ export default {
     methods: {
         sendRequest() {
             this.$store.commit('sendRequest', this.activeTab)
+        },
+        pushItem(object, key, itemToPush) {
+            if(key in object === false) {
+                object[key] = []
+            }
+
+            object[key].push(itemToPush)
         }
     }
 }

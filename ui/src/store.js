@@ -115,8 +115,7 @@ const store = createStore({
         },
         setActiveSidebarItemForContextMenu(state, payload) {
             state.activeSidebarItemForContextMenu = payload.sidebarItem
-            const sidebarItemElement = payload.element.closest('.sidebar-item')
-            state.sidebarContextMenuElement = sidebarItemElement
+            state.sidebarContextMenuElement = payload.element
         },
         clearActiveSidebarItemForContextMenu(state) {
             state.activeSidebarItemForContextMenu = null
@@ -162,6 +161,56 @@ const store = createStore({
                     item.sortOrder = index
                     db.collections.update(item._id, { sortOrder: index })
                 })
+            }
+        },
+        async createCollectionItem(context, payload) {
+            let newCollectionItem = null
+
+            if(payload.type === 'request') {
+                newCollectionItem = {
+                    _id: nanoid(),
+                    _type: 'request',
+                    name: payload.name,
+                    method: payload.method,
+                    body: {
+                        mimeType: payload.mimeType
+                    },
+                    parentId: payload.parentId
+                }
+            }
+
+            if(payload.type === 'request_group') {
+                newCollectionItem = {
+                    _id: nanoid(),
+                    _type: 'request_group',
+                    name: payload.name,
+                    children: [],
+                    parentId: payload.parentId
+                }
+            }
+
+            await db.collections.put(newCollectionItem)
+            context.state.collection.push(newCollectionItem)
+
+            if(newCollectionItem.parentId) {
+                let parentCollection = findItemInTreeById(context.state.collectionTree, newCollectionItem.parentId)
+                parentCollection.children.splice(0, 0, newCollectionItem)
+                // new sort order for new item and its siblings
+                parentCollection.children.forEach((item, index) => {
+                    item.sortOrder = index
+                    db.collections.update(item._id, { sortOrder: index })
+                })
+            } else {
+                context.state.collectionTree.splice(0, 0, newCollectionItem)
+                // new sort order for new item and its siblings
+                context.state.collectionTree.forEach((item, index) => {
+                    item.sortOrder = index
+                    db.collections.update(item._id, { sortOrder: index })
+                })
+            }
+
+            if(payload.type === 'request') {
+                context.commit('addTab', newCollectionItem)
             }
         }
     }

@@ -1,5 +1,5 @@
 <template>
-    <div class="context-menu-container" v-if="show">
+    <div class="context-menu-container" :style="{ 'visibility': show ? 'visible': 'hidden' }">
         <div class="context-menu-background" @click.stop="$emit('update:show', false)"></div>
         <div class="context-menu" :style="contextMenuStyle">
             <div v-for="option in options">
@@ -17,6 +17,34 @@
 </template>
 
 <script>
+// From: https://stackoverflow.com/a/11802841/4932305
+function getContextMenuPostion(x, y, contextMenuElement, yOffset=0) {
+    var mousePosition = {}
+    var menuPostion = {}
+    var menuDimension = {}
+
+    menuDimension.x = contextMenuElement.offsetWidth
+    menuDimension.y = contextMenuElement.offsetHeight
+    mousePosition.x = x
+    mousePosition.y = y
+
+    if(mousePosition.x + menuDimension.x > window.innerWidth + document.body.scrollLeft) {
+        menuPostion.x = mousePosition.x - menuDimension.x
+    } else {
+        menuPostion.x = mousePosition.x
+    }
+
+    if(mousePosition.y + menuDimension.y > window.innerHeight + document.body.scrollTop) {
+        menuPostion.y = mousePosition.y - menuDimension.y - yOffset
+    } else {
+        menuPostion.y = mousePosition.y
+    }
+
+    return menuPostion
+}
+
+import { nextTick } from 'vue'
+
 export default {
     props: {
         options: Array,
@@ -24,6 +52,19 @@ export default {
         show: {
             type: Boolean,
             default: false
+        },
+        x: {
+            type: Number,
+            required: false
+        },
+        y: {
+            type: Number,
+            required: false
+        }
+    },
+    data() {
+        return {
+            contextMenuStyle: {}
         }
     },
     computed: {
@@ -33,11 +74,36 @@ export default {
             }
 
             return null
-        },
-        contextMenuStyle() {
-            return {
-                left: (this.elementRect.left + 20) + 'px',
-                top: this.elementRect.bottom + 'px'
+        }
+    },
+    watch: {
+        show() {
+            if(this.show) {
+                nextTick(() => {
+                    this.setContextMenuStyle()
+                })
+            }
+        }
+    },
+    methods: {
+        setContextMenuStyle() {
+            const xDefined = this.x !== null && this.x !== undefined
+            const yDefined = this.y !== null && this.y !== undefined
+
+            if((!xDefined && !xDefined) && !this.element) {
+                return {}
+            }
+
+            let x = xDefined ? this.x : this.elementRect.left + 20
+            let y = yDefined ? this.y : this.elementRect.bottom
+
+            const contextMenuPosition = getContextMenuPostion(x, y, this.$el.querySelector('.context-menu'), yDefined ? 0 : this.elementRect.height)
+            x = contextMenuPosition.x
+            y = contextMenuPosition.y
+
+            this.contextMenuStyle = {
+                left: x + 'px',
+                top: y + 'px'
             }
         }
     }

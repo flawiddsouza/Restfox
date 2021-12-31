@@ -44,7 +44,7 @@ export default {
             }
         },
         handleContextMenu(sidebarItem, event) {
-            this.$store.commit('setActiveSidebarItemForContextMenu', { sidebarItem, element: event.target })
+            this.$store.commit('setActiveSidebarItemForContextMenu', { sidebarItem, element: event.target.closest('.sidebar-item') })
         }
     },
     computed: {
