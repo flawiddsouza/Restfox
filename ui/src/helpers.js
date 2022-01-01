@@ -1,16 +1,24 @@
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 
-export function toTree(data, pid = null) {
-    return data.reduce((r, e) => {
-        if (e.parentId == pid) {
-            const obj = { ...e }
-            const children = toTree(data, e._id)
-            if (children.length) obj.children = children
-            r.push(obj)
+// From: https://stackoverflow.com/a/67802481/4932305
+export function toTree(array) {
+    let map = {}, node, res = [], i
+    for(i = 0; i < array.length; i += 1) {
+        map[array[i]._id] = i
+        if(array[i]._type === 'request_group') {
+            array[i].children = []
         }
-        return r
-    }, [])
+    }
+    for(i = 0; i < array.length; i += 1) {
+       node = array[i]
+       if(node.parentId !== null) {
+          array[map[node.parentId]].children.push(node)
+       } else {
+          res.push(node)
+       }
+    }
+    return res
 }
 
 export function flattenTree(array) {
