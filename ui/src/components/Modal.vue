@@ -1,5 +1,5 @@
 <template>
-    <div class="modal" tabindex="0" @click="closeModalOnBackgroundClick">
+    <div class="modal" tabindex="0" @mousedown="closeModalOnBackgroundClick">
         <div class="modal__container" :style="{ width: width }">
             <div class="modal__content">
                 <header>
