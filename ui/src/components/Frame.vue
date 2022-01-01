@@ -42,7 +42,7 @@ import ImportModal from '@/components/ImportModal.vue'
       "sidebar tab-bar tab-bar"
       "sidebar request-panel response-panel";
 
-    grid-template-columns: 300px 1fr 1fr;
+    grid-template-columns: 300px 1.2fr 1fr;
     grid-template-rows: auto auto 1fr;
 
     height: 100%;
