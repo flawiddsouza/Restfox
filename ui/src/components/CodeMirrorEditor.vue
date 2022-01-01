@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { EditorView, highlightActiveLine, keymap } from '@codemirror/view'
+import { EditorView, highlightActiveLine, keymap, highlightSpecialChars } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { lineNumbers, highlightActiveLineGutter } from '@codemirror/gutter'
@@ -28,6 +28,7 @@ function createState(documentText, vueInstance) {
             indentOnInput(),
             highlightActiveLine(),
             history(),
+            highlightSpecialChars(),
             EditorView.lineWrapping,
             EditorView.updateListener.of(v => {
                 if(v.docChanged) {
@@ -87,5 +88,15 @@ export default {
 
 .code-mirror-editor .cm-activeLine, .code-mirror-editor .cm-activeLineGutter {
     background-color: rgb(130, 130, 130, 0.1);
+}
+
+.code-mirror-editor .cm-foldGutter span {
+    font-size: 1.1rem;
+    line-height: 1.1rem;
+    color: rgb(130, 130, 130, 0.5);
+}
+
+.code-mirror-editor .cm-foldGutter span:hover {
+    color: #999999;
 }
 </style>

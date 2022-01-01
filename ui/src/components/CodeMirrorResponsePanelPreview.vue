@@ -66,4 +66,18 @@ export default {
 .code-mirror-response-panel-preview .cm-scroller {
     font-family: var(--font-monospace);
 }
+
+.code-mirror-response-panel-preview .cm-foldGutter span {
+    font-size: 1.1rem;
+    line-height: 1.1rem;
+    color: rgb(130, 130, 130, 0.5);
+}
+
+.code-mirror-response-panel-preview .cm-foldGutter span:hover {
+    color: #999999;
+}
+
+.code-mirror-response-panel-preview .cm-lineNumbers .cm-gutterElement {
+    padding-left: 0.6rem;
+}
 </style>
