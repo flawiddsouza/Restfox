@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { EditorView, highlightActiveLine } from '@codemirror/view'
+import { EditorView, highlightActiveLine, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { lineNumbers, highlightActiveLineGutter } from '@codemirror/gutter'
@@ -12,6 +12,7 @@ import { defaultHighlightStyle } from '@codemirror/highlight'
 import { closeBrackets } from '@codemirror/closebrackets'
 import { bracketMatching } from '@codemirror/matchbrackets'
 import { indentOnInput } from '@codemirror/language'
+import { history, historyKeymap } from '@codemirror/history'
 
 function createState(documentText, vueInstance) {
     return EditorState.create({
@@ -26,13 +27,17 @@ function createState(documentText, vueInstance) {
             bracketMatching(),
             indentOnInput(),
             highlightActiveLine(),
+            history(),
             EditorView.lineWrapping,
             EditorView.updateListener.of(v => {
                 if(v.docChanged) {
                     vueInstance.emitted = true
                     vueInstance.$emit('update:modelValue', v.state.doc.toString())
                 }
-            })
+            }),
+            keymap.of([
+                ...historyKeymap,
+            ])
         ]
     })
 }
