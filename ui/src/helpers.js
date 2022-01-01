@@ -59,7 +59,19 @@ export async function handleRequest(request, environment) {
             })
         }
 
-        const headers = 'headers' in request ? Object.fromEntries(request.headers.filter(item => !item.disabled).map(item => ([item.name, item.value]))) : {}
+        let headers = {}
+
+        if('GLOBAL_HEADERS' in environment) {
+            Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
+                headers[header.toLowerCase()] = environment.GLOBAL_HEADERS[header]
+            })
+        }
+
+        if('headers' in request) {
+            request.headers.filter(header => !header.disabled).forEach(header => {
+                headers[header.name.toLowerCase()] = header.value
+            })
+        }
 
         const response = await fetch(url, {
             method: request.method,
