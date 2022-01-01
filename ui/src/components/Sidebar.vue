@@ -12,6 +12,7 @@
     <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" />
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
+    <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
 </template>
 
 <script>
@@ -19,6 +20,7 @@ import SidebarItem from './SidebarItem.vue'
 import ContextMenu from './ContextMenu.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
+import EnvironmentModal from './modals/EnvironmentModal.vue'
 import { mapState } from 'vuex'
 
 export default {
@@ -26,7 +28,8 @@ export default {
         SidebarItem,
         ContextMenu,
         AddRequestModal,
-        AddFolderModal
+        AddFolderModal,
+        EnvironmentModal
     },
     data() {
         return {
@@ -37,7 +40,9 @@ export default {
             addFolderModalParentId: null,
             contextMenuX: null,
             contextMenuY: null,
-            enableOptionsForEmptyContextMenu: false
+            enableOptionsForEmptyContextMenu: false,
+            environmentModalShow: false,
+            environmentModalCollectionItem: null
         }
     },
     computed: {
@@ -184,6 +189,11 @@ export default {
             if(clickedSidebarItem === 'New Folder') {
                 this.addFolderModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
                 this.addFolderModalShow = true
+            }
+
+            if(clickedSidebarItem === 'Environment') {
+                this.environmentModalCollectionItem = this.activeSidebarItemForContextMenu
+                this.environmentModalShow = true
             }
 
             this.showContextMenu = false

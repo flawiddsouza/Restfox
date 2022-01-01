@@ -123,6 +123,9 @@ const store = createStore({
         clearActiveSidebarItemForContextMenu(state) {
             state.activeSidebarItemForContextMenu = null
             state.sidebarContextMenuElement = null
+        },
+        async updateCollectionItemEnvironment(_state, collectionItem) {
+            await db.collections.update(collectionItem._id, { environment: JSON.parse(JSON.stringify(collectionItem.environment)) })
         }
     },
     actions: {

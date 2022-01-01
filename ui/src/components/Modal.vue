@@ -1,12 +1,12 @@
 <template>
     <div class="modal" tabindex="0" @click="closeModalOnBackgroundClick">
-        <div class="modal__container">
+        <div class="modal__container" :style="{ width: width }">
             <div class="modal__content">
                 <header>
                     <h3>{{ title }}</h3>
                     <span @click="$emit('update:modelValue', false)"><i class="fa fa-times"></i></span>
                 </header>
-                <div class="modal-main">
+                <div class="modal-main" :style="{ flexBasis: height }">
                     <slot>No Modal Content</slot>
                 </div>
                 <footer v-if="$slots.footer">
@@ -21,7 +21,15 @@
 export default {
     props: {
         modelValue: Boolean,
-        title: String
+        title: String,
+        height: {
+            type: String,
+            required: false
+        },
+        width: {
+            type: String,
+            required: false
+        }
     },
     methods: {
         closeModalOnBackgroundClick(e) {

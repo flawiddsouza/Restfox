@@ -8,13 +8,14 @@ import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { lineNumbers } from '@codemirror/gutter'
 import { foldGutter } from '@codemirror/fold'
-import { defaultHighlightStyle } from "@codemirror/highlight"
+import { defaultHighlightStyle } from '@codemirror/highlight'
 
 const extensions = [
     json(),
     defaultHighlightStyle,
     lineNumbers(),
-    foldGutter(),
+    foldGutter({ openText: '▾', closedText: '▸' }),
+    EditorView.lineWrapping,
     EditorView.editable.of(false),
     EditorState.readOnly.of(true)
 ]
@@ -58,6 +59,8 @@ export default {
 
 .code-mirror-response-panel-preview .cm-gutters {
     user-select: none;
+    background-color: inherit;
+    border-right: 0;
 }
 
 .code-mirror-response-panel-preview .cm-scroller {
