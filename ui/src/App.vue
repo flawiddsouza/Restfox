@@ -1,9 +1,11 @@
 <script setup>
 import Frame from '@/components/Frame.vue'
+import ReloadPrompt from '@/components/ReloadPrompt.vue'
 </script>
 
 <template>
     <Frame />
+    <ReloadPrompt />
 </template>
 
 <script>
