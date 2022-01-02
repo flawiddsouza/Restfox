@@ -498,3 +498,10 @@ export function generateNewIdsForTreeItemChildren(treeItem) {
         }
     })
 }
+
+// From: https://stackoverflow.com/a/6470794/4932305
+export function arrayMove(array, fromIndex, toIndex) {
+    var element = array[fromIndex]
+    array.splice(fromIndex, 1)
+    array.splice(toIndex, 0, element)
+}
