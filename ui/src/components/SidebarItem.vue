@@ -7,7 +7,7 @@ defineProps({
 </script>
 
 <template>
-    <div class="sidebar-item" :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }" @click="handleSidebarItemClick(sidebarItem)" @contextmenu.prevent="handleContextMenu(sidebarItem, $event)">
+    <div class="sidebar-item" :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }" @click="handleSidebarItemClick(sidebarItem)" @contextmenu.prevent="handleContextMenu(sidebarItem, $event)" :draggable="collectionFilter === '' ? true : false" :data-parent-id="sidebarItem.parentId" :data-id="sidebarItem._id" :data-type="sidebarItem._type">
         <template v-if="sidebarItem._type === 'request_group'">
             <div style="margin-right: 0.3rem">
                 <i class="fa space-right fa-folder-open" v-if="hideChildren === false"></i>
@@ -33,6 +33,14 @@ export default {
             hideChildren: false
         }
     },
+    computed: {
+        activeTab() {
+            return this.$store.state.activeTab
+        },
+        collectionFilter() {
+            return this.$store.state.collectionFilter
+        }
+    },
     methods: {
         handleSidebarItemClick(sidebarItem) {
             if(sidebarItem._type === 'request') {
@@ -45,11 +53,6 @@ export default {
         },
         handleContextMenu(sidebarItem, event) {
             this.$store.commit('setActiveSidebarItemForContextMenu', { sidebarItem, element: event.target.closest('.sidebar-item') })
-        }
-    },
-    computed: {
-        activeTab() {
-            return this.$store.state.activeTab
         }
     }
 }

@@ -218,6 +218,77 @@ const store = createStore({
             if(payload.type === 'request') {
                 context.commit('addTab', newCollectionItem)
             }
+        },
+        async reorderCollectionItem(context, payload) {
+            let draggedItemCollectionItem = null
+            let draggedItemCollectionItemIndex = null
+
+            if(payload.from.parentId) {
+                const draggedItemParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.from.parentId)
+                draggedItemCollectionItemIndex = draggedItemParentCollectionItem.children.findIndex(item => item._id === payload.from.id)
+                draggedItemCollectionItem = draggedItemParentCollectionItem.children[draggedItemCollectionItemIndex]
+                draggedItemParentCollectionItem.children.splice(draggedItemCollectionItemIndex, 1)
+            } else {
+                draggedItemCollectionItemIndex = context.state.collectionTree.findIndex(item => item._id === payload.from.id)
+                draggedItemCollectionItem = context.state.collectionTree[draggedItemCollectionItemIndex]
+                context.state.collectionTree.splice(draggedItemCollectionItemIndex, 1)
+            }
+
+            let sidebarItemToDropOnParentCollectionItem = null
+
+            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') {
+                draggedItemCollectionItem.parentId = payload.to.id
+                sidebarItemToDropOnParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.to.id)
+                sidebarItemToDropOnParentCollectionItem.children.splice(0, 0, draggedItemCollectionItem)
+            } else {
+                if(payload.to.parentId) {
+                    draggedItemCollectionItem.parentId = payload.to.parentId
+                    sidebarItemToDropOnParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.to.parentId)
+                    const sidebarItemToDropOnCollectionItemIndex = sidebarItemToDropOnParentCollectionItem.children.findIndex(item => item._id === payload.to.id)
+                    if((sidebarItemToDropOnParentCollectionItem.children.length - 1) === sidebarItemToDropOnCollectionItemIndex && ((payload.to.parentId === payload.from.parentId && draggedItemCollectionItemIndex === sidebarItemToDropOnCollectionItemIndex) || payload.to.parentId !== payload.from.parentId)) {
+                        sidebarItemToDropOnParentCollectionItem.children.push(draggedItemCollectionItem)
+                        // console.log('push')
+                    } else {
+                        sidebarItemToDropOnParentCollectionItem.children.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
+                        // console.log('splice')
+                    }
+                } else {
+                    draggedItemCollectionItem.parentId = null
+                    const sidebarItemToDropOnCollectionItemIndex = context.state.collectionTree.findIndex(item => item._id === payload.to.id)
+                    if((context.state.collectionTree.length - 1) === sidebarItemToDropOnCollectionItemIndex && ((payload.to.parentId === payload.from.parentId && draggedItemCollectionItemIndex === sidebarItemToDropOnCollectionItemIndex) || payload.to.parentId !== payload.from.parentId)) {
+                        context.state.collectionTree.push(draggedItemCollectionItem)
+                        // console.log('push')
+                    } else {
+                        context.state.collectionTree.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
+                        // console.log('splice')
+                    }
+
+                }
+            }
+
+            await db.collections.update(draggedItemCollectionItem._id, { parentId: draggedItemCollectionItem.parentId })
+
+            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') {
+                // new sort order for new item and its siblings
+                sidebarItemToDropOnParentCollectionItem.children.forEach((item, index) => {
+                    item.sortOrder = index
+                    db.collections.update(item._id, { sortOrder: index })
+                })
+            } else {
+                if(payload.to.parentId) {
+                    // new sort order for new item and its siblings
+                    sidebarItemToDropOnParentCollectionItem.children.forEach((item, index) => {
+                        item.sortOrder = index
+                        db.collections.update(item._id, { sortOrder: index })
+                    })
+                } else {
+                    // new sort order for new item and its siblings
+                    context.state.collectionTree.forEach((item, index) => {
+                        item.sortOrder = index
+                        db.collections.update(item._id, { sortOrder: index })
+                    })
+                }
+            }
         }
     }
 })
