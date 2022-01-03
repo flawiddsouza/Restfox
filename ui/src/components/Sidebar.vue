@@ -13,6 +13,7 @@
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
+    <SettingsModal v-model:showModal="settingsModalShow" :collection-item="settingsModalCollectionItem" />
 </template>
 
 <script>
@@ -21,6 +22,7 @@ import ContextMenu from './ContextMenu.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
+import SettingsModal from './modals/SidebarSettingsModal.vue'
 import { mapState } from 'vuex'
 import { findItemInTreeById } from '@/helpers'
 
@@ -30,7 +32,8 @@ export default {
         ContextMenu,
         AddRequestModal,
         AddFolderModal,
-        EnvironmentModal
+        EnvironmentModal,
+        SettingsModal
     },
     data() {
         return {
@@ -44,6 +47,8 @@ export default {
             enableOptionsForEmptyContextMenu: false,
             environmentModalShow: false,
             environmentModalCollectionItem: null,
+            settingsModalShow: false,
+            settingsModalCollectionItem: null,
             draggedSidebarElement: null,
             sidebarItemCursorPositition: 'below'
         }
@@ -197,6 +202,11 @@ export default {
             if(clickedSidebarItem === 'Environment') {
                 this.environmentModalCollectionItem = this.activeSidebarItemForContextMenu
                 this.environmentModalShow = true
+            }
+
+            if(clickedSidebarItem === 'Settings') {
+                this.settingsModalCollectionItem = this.activeSidebarItemForContextMenu
+                this.settingsModalShow = true
             }
 
             this.showContextMenu = false

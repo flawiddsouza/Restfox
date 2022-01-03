@@ -126,6 +126,9 @@ const store = createStore({
         },
         async updateCollectionItemEnvironment(_state, collectionItem) {
             await db.collections.update(collectionItem._id, { environment: JSON.parse(JSON.stringify(collectionItem.environment)) })
+        },
+        async updateCollectionItemName(_state, collectionItem) {
+            await db.collections.update(collectionItem._id, { name: collectionItem.name })
         }
     },
     actions: {
