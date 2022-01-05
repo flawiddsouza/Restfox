@@ -52,6 +52,7 @@ export default {
             }
             const tabToDropOn = event.target.closest('.tab')
             if(tabToDropOn) {
+                tabToDropOn.classList.add('disable-pointer-events')
                 tabToDropOn.style.background = '#ffc0cb1f'
             }
         },
@@ -61,6 +62,7 @@ export default {
             }
             const tabToDropOn = event.target.closest('.tab')
             if(tabToDropOn) {
+                tabToDropOn.classList.remove('disable-pointer-events')
                 tabToDropOn.style.background = ''
             }
         },
@@ -108,7 +110,7 @@ export default {
             draggable="true"
         >
             <span :class="`request-method--${tab.method}`">{{ tab.method }}</span> {{ tab.name }}
-            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)">x</span>
+            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close">x</span>
         </div>
     </div>
     <div class="tab-add" @click="addTab" style="visibility: hidden">+</div>
@@ -132,7 +134,7 @@ export default {
     white-space: nowrap;
 }
 
-.tab-bar .tab * {
+.tab-bar .tab.disable-pointer-events * {
     pointer-events: none;
 }
 
