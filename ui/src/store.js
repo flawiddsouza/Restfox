@@ -10,7 +10,8 @@ import {
     removeFromTree,
     getChildIds,
     findItemInTreeById,
-    generateNewIdsForTreeItemChildren
+    generateNewIdsForTreeItemChildren,
+    arrayMove
 } from './helpers'
 import { db } from './db'
 import { nextTick } from 'vue'
@@ -230,11 +231,15 @@ const store = createStore({
                 const draggedItemParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.from.parentId)
                 draggedItemCollectionItemIndex = draggedItemParentCollectionItem.children.findIndex(item => item._id === payload.from.id)
                 draggedItemCollectionItem = draggedItemParentCollectionItem.children[draggedItemCollectionItemIndex]
-                draggedItemParentCollectionItem.children.splice(draggedItemCollectionItemIndex, 1)
+                if(payload.to.parentId !== payload.from.parentId) {
+                    draggedItemParentCollectionItem.children.splice(draggedItemCollectionItemIndex, 1)
+                }
             } else {
                 draggedItemCollectionItemIndex = context.state.collectionTree.findIndex(item => item._id === payload.from.id)
                 draggedItemCollectionItem = context.state.collectionTree[draggedItemCollectionItemIndex]
-                context.state.collectionTree.splice(draggedItemCollectionItemIndex, 1)
+                if(payload.to.parentId !== payload.from.parentId) {
+                    context.state.collectionTree.splice(draggedItemCollectionItemIndex, 1)
+                }
             }
 
             let sidebarItemToDropOnParentCollectionItem = null
@@ -248,24 +253,31 @@ const store = createStore({
                     draggedItemCollectionItem.parentId = payload.to.parentId
                     sidebarItemToDropOnParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.to.parentId)
                     const sidebarItemToDropOnCollectionItemIndex = sidebarItemToDropOnParentCollectionItem.children.findIndex(item => item._id === payload.to.id)
-                    if((sidebarItemToDropOnParentCollectionItem.children.length - 1) === sidebarItemToDropOnCollectionItemIndex && ((payload.to.parentId === payload.from.parentId && draggedItemCollectionItemIndex === sidebarItemToDropOnCollectionItemIndex) || payload.to.parentId !== payload.from.parentId)) {
-                        sidebarItemToDropOnParentCollectionItem.children.push(draggedItemCollectionItem)
-                        // console.log('push')
+                    if(payload.to.parentId === payload.from.parentId) {
+                        arrayMove(sidebarItemToDropOnParentCollectionItem.children, draggedItemCollectionItemIndex, sidebarItemToDropOnCollectionItemIndex)
                     } else {
-                        sidebarItemToDropOnParentCollectionItem.children.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
-                        // console.log('splice')
+                        if((sidebarItemToDropOnParentCollectionItem.children.length - 1) === sidebarItemToDropOnCollectionItemIndex) {
+                            sidebarItemToDropOnParentCollectionItem.children.push(draggedItemCollectionItem)
+                            // console.log('push')
+                        } else {
+                            sidebarItemToDropOnParentCollectionItem.children.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
+                            // console.log('splice')
+                        }
                     }
                 } else {
                     draggedItemCollectionItem.parentId = null
                     const sidebarItemToDropOnCollectionItemIndex = context.state.collectionTree.findIndex(item => item._id === payload.to.id)
-                    if((context.state.collectionTree.length - 1) === sidebarItemToDropOnCollectionItemIndex && ((payload.to.parentId === payload.from.parentId && draggedItemCollectionItemIndex === sidebarItemToDropOnCollectionItemIndex) || payload.to.parentId !== payload.from.parentId)) {
-                        context.state.collectionTree.push(draggedItemCollectionItem)
-                        // console.log('push')
+                    if(payload.to.parentId === payload.from.parentId) {
+                        arrayMove(context.state.collectionTree, draggedItemCollectionItemIndex, sidebarItemToDropOnCollectionItemIndex)
                     } else {
-                        context.state.collectionTree.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
-                        // console.log('splice')
+                        if((context.state.collectionTree.length - 1) === sidebarItemToDropOnCollectionItemIndex) {
+                            context.state.collectionTree.push(draggedItemCollectionItem)
+                            // console.log('push')
+                        } else {
+                            context.state.collectionTree.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
+                            // console.log('splice')
+                        }
                     }
-
                 }
             }
 
