@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { useRegisterSW } from 'virtual:pwa-register/vue'
 
 const {
@@ -15,16 +15,13 @@ const close = async() => {
 
 <template>
     <div
-        v-if="offlineReady || needRefresh"
+        v-if="needRefresh"
         class="pwa-toast"
         role="alert"
     >
         <div class="message">
-            <span v-if="offlineReady">
-                App ready to work offline
-            </span>
-            <span v-else>
-                New content available, click on reload button to update.
+            <span>
+                New update available, click on reload button to update.
             </span>
         </div>
         <button v-if="needRefresh" @click="updateServiceWorker()">
