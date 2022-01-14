@@ -5,7 +5,7 @@
             <div v-for="option in options">
                 <template v-if="option.type === 'option'">
                     <button type="button" class="context-menu-item" :disabled="option.disabled"  @click.stop="$emit('click', option.value); $emit('update:show', false);">
-                        <i :class="option.icon"></i> {{ option.label }}
+                        <i :class="option.icon" v-if="option.icon"></i> {{ option.label }}
                     </button>
                 </template>
                 <template v-if="option.type === 'separator'">
@@ -60,6 +60,10 @@ export default {
         y: {
             type: Number,
             required: false
+        },
+        xOffset: {
+            type: Number,
+            required: false
         }
     },
     data() {
@@ -94,7 +98,7 @@ export default {
                 return {}
             }
 
-            let x = xDefined ? this.x : this.elementRect.left + 20
+            let x = xDefined ? this.x : this.elementRect.left + (this.xOffset ? this.xOffset : 0)
             let y = yDefined ? this.y : this.elementRect.bottom
 
             const contextMenuPosition = getContextMenuPostion(x, y, this.$el.querySelector('.context-menu'), yDefined ? 0 : this.elementRect.height)

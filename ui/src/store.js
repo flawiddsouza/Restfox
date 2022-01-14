@@ -28,7 +28,9 @@ const store = createStore({
             showImportModal: false,
             collectionFilter: '',
             activeSidebarItemForContextMenu: '',
-            sidebarContextMenuElement: null
+            sidebarContextMenuElement: null,
+            workspaces: [],
+            activeWorkspace: null
         }
     },
     getters: {
@@ -104,7 +106,7 @@ const store = createStore({
         },
         clearCollection(state) {
             state.collection = []
-            db.collections.clear()
+            db.collections.where({ workspaceId: state.activeWorkspace._id }).delete()
             state.collectionTree = []
             state.activeTab = null
             state.tabs = []
@@ -130,6 +132,12 @@ const store = createStore({
         },
         async updateCollectionItemName(_state, collectionItem) {
             await db.collections.update(collectionItem._id, { name: collectionItem.name })
+        },
+        setWorkspaces(state, workspaces) {
+            state.workspaces = workspaces
+        },
+        setActiveWorkspace(state, workspace) {
+            state.activeWorkspace = workspace
         }
     },
     actions: {
@@ -185,7 +193,8 @@ const store = createStore({
                     body: {
                         mimeType: payload.mimeType
                     },
-                    parentId: payload.parentId
+                    parentId: payload.parentId,
+                    workspaceId: context.state.activeWorkspace._id
                 }
             }
 
@@ -195,7 +204,8 @@ const store = createStore({
                     _type: 'request_group',
                     name: payload.name,
                     children: [],
-                    parentId: payload.parentId
+                    parentId: payload.parentId,
+                    workspaceId: context.state.activeWorkspace._id
                 }
             }
 

@@ -42,6 +42,9 @@ export default {
             set(value) {
                 this.$store.commit('showImportModal', value)
             }
+        },
+        activeWorkspace() {
+            return this.$store.state.activeWorkspace
         }
     },
     methods: {
@@ -56,12 +59,12 @@ export default {
                 }
 
                 if(this.importFrom === 'Postman') {
-                    const collection = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'))
+                    const collection = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
                     this.$store.commit('setCollectionTree', collection)
                 }
 
                 if(this.importFrom === 'Insomnia') {
-                    const collection = convertInsomniaExportToRestfoxCollection(json)
+                    const collection = convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id)
                     this.$store.commit('setCollectionTree', collection)
                 }
 

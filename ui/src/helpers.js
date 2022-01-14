@@ -117,7 +117,7 @@ export async function handleRequest(request, environment) {
     }
 }
 
-export function convertInsomniaExportToRestfoxCollection(json) {
+export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
     let collection = []
 
     json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment'].includes(item._type) == false).forEach(item => {
@@ -127,7 +127,8 @@ export function convertInsomniaExportToRestfoxCollection(json) {
                 _type: 'request_group',
                 name: item.name,
                 environment: item.environment,
-                parentId: item.parentId
+                parentId: item.parentId,
+                workspaceId
             })
         } else {
             let body = {}
@@ -170,7 +171,8 @@ export function convertInsomniaExportToRestfoxCollection(json) {
                     description: parameter.description,
                     disabled: parameter.disabled
                 })) : [],
-                parentId: item.parentId
+                parentId: item.parentId,
+                workspaceId
             })
         }
     })
@@ -178,7 +180,7 @@ export function convertInsomniaExportToRestfoxCollection(json) {
     return toTree(collection)
 }
 
-export async function convertPostmanExportToRestfoxCollection(json, isZip=false) {
+export async function convertPostmanExportToRestfoxCollection(json, isZip, workspaceId) {
     if(isZip) {
         const zip = new JSZip()
         const extractedZip = await zip.loadAsync(json)
@@ -199,13 +201,13 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip=false)
             collections.push(JSON.parse(await extractedZip.files[filePathMap[`collection/${collectionId}.json`]].async('text')))
         }
 
-        return importPostmanV2(collections)
+        return importPostmanV2(collections, workspaceId)
     } else {
-        return importPostmanV1(json.collections)
+        return importPostmanV1(json.collections, workspaceId)
     }
 }
 
-function importPostmanV1(collections) {
+function importPostmanV1(collections, workspaceId) {
     let collection = []
 
     collections.forEach(item => {
@@ -268,7 +270,8 @@ function importPostmanV1(collections) {
                 body,
                 headers,
                 parameters,
-                parentId: item.id
+                parentId: item.id,
+                workspaceId
             })
         })
 
@@ -277,14 +280,15 @@ function importPostmanV1(collections) {
             _type: 'request_group',
             name: item.name,
             children: requests,
-            parentId: null
+            parentId: null,
+            workspaceId
         })
     })
 
     return collection
 }
 
-function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
+function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, workspaceId) {
     let requests = []
 
     postmanCollectionItem.item.forEach(request => {
@@ -293,8 +297,9 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
                 _id: request.id,
                 _type: 'request_group',
                 name: request.name,
-                children: handlePostmanV2CollectionItem(request, request.id),
-                parentId
+                children: handlePostmanV2CollectionItem(request, request.id, workspaceId),
+                parentId,
+                workspaceId
             })
             return
         }
@@ -360,14 +365,15 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null) {
             body,
             headers,
             parameters,
-            parentId
+            parentId,
+            workspaceId
         })
     })
 
     return requests
 }
 
-function importPostmanV2(collections) {
+function importPostmanV2(collections, workspaceId) {
     let collection = []
 
     collections.forEach(postmanCollectionItem => {
@@ -375,8 +381,9 @@ function importPostmanV2(collections) {
             _id: postmanCollectionItem.info._postman_id,
             _type: 'request_group',
             name: postmanCollectionItem.info.name,
-            children: handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id),
-            parentId: null
+            children: handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId),
+            parentId: null,
+            workspaceId
         })
     })
 

@@ -10,7 +10,7 @@ import ImportModal from '@/components/ImportModal.vue'
 <template>
     <div class="container">
         <header>
-            <NavBar />
+            <NavBar nav="collection" />
         </header>
 
         <section class="tab-bar">
@@ -84,13 +84,5 @@ header {
     position: relative;
     display: grid;
     grid-template-rows: auto auto 1fr;
-}
-
-.heading {
-    font-weight: 500;
-}
-
-.heading a:not(:hover) {
-    text-decoration: none;
 }
 </style>
