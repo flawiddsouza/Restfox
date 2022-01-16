@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
+import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -37,7 +38,17 @@ export function flattenTree(array) {
     return level
 }
 
-export async function handleRequest(request, environment) {
+export async function handleRequest(request, environment, plugins) {
+    for(const plugin of plugins) {
+        const requestContext = createRequestContextForPlugin(request, environment)
+
+        await usePlugin(requestContext, {
+            code: plugin.code
+        })
+
+        request = { ...request, body: requestContext.request.getBody() }
+    }
+
     let body = null
 
     if(request.body.mimeType === 'application/x-www-form-urlencoded') {
@@ -95,13 +106,25 @@ export async function handleRequest(request, environment) {
             responseParsed = JSON.stringify(JSON.parse(responseParsed), null, 4)
         } catch {}
 
-        return {
+        let responseToSend = {
             status: response.status,
             statusText: response.statusText,
             headers: [...response.headers.entries()],
             responseOriginal: responseText,
             responseParsed: responseParsed
         }
+
+        for(const plugin of plugins) {
+            const responseContext = createResponseContextForPlugin(responseToSend, environment)
+
+            await usePlugin(responseContext, {
+                code: plugin.code
+            })
+
+            responseToSend = { ...responseToSend, responseOriginal: responseContext.response.getBody(), responseParsed: responseContext.response.getParsedBody() }
+        }
+
+        return responseToSend
     } catch(e) {
         let error = `Error: Couldn't resolve host name`
 

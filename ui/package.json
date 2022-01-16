@@ -16,9 +16,12 @@
         "@codemirror/matchbrackets": "^0.19.3",
         "@codemirror/state": "^0.19.6",
         "@codemirror/view": "^0.19.37",
+        "dayjs": "^1.10.7",
         "dexie": "^3.2.0",
         "jszip": "^3.7.1",
         "nanoid": "^3.1.30",
+        "quickjs-emscripten": "^0.15.0",
+        "quickjs-emscripten-sync": "^1.2.0",
         "sass": "^1.43.4",
         "vue": "^3.2.16",
         "vuex": "^4.0.2"

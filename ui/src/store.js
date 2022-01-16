@@ -30,7 +30,8 @@ const store = createStore({
             activeSidebarItemForContextMenu: '',
             sidebarContextMenuElement: null,
             workspaces: [],
-            activeWorkspace: null
+            activeWorkspace: null,
+            plugins: []
         }
     },
     getters: {
@@ -40,6 +41,9 @@ const store = createStore({
             }
 
             return state.collectionTree
+        },
+        enabledPlugins(state) {
+            return state.plugins.filter(plugin => plugin.enabled)
         }
     },
     mutations: {
@@ -77,16 +81,6 @@ const store = createStore({
             }
 
             state.tabs.splice(tabIndex, 1)
-        },
-        async sendRequest(state, activeTab) {
-            state.requestResponseStatus[activeTab._id] = 'loading'
-            const parent = activeTab.parentId ? await db.collections.where({ ':id': activeTab.parentId }).first() : null
-            let environment = {}
-            if(parent) {
-                environment = parent.environment ?? {}
-            }
-            state.requestResponses[activeTab._id] = await handleRequest(activeTab, environment)
-            state.requestResponseStatus[activeTab._id] = 'loaded'
         },
         showImportModal(state, value) {
             state.showImportModal = value
@@ -138,6 +132,39 @@ const store = createStore({
         },
         setActiveWorkspace(state, workspace) {
             state.activeWorkspace = workspace
+        },
+        async addPlugin(state, plugin) {
+            const newPlugin = {
+                _id: nanoid(),
+                name: plugin.name,
+                code: plugin.code,
+                enabled: true,
+                createdAt: new Date().getTime(),
+                updatedAt: new Date().getTime()
+            }
+            await db.plugins.put(newPlugin)
+            state.plugins.push(newPlugin)
+        },
+        async updatePlugin(state, plugin) {
+            const updatePlugin = {
+                name: plugin.name,
+                code: plugin.code,
+                updatedAt: new Date().getTime()
+            }
+            await db.plugins.update(plugin._id, updatePlugin)
+            const foundPlugin = state.plugins.find(item => item._id === plugin._id)
+            foundPlugin.name = updatePlugin.name
+            foundPlugin.code = updatePlugin.code
+            foundPlugin.updatedAt = updatePlugin.updatedAt
+        },
+        async updatePluginStatus(state, plugin) {
+            await db.plugins.update(plugin._id, { enabled: plugin.enabled })
+            const foundPlugin = state.plugins.find(item => item._id === plugin._id)
+            foundPlugin.enabled = plugin.enabled
+        },
+        async deletePlugin(state, pluginId) {
+            await db.plugins.where({ _id: pluginId }).delete()
+            state.plugins = state.plugins.filter(plugin => plugin._id !== pluginId)
         }
     },
     actions: {
@@ -314,6 +341,20 @@ const store = createStore({
                     })
                 }
             }
+        },
+        async loadPlugins(context) {
+            const plugins = await db.plugins.toArray()
+            context.state.plugins = plugins
+        },
+        async sendRequest(context, activeTab) {
+            context.state.requestResponseStatus[activeTab._id] = 'loading'
+            const parent = activeTab.parentId ? await db.collections.where({ ':id': activeTab.parentId }).first() : null
+            let environment = {}
+            if(parent) {
+                environment = parent.environment ?? {}
+            }
+            context.state.requestResponses[activeTab._id] = await handleRequest(activeTab, environment, context.getters.enabledPlugins)
+            context.state.requestResponseStatus[activeTab._id] = 'loaded'
         }
     }
 })

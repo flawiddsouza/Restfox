@@ -137,7 +137,7 @@ export default {
     },
     methods: {
         sendRequest() {
-            this.$store.commit('sendRequest', this.activeTab)
+            this.$store.dispatch('sendRequest', this.activeTab)
         },
         pushItem(object, key, itemToPush) {
             if(key in object === false) {

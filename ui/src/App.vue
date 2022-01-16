@@ -49,6 +49,8 @@ export default {
         }
     },
     async created() {
+        this.$store.dispatch('loadPlugins')
+
         let workspaces = await db.workspaces.toArray()
 
         if(workspaces.length > 0) {

@@ -9,7 +9,7 @@
                 </div>
             </div>
             <div class="workspace-name">{{ workspace.name }}</div>
-            <div class="workspace-timestamp">{{ new Date(workspace.createdAt) }}</div>
+            <div class="workspace-timestamp">{{ dateFormat(workspace.createdAt) }}</div>
         </div>
         <ContextMenu :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
     </div>
@@ -17,6 +17,7 @@
 
 <script>
 import ContextMenu from './ContextMenu.vue'
+import dayjs from 'dayjs'
 
 export default {
     components: {
@@ -67,6 +68,9 @@ export default {
         },
         handleContextMenuClick(clickedContextMenuItem) {
             alert(clickedContextMenuItem)
+        },
+        dateFormat(date) {
+            return dayjs(date).format('DD-MMM-YY hh:mm A')
         }
     }
 }

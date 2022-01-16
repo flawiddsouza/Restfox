@@ -6,19 +6,34 @@
                 <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
             </template>
         </div>
-        <div v-if="nav === 'collection'">
-            <a href="#" @click.prevent="this.$store.commit('showImportModal', true)">Import</a>
+        <div class="right-nav-container">
+            <div v-if="nav === 'collection'">
+                <a href="#" @click.prevent="this.$store.commit('showImportModal', true)">Import</a>
+                <span class="spacer"></span>
+                <a href="#" @click.prevent="clearCollection">Clear Collection</a>
+            </div>
             <span class="spacer"></span>
-            <a href="#" @click.prevent="clearCollection">Clear Collection</a>
+            <a href="#" @click.prevent="showPluginsManager">Plugins</a>
         </div>
     </div>
+    <PluginManagerModal v-model:showModal="showPluginManagerModal" />
 </template>
 
 <script>
+import PluginManagerModal from './modals/PluginManagerModal.vue'
+
 export default {
+     components: {
+        PluginManagerModal
+    },
     props: {
         nav: String,
         required: false
+    },
+    data() {
+        return {
+            showPluginManagerModal: false
+        }
     },
     computed: {
         activeWorkspace() {
@@ -33,6 +48,9 @@ export default {
         },
         setActiveWorkspace(workspace) {
             this.$store.commit('setActiveWorkspace', workspace)
+        },
+        showPluginsManager() {
+            this.showPluginManagerModal = true
         }
     }
 }
@@ -58,5 +76,9 @@ export default {
 
 .heading a:not(:hover) {
     text-decoration: none;
+}
+
+.right-nav-container {
+    display: flex;
 }
 </style>

@@ -24,7 +24,6 @@ import AddFolderModal from './modals/AddFolderModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import SettingsModal from './modals/SidebarSettingsModal.vue'
 import { mapState } from 'vuex'
-import { findItemInTreeById } from '@/helpers'
 
 export default {
     components: {
