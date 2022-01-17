@@ -1,7 +1,7 @@
 <template>
     <div class="modal" tabindex="0" @mousedown="closeModalOnBackgroundClick">
         <div class="modal__container" :style="{ width: width }">
-            <div class="modal__content">
+            <div class="modal__content" :style="{ height: fullHeight ? '90vh': undefined }">
                 <header>
                     <h3>{{ title }}</h3>
                     <span @click="$emit('update:modelValue', false)"><i class="fa fa-times"></i></span>
@@ -29,6 +29,10 @@ export default {
         width: {
             type: String,
             required: false
+        },
+        fullHeight: {
+            type: Boolean,
+            default: false
         }
     },
     methods: {
@@ -106,7 +110,6 @@ export default {
     text-align: left;
     overflow: auto;
     padding: 1rem 1.5rem;
-    max-height: 62vh;
 }
 
 .modal__container footer {
@@ -127,8 +130,8 @@ export default {
 }
 
 .modal__content {
-    height: 100%;
     display: flex;
     flex-direction: column;
+    max-height: 90vh;
 }
 </style>
