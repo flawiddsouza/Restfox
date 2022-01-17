@@ -12,8 +12,11 @@ import { foldGutter } from '@codemirror/fold'
 import { defaultHighlightStyle } from '@codemirror/highlight'
 import { closeBrackets } from '@codemirror/closebrackets'
 import { bracketMatching } from '@codemirror/matchbrackets'
-import { indentOnInput } from '@codemirror/language'
+import { indentOnInput, indentUnit } from '@codemirror/language'
 import { history, historyKeymap } from '@codemirror/history'
+import { defaultKeymap, indentWithTab } from '@codemirror/commands'
+import { commentKeymap } from '@codemirror/comment'
+import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 
 function createState(language, documentText, vueInstance) {
     let languageFunc = null
@@ -40,6 +43,8 @@ function createState(language, documentText, vueInstance) {
             highlightActiveLine(),
             history(),
             highlightSpecialChars(),
+            highlightSelectionMatches(),
+            indentUnit.of('    '), // 4 spaces
             EditorView.lineWrapping,
             EditorView.updateListener.of(v => {
                 if(v.docChanged) {
@@ -48,7 +53,11 @@ function createState(language, documentText, vueInstance) {
                 }
             }),
             keymap.of([
+                ...defaultKeymap,
                 ...historyKeymap,
+                ...commentKeymap,
+                indentWithTab,
+                ...searchKeymap,
             ])
         ]
     })
