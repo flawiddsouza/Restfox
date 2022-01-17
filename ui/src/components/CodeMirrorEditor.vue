@@ -6,6 +6,7 @@
 import { EditorView, highlightActiveLine, keymap, highlightSpecialChars } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
+import { javascript } from '@codemirror/lang-javascript'
 import { lineNumbers, highlightActiveLineGutter } from '@codemirror/gutter'
 import { foldGutter } from '@codemirror/fold'
 import { defaultHighlightStyle } from '@codemirror/highlight'
@@ -14,11 +15,21 @@ import { bracketMatching } from '@codemirror/matchbrackets'
 import { indentOnInput } from '@codemirror/language'
 import { history, historyKeymap } from '@codemirror/history'
 
-function createState(documentText, vueInstance) {
+function createState(language, documentText, vueInstance) {
+    let languageFunc = null
+
+    if(language === 'json') {
+        languageFunc = json()
+    }
+
+    if(language === 'javascript') {
+        languageFunc = javascript()
+    }
+
     return EditorState.create({
         doc: documentText,
         extensions: [
-            json(),
+            languageFunc,
             defaultHighlightStyle,
             lineNumbers(),
             highlightActiveLineGutter(),
@@ -45,7 +56,8 @@ function createState(documentText, vueInstance) {
 
 export default {
     props: {
-        modelValue: String
+        modelValue: String,
+        lang: String
     },
     data() {
         return {
@@ -56,7 +68,7 @@ export default {
     watch: {
         modelValue() {
             if(!this.emitted) {
-                this.editor.setState(createState(this.modelValue, this))
+                this.editor.setState(createState(this.lang, this.modelValue, this))
             } else {
                 this.emitted = false
             }
@@ -64,7 +76,7 @@ export default {
     },
     mounted() {
         this.editor = new EditorView({
-            state: createState(this.modelValue, this),
+            state: createState(this.lang, this.modelValue, this),
             parent: this.$el
         })
     }

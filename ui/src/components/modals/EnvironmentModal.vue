@@ -1,7 +1,7 @@
 <template>
     <form @submit.prevent="done" v-if="showModalComp">
         <modal :title="`Environment (JSON Format) — ${collectionItem.name}`" v-model="showModalComp" height="70vh" width="55rem">
-            <CodeMirrorEditor v-model="environment"></CodeMirrorEditor>
+            <CodeMirrorEditor v-model="environment" lang="json"></CodeMirrorEditor>
             <div style="margin-top: 1rem">
                 <div v-if="parseError" class="box">{{ parseError }}</div>
                 <div class="box box-hidden" v-else>

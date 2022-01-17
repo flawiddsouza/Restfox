@@ -8,7 +8,7 @@
             <div style="padding-bottom: 1rem"></div>
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Code</div>
-                <CodeMirrorEditor v-model="code" style="height: 29rem; width: 50vw; max-width: 90vw; overflow-y: auto"></CodeMirrorEditor>
+                <CodeMirrorEditor v-model="code" lang="javascript" style="height: 29rem; width: 50vw; max-width: 90vw; overflow-y: auto"></CodeMirrorEditor>
             </label>
             <template #footer>
                 <button>Save</button>
