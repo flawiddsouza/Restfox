@@ -122,7 +122,9 @@ const store = createStore({
             state.sidebarContextMenuElement = null
         },
         async updateCollectionItemEnvironment(_state, collectionItem) {
-            await db.collections.update(collectionItem._id, { environment: JSON.parse(JSON.stringify(collectionItem.environment)) })
+            if('environment' in collectionItem) {
+                await db.collections.update(collectionItem._id, { environment: JSON.parse(JSON.stringify(collectionItem.environment)) })
+            }
         },
         async updateCollectionItemName(_state, collectionItem) {
             await db.collections.update(collectionItem._id, { name: collectionItem.name })
