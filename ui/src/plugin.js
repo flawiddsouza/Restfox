@@ -10,7 +10,11 @@ export function createRequestContextForPlugin(request, environment) {
                 return state.body
             },
             getEnvironmentVariable(variable) {
-                return JSON.parse(JSON.stringify(environment[variable]))
+                if(variable in environment) {
+                    return JSON.parse(JSON.stringify(environment[variable]))
+                }
+
+                return undefined
             },
             setBody(requestBody) {
                 state.body = requestBody
