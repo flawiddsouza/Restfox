@@ -10,7 +10,11 @@
     </div>
     <template v-if="status !== 'not loaded' && response !== null">
         <div class="response-panel-address-bar">
-            <div class="tag" :class="{ 'green': response.status >= 200 && response.status <= 299, 'red': response.status >= 500 || response.statusText === 'Error' }">
+            <div class="tag" :class="{
+                'green': response.status >= 200 && response.status <= 299,
+                'yellow': response.status >= 400 && response.status <= 499,
+                'red': response.status >= 500 || response.statusText === 'Error'
+            }">
                 <span class="bold">{{ response.status }}</span>
                 {{ response.statusText }}
             </div>
@@ -140,6 +144,11 @@ export default {
 
 .response-panel-address-bar .tag.green {
     background: #75ba24;
+    color: white;
+}
+
+.response-panel-address-bar .tag.yellow {
+    background: #ec8702;
     color: white;
 }
 
