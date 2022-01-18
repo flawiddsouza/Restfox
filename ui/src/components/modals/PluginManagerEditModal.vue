@@ -23,6 +23,8 @@
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 
+const examplePluginCode = `// Available methods:\n// context.request.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')\n// context.request.getBody()\n// context.request.setBody(<REQUEST_BODY_OBJECT>)\n// context.response.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')\n// context.response.getBody()\n// context.response.setBody(<RESPONSE_BODY_OBJECT>)\n// console.log(...)\n\nfunction handleRequest() {\n    console.log(context.request.getBody())\n}\n\nfunction handleResponse() {\n    console.log(context.response.getBody())\n}\n\nif('request' in context) {\n    handleRequest()\n}\n\nif('response' in context) {\n    handleResponse()\n}\n`
+
 export default {
     directives: {
         focus: {
@@ -43,7 +45,7 @@ export default {
     data() {
         return {
             name: '',
-            code: ''
+            code: examplePluginCode
         }
     },
     computed: {
@@ -63,7 +65,7 @@ export default {
                 this.code = this.plugin.code
             } else {
                 this.name = ''
-                this.code = ''
+                this.code = examplePluginCode
             }
         }
     },
