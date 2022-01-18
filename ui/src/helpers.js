@@ -58,7 +58,7 @@ export async function handleRequest(request, environment, plugins) {
     }
 
     if(request.body.mimeType === 'application/json') {
-        body = JSON.stringify(request.body.text)
+        body = request.body.text
     }
 
     if(request.body.mimeType === 'text/plain') {
