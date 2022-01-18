@@ -1,5 +1,5 @@
 <template>
-    <form v-if="showModalComp">
+    <div v-if="showModalComp">
         <modal :title="collectionItem._type === 'request_group' ? 'Folder Settings' : 'Request Settings'" v-model="showModalComp">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
@@ -7,7 +7,7 @@
             </label>
             <div style="padding-bottom: 1rem"></div>
         </modal>
-    </form>
+    </div>
 </template>
 
 <script>
