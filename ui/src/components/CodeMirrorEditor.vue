@@ -105,6 +105,7 @@ export default {
 
 .code-mirror-editor .cm-scroller {
     font-family: var(--font-monospace);
+    overflow: auto;
 }
 
 .code-mirror-editor .cm-activeLine, .code-mirror-editor .cm-activeLineGutter {
@@ -119,5 +120,9 @@ export default {
 
 .code-mirror-editor .cm-foldGutter span:hover {
     color: #999999;
+}
+
+.code-mirror-editor .cm-editor {
+    height: 100%;
 }
 </style>

@@ -20,6 +20,7 @@
                 <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem">
                     <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
                     <option value="text/plain">Plain Text</option>
+                    <option value="application/json">JSON</option>
                 </select>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
                     <table>
@@ -46,6 +47,9 @@
                 </div>
                 <div v-if="activeTab.body.mimeType === 'text/plain'">
                     <textarea v-model="activeTab.body.text" style="width: 100%" spellcheck="false"></textarea>
+                </div>
+                <div v-if="activeTab.body.mimeType === 'application/json'" class="oy-a">
+                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor"></CodeMirrorEditor>
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
@@ -100,10 +104,12 @@
 
 <script>
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
+import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 
 export default {
     components: {
-        CodeMirrorSingleLine
+        CodeMirrorSingleLine,
+        CodeMirrorEditor
     },
     data() {
         return {
@@ -271,5 +277,15 @@ export default {
 
 .request-panel-tabs-context-container > div, .request-panel-tabs-context-container > div > textarea {
     height: 100%;
+}
+
+.oy-a {
+    overflow-y: auto;
+}
+
+.code-editor {
+    border: 1px solid var(--default-border-color);
+    height: 100%;
+    overflow-y: auto;
 }
 </style>
