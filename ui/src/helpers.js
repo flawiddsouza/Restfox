@@ -254,9 +254,11 @@ function importPostmanV1(collections, workspaceId) {
         let requests = []
 
         item.requests.forEach(request => {
-            let body = {}
+            let body = {
+                mimeType: 'No Body'
+            }
 
-            if(request.dataMode === 'urlencoded' || request.dataMode === null) {
+            if(request.dataMode === 'urlencoded') {
                 let params = []
                 const requestData = request.data !== null ? request.data : []
                 requestData.forEach(requestDataItem => {
@@ -346,8 +348,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
         }
 
         let body = {
-            mimeType: 'application/x-www-form-urlencoded',
-            params: []
+            mimeType: 'No Body'
         }
 
         if('body' in request.request && 'mode' in request.request.body) {
