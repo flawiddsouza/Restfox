@@ -360,8 +360,14 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             }
 
             if(request.request.body.mode === 'raw') {
+                let mimeType = 'text/plain'
+
+                if('options' in request.request.body && 'raw' in request.request.body.options && request.request.body.options.raw.language === 'json') {
+                    mimeType = 'application/json'
+                }
+
                 body = {
-                    mimeType: 'text/plain',
+                    mimeType: mimeType,
                     text: request.request.body.raw
                 }
             }
