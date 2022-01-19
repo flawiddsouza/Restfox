@@ -226,6 +226,13 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip, works
 
         return importPostmanV2(collections, workspaceId)
     } else {
+        if('info' in json) {
+            if('schema' in json.info) {
+                if(json.info.schema === 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json' || json.info.schema === 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json') {
+                    return importPostmanV2([json], workspaceId)
+                }
+            }
+        }
         return importPostmanV1(json.collections, workspaceId)
     }
 }
@@ -315,12 +322,13 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
     let requests = []
 
     postmanCollectionItem.item.forEach(request => {
+        const requestId = request.id ?? nanoid()
         if('item' in request) {
             requests.push({
-                _id: request.id,
+                _id: requestId,
                 _type: 'request_group',
                 name: request.name,
-                children: handlePostmanV2CollectionItem(request, request.id, workspaceId),
+                children: handlePostmanV2CollectionItem(request, requestId, workspaceId),
                 parentId,
                 workspaceId
             })
@@ -380,7 +388,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
         })
 
         requests.push({
-            _id: request.id,
+            _id: requestId,
             _type: 'request',
             method: request.request.method,
             url: typeof request.request.url === 'string' ? request.request.url : request.request.url.raw,
