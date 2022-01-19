@@ -11,7 +11,24 @@
         </div>
         <div class="request-panel-tabs">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs">
-                {{ requestPanelTab.name }}
+                <span>{{ requestPanelTab.name }}</span>
+                <template v-if="requestPanelTab.name === 'Body'">
+                    <template v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
+                        <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
+                            <span> ({{ activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
+                        </template>
+                    </template>
+                </template>
+                <template v-if="requestPanelTab.name === 'Query'">
+                    <template v-if="'parameters' in activeTab && activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
+                        <span> ({{ activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
+                    </template>
+                </template>
+                <template v-if="requestPanelTab.name === 'Header'">
+                    <template v-if="'headers' in activeTab && activeTab.headers.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
+                        <span> ({{ activeTab.headers.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
+                    </template>
+                </template>
             </div>
             <div class="request-panel-tab-fill"></div>
         </div>
@@ -206,6 +223,7 @@ export default {
     border-bottom: 1px solid var(--default-border-color);
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
+    white-space: nowrap;
 }
 
 .request-panel-tabs .request-panel-tab-active {
