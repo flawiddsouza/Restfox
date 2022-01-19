@@ -155,7 +155,9 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 workspaceId
             })
         } else {
-            let body = {}
+            let body = {
+                mimeType: 'No Body'
+            }
 
             if(item.body.mimeType === 'application/x-www-form-urlencoded') {
                 body = {
@@ -170,6 +172,13 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
             }
 
             if(item.body.mimeType === 'text/plain') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    text: item.body.text
+                }
+            }
+
+            if(item.body.mimeType === 'application/json') {
                 body = {
                     mimeType: item.body.mimeType,
                     text: item.body.text

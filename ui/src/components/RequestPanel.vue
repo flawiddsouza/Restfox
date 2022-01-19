@@ -35,6 +35,7 @@
         <div class="request-panel-tabs-context">
             <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
                 <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem">
+                    <option value="No Body">No Body</option>
                     <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
                     <option value="text/plain">Plain Text</option>
                     <option value="application/json">JSON</option>
