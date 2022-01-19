@@ -69,6 +69,7 @@ export async function handleRequest(request, environment, plugins) {
         let urlWithEnvironmentVariablesSubtituted = request.url
         Object.keys(environment).forEach(variable => {
             urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ _.${variable} }}`, environment[variable])
+            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{${variable}}}`, environment[variable])
         })
         const url = new URL(urlWithEnvironmentVariablesSubtituted)
 
