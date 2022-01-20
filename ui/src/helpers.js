@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
+import dayjs from 'dayjs'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -438,6 +439,93 @@ function importPostmanV2(collections, workspaceId) {
     return collection
 }
 
+function importRestfoxV1(collections, workspaceId) {
+    let collection = []
+
+    collections.forEach(item => {
+        if(item._type === 'request_group') {
+            collection.push({
+                _id: item._id,
+                _type: 'request_group',
+                name: item.name,
+                environment: item.environment,
+                parentId: item.parentId,
+                workspaceId,
+                sortOrder: item.sortOrder
+            })
+        } else {
+            let body = {
+                mimeType: 'No Body'
+            }
+
+            if(item.body.mimeType === 'application/x-www-form-urlencoded') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    params: item.body.params.map(parameter => ({
+                        name: parameter.name,
+                        value: parameter.value,
+                        description: parameter.description,
+                        disabled: parameter.disabled
+                    }))
+                }
+            }
+
+            if(item.body.mimeType === 'text/plain') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    text: item.body.text
+                }
+            }
+
+            if(item.body.mimeType === 'application/json') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    text: item.body.text
+                }
+            }
+
+            collection.push({
+                _id: item._id,
+                _type: item._type,
+                name: item.name,
+                url: item.url,
+                method: item.method,
+                body: body,
+                headers: item.headers ? item.headers.map(header => ({
+                    name: header.name,
+                    value: header.value,
+                    description: header.description,
+                    disabled: header.disabled
+                })) : [],
+                parameters: item.parameters ? item.parameters.map(parameter => ({
+                    name: parameter.name,
+                    value: parameter.value,
+                    description: parameter.description,
+                    disabled: parameter.disabled
+                })) : [],
+                parentId: item.parentId,
+                workspaceId,
+                sortOrder: item.sortOrder
+            })
+        }
+    })
+
+    const collectionTree = toTree(collection)
+    sortTree(collectionTree)
+
+    return collectionTree
+}
+
+export function convertRestfoxExportToRestfoxCollection(json, workspaceId) {
+    if('exportedFrom' in json) {
+        if(json.exportedFrom === 'Restfox-1.0.0') {
+            return importRestfoxV1(json.collection, workspaceId)
+        }
+    }
+
+    throw new Error('Invalid Restfox Export')
+}
+
 // From: https://stackoverflow.com/a/66387148/4932305
 export async function fileToJSON(file) {
     return new Promise((resolve, reject) => {
@@ -559,4 +647,27 @@ export function arrayMove(array, fromIndex, toIndex) {
     var element = array[fromIndex]
     array.splice(fromIndex, 1)
     array.splice(toIndex, 0, element)
+}
+
+// From: https://stackoverflow.com/a/65939108/4932305
+export function downloadObjectAsJSON(filename, dataObjToWrite) {
+    const blob = new Blob([JSON.stringify(dataObjToWrite)], { type: 'text/json' })
+    const link = document.createElement('a')
+
+    link.download = filename
+    link.href = window.URL.createObjectURL(blob)
+    link.dataset.downloadurl = ['text/json', link.download, link.href].join(':')
+
+    const event = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+    })
+
+    link.dispatchEvent(event)
+    link.remove()
+}
+
+export function todayISODate() {
+    return dayjs().format('YYYY-MM-DD')
 }

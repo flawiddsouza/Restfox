@@ -4,6 +4,7 @@
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Import From</div>
                 <select style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="importFrom">
+                    <option>Restfox</option>
                     <option>Postman</option>
                     <option>Insomnia</option>
                 </select>
@@ -21,7 +22,7 @@
 </template>
 
 <script>
-import { fileToJSON, convertInsomniaExportToRestfoxCollection, convertPostmanExportToRestfoxCollection } from '@/helpers'
+import { fileToJSON, convertInsomniaExportToRestfoxCollection, convertPostmanExportToRestfoxCollection, convertRestfoxExportToRestfoxCollection } from '@/helpers'
 import Modal from '@/components/Modal.vue'
 
 export default {
@@ -31,7 +32,7 @@ export default {
     data() {
         return {
             fileToImport: null,
-            importFrom: 'Postman'
+            importFrom: 'Restfox'
         }
     },
     computed: {
@@ -65,6 +66,11 @@ export default {
 
                 if(this.importFrom === 'Insomnia') {
                     const collection = convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id)
+                    this.$store.commit('setCollectionTree', collection)
+                }
+
+                if(this.importFrom === 'Restfox') {
+                    const collection = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
                     this.$store.commit('setCollectionTree', collection)
                 }
 

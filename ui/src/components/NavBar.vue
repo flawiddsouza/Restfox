@@ -10,6 +10,8 @@
             <div v-if="nav === 'collection'">
                 <a href="#" @click.prevent="this.$store.commit('showImportModal', true)">Import</a>
                 <span class="spacer"></span>
+                <a href="#" @click.prevent="exportCollection">Export</a>
+                <span class="spacer"></span>
                 <a href="#" @click.prevent="clearCollection">Clear Collection</a>
             </div>
             <span class="spacer"></span>
@@ -21,6 +23,7 @@
 
 <script>
 import PluginManagerModal from './modals/PluginManagerModal.vue'
+import { downloadObjectAsJSON, todayISODate } from '@/helpers'
 
 export default {
      components: {
@@ -41,6 +44,12 @@ export default {
         }
     },
     methods: {
+        exportCollection() {
+            downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
+                exportedFrom: 'Restfox-1.0.0',
+                collection: this.$store.state.collection
+            })
+        },
         clearCollection() {
             if(confirm('Are you sure?')) {
                 this.$store.commit('clearCollection')
