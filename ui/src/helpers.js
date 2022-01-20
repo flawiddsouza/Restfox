@@ -671,3 +671,30 @@ export function downloadObjectAsJSON(filename, dataObjToWrite) {
 export function todayISODate() {
     return dayjs().format('YYYY-MM-DD')
 }
+
+// From: https://stackoverflow.com/a/46800515/4932305
+export function isFirstIdIndirectOrDirectParentOfSecondIdInTree(array, firstId, secondId) {
+    let result = false
+
+    function f(data, a, b, p = false) {
+        if (Array.isArray(data)) {
+            data.forEach(function(o) {
+                if(p && a == o._id) {
+                    result = true
+                } else {
+                    if('children' in o) {
+                        f(o.children, a, b, !p ? b == o._id : p)
+                    }
+                }
+            })
+        } else {
+            if('children' in data) {
+                f(data.children, a, b, p)
+            }
+        }
+    }
+
+    f(array, secondId, firstId)
+
+    return result
+}

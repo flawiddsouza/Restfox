@@ -11,7 +11,7 @@ import {
     getChildIds,
     findItemInTreeById,
     generateNewIdsForTreeItemChildren,
-    arrayMove
+    isFirstIdIndirectOrDirectParentOfSecondIdInTree
 } from './helpers'
 import { db } from './db'
 import { nextTick } from 'vue'
@@ -263,86 +263,43 @@ const store = createStore({
             }
         },
         async reorderCollectionItem(context, payload) {
-            let draggedItemCollectionItem = null
-            let draggedItemCollectionItemIndex = null
-
-            if(payload.from.parentId) {
-                const draggedItemParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.from.parentId)
-                draggedItemCollectionItemIndex = draggedItemParentCollectionItem.children.findIndex(item => item._id === payload.from.id)
-                draggedItemCollectionItem = draggedItemParentCollectionItem.children[draggedItemCollectionItemIndex]
-                if(payload.to.parentId !== payload.from.parentId) {
-                    draggedItemParentCollectionItem.children.splice(draggedItemCollectionItemIndex, 1)
-                }
-            } else {
-                draggedItemCollectionItemIndex = context.state.collectionTree.findIndex(item => item._id === payload.from.id)
-                draggedItemCollectionItem = context.state.collectionTree[draggedItemCollectionItemIndex]
-                if(payload.to.parentId !== payload.from.parentId) {
-                    context.state.collectionTree.splice(draggedItemCollectionItemIndex, 1)
-                }
+            if(payload.from.id === payload.to.id) { // don't allow an item to be dropped onto itself
+                return
             }
 
-            let sidebarItemToDropOnParentCollectionItem = null
-
-            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') {
-                draggedItemCollectionItem.parentId = payload.to.id
-                sidebarItemToDropOnParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.to.id)
-                sidebarItemToDropOnParentCollectionItem.children.splice(0, 0, draggedItemCollectionItem)
-            } else {
-                if(payload.to.parentId) {
-                    draggedItemCollectionItem.parentId = payload.to.parentId
-                    sidebarItemToDropOnParentCollectionItem = findItemInTreeById(context.state.collectionTree, payload.to.parentId)
-                    const sidebarItemToDropOnCollectionItemIndex = sidebarItemToDropOnParentCollectionItem.children.findIndex(item => item._id === payload.to.id)
-                    if(payload.to.parentId === payload.from.parentId) {
-                        arrayMove(sidebarItemToDropOnParentCollectionItem.children, draggedItemCollectionItemIndex, sidebarItemToDropOnCollectionItemIndex)
-                    } else {
-                        if((sidebarItemToDropOnParentCollectionItem.children.length - 1) === sidebarItemToDropOnCollectionItemIndex) {
-                            sidebarItemToDropOnParentCollectionItem.children.push(draggedItemCollectionItem)
-                            // console.log('push')
-                        } else {
-                            sidebarItemToDropOnParentCollectionItem.children.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
-                            // console.log('splice')
-                        }
-                    }
-                } else {
-                    draggedItemCollectionItem.parentId = null
-                    const sidebarItemToDropOnCollectionItemIndex = context.state.collectionTree.findIndex(item => item._id === payload.to.id)
-                    if(payload.to.parentId === payload.from.parentId) {
-                        arrayMove(context.state.collectionTree, draggedItemCollectionItemIndex, sidebarItemToDropOnCollectionItemIndex)
-                    } else {
-                        if((context.state.collectionTree.length - 1) === sidebarItemToDropOnCollectionItemIndex) {
-                            context.state.collectionTree.push(draggedItemCollectionItem)
-                            // console.log('push')
-                        } else {
-                            context.state.collectionTree.splice(sidebarItemToDropOnCollectionItemIndex, 0, draggedItemCollectionItem)
-                            // console.log('splice')
-                        }
-                    }
-                }
+            // don't allow an item to be dropped into its children
+            if(isFirstIdIndirectOrDirectParentOfSecondIdInTree(context.state.collectionTree, payload.from.id, payload.to.id)) {
+                return
             }
 
-            await db.collections.update(draggedItemCollectionItem._id, { parentId: draggedItemCollectionItem.parentId })
-
-            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') {
-                // new sort order for new item and its siblings
-                sidebarItemToDropOnParentCollectionItem.children.forEach((item, index) => {
-                    item.sortOrder = index
-                    db.collections.update(item._id, { sortOrder: index })
-                })
-            } else {
-                if(payload.to.parentId) {
-                    // new sort order for new item and its siblings
-                    sidebarItemToDropOnParentCollectionItem.children.forEach((item, index) => {
-                        item.sortOrder = index
-                        db.collections.update(item._id, { sortOrder: index })
-                    })
-                } else {
-                    // new sort order for new item and its siblings
-                    context.state.collectionTree.forEach((item, index) => {
-                        item.sortOrder = index
-                        db.collections.update(item._id, { sortOrder: index })
-                    })
-                }
+            let targetKey = 'parentId'
+            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') { // dropping an item into a folder, bottom = pink highlight
+                targetKey = 'id'
             }
+
+            const sourceParentCollection = !payload.from.parentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.from.parentId).children
+            const targetParentCollection = !payload.to[targetKey] ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.to[targetKey]).children
+
+            let sourceIndex = sourceParentCollection.findIndex(item => item._id === payload.from.id)
+            const sourceItem = sourceParentCollection[sourceIndex]
+            sourceParentCollection.splice(sourceIndex, 1)
+            sourceItem.parentId = payload.to[targetKey] ?? null
+
+            let targetIndex = targetParentCollection.findIndex(item => item._id === payload.to.id)
+            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') { // dropping an item into a folder, bottom = pink highlight
+                targetIndex = 0
+            }
+            if(payload.to.type === 'request' && payload.to.cursorPosition === 'bottom') {
+                targetIndex++
+            }
+            targetParentCollection.splice(targetIndex, 0, sourceItem)
+
+            await db.collections.update(sourceItem._id, { parentId: sourceItem.parentId })
+
+            targetParentCollection.forEach((item, index) => {
+                item.sortOrder = index
+                db.collections.update(item._id, { sortOrder: index })
+            })
         },
         async loadPlugins(context) {
             const plugins = await db.plugins.toArray()
