@@ -125,7 +125,7 @@ export default {
 }
 
 .context-menu {
-    position: absolute;
+    position: fixed;
     z-index: 1;
     border: 1px solid #82828240;
     box-shadow: 0 0 1rem 0 rgba(0, 0, 0, 0.1);
