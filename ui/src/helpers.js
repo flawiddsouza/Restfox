@@ -642,6 +642,21 @@ export function generateNewIdsForTreeItemChildren(treeItem) {
     })
 }
 
+export function generateNewIdsForTree(array) {
+    array.forEach(treeItem => {
+        treeItem._id = nanoid()
+        if('children' in treeItem) {
+            treeItem.children.forEach(item => {
+                item._id = nanoid()
+                item.parentId = treeItem._id
+                if('children' in item) {
+                    generateNewIdsForTreeItemChildren(item)
+                }
+            })
+        }
+    })
+}
+
 // From: https://stackoverflow.com/a/6470794/4932305
 export function arrayMove(array, fromIndex, toIndex) {
     var element = array[fromIndex]

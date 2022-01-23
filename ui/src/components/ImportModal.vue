@@ -22,7 +22,13 @@
 </template>
 
 <script>
-import { fileToJSON, convertInsomniaExportToRestfoxCollection, convertPostmanExportToRestfoxCollection, convertRestfoxExportToRestfoxCollection } from '@/helpers'
+import {
+    fileToJSON,
+    convertInsomniaExportToRestfoxCollection,
+    convertPostmanExportToRestfoxCollection,
+    convertRestfoxExportToRestfoxCollection,
+    generateNewIdsForTree
+} from '@/helpers'
 import Modal from '@/components/Modal.vue'
 
 export default {
@@ -59,20 +65,23 @@ export default {
                     json = this.fileToImport
                 }
 
+                let collectionTree = []
+
                 if(this.importFrom === 'Postman') {
-                    const collection = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
-                    this.$store.commit('setCollectionTree', collection)
+                    collectionTree = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
                 }
 
                 if(this.importFrom === 'Insomnia') {
-                    const collection = convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id)
-                    this.$store.commit('setCollectionTree', collection)
+                    collectionTree = convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id)
                 }
 
                 if(this.importFrom === 'Restfox') {
-                    const collection = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
-                    this.$store.commit('setCollectionTree', collection)
+                    collectionTree = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
                 }
+
+                generateNewIdsForTree(collectionTree)
+
+                this.$store.commit('setCollectionTree', collectionTree)
 
                 this.fileToImport = null
                 this.showImportModal = false
