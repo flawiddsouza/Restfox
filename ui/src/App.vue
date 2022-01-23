@@ -13,6 +13,7 @@ import { nanoid } from 'nanoid'
 
 <script>
 import { db } from './db'
+import constants from './constants'
 
 export default {
     computed: {
@@ -31,6 +32,11 @@ export default {
             deep: true
         },
         async activeWorkspace() {
+            if(this.activeWorkspace) {
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.ACTIVE_WORKSPACE_ID, this.activeWorkspace._id)
+            } else {
+                localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ACTIVE_WORKSPACE_ID)
+            }
             await this.fetchSetCollectionForWorkspace()
         }
     },
@@ -50,30 +56,7 @@ export default {
     },
     async created() {
         this.$store.dispatch('loadPlugins')
-
-        let workspaces = await db.workspaces.toArray()
-
-        if(workspaces.length > 0) {
-            this.$store.commit('setWorkspaces', workspaces)
-            this.$store.commit('setActiveWorkspace', workspaces[0])
-        } else {
-            await db.workspaces.put({
-                _id: nanoid(),
-                name: 'My Collection',
-                createdAt: new Date().getTime(),
-                updatedAt: new Date().getTime()
-            })
-
-            workspaces = await db.workspaces.toArray()
-
-            this.$store.commit('setWorkspaces', workspaces)
-            this.$store.commit('setActiveWorkspace', workspaces[0])
-
-            // update pre-existing collections with a default workspaceId, so as to not break
-            // collections created before the introduction of workspaces
-            await db.collections.toCollection().modify({ workspaceId: this.activeWorkspace._id })
-        }
-
+        await this.$store.dispatch('loadWorkspaces')
         await this.fetchSetCollectionForWorkspace()
     }
 }

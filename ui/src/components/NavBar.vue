@@ -14,20 +14,26 @@
                 <span class="spacer"></span>
                 <a href="#" @click.prevent="clearCollection">Clear Collection</a>
             </div>
+            <div v-if="nav === 'workspaces'">
+                <a href="#" @click.prevent="showAddWorkspace">Add Workspace</a>
+            </div>
             <span class="spacer"></span>
             <a href="#" @click.prevent="showPluginsManager">Plugins</a>
         </div>
     </div>
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
+    <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" />
 </template>
 
 <script>
 import PluginManagerModal from './modals/PluginManagerModal.vue'
+import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import { downloadObjectAsJSON, todayISODate } from '@/helpers'
 
 export default {
      components: {
-        PluginManagerModal
+        PluginManagerModal,
+        AddWorkspaceModal
     },
     props: {
         nav: String,
@@ -35,7 +41,8 @@ export default {
     },
     data() {
         return {
-            showPluginManagerModal: false
+            showPluginManagerModal: false,
+            showAddWorkspaceModal: false
         }
     },
     computed: {
@@ -60,6 +67,9 @@ export default {
         },
         showPluginsManager() {
             this.showPluginManagerModal = true
+        },
+        showAddWorkspace() {
+            this.showAddWorkspaceModal = true
         }
     }
 }

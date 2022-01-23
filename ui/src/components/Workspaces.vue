@@ -12,22 +12,26 @@
             <div class="workspace-timestamp">{{ dateFormat(workspace.createdAt) }}</div>
         </div>
         <ContextMenu :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
+        <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" />
     </div>
 </template>
 
 <script>
 import ContextMenu from './ContextMenu.vue'
+import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import dayjs from 'dayjs'
 
 export default {
     components: {
-        ContextMenu
+        ContextMenu,
+        AddWorkspaceModal
     },
     data() {
         return {
             showContextMenu: false,
             contextMenuElement: null,
-            contextMenuWorkspace: null
+            contextMenuWorkspace: null,
+            showAddWorkspaceModal: false
         }
     },
     computed: {
@@ -36,11 +40,11 @@ export default {
         },
         options() {
             return [
-                {
-                    'type': 'option',
-                    'label': 'Duplicate',
-                    'value': 'Duplicate'
-                },
+                // {
+                //     'type': 'option',
+                //     'label': 'Duplicate',
+                //     'value': 'Duplicate'
+                // },
                 {
                     'type': 'option',
                     'label': 'Rename',
@@ -67,7 +71,15 @@ export default {
             this.showContextMenu = true
         },
         handleContextMenuClick(clickedContextMenuItem) {
-            alert(clickedContextMenuItem)
+            if(clickedContextMenuItem === 'Rename') {
+                this.showAddWorkspaceModal = true
+            }
+
+            if(clickedContextMenuItem === 'Delete') {
+                if(confirm('Are you sure?')) {
+                    this.$store.dispatch('deleteWorkspace', this.contextMenuWorkspace._id)
+                }
+            }
         },
         dateFormat(date) {
             return dayjs(date).format('DD-MMM-YY hh:mm A')
@@ -79,15 +91,17 @@ export default {
 <style scoped>
 .workspace-container {
     display: flex;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 1rem;
     margin: 1rem;
 }
 
 .workspace {
     border: 1px solid var(--default-border-color);
     cursor: pointer;
-    height: 15rem;
-    width: 15rem;
+    height: 196px;
+    width: 204px;
     border-radius: 4px;
     user-select: none;
     word-break: break-all;

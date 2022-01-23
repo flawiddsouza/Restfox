@@ -6,7 +6,7 @@ import Workspaces from '@/components/Workspaces.vue'
 <template>
     <div class="container">
         <header>
-            <NavBar />
+            <NavBar nav="workspaces" />
         </header>
 
         <section class="workspaces">

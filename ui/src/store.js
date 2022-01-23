@@ -15,6 +15,7 @@ import {
 } from './helpers'
 import { db } from './db'
 import { nextTick } from 'vue'
+import constants from './constants'
 
 const store = createStore({
     state() {
@@ -90,7 +91,7 @@ const store = createStore({
             const flattenedCollectionTree = flattenTree(collectionTree)
             state.collection = state.collection.concat(flattenedCollectionTree)
             db.collections.bulkPut(flattenedCollectionTree)
-            state.collectionTree = collectionTree
+            state.collectionTree = state.collectionTree.concat(collectionTree)
         },
         setCollection(state, collection) {
             state.collection = collection
@@ -314,6 +315,62 @@ const store = createStore({
             }
             context.state.requestResponses[activeTab._id] = await handleRequest(activeTab, environment, context.getters.enabledPlugins)
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
+        },
+        async createWorkspace(context, payload) {
+            const newWorkspace = {
+                _id: nanoid(),
+                name: payload.name,
+                createdAt: new Date().getTime(),
+                updatedAt: new Date().getTime()
+            }
+
+            await db.workspaces.put(newWorkspace)
+
+            context.state.workspaces.unshift(newWorkspace)
+
+            if(payload.setAsActive) {
+                context.commit('setActiveWorkspace', newWorkspace)
+            }
+        },
+        async updateWorkspace(context, payload) {
+            const updatedAt = new Date().getTime()
+            await db.workspaces.update(payload._id, {
+                name: payload.name,
+                updatedAt
+            })
+            const workspace = context.state.workspaces.find(item => item._id === payload._id)
+            workspace.name = payload.name
+            workspace.updatedAt = updatedAt
+            context.state.workspaces.sort((a, b) => b.updatedAt - a.updatedAt)
+        },
+        async deleteWorkspace(context, workspaceId) {
+            await db.collections.where({ workspaceId: workspaceId }).delete()
+            await db.workspaces.where({ _id: workspaceId }).delete()
+            context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
+        },
+        async loadWorkspaces(context) {
+            let workspaces = await db.workspaces.toCollection().reverse().sortBy('updatedAt')
+
+            if(workspaces.length > 0) {
+                context.commit('setWorkspaces', workspaces)
+
+                const activeWorkspaceId = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ACTIVE_WORKSPACE_ID)
+                if(activeWorkspaceId) {
+                    const activeWorkspace = workspaces.find(item => item._id === activeWorkspaceId)
+                    if(activeWorkspace) {
+                        context.commit('setActiveWorkspace', activeWorkspace)
+                    }
+                }
+            } else {
+                await context.dispatch('createWorkspace', {
+                    name: 'My Collection',
+                    setAsActive: true
+                })
+
+                // update pre-existing collections with a default workspaceId, so as to not break
+                // collections created before the introduction of workspaces
+                await db.collections.toCollection().modify({ workspaceId: context.state.activeWorkspace._id })
+            }
         }
     }
 })
