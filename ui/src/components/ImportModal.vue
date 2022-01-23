@@ -11,7 +11,7 @@
             </label>
 
             <div style="margin-top: 1rem">
-                <input type="file" @change="fileToImport = $event.target.files[0]" required>
+                <input type="file" @change="fileToImport = $event.target.files[0]" accept=".json, .zip" required>
             </div>
 
             <template #footer>
