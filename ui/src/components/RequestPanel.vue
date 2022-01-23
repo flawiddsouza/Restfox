@@ -67,7 +67,7 @@
                     <textarea v-model="activeTab.body.text" style="width: 100%" spellcheck="false"></textarea>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/json'" class="oy-a">
-                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor"></CodeMirrorEditor>
+                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id"></CodeMirrorEditor>
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
