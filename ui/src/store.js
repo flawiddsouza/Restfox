@@ -371,6 +371,9 @@ const store = createStore({
                 // collections created before the introduction of workspaces
                 await db.collections.toCollection().modify({ workspaceId: context.state.activeWorkspace._id })
             }
+        },
+        async saveCollectionItemCollapsedState(_context, payload) {
+            await db.collections.update(payload._id, { collapsed: payload.collapsed })
         }
     }
 })
