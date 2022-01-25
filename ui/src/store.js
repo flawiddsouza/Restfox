@@ -195,7 +195,7 @@ const store = createStore({
             if(collectionItem.parentId) {
                 let parentCollection = findItemInTreeById(context.state.collectionTree, collectionItem.parentId)
                 const childIndex = parentCollection.children.findIndex(item => item._id === collectionItem._id)
-                parentCollection.children.splice(childIndex, 0, newCollectionItem)
+                parentCollection.children.splice(childIndex + 1, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
@@ -203,7 +203,7 @@ const store = createStore({
                 })
             } else {
                 const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
-                context.state.collectionTree.splice(childIndex, 0, newCollectionItem)
+                context.state.collectionTree.splice(childIndex + 1, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
