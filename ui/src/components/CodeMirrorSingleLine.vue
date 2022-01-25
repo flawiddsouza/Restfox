@@ -3,13 +3,15 @@
 </template>
 
 <script>
-import { EditorView } from '@codemirror/view'
+import { EditorView, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
+import { history, historyKeymap } from '@codemirror/history'
 
 function createState(vueInstance) {
     return EditorState.create({
         doc: vueInstance.modelValue,
         extensions: [
+            history(),
             EditorView.updateListener.of(v => {
                 if(v.docChanged) {
                     vueInstance.emitted = true
@@ -17,7 +19,10 @@ function createState(vueInstance) {
                 }
             }),
             // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
-            EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr)
+            EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
+            keymap.of([
+                ...historyKeymap
+            ])
         ]
     })
 }
