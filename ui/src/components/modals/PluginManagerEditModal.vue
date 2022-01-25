@@ -23,7 +23,34 @@
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 
-const examplePluginCode = `// Available methods:\n// context.request.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')\n// context.request.getBody()\n// context.request.setBody(<REQUEST_BODY_OBJECT>)\n// context.response.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')\n// context.response.getBody()\n// context.response.setBody(<RESPONSE_BODY_OBJECT>)\n// console.log(...)\n\nfunction handleRequest() {\n    console.log(context.request.getBody())\n}\n\nfunction handleResponse() {\n    console.log(context.response.getBody())\n}\n\nif('request' in context) {\n    handleRequest()\n}\n\nif('response' in context) {\n    handleResponse()\n}\n`
+const examplePluginCode =
+`// Available methods:
+// context.request.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
+// context.request.getBody()
+// context.request.setBody(<REQUEST_BODY_OBJECT>)
+// context.response.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
+// context.response.getBody() - returns ArrayBuffer
+// context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
+// context.response.getBodyText() - returns context.response.getBody() ArrayBuffer as text
+// context.response.setBodyText(<RESPONSE_BODY_TEXT>) - sets given text as context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
+// console.log(...)
+
+function handleRequest() {
+    console.log(context.request.getBody())
+}
+
+function handleResponse() {
+    console.log(context.response.getBody())
+}
+
+if('request' in context) {
+    handleRequest()
+}
+
+if('response' in context) {
+    handleResponse()
+}
+`
 
 export default {
     directives: {

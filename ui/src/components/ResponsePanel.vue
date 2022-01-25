@@ -28,9 +28,9 @@
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
                 <template v-if="response.statusText !== 'Error'">
-                    <CodeMirrorResponsePanelPreview v-model="response.responseParsed" />
+                    <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.responseBuffer)" />
                 </template>
-                <div class="content-box" v-else>{{ response.responseOriginal }}</div>
+                <div class="content-box" v-else>{{ response.error }}</div>
             </template>
             <template v-if="activeResponsePanelTab === 'Header'">
                 <div class="content-box">
@@ -82,16 +82,24 @@ export default {
                 return this.$store.state.requestResponses[this.activeTab._id]
             }
 
-            return {
-                status: null,
-                statusText: null,
-                response: null
-            }
+            return null
         }
     },
     methods: {
         cancelRequest() {
             // this.$store.commit('cancelRequest', this.activeTab)
+        },
+        bufferToString(buffer) {
+            const textDecoder = new TextDecoder('utf-8')
+            return textDecoder.decode(buffer)
+        },
+        bufferToJSONString(buffer) {
+            const responseText = this.bufferToString(buffer)
+            try {
+                return JSON.stringify(JSON.parse(responseText), null, 4)
+            } catch {
+                return responseText
+            }
         }
     }
 }

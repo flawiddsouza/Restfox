@@ -100,20 +100,16 @@ export async function handleRequest(request, environment, plugins) {
             body: request.method !== 'GET' ? body : undefined
         })
 
-        const responseText = await response.text()
-
-        let responseParsed = responseText
-
-        try {
-            responseParsed = JSON.stringify(JSON.parse(responseParsed), null, 4)
-        } catch {}
+        const responseBlob = await response.blob()
+        const responseMimeType = responseBlob.type
+        const responseBuffer = await responseBlob.arrayBuffer()
 
         let responseToSend = {
             status: response.status,
             statusText: response.statusText,
             headers: [...response.headers.entries()],
-            responseOriginal: responseText,
-            responseParsed: responseParsed
+            responseMimeType,
+            responseBuffer
         }
 
         for(const plugin of plugins) {
@@ -123,7 +119,7 @@ export async function handleRequest(request, environment, plugins) {
                 code: plugin.code
             })
 
-            responseToSend = { ...responseToSend, responseOriginal: responseContext.response.getBody(), responseParsed: responseContext.response.getParsedBody() }
+            responseToSend = { ...responseToSend, responseBuffer: responseContext.response.getBody() }
         }
 
         return responseToSend
@@ -137,7 +133,7 @@ export async function handleRequest(request, environment, plugins) {
         return {
             status: null,
             statusText: 'Error',
-            responseOriginal: error
+            error
         }
     }
 }
