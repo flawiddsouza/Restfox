@@ -14,6 +14,7 @@
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
     <SettingsModal v-model:showModal="settingsModalShow" :collection-item="settingsModalCollectionItem" />
+    <DuplicateCollectionItemModal v-model:showModal="showDuplicateCollectionItemModal" :collection-item-to-duplicate="collectionItemToDuplicate" />
 </template>
 
 <script>
@@ -23,6 +24,7 @@ import AddRequestModal from './modals/AddRequestModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import SettingsModal from './modals/SidebarSettingsModal.vue'
+import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import { mapState } from 'vuex'
 
 export default {
@@ -32,7 +34,8 @@ export default {
         AddRequestModal,
         AddFolderModal,
         EnvironmentModal,
-        SettingsModal
+        SettingsModal,
+        DuplicateCollectionItemModal
     },
     data() {
         return {
@@ -49,7 +52,9 @@ export default {
             settingsModalShow: false,
             settingsModalCollectionItem: null,
             draggedSidebarElement: null,
-            sidebarItemCursorPositition: 'below'
+            sidebarItemCursorPositition: 'below',
+            showDuplicateCollectionItemModal: false,
+            collectionItemToDuplicate: null
         }
     },
     computed: {
@@ -177,7 +182,7 @@ export default {
         }
     },
     methods: {
-        handleClick(clickedSidebarItem) {
+        async handleClick(clickedSidebarItem) {
             if(clickedSidebarItem === 'Delete') {
                 if(confirm('Are you sure?')) {
                     this.$store.dispatch('deleteCollectionItem', this.activeSidebarItemForContextMenu)
@@ -185,7 +190,8 @@ export default {
             }
 
             if(clickedSidebarItem === 'Duplicate') {
-                this.$store.dispatch('duplicateCollectionItem', this.activeSidebarItemForContextMenu)
+                this.collectionItemToDuplicate = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.showDuplicateCollectionItemModal = true
             }
 
             if(clickedSidebarItem === 'New Request') {

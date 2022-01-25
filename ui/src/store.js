@@ -210,6 +210,10 @@ const store = createStore({
                     db.collections.update(item._id, { sortOrder: index })
                 })
             }
+
+            if(newCollectionItem._type === 'request') {
+                context.commit('addTab', newCollectionItem)
+            }
         },
         async createCollectionItem(context, payload) {
             let newCollectionItem = null
