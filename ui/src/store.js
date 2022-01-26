@@ -31,6 +31,23 @@ async function loadResponses(state) {
     }
 }
 
+function setActiveTab(state, tab, scrollSidebarItemIntoView=false) {
+    state.activeTab = tab
+    loadResponses(state)
+    if(scrollSidebarItemIntoView) {
+        nextTick(() => {
+            const activeSidebarElement = document.querySelector(`.sidebar-list-container div[data-id="${tab._id}"]`)
+            if(activeSidebarElement) {
+                activeSidebarElement.scrollIntoView({
+                    behavior: 'auto',
+                    block: 'center',
+                    inline: 'center'
+                })
+            }
+        })
+    }
+}
+
 const store = createStore({
     state() {
         return {
@@ -68,16 +85,14 @@ const store = createStore({
             if(!existingTab) {
                 state.tabs.push(tab)
             }
-            state.activeTab = tab
-            loadResponses(state)
+            setActiveTab(state, tab)
             nextTick(() => {
                 const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tab._id}"]`)
                 activeTabElement.scrollIntoView()
             })
         },
         setActiveTab(state, tab) {
-            state.activeTab = tab
-            loadResponses(state)
+            setActiveTab(state, tab, true)
         },
         closeTab(state, collectionItemId) {
             const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === collectionItemId)
