@@ -102,11 +102,12 @@ const store = createStore({
             }
 
             const tabIndexLeft = tabIndex - 1
+            const tabIndexRight = tabIndex + 1
 
             if(state.activeTab && state.activeTab._id === collectionItemId) {
                 delete state.requestResponseStatus[state.activeTab._id]
                 delete state.requestResponses[state.activeTab._id]
-                state.activeTab = tabIndexLeft >= 0 ? state.tabs[tabIndexLeft] : null
+                state.activeTab = tabIndexLeft >= 0 ? state.tabs[tabIndexLeft] : (tabIndexRight <= state.tabs.length - 1 ? state.tabs[tabIndexRight] : null)
             }
 
             state.tabs.splice(tabIndex, 1)
