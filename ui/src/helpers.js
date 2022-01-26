@@ -729,3 +729,28 @@ export function dateFormat(date, includeSeconds=false) {
 
     return dayjs(date).format(format)
 }
+
+// From: https://github.com/Kong/insomnia/blob/e5b6f9034e34afc06def38c9d6a79a978fb19bb2/packages/insomnia-app/app/ui/components/tags/time-tag.tsx
+export function humanFriendlyTime(milliseconds) {
+    let unit = 'ms'
+    let number = milliseconds
+
+    if (milliseconds > 1000 * 60) {
+        unit = 'm'
+        number = milliseconds / 1000 / 60
+    } else if (milliseconds > 1000) {
+        unit = 's'
+        number = milliseconds / 1000
+    }
+
+    // Round to 0, 1, 2 decimal places depending on how big the number is
+    if (number > 100) {
+        number = Math.round(number);
+    } else if (number > 10) {
+        number = Math.round(number * 10) / 10;
+    } else {
+        number = Math.round(number * 100) / 100;
+    }
+
+    return `${number} ${unit}`
+}

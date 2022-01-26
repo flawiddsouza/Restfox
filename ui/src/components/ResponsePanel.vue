@@ -19,7 +19,7 @@
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText }}
                 </div>
-                <div class="tag">{{ Math.round(response.timeTaken) }} ms</div>
+                <div class="tag">{{ humanFriendlyTime(response.timeTaken) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
@@ -58,7 +58,7 @@
 <script>
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
-import { dateFormat } from '@/helpers'
+import { dateFormat, humanFriendlyTime } from '@/helpers'
 
 export default {
     components: {
@@ -140,6 +140,7 @@ export default {
             }
         },
         dateFormat,
+        humanFriendlyTime,
         handleResponseHistoryContextMenu(event) {
             this.responseHistoryContextMenuElement = event.target
             this.showResponseHistoryContextMenu = true
