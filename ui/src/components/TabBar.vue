@@ -87,7 +87,7 @@ export default {
         document.addEventListener('dragleave', this.dragLeave)
         document.addEventListener('drop', this.drop)
     },
-    onUnmounted() {
+    unmounted() {
         document.removeEventListener('dragstart', this.dragStart)
         document.removeEventListener('dragend', this.dragEnd)
         document.removeEventListener('dragover', this.dragOver)
