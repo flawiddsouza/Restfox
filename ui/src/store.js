@@ -186,6 +186,24 @@ const store = createStore({
                 state.responses.unshift(response)
                 await db.responses.put(response)
             }
+        },
+        async clearResponseHistory(state) {
+            await db.responses.where({ collectionId: state.activeTab._id }).delete()
+            state.responses = []
+            state.requestResponses[state.activeTab._id] = null
+            state.requestResponseStatus[state.activeTab._id] = 'pending'
+        },
+        async deleteCurrentlyActiveResponse(state) {
+            const responseId = state.requestResponses[state.activeTab._id]._id
+            await db.responses.where({ _id: responseId }).delete()
+            state.responses = state.responses.filter(response => response._id !== responseId)
+            if(state.responses.length > 0) {
+                state.requestResponses[state.activeTab._id] = state.responses[0]
+                state.requestResponseStatus[state.activeTab._id] = 'loaded'
+            } else {
+                state.requestResponses[state.activeTab._id] = null
+                state.requestResponseStatus[state.activeTab._id] = 'pending'
+            }
         }
     },
     actions: {

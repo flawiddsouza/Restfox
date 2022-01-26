@@ -22,7 +22,7 @@
                 <div class="tag">{{ Math.round(response.timeTaken) }} ms</div>
             </div>
             <div class="response-panel-address-bar-select-container">
-                <select v-model="response" v-if="responses.length > 0">
+                <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
                     <option v-for="response in responses" :value="response">{{ dateFormat(response.createdAt, true) }} | {{ response.url }}</option>
                 </select>
             </div>
@@ -52,15 +52,18 @@
             </template>
         </div>
     </template>
+    <ContextMenu :options="responseHistoryContextMenuOptions" :element="responseHistoryContextMenuElement" v-model:show="showResponseHistoryContextMenu" @click="handleResponseHistoryContextMenuItemClick" />
 </template>
 
 <script>
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
+import ContextMenu from './ContextMenu.vue'
 import { dateFormat } from '@/helpers'
 
 export default {
     components: {
-        CodeMirrorResponsePanelPreview
+        CodeMirrorResponsePanelPreview,
+        ContextMenu
     },
     data() {
         return {
@@ -72,7 +75,9 @@ export default {
                     name: 'Header'
                 }
             ],
-            activeResponsePanelTab: 'Preview'
+            activeResponsePanelTab: 'Preview',
+            responseHistoryContextMenuElement: null,
+            showResponseHistoryContextMenu: false
         }
     },
     computed: {
@@ -100,6 +105,22 @@ export default {
             set(response) {
                 this.$store.state.requestResponses[this.activeTab._id] = response
             }
+        },
+        responseHistoryContextMenuOptions() {
+            return [
+                {
+                    'type': 'option',
+                    'label': 'Delete Current Response',
+                    'value': 'Delete Current Response',
+                    'icon': 'fa fa-trash',
+                },
+                {
+                    'type': 'option',
+                    'label': 'Clear History',
+                    'value': 'Clear History',
+                    'icon': 'fa fa-trash',
+                }
+            ]
         }
     },
     methods: {
@@ -118,7 +139,20 @@ export default {
                 return responseText
             }
         },
-        dateFormat
+        dateFormat,
+        handleResponseHistoryContextMenu(event) {
+            this.responseHistoryContextMenuElement = event.target
+            this.showResponseHistoryContextMenu = true
+        },
+        handleResponseHistoryContextMenuItemClick(clickedContextMenuitem) {
+            if(clickedContextMenuitem === 'Delete Current Response') {
+                this.$store.commit('deleteCurrentlyActiveResponse')
+            }
+
+            if(clickedContextMenuitem === 'Clear History') {
+                this.$store.commit('clearResponseHistory')
+            }
+        }
     }
 }
 </script>
