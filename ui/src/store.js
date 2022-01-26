@@ -17,6 +17,19 @@ import { db } from './db'
 import { nextTick } from 'vue'
 import constants from './constants'
 
+async function loadResponses(state) {
+    state.responses = await db.responses.where({ collectionId: state.activeTab._id }).reverse().sortBy('createdAt')
+    if(state.responses.length > 0) {
+        if((state.activeTab._id in state.requestResponses) === false || (state.activeTab._id in state.requestResponses && state.requestResponses[state.activeTab._id] === null)) {
+            state.requestResponses[state.activeTab._id] = state.responses[0]
+            state.requestResponseStatus[state.activeTab._id] = 'loaded'
+        }
+    } else {
+        state.requestResponses[state.activeTab._id] = null
+        state.requestResponseStatus[state.activeTab._id] = 'pending'
+    }
+}
+
 const store = createStore({
     state() {
         return {
@@ -26,6 +39,7 @@ const store = createStore({
             activeTab: null,
             requestResponseStatus: {},
             requestResponses: {},
+            responses: [],
             showImportModal: false,
             collectionFilter: '',
             activeSidebarItemForContextMenu: '',
@@ -54,6 +68,7 @@ const store = createStore({
                 state.tabs.push(tab)
             }
             state.activeTab = tab
+            loadResponses(state)
             nextTick(() => {
                 const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tab._id}"]`)
                 activeTabElement.scrollIntoView()
@@ -61,10 +76,7 @@ const store = createStore({
         },
         setActiveTab(state, tab) {
             state.activeTab = tab
-            if(state.activeTab._id in state.requestResponseStatus === false) {
-                state.requestResponseStatus[state.activeTab._id] = 'pending'
-                state.requestResponses[state.activeTab._id] = null
-            }
+            loadResponses(state)
         },
         closeTab(state, collectionItemId) {
             const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === collectionItemId)
@@ -168,17 +180,25 @@ const store = createStore({
         async deletePlugin(state, pluginId) {
             await db.plugins.where({ _id: pluginId }).delete()
             state.plugins = state.plugins.filter(plugin => plugin._id !== pluginId)
+        },
+        async saveResponse(state, response) {
+            if(response._id) {
+                state.responses.unshift(response)
+                await db.responses.put(response)
+            }
         }
     },
     actions: {
         async deleteCollectionItem(context, collectionItem) {
             const childIds = getChildIds(context.state.collection, collectionItem._id)
+            await db.responses.where('collectionId').anyOf(childIds).delete()
             await db.collections.where(':id').anyOf(childIds).delete()
             await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
             })
             context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
+            context.state.responses = context.state.responses.filter(item => childIds.includes(item.collectionId))
         },
         async duplicateCollectionItem(context, collectionItem) {
             const newCollectionItem = JSON.parse(JSON.stringify(collectionItem))
@@ -317,7 +337,10 @@ const store = createStore({
             if(parent) {
                 environment = parent.environment ?? {}
             }
-            context.state.requestResponses[activeTab._id] = await handleRequest(activeTab, environment, context.getters.enabledPlugins)
+
+            const response = await handleRequest(activeTab, environment, context.getters.enabledPlugins)
+            context.commit('saveResponse', response)
+            context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
         },
         async createWorkspace(context, payload) {
@@ -348,9 +371,14 @@ const store = createStore({
             context.state.workspaces.sort((a, b) => b.updatedAt - a.updatedAt)
         },
         async deleteWorkspace(context, workspaceId) {
+            const collectionIds = await db.collections.where({ workspaceId: workspaceId }).primaryKeys()
+            await db.responses.where('collectionId').anyOf(collectionIds).delete()
             await db.collections.where({ workspaceId: workspaceId }).delete()
             await db.workspaces.where({ _id: workspaceId }).delete()
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
+            collectionIds.forEach(collectionId => {
+                context.commit('closeTab', collectionId)
+            })
         },
         async loadWorkspaces(context) {
             let workspaces = await db.workspaces.toCollection().reverse().sortBy('updatedAt')

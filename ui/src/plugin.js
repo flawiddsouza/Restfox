@@ -24,24 +24,24 @@ export function createRequestContextForPlugin(request, environment) {
 }
 
 export function createResponseContextForPlugin(response, environment) {
-    let responseBufferCopy = response.responseBuffer.slice(0)
+    let bufferCopy = response.buffer.slice(0)
 
     return {
         response: {
             getBody() {
-                return responseBufferCopy
+                return bufferCopy
             },
             getBodyText() {
-                return (new TextDecoder('utf-8')).decode(responseBufferCopy)
+                return (new TextDecoder('utf-8')).decode(bufferCopy)
             },
             getEnvironmentVariable(variable) {
                 return JSON.parse(JSON.stringify(environment[variable]))
             },
-            setBody(responseBuffer) {
-                responseBufferCopy = responseBuffer
+            setBody(buffer) {
+                bufferCopy = buffer
             },
             setBodyText(bodyText) {
-                responseBufferCopy = (new TextEncoder('utf-8')).encode(bodyText)
+                bufferCopy = (new TextEncoder('utf-8')).encode(bodyText)
             }
         }
     }

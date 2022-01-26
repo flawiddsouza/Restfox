@@ -18,6 +18,11 @@
                 <span class="bold">{{ response.status }}</span>
                 {{ response.statusText }}
             </div>
+            <div class="response-panel-address-bar-select-container">
+                <select v-model="response" v-if="responses.length > 0">
+                    <option v-for="response in responses" :value="response">{{ dateFormat(response.createdAt, true) }} | {{ response.url }}</option>
+                </select>
+            </div>
         </div>
         <div class="response-panel-tabs">
             <div class="response-panel-tab" :class="{ 'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name }" @click="activeResponsePanelTab = responsePanelTab.name" v-for="responsePanelTab in responsePanelTabs">
@@ -28,7 +33,7 @@
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
                 <template v-if="response.statusText !== 'Error'">
-                    <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.responseBuffer)" />
+                    <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" />
                 </template>
                 <div class="content-box" v-else>{{ response.error }}</div>
             </template>
@@ -48,6 +53,7 @@
 
 <script>
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
+import { dateFormat } from '@/helpers'
 
 export default {
     components: {
@@ -77,12 +83,20 @@ export default {
 
             return 'not loaded'
         },
-        response() {
-            if(this.activeTab && this.activeTab._id in this.$store.state.requestResponses) {
-                return this.$store.state.requestResponses[this.activeTab._id]
-            }
+        responses() {
+            return this.$store.state.responses
+        },
+        response: {
+            get() {
+                if(this.activeTab && this.activeTab._id in this.$store.state.requestResponses) {
+                    return this.$store.state.requestResponses[this.activeTab._id]
+                }
 
-            return null
+                return null
+            },
+            set(response) {
+                this.$store.state.requestResponses[this.activeTab._id] = response
+            }
         }
     },
     methods: {
@@ -100,7 +114,8 @@ export default {
             } catch {
                 return responseText
             }
-        }
+        },
+        dateFormat
     }
 }
 </script>
@@ -135,6 +150,7 @@ export default {
 
 .response-panel-address-bar {
     display: flex;
+    justify-content: space-between;
     border-bottom: 1px solid var(--default-border-color);
     height: 2rem;
     align-items: center;
@@ -144,6 +160,7 @@ export default {
 
 .response-panel-address-bar .tag {
     padding: 0.2rem 0.6rem;
+    white-space: nowrap;
 }
 
 .response-panel-address-bar .tag .bold {
@@ -163,6 +180,24 @@ export default {
 .response-panel-address-bar .tag.red {
     background: #e15251;
     color: white;
+}
+
+.response-panel-address-bar .response-panel-address-bar-select-container {
+    height: 100%;
+    margin-left: 1rem;
+}
+
+.response-panel-address-bar  .response-panel-address-bar-select-container select {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+}
+
+.response-panel-address-bar  .response-panel-address-bar-select-container select:hover {
+    background-color: #f7f7f7;
 }
 
 .response-panel-tabs {

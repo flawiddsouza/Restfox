@@ -101,15 +101,19 @@ export async function handleRequest(request, environment, plugins) {
         })
 
         const responseBlob = await response.blob()
-        const responseMimeType = responseBlob.type
-        const responseBuffer = await responseBlob.arrayBuffer()
+        const mimeType = responseBlob.type
+        const buffer = await responseBlob.arrayBuffer()
 
         let responseToSend = {
+            _id: nanoid(),
+            collectionId: request._id,
+            url: urlWithEnvironmentVariablesSubtituted,
             status: response.status,
             statusText: response.statusText,
             headers: [...response.headers.entries()],
-            responseMimeType,
-            responseBuffer
+            mimeType,
+            buffer,
+            createdAt: new Date().getTime()
         }
 
         for(const plugin of plugins) {
@@ -119,7 +123,7 @@ export async function handleRequest(request, environment, plugins) {
                 code: plugin.code
             })
 
-            responseToSend = { ...responseToSend, responseBuffer: responseContext.response.getBody() }
+            responseToSend = { ...responseToSend, buffer: responseContext.response.getBody() }
         }
 
         return responseToSend
@@ -708,4 +712,14 @@ export function isFirstIdIndirectOrDirectParentOfSecondIdInTree(array, firstId, 
     f(array, secondId, firstId)
 
     return result
+}
+
+export function dateFormat(date, includeSeconds=false) {
+    let format = 'DD-MMM-YY hh:mm A'
+
+    if(includeSeconds) {
+        format = 'DD-MMM-YY hh:mm:ss A'
+    }
+
+    return dayjs(date).format(format)
 }
