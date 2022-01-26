@@ -10,13 +10,16 @@
     </div>
     <template v-if="status !== 'not loaded' && response !== null">
         <div class="response-panel-address-bar">
-            <div class="tag" :class="{
-                'green': response.status >= 200 && response.status <= 299,
-                'yellow': response.status >= 400 && response.status <= 499,
-                'red': response.status >= 500 || response.statusText === 'Error'
-            }">
-                <span class="bold">{{ response.status }}</span>
-                {{ response.statusText }}
+            <div class="response-panel-address-bar-tag-container">
+                <div class="tag" :class="{
+                    'green': response.status >= 200 && response.status <= 299,
+                    'yellow': response.status >= 400 && response.status <= 499,
+                    'red': response.status >= 500 || response.statusText === 'Error'
+                }">
+                    <span class="bold">{{ response.status }}</span>
+                    {{ response.statusText }}
+                </div>
+                <div class="tag">{{ Math.round(response.timeTaken) }} ms</div>
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0">
@@ -158,9 +161,14 @@ export default {
     padding-left: 0.5rem;
 }
 
+.response-panel-address-bar .response-panel-address-bar-tag-container {
+    display: flex;
+}
+
 .response-panel-address-bar .tag {
     padding: 0.2rem 0.6rem;
     white-space: nowrap;
+    user-select: none;
 }
 
 .response-panel-address-bar .tag .bold {

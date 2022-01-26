@@ -94,11 +94,16 @@ export async function handleRequest(request, environment, plugins) {
             })
         }
 
+        const startTime = new Date()
+
         const response = await fetch(url, {
             method: request.method,
             headers,
             body: request.method !== 'GET' ? body : undefined
         })
+
+        const endTime = new Date()
+        const timeTaken = endTime - startTime
 
         const responseBlob = await response.blob()
         const mimeType = responseBlob.type
@@ -113,6 +118,7 @@ export async function handleRequest(request, environment, plugins) {
             headers: [...response.headers.entries()],
             mimeType,
             buffer,
+            timeTaken,
             createdAt: new Date().getTime()
         }
 
