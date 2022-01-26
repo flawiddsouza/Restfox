@@ -13,25 +13,30 @@
         </div>
         <ContextMenu :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
         <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" />
+        <DuplicateWorkspaceModal v-model:showModal="showDuplicateWorkspaceModal" :workspace-to-duplicate="workspaceToDuplicate" />
     </div>
 </template>
 
 <script>
 import ContextMenu from './ContextMenu.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
+import DuplicateWorkspaceModal from './modals/DuplicateWorkspaceModal.vue'
 import dayjs from 'dayjs'
 
 export default {
     components: {
         ContextMenu,
-        AddWorkspaceModal
+        AddWorkspaceModal,
+        DuplicateWorkspaceModal
     },
     data() {
         return {
             showContextMenu: false,
             contextMenuElement: null,
             contextMenuWorkspace: null,
-            showAddWorkspaceModal: false
+            showAddWorkspaceModal: false,
+            showDuplicateWorkspaceModal: false,
+            workspaceToDuplicate: null
         }
     },
     computed: {
@@ -40,11 +45,11 @@ export default {
         },
         options() {
             return [
-                // {
-                //     'type': 'option',
-                //     'label': 'Duplicate',
-                //     'value': 'Duplicate'
-                // },
+                {
+                    'type': 'option',
+                    'label': 'Duplicate',
+                    'value': 'Duplicate'
+                },
                 {
                     'type': 'option',
                     'label': 'Rename',
@@ -71,6 +76,11 @@ export default {
             this.showContextMenu = true
         },
         handleContextMenuClick(clickedContextMenuItem) {
+            if(clickedContextMenuItem === 'Duplicate') {
+                this.workspaceToDuplicate = JSON.parse(JSON.stringify(this.contextMenuWorkspace))
+                this.showDuplicateWorkspaceModal = true
+            }
+
             if(clickedContextMenuItem === 'Rename') {
                 this.showAddWorkspaceModal = true
             }

@@ -11,7 +11,8 @@ import {
     getChildIds,
     findItemInTreeById,
     generateNewIdsForTreeItemChildren,
-    isFirstIdIndirectOrDirectParentOfSecondIdInTree
+    isFirstIdIndirectOrDirectParentOfSecondIdInTree,
+    generateNewIdsForTree
 } from './helpers'
 import { db } from './db'
 import { nextTick } from 'vue'
@@ -362,8 +363,10 @@ const store = createStore({
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
         },
         async createWorkspace(context, payload) {
+            const newWorkspaceId = nanoid()
+
             const newWorkspace = {
-                _id: nanoid(),
+                _id: newWorkspaceId,
                 name: payload.name,
                 createdAt: new Date().getTime(),
                 updatedAt: new Date().getTime()
@@ -376,6 +379,8 @@ const store = createStore({
             if(payload.setAsActive) {
                 context.commit('setActiveWorkspace', newWorkspace)
             }
+
+            return newWorkspaceId
         },
         async updateWorkspace(context, payload) {
             const updatedAt = new Date().getTime()
@@ -424,6 +429,18 @@ const store = createStore({
         },
         async saveCollectionItemCollapsedState(_context, payload) {
             await db.collections.update(payload._id, { collapsed: payload.collapsed })
+        },
+        async duplicateWorkspace(context, workspace) {
+            const newWorkspaceId = await context.dispatch('createWorkspace', {
+                name: workspace.name
+            })
+            const workspaceCollectionItems = await db.collections.where({ workspaceId: workspace.sourceWorkspaceId }).toArray()
+            workspaceCollectionItems.forEach(collectionItem => {
+                collectionItem.workspaceId = newWorkspaceId
+            })
+            const collectionTree = toTree(workspaceCollectionItems)
+            generateNewIdsForTree(collectionTree)
+            await db.collections.bulkPut(flattenTree(collectionTree))
         }
     }
 })
