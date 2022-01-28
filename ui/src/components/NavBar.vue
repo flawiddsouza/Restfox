@@ -29,6 +29,7 @@
 import PluginManagerModal from './modals/PluginManagerModal.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import { downloadObjectAsJSON, todayISODate } from '@/helpers'
+import { getCollectionForWorkspace } from '@/db'
 
 export default {
      components: {
@@ -51,10 +52,10 @@ export default {
         }
     },
     methods: {
-        exportCollection() {
+        async exportCollection() {
             downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
                 exportedFrom: 'Restfox-1.0.0',
-                collection: this.$store.state.collection
+                collection: await getCollectionForWorkspace(this.activeWorkspace._id)
             })
         },
         clearCollection() {

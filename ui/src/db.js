@@ -8,3 +8,7 @@ db.version(4).stores({
     plugins: '_id',
     responses: '_id, collectionId'
 })
+
+export async function getCollectionForWorkspace(workspaceId) {
+    return db.collections.where({ workspaceId }).toArray()
+}

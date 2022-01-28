@@ -467,12 +467,12 @@ function importRestfoxV1(collections, workspaceId) {
             if(item.body.mimeType === 'application/x-www-form-urlencoded') {
                 body = {
                     mimeType: item.body.mimeType,
-                    params: item.body.params.map(parameter => ({
+                    params: 'params' in item.body ? item.body.params.map(parameter => ({
                         name: parameter.name,
                         value: parameter.value,
                         description: parameter.description,
                         disabled: parameter.disabled
-                    }))
+                    })) : []
                 }
             }
 
