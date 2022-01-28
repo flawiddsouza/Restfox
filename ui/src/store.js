@@ -14,7 +14,7 @@ import {
     isFirstIdIndirectOrDirectParentOfSecondIdInTree,
     generateNewIdsForTree
 } from './helpers'
-import { db } from './db'
+import { db, getCollectionForWorkspace } from './db'
 import { nextTick } from 'vue'
 import constants from './constants'
 
@@ -450,7 +450,7 @@ const store = createStore({
             const newWorkspaceId = await context.dispatch('createWorkspace', {
                 name: workspace.name
             })
-            const workspaceCollectionItems = await db.collections.where({ workspaceId: workspace.sourceWorkspaceId }).toArray()
+            const workspaceCollectionItems = await getCollectionForWorkspace(workspace.sourceWorkspaceId)
             workspaceCollectionItems.forEach(collectionItem => {
                 collectionItem.workspaceId = newWorkspaceId
             })

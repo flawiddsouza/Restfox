@@ -12,7 +12,7 @@ import { nanoid } from 'nanoid'
 </template>
 
 <script>
-import { db } from './db'
+import { db, getCollectionForWorkspace } from './db'
 import constants from './constants'
 
 export default {
@@ -47,7 +47,7 @@ export default {
                 return
             }
 
-            const collections = await db.collections.where({ workspaceId: this.activeWorkspace._id }).toArray()
+            const collections = await getCollectionForWorkspace(this.activeWorkspace._id)
 
             if(collections.length > 0) {
                 this.$store.commit('setCollection', collections)
