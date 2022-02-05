@@ -2,6 +2,7 @@ import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import dayjs from 'dayjs'
+import getObjectPathValue from 'lodash.get'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -68,10 +69,15 @@ export async function handleRequest(request, environment, plugins) {
 
     try {
         let urlWithEnvironmentVariablesSubtituted = request.url
-        Object.keys(environment).forEach(variable => {
-            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ _.${variable} }}`, environment[variable])
-            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{${variable}}}`, environment[variable])
+
+        const possibleEnvironmentObjectPaths = getObjectPaths(environment)
+
+        possibleEnvironmentObjectPaths.forEach(objectPath => {
+            const objectPathValue = getObjectPathValue(environment, objectPath)
+            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ _.${objectPath} }}`, objectPathValue)
+            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{${objectPath}}}`, objectPathValue)
         })
+
         const url = new URL(urlWithEnvironmentVariablesSubtituted)
 
         if('parameters' in request) {
@@ -753,4 +759,33 @@ export function humanFriendlyTime(milliseconds) {
     }
 
     return `${number} ${unit}`
+}
+
+export function getObjectPaths(object) {
+    let paths = []
+
+    function recurse(obj, keyParent='') {
+        if(typeof obj === 'number' || typeof obj === 'string') {
+            return
+        }
+        const isArray = Array.isArray(obj)
+        Object.keys(obj).forEach(key => {
+            let newKeyParent = keyParent
+            if(newKeyParent) {
+                if(isArray) {
+                    newKeyParent = `${newKeyParent}[${key}]`
+                } else {
+                    newKeyParent = `${newKeyParent}.${key}`
+                }
+            } else {
+                newKeyParent = key
+            }
+            paths.push(newKeyParent)
+            recurse(obj[key], newKeyParent)
+        })
+    }
+
+    recurse(object)
+
+    return paths
 }
