@@ -35,7 +35,11 @@ export function createResponseContextForPlugin(response, environment) {
                 return (new TextDecoder('utf-8')).decode(bufferCopy)
             },
             getEnvironmentVariable(variable) {
-                return JSON.parse(JSON.stringify(environment[variable]))
+                if(variable in environment) {
+                    return JSON.parse(JSON.stringify(environment[variable]))
+                }
+
+                return undefined
             },
             setBody(buffer) {
                 bufferCopy = buffer
