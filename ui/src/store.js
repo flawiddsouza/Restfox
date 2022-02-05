@@ -57,6 +57,7 @@ const store = createStore({
             activeTab: null,
             requestResponseStatus: {},
             requestResponses: {},
+            requestAbortController: {},
             responses: [],
             showImportModal: false,
             collectionFilter: '',
@@ -373,7 +374,8 @@ const store = createStore({
                 environment = parent.environment ?? {}
             }
 
-            const response = await handleRequest(activeTab, environment, context.getters.enabledPlugins)
+            context.state.requestAbortController[activeTab._id] = new AbortController()
+            const response = await handleRequest(activeTab, environment, context.getters.enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'

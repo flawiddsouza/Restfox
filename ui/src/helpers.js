@@ -40,7 +40,7 @@ export function flattenTree(array) {
     return level
 }
 
-export async function handleRequest(request, environment, plugins) {
+export async function handleRequest(request, environment, plugins, abortControllerSignal) {
     for(const plugin of plugins) {
         const requestContext = createRequestContextForPlugin(request, environment)
 
@@ -105,7 +105,8 @@ export async function handleRequest(request, environment, plugins) {
         const response = await fetch(url, {
             method: request.method,
             headers,
-            body: request.method !== 'GET' ? body : undefined
+            body: request.method !== 'GET' ? body : undefined,
+            signal: abortControllerSignal
         })
 
         const endTime = new Date()
@@ -144,6 +145,10 @@ export async function handleRequest(request, environment, plugins) {
 
         if(e.message.includes('Invalid URL')) {
             error = 'Error: Invalid URL'
+        }
+
+        if(e.name === 'AbortError') {
+            error = 'Error: Request Cancelled'
         }
 
         return {

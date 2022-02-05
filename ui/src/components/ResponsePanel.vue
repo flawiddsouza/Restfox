@@ -5,7 +5,7 @@
             <i class="fas fa-sync fa-spin"></i>
         </div>
         <div class="pad">
-            <button class="btn btn--clicky">Cancel Request</button>
+            <button @click="cancelRequest">Cancel Request</button>
         </div>
     </div>
     <template v-if="status !== 'not loaded' && response !== null">
@@ -19,7 +19,7 @@
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText }}
                 </div>
-                <div class="tag">{{ humanFriendlyTime(response.timeTaken) }}</div>
+                <div class="tag" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
@@ -106,6 +106,13 @@ export default {
                 this.$store.state.requestResponses[this.activeTab._id] = response
             }
         },
+        requestAbortController() {
+            if(this.activeTab && this.activeTab._id in this.$store.state.requestResponses) {
+                return this.$store.state.requestAbortController[this.activeTab._id]
+            }
+
+            return null
+        },
         responseHistoryContextMenuOptions() {
             return [
                 {
@@ -125,7 +132,7 @@ export default {
     },
     methods: {
         cancelRequest() {
-            // this.$store.commit('cancelRequest', this.activeTab)
+            this.requestAbortController.abort()
         },
         bufferToString(buffer) {
             const textDecoder = new TextDecoder('utf-8')
