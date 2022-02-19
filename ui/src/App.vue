@@ -27,7 +27,7 @@ export default {
     watch: {
         'activeTab.url'() {
             // sync query params in url with query params in collection if they are the same
-            if('parameters' in this.activeTab) {
+            if(this.activeTab && 'parameters' in this.activeTab) {
                 let urlParamsSplit = this.activeTab.url.split('?')
                 if(urlParamsSplit.length > 1) {
                     const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
@@ -43,16 +43,18 @@ export default {
         'activeTab.parameters': {
             handler() {
                 // sync query params in url with query params in collection if they are the same
-                let urlParamsSplit = this.activeTab.url.split('?')
-                if(urlParamsSplit.length > 1) {
-                    const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
-                    this.activeTab.parameters.forEach(param => {
-                        if(urlSearchParams.has(param.name)) {
-                            urlSearchParams.set(param.name, param.value)
-                        }
-                    })
-                    urlParamsSplit[1] = urlSearchParams.toString()
-                    this.activeTab.url = urlParamsSplit.join('?')
+                if(this.activeTab && 'url' in this.activeTab) {
+                    let urlParamsSplit = this.activeTab.url.split('?')
+                    if(urlParamsSplit.length > 1) {
+                        const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
+                        this.activeTab.parameters.forEach(param => {
+                            if(urlSearchParams.has(param.name)) {
+                                urlSearchParams.set(param.name, param.value)
+                            }
+                        })
+                        urlParamsSplit[1] = urlSearchParams.toString()
+                        this.activeTab.url = urlParamsSplit.join('?')
+                    }
                 }
             },
             deep: true
