@@ -8,6 +8,9 @@
                 <sidebar-item :sidebar-item="sidebarItem" />
             </template>
         </div>
+        <div v-if="sidebarItems.length === 0" class="sidebar-empty-message">
+            You can right click here to create a new request or a new folder
+        </div>
     </div>
     <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" :x-offset="20" />
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
@@ -217,7 +220,7 @@ export default {
             this.showContextMenu = false
         },
         handleSidebarEmptyAreaContextMenu(event) {
-            if(event.target.classList.contains('sidebar-list-container') === false) {
+            if(event.target.classList.contains('sidebar-list-container') === false && event.target.classList.contains('sidebar-empty-message') === false) {
                 return
             }
             this.contextMenuX = event.pageX
@@ -387,5 +390,11 @@ export default {
 
 .sidebar .sidebar-item * {
     pointer-events: none;
+}
+
+.sidebar-empty-message {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.5rem;
 }
 </style>
