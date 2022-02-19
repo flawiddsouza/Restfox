@@ -16,7 +16,7 @@ const extensions = [
     lineNumbers(),
     foldGutter({ openText: '▾', closedText: '▸' }),
     EditorView.lineWrapping,
-    EditorView.editable.of(false),
+    EditorView.editable.of(true),
     EditorState.readOnly.of(true)
 ]
 
