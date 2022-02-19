@@ -54,7 +54,7 @@ export default {
                 type: 'request',
                 name: this.requestName,
                 method: this.requestMethod,
-                mimeType: 'application/x-www-form-urlencoded',
+                mimeType: 'No Body',
                 parentId: this.parentId
             })
             this.showModalComp = false
