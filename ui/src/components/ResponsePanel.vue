@@ -32,6 +32,9 @@
                 {{ responsePanelTab.name }}
             </div>
             <div class="response-panel-tab-fill"></div>
+            <div class="response-panel-tab-actions">
+                <i class="fas fa-paste" @click="copyResponseToClipboard" title="Copy response to clipboard"></i>
+            </div>
         </div>
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
@@ -160,6 +163,14 @@ export default {
             if(clickedContextMenuitem === 'Clear History') {
                 this.$store.commit('clearResponseHistory')
             }
+        },
+        async copyResponseToClipboard() {
+            if(!window.isSecureContext) {
+                alert('Copy to clipboard needs Restfox running under a https url')
+                return
+            }
+            await navigator.clipboard.writeText(this.bufferToJSONString(this.response.buffer))
+            this.$toast.success('Copied to clipboard')
         }
     }
 }
@@ -274,6 +285,20 @@ export default {
 .response-panel-tabs .response-panel-tab-fill {
     width: 100%;
     border-bottom: 1px solid var(--default-border-color);
+}
+
+.response-panel-tabs .response-panel-tab-actions {
+    display: flex;
+    border-bottom: 1px solid var(--default-border-color);
+}
+
+.response-panel-tabs .response-panel-tab-actions i {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    font-size: 1rem;
+    padding-right: 1rem;
 }
 
 .response-panel-tabs-context {
