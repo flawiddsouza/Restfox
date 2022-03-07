@@ -5,6 +5,10 @@ import Sidebar from '@/components/Sidebar.vue'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
 import ImportModal from '@/components/ImportModal.vue'
+import { computed } from 'vue'
+import { useStore } from 'vuex'
+const store = useStore()
+const activeTab = computed(() => store.state.activeTab)
 </script>
 
 <template>
@@ -13,7 +17,7 @@ import ImportModal from '@/components/ImportModal.vue'
             <NavBar nav="collection" />
         </header>
 
-        <section class="tab-bar">
+        <section class="tab-bar" v-if="activeTab">
             <TabBar />
         </section>
 
@@ -21,11 +25,11 @@ import ImportModal from '@/components/ImportModal.vue'
             <Sidebar />
         </aside>
 
-        <section class="request-panel">
+        <section class="request-panel" v-if="activeTab">
             <RequestPanel />
         </section>
 
-        <section class="response-panel">
+        <section class="response-panel" v-if="activeTab">
             <ResponsePanel />
         </section>
 
