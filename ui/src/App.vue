@@ -27,7 +27,7 @@ export default {
     watch: {
         'activeTab.url'() {
             // sync query params in url with query params in collection if they are the same
-            if(this.activeTab && 'parameters' in this.activeTab) {
+            if(this.activeTab && 'url' in this.activeTab && this.activeTab.url && 'parameters' in this.activeTab) {
                 let urlParamsSplit = this.activeTab.url.split('?')
                 if(urlParamsSplit.length > 1) {
                     const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
@@ -43,7 +43,7 @@ export default {
         'activeTab.parameters': {
             handler() {
                 // sync query params in url with query params in collection if they are the same
-                if(this.activeTab && 'url' in this.activeTab) {
+                if(this.activeTab && 'url' in this.activeTab && this.activeTab.url) {
                     let urlParamsSplit = this.activeTab.url.split('?')
                     if(urlParamsSplit.length > 1) {
                         const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
