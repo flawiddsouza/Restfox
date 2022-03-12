@@ -29,6 +29,7 @@ import EnvironmentModal from './modals/EnvironmentModal.vue'
 import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import { mapState } from 'vuex'
+import { flattenTree, exportRestfoxCollection } from '@/helpers'
 
 export default {
     components: {
@@ -105,6 +106,12 @@ export default {
                     },
                     {
                         'type': 'option',
+                        'label': 'Export',
+                        'value': 'Export',
+                        'icon': 'fa fa-download'
+                    },
+                    {
+                        'type': 'option',
                         'label': 'Delete',
                         'value': 'Delete',
                         'icon': 'fa fa-trash',
@@ -143,6 +150,12 @@ export default {
                         'label': 'Duplicate',
                         'value': 'Duplicate',
                         'icon': 'fa fa-copy',
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Export',
+                        'value': 'Export',
+                        'icon': 'fa fa-download'
                     },
                     {
                         'type': 'option',
@@ -195,6 +208,12 @@ export default {
             if(clickedSidebarItem === 'Duplicate') {
                 this.collectionItemToDuplicate = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
                 this.showDuplicateCollectionItemModal = true
+            }
+
+            if(clickedSidebarItem === 'Export') {
+                const collectionItemToExport = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                collectionItemToExport.parentId = null
+                exportRestfoxCollection(flattenTree([collectionItemToExport]))
             }
 
             if(clickedSidebarItem === 'New Request') {

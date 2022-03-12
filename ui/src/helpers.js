@@ -794,3 +794,10 @@ export function getObjectPaths(object) {
 
     return paths
 }
+
+export function exportRestfoxCollection(collection) {
+    downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
+        exportedFrom: 'Restfox-1.0.0',
+        collection
+    })
+}
