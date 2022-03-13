@@ -8,7 +8,7 @@
         </div>
         <div class="right-nav-container">
             <div v-if="nav === 'collection'">
-                <a href="#" @click.prevent="this.$store.commit('showImportModal', true)">Import</a>
+                <a href="#" @click.prevent="showImportModal">Import</a>
                 <span class="spacer"></span>
                 <a href="#" @click.prevent="exportCollection">Export</a>
                 <span class="spacer"></span>
@@ -69,6 +69,10 @@ export default {
         },
         showAddWorkspace() {
             this.showAddWorkspaceModal = true
+        },
+        showImportModal() {
+            this.$store.commit('showImportModalSelectedRequestGroupId', null)
+            this.$store.commit('showImportModal', true)
         }
     }
 }

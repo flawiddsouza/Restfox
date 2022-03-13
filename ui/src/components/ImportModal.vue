@@ -14,6 +14,16 @@
                 <input type="file" @change="fileToImport = $event.target.files[0]" accept=".json, .zip" required>
             </div>
 
+            <div style="margin-top: 1.5rem">
+                <label>
+                    <div style="font-weight: 500; margin-bottom: 0.25rem">Import Into</div>
+                    <select style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="selectedRequestGroupId">
+                        <option :value="null">Root of the workspace</option>
+                        <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
+                    </select>
+                </label>
+            </div>
+
             <template #footer>
                 <button>Import</button>
             </template>
@@ -30,6 +40,7 @@ import {
     generateNewIdsForTree
 } from '@/helpers'
 import Modal from '@/components/Modal.vue'
+import { getCollectionForWorkspace } from '@/db'
 
 export default {
     components: {
@@ -37,6 +48,7 @@ export default {
     },
     data() {
         return {
+            activeWorkspaceFolders: [],
             fileToImport: null,
             importFrom: 'Restfox'
         }
@@ -50,11 +62,39 @@ export default {
                 this.$store.commit('showImportModal', value)
             }
         },
+        selectedRequestGroupId: {
+            get() {
+                return this.$store.state.showImportModalSelectedRequestGroupId
+            },
+            set(value) {
+                this.$store.commit('showImportModalSelectedRequestGroupId', value)
+            }
+        },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
+        },
+        collectionTree() {
+            return this.$store.state.collectionTree
+        }
+    },
+    watch: {
+        activeWorkspace() {
+            if(this.activeWorkspace) {
+                this.handleActiveWorkspace()
+            }
+        },
+        collectionTree() {
+            if(this.activeWorkspace) {
+                this.handleActiveWorkspace()
+            }
         }
     },
     methods: {
+        async handleActiveWorkspace() {
+            this.activeWorkspaceFolders = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
+            this.activeWorkspaceFolders.sort((a, b) => a.name.localeCompare(b.name))
+            this.selectedRequestGroupId = null
+        },
         async importFile() {
             try {
                 let json = null
@@ -79,9 +119,15 @@ export default {
                     collectionTree = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
                 }
 
+                if(this.selectedRequestGroupId) {
+                    collectionTree.forEach(collection => {
+                        collection.parentId = this.selectedRequestGroupId
+                    })
+                }
+
                 generateNewIdsForTree(collectionTree)
 
-                this.$store.commit('setCollectionTree', collectionTree)
+                this.$store.dispatch('setCollectionTree', { collectionTree, parentId: this.selectedRequestGroupId })
 
                 this.fileToImport = null
                 this.showImportModal = false
@@ -92,6 +138,9 @@ export default {
                 alert('Invalid import file given')
             }
         }
+    },
+    created() {
+        this.handleActiveWorkspace()
     }
 }
 </script>

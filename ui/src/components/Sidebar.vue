@@ -88,6 +88,12 @@ export default {
                         'label': 'New Folder',
                         'value': 'New Folder',
                         'icon': 'fa fa-folder',
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Import',
+                        'value': 'Import Into',
+                        'icon': 'fa fa-upload'
                     }
                 ]
             }
@@ -174,6 +180,15 @@ export default {
                     },
                     {
                         'type': 'option',
+                        'label': 'Import Into',
+                        'value': 'Import Into',
+                        'icon': 'fa fa-upload'
+                    },
+                    {
+                        'type': 'separator'
+                    },
+                    {
+                        'type': 'option',
                         'label': 'Settings',
                         'value': 'Settings',
                         'icon': 'fa fa-wrench',
@@ -229,6 +244,11 @@ export default {
             if(clickedSidebarItem === 'Environment') {
                 this.environmentModalCollectionItem = this.activeSidebarItemForContextMenu
                 this.environmentModalShow = true
+            }
+
+            if(clickedSidebarItem === 'Import Into') {
+                this.$store.commit('showImportModalSelectedRequestGroupId', this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null)
+                this.$store.commit('showImportModal', true)
             }
 
             if(clickedSidebarItem === 'Settings') {

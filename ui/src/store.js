@@ -60,6 +60,7 @@ const store = createStore({
             requestAbortController: {},
             responses: [],
             showImportModal: false,
+            showImportModalSelectedRequestGroupId: null,
             collectionFilter: '',
             activeSidebarItemForContextMenu: '',
             sidebarContextMenuElement: null,
@@ -116,12 +117,8 @@ const store = createStore({
         showImportModal(state, value) {
             state.showImportModal = value
         },
-        setCollectionTree(state, collectionTree) {
-            addSortOrderToTree(collectionTree)
-            const flattenedCollectionTree = flattenTree(collectionTree)
-            state.collection = state.collection.concat(flattenedCollectionTree)
-            db.collections.bulkPut(flattenedCollectionTree)
-            state.collectionTree = state.collectionTree.concat(collectionTree)
+        showImportModalSelectedRequestGroupId(state, value) {
+            state.showImportModalSelectedRequestGroupId = value
         },
         setCollection(state, collection) {
             state.collection = collection
@@ -459,6 +456,18 @@ const store = createStore({
             const collectionTree = toTree(workspaceCollectionItems)
             generateNewIdsForTree(collectionTree)
             await db.collections.bulkPut(flattenTree(collectionTree))
+        },
+        async setCollectionTree(context, { collectionTree, parentId=null }) {
+            if(parentId) {
+                const parentCollection = findItemInTreeById(context.state.collectionTree, parentId)
+                collectionTree = parentCollection.children.concat(collectionTree)
+            } else {
+                collectionTree = context.state.collectionTree.concat(collectionTree)
+            }
+            addSortOrderToTree(collectionTree)
+            const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
+            await db.collections.bulkPut(flattenedCollectionTree)
+            context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))
         }
     }
 })
