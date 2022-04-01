@@ -45,7 +45,7 @@ export function createResponseContextForPlugin(response, environment) {
 }
 
 export async function usePlugin(context, plugin) {
-    const vm = (await getQuickJS()).createVm()
+    const vm = (await getQuickJS()).newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 
     arena.expose({

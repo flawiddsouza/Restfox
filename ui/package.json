@@ -25,7 +25,7 @@
         "jszip": "^3.7.1",
         "lodash.get": "^4.4.2",
         "nanoid": "^3.1.30",
-        "quickjs-emscripten": "^0.15.0",
+        "quickjs-emscripten": "^0.20.0",
         "quickjs-emscripten-sync": "^1.2.0",
         "sass": "^1.43.4",
         "vue": "^3.2.16",
