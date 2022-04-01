@@ -7,6 +7,9 @@ export function createRequestContextForPlugin(request, environment) {
 
     return {
         request: {
+            getMethod() {
+                return state.method
+            },
             getBody() {
                 return state.body
             },
@@ -15,6 +18,12 @@ export function createRequestContextForPlugin(request, environment) {
             },
             setBody(requestBody) {
                 state.body = requestBody
+            },
+            getQueryParams() {
+                return state.parameters
+            },
+            setQueryParams(queryParams) {
+                state.parameters = queryParams
             }
         }
     }

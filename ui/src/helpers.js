@@ -48,7 +48,7 @@ export async function handleRequest(request, environment, plugins, abortControll
             code: plugin.code
         })
 
-        request = { ...request, body: requestContext.request.getBody() }
+        request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
     }
 
     let body = null

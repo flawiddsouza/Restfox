@@ -25,9 +25,12 @@ import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 
 const examplePluginCode =
 `// Available methods:
+// context.request.getMethod()
 // context.request.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
 // context.request.getBody()
 // context.request.setBody(<REQUEST_BODY_OBJECT>)
+// context.request.getQueryParams()
+// context.request.setQueryParams(<REQUEST_QUERY_PARAMS_ARRAY>)
 // context.response.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
 // context.response.getBody() - returns ArrayBuffer
 // context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
