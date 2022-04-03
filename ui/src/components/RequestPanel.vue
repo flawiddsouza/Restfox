@@ -67,7 +67,10 @@
                     <textarea v-model="activeTab.body.text" style="width: 100%" spellcheck="false"></textarea>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/json'" class="oy-a">
-                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id"></CodeMirrorEditor>
+                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id" ref="jsonEditor"></CodeMirrorEditor>
+                </div>
+                <div class="request-panel-body-footer" v-if="activeTab.body.mimeType === 'application/json'">
+                    <button @click="beautifyJSON">Beautify JSON</button>
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
@@ -169,6 +172,11 @@ export default {
             }
 
             object[key].push(itemToPush)
+        },
+        beautifyJSON() {
+            try {
+                this.$refs.jsonEditor.setValue(JSON.stringify(JSON.parse(this.activeTab.body.text), null, 4))
+            } catch {} // catch all json parsing errors and ignore them
         }
     }
 }
@@ -306,5 +314,13 @@ export default {
     border: 1px solid var(--default-border-color);
     height: 100%;
     overflow-y: auto;
+}
+
+.request-panel-body-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 0.5rem;
+    margin-bottom: -0.5rem
 }
 </style>

@@ -83,6 +83,13 @@ export default {
             }
         }
     },
+    methods: {
+        setValue(value) {
+            this.editor.dispatch({
+                changes: { from: 0, to: this.editor.state.doc.length, insert: value }
+            })
+        }
+    },
     mounted() {
         this.editor = new EditorView({
             state: createState(this.lang, this.modelValue, this),
