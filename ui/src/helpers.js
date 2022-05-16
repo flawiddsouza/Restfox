@@ -80,7 +80,7 @@ export async function handleRequest(request, environment, plugins, abortControll
 
         const url = new URL(urlWithEnvironmentVariablesSubtituted)
 
-        if('parameters' in request) {
+        if('parameters' in request && request.parameters) {
             request.parameters.filter(item => !item.disabled).forEach(param => {
                 url.searchParams.append(param.name, param.value)
             })
