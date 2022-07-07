@@ -19,22 +19,27 @@
             </div>
             <span class="spacer"></span>
             <a href="#" @click.prevent="showPluginsManager">Plugins</a>
+            <span class="spacer"></span>
+            <a href="#" @click.prevent="showSettings">Settings</a>
         </div>
     </div>
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" />
+    <SettingsModal v-model:showModal="showSettingsModal" />
 </template>
 
 <script>
 import PluginManagerModal from './modals/PluginManagerModal.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
+import SettingsModal from './modals/SettingsModal.vue'
 import { exportRestfoxCollection } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 
 export default {
      components: {
         PluginManagerModal,
-        AddWorkspaceModal
+        AddWorkspaceModal,
+        SettingsModal
     },
     props: {
         nav: String,
@@ -42,6 +47,7 @@ export default {
     },
     data() {
         return {
+            showSettingsModal: false,
             showPluginManagerModal: false,
             showAddWorkspaceModal: false
         }
@@ -63,6 +69,9 @@ export default {
         },
         setActiveWorkspace(workspace) {
             this.$store.commit('setActiveWorkspace', workspace)
+        },
+        showSettings() {
+            this.showSettingsModal = true
         },
         showPluginsManager() {
             this.showPluginManagerModal = true
