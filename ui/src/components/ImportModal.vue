@@ -6,12 +6,18 @@
                 <select style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="importFrom">
                     <option>Restfox</option>
                     <option>Postman</option>
+                    <option>Postman URL</option>
                     <option>Insomnia</option>
                 </select>
             </label>
 
             <div style="margin-top: 1rem">
-                <input type="file" @change="fileToImport = $event.target.files[0]" accept=".json, .zip" required>
+                <template v-if="importFrom !== 'Postman URL'">
+                    <input type="file" @change="fileToImport = $event.target.files[0]" accept=".json, .zip" required>
+                </template>
+                <template v-else>
+                    <input type="url" v-model="urlToImport" required placeholder="https://postman.com/collections/{collectionId}" style="width: 100%; border: 1px solid var(--default-border-color); outline: 0px; padding: 0.3rem; background: inherit;">
+                </template>
             </div>
 
             <div style="margin-top: 1.5rem">
@@ -50,6 +56,7 @@ export default {
         return {
             activeWorkspaceFolders: [],
             fileToImport: null,
+            urlToImport: '',
             importFrom: 'Restfox'
         }
     },
@@ -99,7 +106,7 @@ export default {
             try {
                 let json = null
 
-                if(this.fileToImport.name.endsWith('.json')) {
+                if(this.fileToImport && this.fileToImport.name.endsWith('.json')) {
                     json = await fileToJSON(this.fileToImport)
                 } else {
                     json = this.fileToImport
@@ -109,6 +116,13 @@ export default {
 
                 if(this.importFrom === 'Postman') {
                     collectionTree = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
+                }
+
+                if(this.importFrom === 'Postman URL') {
+                    const response = await fetch(this.urlToImport)
+                    json = await response.json()
+
+                    collectionTree = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
                 }
 
                 if(this.importFrom === 'Insomnia') {
