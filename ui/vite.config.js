@@ -10,7 +10,8 @@ export default defineConfig({
         vue(),
         copy({
             targets: [
-                { src: 'dist/*', dest: '../electron/ui' }
+                { src: 'dist/*', dest: '../electron/ui' },
+                { src: 'dist/*', dest: '../tauri/ui' }
             ],
             hook: 'writeBundle'
         }),

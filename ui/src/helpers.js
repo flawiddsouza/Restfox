@@ -141,14 +141,18 @@ export async function handleRequest(request, environment, plugins, abortControll
 
         return responseToSend
     } catch(e) {
+        console.log(e)
+
         let error = `Error: Couldn't resolve host name`
 
-        if(e.message.includes('Invalid URL')) {
-            error = 'Error: Invalid URL'
-        }
+        if(typeof e !== 'string')  {
+            if(e.message.includes('Invalid URL')) {
+                error = 'Error: Invalid URL'
+            }
 
-        if(e.name === 'AbortError') {
-            error = 'Error: Request Cancelled'
+            if(e.name === 'AbortError') {
+                error = 'Error: Request Cancelled'
+            }
         }
 
         return {
