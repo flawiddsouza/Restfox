@@ -67,7 +67,8 @@
                 "height": 600,
                 "resizable": true,
                 "title": "Restfox",
-                "width": 800
+                "width": 800,
+                "maximized": true
             }
         ]
     }
