@@ -32,10 +32,9 @@ export default {
                 if(urlParamsSplit.length > 1) {
                     const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
                     for(const urlParam of urlSearchParams.entries()) {
-                        const foundParam = this.activeTab.parameters.find(item => item.name === urlParam[0])
-                        if(foundParam) {
-                            foundParam.value = urlParam[1]
-                        }
+                        this.activeTab.parameters.filter(item => !item.disabled && item.name === urlParam[0]).forEach(matchingParam => {
+                            matchingParam.value = urlParam[1]
+                        })
                     }
                 }
             }
@@ -47,7 +46,7 @@ export default {
                     let urlParamsSplit = this.activeTab.url.split('?')
                     if(urlParamsSplit.length > 1) {
                         const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
-                        this.activeTab.parameters.forEach(param => {
+                        this.activeTab.parameters.filter(item => !item.disabled).forEach(param => {
                             if(urlSearchParams.has(param.name)) {
                                 urlSearchParams.set(param.name, param.value)
                             }
