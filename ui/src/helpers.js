@@ -76,6 +76,7 @@ export async function handleRequest(request, environment, plugins, abortControll
             const objectPathValue = getObjectPathValue(environment, objectPath)
             urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ _.${objectPath} }}`, objectPathValue)
             urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{${objectPath}}}`, objectPathValue)
+            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ ${objectPath} }}`, objectPathValue)
         })
 
         const url = new URL(urlWithEnvironmentVariablesSubtituted)
@@ -173,7 +174,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 _type: 'request_group',
                 name: item.name,
                 environment: item.environment,
-                parentId: item.parentId,
+                parentId: item.parentId === '__WORKSPACE_ID__' ? null : item.parentId,
                 workspaceId
             })
         } else {
