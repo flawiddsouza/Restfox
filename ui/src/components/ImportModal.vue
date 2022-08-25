@@ -90,10 +90,13 @@ export default {
                 this.handleActiveWorkspace()
             }
         },
-        collectionTree() {
-            if(this.activeWorkspace) {
-                this.handleActiveWorkspace()
-            }
+        collectionTree: {
+            handler() {
+                if(this.activeWorkspace) {
+                    this.handleActiveWorkspace()
+                }
+            },
+            deep: true
         }
     },
     methods: {
