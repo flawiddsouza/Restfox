@@ -3,11 +3,13 @@
         <div class="heading">
             <div v-if="activeWorkspace === null">Workspaces</div>
             <template v-else>
-                <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span> [<a href="#" @click.prevent="environmentModalShow = true">Environment</a>]
+                <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
             </template>
         </div>
         <div class="right-nav-container">
             <div v-if="nav === 'collection'">
+                <a href="#" @click.prevent="environmentModalShow = true">Environment</a>
+                <span class="spacer"></span>
                 <a href="#" @click.prevent="showImportModal">Import</a>
                 <span class="spacer"></span>
                 <a href="#" @click.prevent="exportCollection">Export</a>
