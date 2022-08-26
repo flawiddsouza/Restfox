@@ -48,6 +48,33 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView=false) {
     }
 }
 
+async function getAllParents(parentArray, request) {
+    if(!request.parentId) {
+        return
+    }
+    const requestParent = await db.collections.where({ ':id': request.parentId }).first()
+    if(requestParent) {
+        parentArray.push(requestParent)
+        await getAllParents(parentArray, requestParent)
+    }
+}
+
+async function getEnvironmentForRequest(requestWorkspace, request) {
+    let environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
+
+    let parentArray = []
+    await getAllParents(parentArray, request)
+    parentArray = parentArray.reverse()
+
+    for(const parent of parentArray) {
+        if(parent.environment) {
+            Object.assign(environment, parent.environment)
+        }
+    }
+
+    return environment
+}
+
 const store = createStore({
     state() {
         return {
@@ -370,12 +397,7 @@ const store = createStore({
         },
         async sendRequest(context, activeTab) {
             context.state.requestResponseStatus[activeTab._id] = 'loading'
-            const parent = activeTab.parentId ? await db.collections.where({ ':id': activeTab.parentId }).first() : null
-            let environment = {}
-            if(parent) {
-                environment = parent.environment ?? {}
-            }
-
+            const environment = await getEnvironmentForRequest(context.state.activeWorkspace, activeTab)
             context.state.requestAbortController[activeTab._id] = new AbortController()
             const response = await handleRequest(activeTab, environment, context.getters.enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
             context.commit('saveResponse', response)
