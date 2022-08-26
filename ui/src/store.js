@@ -17,6 +17,7 @@ import {
 import { db, getCollectionForWorkspace } from './db'
 import { nextTick } from 'vue'
 import constants from './constants'
+import { emitter } from './event-bus'
 
 async function loadResponses(state) {
     state.responses = await db.responses.where({ collectionId: state.activeTab._id }).reverse().sortBy('createdAt')
@@ -188,6 +189,10 @@ const store = createStore({
         },
         async updateCollectionItemName(_state, collectionItem) {
             await db.collections.update(collectionItem._id, { name: collectionItem.name })
+
+            if(collectionItem._type === 'request_group') {
+                emitter.emit('request_group', 'renamed')
+            }
         },
         setWorkspaces(state, workspaces) {
             state.workspaces = workspaces
@@ -264,6 +269,10 @@ const store = createStore({
             })
             context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
             context.state.responses = context.state.responses.filter(item => childIds.includes(item.collectionId))
+
+            if(collectionItem._type === 'request_group') {
+                emitter.emit('request_group', 'deleted')
+            }
         },
         async duplicateCollectionItem(context, collectionItem) {
             const newCollectionItem = JSON.parse(JSON.stringify(collectionItem))
@@ -298,6 +307,10 @@ const store = createStore({
 
             if(newCollectionItem._type === 'request') {
                 context.commit('addTab', newCollectionItem)
+            }
+
+            if(newCollectionItem._type === 'request_group') {
+                emitter.emit('request_group', 'added')
             }
         },
         async createCollectionItem(context, payload) {
@@ -350,6 +363,10 @@ const store = createStore({
 
             if(payload.type === 'request') {
                 context.commit('addTab', newCollectionItem)
+            }
+
+            if(payload.type === 'request_group') {
+                emitter.emit('request_group', 'added')
             }
         },
         async reorderCollectionItem(context, payload) {

@@ -47,6 +47,7 @@ import {
 } from '@/helpers'
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
+import { emitter } from '@/event-bus'
 
 export default {
     components: {
@@ -89,14 +90,6 @@ export default {
             if(this.activeWorkspace) {
                 this.handleActiveWorkspace()
             }
-        },
-        collectionTree: {
-            handler() {
-                if(this.activeWorkspace) {
-                    this.handleActiveWorkspace()
-                }
-            },
-            deep: true
         }
     },
     methods: {
@@ -158,6 +151,11 @@ export default {
     },
     created() {
         this.handleActiveWorkspace()
+
+        emitter.on('request_group', this.handleActiveWorkspace)
+    },
+    beforeUnmount() {
+        emitter.off('request_group', this.handleActiveWorkspace)
     }
 }
 </script>
