@@ -3,7 +3,7 @@
         <div class="heading">
             <div v-if="activeWorkspace === null">Workspaces</div>
             <template v-else>
-                <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
+                <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span> [<a href="#" @click.prevent="environmentModalShow = true">Environment</a>]
             </template>
         </div>
         <div class="right-nav-container">
@@ -26,12 +26,14 @@
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" />
     <SettingsModal v-model:showModal="showSettingsModal" />
+    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" />
 </template>
 
 <script>
 import PluginManagerModal from './modals/PluginManagerModal.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
+import EnvironmentModal from './modals/EnvironmentModal.vue'
 import { exportRestfoxCollection } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 
@@ -39,7 +41,8 @@ export default {
      components: {
         PluginManagerModal,
         AddWorkspaceModal,
-        SettingsModal
+        SettingsModal,
+        EnvironmentModal
     },
     props: {
         nav: String,
@@ -49,7 +52,8 @@ export default {
         return {
             showSettingsModal: false,
             showPluginManagerModal: false,
-            showAddWorkspaceModal: false
+            showAddWorkspaceModal: false,
+            environmentModalShow: false
         }
     },
     computed: {

@@ -149,9 +149,14 @@ const store = createStore({
             state.activeSidebarItemForContextMenu = null
             state.sidebarContextMenuElement = null
         },
-        async updateCollectionItemEnvironment(_state, collectionItem) {
-            if('environment' in collectionItem) {
-                await db.collections.update(collectionItem._id, { environment: JSON.parse(JSON.stringify(collectionItem.environment)) })
+        async updateCollectionItemEnvironment(_state, { collectionId, environment }) {
+            if(environment) {
+                await db.collections.update(collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
+            }
+        },
+        async updatWorkspaceEnvironment(_state, { workspaceId, environment }) {
+            if(environment) {
+                await db.workspaces.update(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
         async updateCollectionItemName(_state, collectionItem) {

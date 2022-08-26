@@ -1,6 +1,6 @@
 <template>
     <form @submit.prevent="done" v-if="showModalComp">
-        <modal :title="`Environment (JSON Format) — ${collectionItem.name}`" v-model="showModalComp" height="70vh" width="55rem">
+        <modal :title="`Environment (JSON Format) — ${collectionItem ? collectionItem.name : workspace.name}`" v-model="showModalComp" height="70vh" width="55rem">
             <CodeMirrorEditor v-model="environment" lang="json"></CodeMirrorEditor>
             <div style="margin-top: 1rem">
                 <div v-if="parseError" class="box">{{ parseError }}</div>
@@ -23,7 +23,8 @@ import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 export default {
     props: {
         showModal: Boolean,
-        collectionItem: Object
+        collectionItem: Object,
+        workspace: Object
     },
     components: {
         Modal,
@@ -32,6 +33,7 @@ export default {
     data() {
         return {
             environment: '{}',
+            environmentToSave: {},
             parseError: ''
         }
     },
@@ -49,21 +51,36 @@ export default {
         collectionItem() {
             this.environment = this.collectionItem.environment ? JSON.stringify(this.collectionItem.environment, null, 4) : '{}'
         },
+        workspace() {
+            this.environment = this.workspace.environment ? JSON.stringify(this.workspace.environment, null, 4) : '{}'
+        },
         environment() {
             let environment = {}
             try {
                 environment = JSON.parse(this.environment)
                 this.parseError = ''
-                this.collectionItem.environment = environment
+                this.environmentToSave = environment
             } catch(e) {
                 this.parseError = e.message
             }
         },
         showModal() {
             if(this.showModal) {
-                this.environment = this.collectionItem.environment ? JSON.stringify(this.collectionItem.environment, null, 4) : '{}'
+                if(this.collectionItem) {
+                    this.environment = this.collectionItem.environment ? JSON.stringify(this.collectionItem.environment, null, 4) : '{}'
+                }
+                if(this.workspace) {
+                    this.environment = this.workspace.environment ? JSON.stringify(this.workspace.environment, null, 4) : '{}'
+                }
             } else {
-                this.$store.commit('updateCollectionItemEnvironment', this.collectionItem)
+                if(this.collectionItem) {
+                    this.collectionItem.environment = this.environmentToSave
+                    this.$store.commit('updateCollectionItemEnvironment', { collectionId: this.collectionItem._id, environment: this.environmentToSave })
+                }
+                if(this.workspace) {
+                    this.workspace.environment = this.environmentToSave
+                    this.$store.commit('updatWorkspaceEnvironment',  { workspaceId: this.workspace._id, environment: this.environmentToSave })
+                }
             }
         }
     },
