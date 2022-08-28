@@ -48,6 +48,16 @@ import {
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
+import { flattenTree, sortTree, toTree } from '../helpers'
+
+function prependParentTitleToChildTitle(array, prepend='') {
+    array.forEach(item => {
+        item.name = `${prepend ? prepend + ' ' : ''}${item.name}`
+        if('children' in item) {
+            prependParentTitleToChildTitle(item.children, item.name + ' → ')
+        }
+    })
+}
 
 export default {
     components: {
@@ -94,8 +104,12 @@ export default {
     },
     methods: {
         async handleActiveWorkspace() {
-            this.activeWorkspaceFolders = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
-            this.activeWorkspaceFolders.sort((a, b) => a.name.localeCompare(b.name))
+            let activeWorkspaceFolders = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
+            activeWorkspaceFolders = toTree(activeWorkspaceFolders)
+            sortTree(activeWorkspaceFolders)
+            prependParentTitleToChildTitle(activeWorkspaceFolders)
+            activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
+            this.activeWorkspaceFolders = activeWorkspaceFolders
             this.selectedRequestGroupId = null
         },
         async importFile() {
