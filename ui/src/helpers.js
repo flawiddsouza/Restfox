@@ -40,6 +40,25 @@ export function flattenTree(array) {
     return level
 }
 
+export function substituteEnvironmentVariables(environment, string) {
+    let substitutedString = String(string)
+
+    const possibleEnvironmentObjectPaths = getObjectPaths(environment)
+
+    possibleEnvironmentObjectPaths.forEach(objectPath => {
+        const objectPathValue = getObjectPathValue(environment, objectPath)
+        substitutedString = substitutedString.replace(`{{ _.${objectPath} }}`, objectPathValue)
+        substitutedString = substitutedString.replace(`{{${objectPath}}}`, objectPathValue)
+        substitutedString = substitutedString.replace(`{{ ${objectPath} }}`, objectPathValue)
+    })
+
+    return substitutedString
+}
+
+export function generateBasicAuthString(username, password) {
+    return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
+}
+
 export async function handleRequest(request, environment, plugins, abortControllerSignal) {
     for(const plugin of plugins) {
         const requestContext = createRequestContextForPlugin(request, environment)
@@ -55,35 +74,38 @@ export async function handleRequest(request, environment, plugins, abortControll
 
     if(request.body.mimeType === 'application/x-www-form-urlencoded') {
         if('params' in request.body) {
-            body = new URLSearchParams(Object.fromEntries(request.body.params.filter(item => !item.disabled).map(item => ([item.name, item.value]))))
+            body = new URLSearchParams(
+                Object.fromEntries(
+                    request.body.params.filter(item => !item.disabled).map(item => {
+                        return [
+                            substituteEnvironmentVariables(environment, item.name),
+                            substituteEnvironmentVariables(environment, item.value)
+                        ]
+                    })
+                )
+            )
         }
     }
 
     if(request.body.mimeType === 'application/json') {
-        body = request.body.text
+        body = substituteEnvironmentVariables(environment, request.body.text)
     }
 
     if(request.body.mimeType === 'text/plain') {
-        body = request.body.text
+        body = substituteEnvironmentVariables(environment, request.body.text)
     }
 
     try {
-        let urlWithEnvironmentVariablesSubtituted = request.url
+        let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
 
-        const possibleEnvironmentObjectPaths = getObjectPaths(environment)
-
-        possibleEnvironmentObjectPaths.forEach(objectPath => {
-            const objectPathValue = getObjectPathValue(environment, objectPath)
-            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ _.${objectPath} }}`, objectPathValue)
-            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{${objectPath}}}`, objectPathValue)
-            urlWithEnvironmentVariablesSubtituted = urlWithEnvironmentVariablesSubtituted.replace(`{{ ${objectPath} }}`, objectPathValue)
-        })
-
-        const url = new URL(urlWithEnvironmentVariablesSubtituted)
+        const url = new URL(urlWithEnvironmentVariablesSubstituted)
 
         if('parameters' in request && request.parameters) {
             request.parameters.filter(item => !item.disabled).forEach(param => {
-                url.searchParams.append(param.name, param.value)
+                url.searchParams.append(
+                    substituteEnvironmentVariables(environment, param.name),
+                    substituteEnvironmentVariables(environment, param.value)
+                )
             })
         }
 
@@ -97,18 +119,21 @@ export async function handleRequest(request, environment, plugins, abortControll
 
         if('headers' in request) {
             request.headers.filter(header => !header.disabled).forEach(header => {
-                headers[header.name.toLowerCase()] = header.value
+                headers[substituteEnvironmentVariables(environment, header.name.toLowerCase())] = substituteEnvironmentVariables(environment, header.value)
             })
         }
 
         if('authentication' in request && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
             if(request.authentication.type === 'basic') {
-                headers['Authorization'] = 'Basic ' + window.btoa(unescape(encodeURIComponent(request.authentication.username)) + ':' + unescape(encodeURIComponent(request.authentication.password)))
+                headers['Authorization'] = generateBasicAuthString(
+                    substituteEnvironmentVariables(environment, request.authentication.username),
+                    substituteEnvironmentVariables(environment, request.authentication.password)
+                )
             }
 
             if(request.authentication.type === 'bearer') {
                 const authenticationBearerPrefix = request.authentication.prefix !== undefined && request.authentication.prefix !== '' ? request.authentication.prefix : 'Bearer'
-                headers['Authorization'] = `${authenticationBearerPrefix} ${request.authentication.token}`
+                headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, request.authentication.token)}`
             }
         }
 
@@ -131,7 +156,7 @@ export async function handleRequest(request, environment, plugins, abortControll
         let responseToSend = {
             _id: nanoid(),
             collectionId: request._id,
-            url: urlWithEnvironmentVariablesSubtituted,
+            url: urlWithEnvironmentVariablesSubstituted,
             status: response.status,
             statusText: response.statusText,
             headers: [...response.headers.entries()],
