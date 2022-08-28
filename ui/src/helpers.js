@@ -239,6 +239,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                     disabled: parameter.disabled
                 })) : [],
                 authentication: 'authentication' in item ? item.authentication : {},
+                description: 'description' in item ? item.description : undefined,
                 parentId: item.parentId,
                 workspaceId
             })
@@ -448,6 +449,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             body,
             headers,
             parameters,
+            description: 'description' in request.request ? request.request.description : undefined,
             parentId,
             workspaceId
         })

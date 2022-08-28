@@ -71,7 +71,7 @@
                     </table>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'text/plain'">
-                    <textarea v-model="activeTab.body.text" style="width: 100%" spellcheck="false"></textarea>
+                    <textarea v-model="activeTab.body.text" style="width: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/json'" class="oy-a">
                     <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id" ref="jsonEditor"></CodeMirrorEditor>
@@ -181,6 +181,11 @@
                     </table>
                 </div>
             </template>
+            <template v-if="activeRequestPanelTab === 'Description'">
+                <div style="height: 100%">
+                    <textarea v-model="activeTab.description" style="width: 100%; height: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
+                </div>
+            </template>
         </div>
     </template>
 </template>
@@ -208,6 +213,9 @@ export default {
                 },
                 {
                     name: 'Auth'
+                },
+                {
+                    name: 'Description'
                 }
             ],
             activeRequestPanelTab: 'Body',
