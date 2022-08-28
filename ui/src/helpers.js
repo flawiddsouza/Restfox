@@ -466,6 +466,10 @@ function importPostmanV2(collections, workspaceId) {
             _id: postmanCollectionItem.info._postman_id,
             _type: 'request_group',
             name: postmanCollectionItem.info.name,
+            environment: 'variable' in postmanCollectionItem ? postmanCollectionItem.variable.reduce((prev, acc) => {
+                prev[acc.key] = acc.value
+                return prev
+            }, {}) : undefined,
             children: handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId),
             parentId: null,
             workspaceId
