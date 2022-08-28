@@ -12,7 +12,8 @@ import {
     findItemInTreeById,
     generateNewIdsForTreeItemChildren,
     isFirstIdIndirectOrDirectParentOfSecondIdInTree,
-    generateNewIdsForTree
+    generateNewIdsForTree,
+    substituteEnvironmentVariables
 } from './helpers'
 import { db, getCollectionForWorkspace } from './db'
 import { nextTick } from 'vue'
@@ -69,7 +70,10 @@ async function getEnvironmentForRequest(requestWorkspace, request) {
 
     for(const parent of parentArray) {
         if(parent.environment) {
-            Object.assign(environment, parent.environment)
+            let tempEnvironment = JSON.stringify(parent.environment)
+            tempEnvironment = substituteEnvironmentVariables(environment, tempEnvironment)
+            tempEnvironment = JSON.parse(tempEnvironment)
+            Object.assign(environment, tempEnvironment)
         }
     }
 
