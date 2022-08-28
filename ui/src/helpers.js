@@ -101,6 +101,17 @@ export async function handleRequest(request, environment, plugins, abortControll
             })
         }
 
+        if('authentication' in request && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
+            if(request.authentication.type === 'basic') {
+                headers['Authorization'] = 'Basic ' + window.btoa(unescape(encodeURIComponent(request.authentication.username)) + ':' + unescape(encodeURIComponent(request.authentication.password)))
+            }
+
+            if(request.authentication.type === 'bearer') {
+                const authenticationBearerPrefix = request.authentication.prefix !== undefined && request.authentication.prefix !== '' ? request.authentication.prefix : 'Bearer'
+                headers['Authorization'] = `${authenticationBearerPrefix} ${request.authentication.token}`
+            }
+        }
+
         const startTime = new Date()
 
         const response = await fetch(url, {
@@ -227,6 +238,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                     description: parameter.description,
                     disabled: parameter.disabled
                 })) : [],
+                authentication: 'authentication' in item ? item.authentication : {},
                 parentId: item.parentId,
                 workspaceId
             })

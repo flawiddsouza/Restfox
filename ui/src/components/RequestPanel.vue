@@ -18,6 +18,8 @@
                             <span> ({{ activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
                         </template>
                     </template>
+                    <template v-if="activeTab.body.mimeType === 'text/plain'"> (Plain)</template>
+                    <template v-if="activeTab.body.mimeType === 'application/json'"> (JSON)</template>
                 </template>
                 <template v-if="requestPanelTab.name === 'Query'">
                     <template v-if="'parameters' in activeTab && activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
@@ -27,6 +29,11 @@
                 <template v-if="requestPanelTab.name === 'Header'">
                     <template v-if="'headers' in activeTab && activeTab.headers.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
                         <span> ({{ activeTab.headers.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
+                    </template>
+                </template>
+                <template v-if="requestPanelTab.name === 'Auth'">
+                    <template v-if="'authentication' in activeTab && activeTab.authentication.type !== 'No Auth'">
+                        <span> ({{ getAuthenticationTypeLabel(activeTab.authentication.type) }})</span>
                     </template>
                 </template>
             </div>
@@ -119,6 +126,61 @@
                     </tr>
                 </table>
             </template>
+            <template v-if="activeRequestPanelTab === 'Auth'">
+                <select :value="activeTab.authentication?.type ?? 'No Auth'" @change="handleActiveTabAuthenticationTypeChange" style="margin-bottom: 0.5rem">
+                    <option value="No Auth">No Auth</option>
+                    <option value="basic">Basic Auth</option>
+                    <option value="bearer">Bearer Token</option>
+                </select>
+                <div v-if="activeTab.authentication && activeTab.authentication.type !== 'No Auth'">
+                    <table>
+                        <tr>
+                            <td style="min-width: 6rem; user-select: none;">
+                                <label for="basic-auth-enabled">Enabled</label>
+                            </td>
+                            <td style="width: 100%">
+                                <input type="checkbox" :checked="activeTab.authentication.disabled === undefined || activeTab.authentication.disabled === false" @change="activeTab.authentication.disabled = $event.target.checked ? false : true" id="basic-auth-enabled">
+                            </td>
+                        </tr>
+                        <template v-if="activeTab.authentication.type === 'basic'">
+                            <tr>
+                                <td style="user-select: none;">
+                                    <label for="basic-auth-username" :class="{ disabled: activeTab.authentication.disabled }">Username</label>
+                                </td>
+                                <td style="width: 100%">
+                                    <input type="text" v-model="activeTab.authentication.username" id="basic-auth-username" :disabled="activeTab.authentication.disabled">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="user-select: none;">
+                                    <label for="basic-auth-password" :class="{ disabled: activeTab.authentication.disabled }">Password</label>
+                                </td>
+                                <td style="width: 100%">
+                                    <input type="text" v-model="activeTab.authentication.password" id="basic-auth-password" :disabled="activeTab.authentication.disabled">
+                                </td>
+                            </tr>
+                        </template>
+                        <template v-if="activeTab.authentication.type === 'bearer'">
+                            <tr>
+                                <td style="user-select: none;">
+                                    <label for="basic-auth-token" :class="{ disabled: activeTab.authentication.disabled }">Token</label>
+                                </td>
+                                <td style="width: 100%">
+                                    <input type="text" v-model="activeTab.authentication.token" id="basic-auth-token" :disabled="activeTab.authentication.disabled">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="user-select: none;">
+                                    <label for="basic-auth-prefix" :class="{ disabled: activeTab.authentication.disabled }">Prefix</label>
+                                </td>
+                                <td style="width: 100%">
+                                    <input type="text" v-model="activeTab.authentication.prefix" id="basic-auth-prefix" :disabled="activeTab.authentication.disabled">
+                                </td>
+                            </tr>
+                        </template>
+                    </table>
+                </div>
+            </template>
         </div>
     </template>
 </template>
@@ -143,6 +205,9 @@ export default {
                 },
                 {
                     name: 'Header'
+                },
+                {
+                    name: 'Auth'
                 }
             ],
             activeRequestPanelTab: 'Body',
@@ -177,6 +242,21 @@ export default {
             try {
                 this.$refs.jsonEditor.setValue(JSON.stringify(JSON.parse(this.activeTab.body.text), null, 4))
             } catch {} // catch all json parsing errors and ignore them
+        },
+        handleActiveTabAuthenticationTypeChange(event) {
+            if('authentication' in this.activeTab === false) {
+                this.activeTab.authentication = {}
+            }
+
+            this.activeTab.authentication.type = event.target.value
+        },
+        getAuthenticationTypeLabel(authenticationType) {
+            switch(authenticationType) {
+                case 'basic':
+                    return 'Basic'
+                case 'bearer':
+                    return 'Bearer'
+            }
         }
     }
 }
@@ -287,6 +367,10 @@ export default {
 }
 
 .request-panel-tabs-context table input:disabled {
+    opacity: 0.5;
+}
+
+.request-panel-tabs-context table .disabled {
     opacity: 0.5;
 }
 
