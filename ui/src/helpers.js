@@ -455,7 +455,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
         })
 
         let parameters = []
-        const queryParams = typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
+        const queryParams = 'url' in request.request && typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
         queryParams.forEach(queryParam => {
             parameters.push({
                 name: queryParam.key,
@@ -465,11 +465,18 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             })
         })
 
+
+        let url = ''
+
+        if('url' in request.request) {
+            url = typeof request.request.url === 'string' ? request.request.url : request.request.url.raw
+        }
+
         requests.push({
             _id: requestId,
             _type: 'request',
             method: request.request.method,
-            url: typeof request.request.url === 'string' ? request.request.url : request.request.url.raw,
+            url,
             name: request.name,
             body,
             headers,
