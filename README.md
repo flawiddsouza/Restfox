@@ -2,6 +2,30 @@
 
 Offline-first web HTTP client
 
+## Screenshots
+
+<img src="screenshots/1.png?raw=true">
+
+<img src="screenshots/2.png?raw=true">
+
+### Response History
+
+<img src="screenshots/3.png?raw=true">
+
+### Context Menu
+
+<img src="screenshots/8.png?raw=true">
+
+### Environment Variables
+
+<img src="screenshots/4.png?raw=true">
+<img src="screenshots/5.png?raw=true">
+
+### Plugins
+
+<img src="screenshots/6.png?raw=true">
+<img src="screenshots/7.png?raw=true">
+
 ## ui
 
 ### Development
