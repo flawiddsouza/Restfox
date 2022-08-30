@@ -1,5 +1,8 @@
 const { app, BrowserWindow } = require('electron')
 const { resolve } = require('path')
+require('update-electron-app')()
+
+if(require('electron-squirrel-startup')) return app.quit()
 
 function createWindow() {
     const win = new BrowserWindow({ show: false })

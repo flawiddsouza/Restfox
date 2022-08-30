@@ -50,6 +50,10 @@ npm run start
 ```
 npm run make
 ```
+or
+```
+npm run publish
+```
 
 ## tauri
 

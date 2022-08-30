@@ -1,18 +1,28 @@
 {
     "private": true,
-    "name": "restfox-electron",
-    "productName": "Restfox",
+    "name": "Restfox",
     "version": "0.0.1",
+    "productName": "Restfox",
+    "description": "Offline-first web HTTP client",
+    "license": "MIT",
+    "repository": "github:flawiddsouza/Restfox",
     "main": "src/app.js",
+    "author": {
+        "name": "Flawid D'Souza",
+        "url": "https://github.com/flawiddsouza"
+    },
     "devDependencies": {
-        "@electron-forge/cli": "^6.0.0-beta.64",
-        "@electron-forge/maker-deb": "^6.0.0-beta.64",
-        "@electron-forge/maker-rpm": "^6.0.0-beta.64",
-        "@electron-forge/maker-squirrel": "^6.0.0-beta.64",
-        "@electron-forge/maker-zip": "^6.0.0-beta.64",
+        "@electron-forge/cli": "^6.0.0-beta.65",
+        "@electron-forge/maker-deb": "^6.0.0-beta.65",
+        "@electron-forge/maker-rpm": "^6.0.0-beta.65",
+        "@electron-forge/maker-snap": "^6.0.0-beta.65",
+        "@electron-forge/maker-squirrel": "^6.0.0-beta.65",
+        "@electron-forge/maker-zip": "^6.0.0-beta.65",
+        "@electron-forge/publisher-github": "^6.0.0-beta.65",
+        "@electron-forge/publisher-snapcraft": "^6.0.0-beta.65",
         "@typescript-eslint/eslint-plugin": "^5.4.0",
         "@typescript-eslint/parser": "^5.4.0",
-        "electron": "^19.0.8",
+        "electron": "^20.1.0",
         "eslint": "^8.2.0",
         "eslint-plugin-vue": "^8.0.3"
     },
@@ -20,20 +30,26 @@
         "start": "electron-forge start",
         "lint": "eslint src/*.ts",
         "lint-fix": "eslint src/*.ts --fix",
-        "package": "electron-forge package",
-        "make": "electron-forge make"
+        "make": "electron-forge make",
+        "publish": "electron-forge publish"
     },
     "dependencies": {
-        "electron-squirrel-startup": "^1.0.0"
+        "electron-squirrel-startup": "^1.0.0",
+        "update-electron-app": "^2.0.1"
     },
     "config": {
         "forge": {
-            "packagerConfig": {},
+            "packagerConfig": {
+                "name": "Restfox",
+                "icon": "ui/favicon"
+            },
             "makers": [
                 {
                     "name": "@electron-forge/maker-squirrel",
                     "config": {
-                        "name": ""
+                        "name": "Restfox",
+                        "iconUrl": "https://restfox.dev/favicon.ico",
+                        "setupIcon": "ui/favicon.ico"
                     }
                 },
                 {
@@ -48,6 +64,29 @@
                 },
                 {
                     "name": "@electron-forge/maker-rpm",
+                    "config": {}
+                },
+                {
+                    "name": "@electron-forge/maker-snap",
+                    "config": {
+                      "features": {},
+                      "summary": "Offline-first web HTTP client"
+                    }
+                }
+            ],
+            "publishers": [
+                {
+                    "name": "@electron-forge/publisher-github",
+                    "config": {
+                        "repository": {
+                            "owner": "flawiddsouza",
+                            "name": "Restfox"
+                        },
+                        "prerelease": true
+                    }
+                },
+                {
+                    "name": "@electron-forge/publisher-snapcraft",
                     "config": {}
                 }
             ]
