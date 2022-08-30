@@ -57,7 +57,7 @@ export default {
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 2;
+    z-index: 10;
     position: fixed;
     background-color: rgba(0, 0, 0, 0.7);
     display: flex;
