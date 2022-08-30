@@ -1,4 +1,33 @@
-# Setup
+# Restfox
+
+Offline-first web HTTP client
+
+## ui
+
+### Development
+npm run dev
+
+### Distribution
+npm run build
+
+## electron
+
+### To upgrade electron to latest version
+```bash
+npm install --save-dev electron@latest @electron-forge/cli@latest @electron-forge/maker-deb@latest @electron-forge/maker-rpm@latest @electron-forge/maker-squirrel@latest @electron-forge/maker-zip@latest
+```
+
+### Development
+```
+npm run start
+```
+
+### Distribution
+```
+npm run make
+```
+
+## tauri
 
 ### fetch polyfill for tauri
 
@@ -29,12 +58,12 @@ export async function fetch(input, init) {
 }
 ```
 
-# Development
+### Development
 ```
 npm run dev
 ```
 
-# Distribution
+### Distribution
 ```
 npm run build
 ```
