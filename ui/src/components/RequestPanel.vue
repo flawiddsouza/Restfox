@@ -5,7 +5,7 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <div class="code-mirror-input-container">
-                <CodeMirrorSingleLine v-model="activeTab.url" />
+                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" />
             </div>
             <button @click="sendRequest">Send</button>
         </div>

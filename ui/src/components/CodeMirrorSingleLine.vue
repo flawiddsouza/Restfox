@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { EditorView, keymap } from '@codemirror/view'
+import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { history, historyKeymap } from '@codemirror/history'
 
@@ -22,14 +22,16 @@ function createState(vueInstance) {
             EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
             keymap.of([
                 ...historyKeymap
-            ])
+            ]),
+            placeholder(vueInstance.placeholder)
         ]
     })
 }
 
 export default {
     props: {
-        modelValue: String
+        modelValue: String,
+        placeholder: String
     },
     data() {
         return {
