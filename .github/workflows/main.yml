@@ -1,0 +1,23 @@
+name: Publish Electron Binaries
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-electron-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./electron
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - run: npm ci
+      - name: Install Snapcraft
+        uses: samuelmeuli/action-snapcraft@v1
+        with:
+          use_lxd: true
+      - run: npm run publish
