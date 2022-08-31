@@ -3,21 +3,61 @@ name: Publish Electron Binaries
 on:
   workflow_dispatch:
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   build-electron-linux:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./electron
     steps:
       - uses: actions/checkout@v3
       - name: Setup Node 16
         uses: actions/setup-node@v3
         with:
           node-version: 16
-      - run: npm ci
-      - name: Install Snapcraft
-        uses: samuelmeuli/action-snapcraft@v1
+      - name: Build UI
+        working-directory: ./ui
+        run: |
+          npm ci
+          npm run build
+      - name: Build deb, rpm
+        working-directory: ./electron
+        run: |
+          npm ci
+          npm run publish
+  build-electron-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 16
+        uses: actions/setup-node@v3
         with:
-          use_lxd: true
-      - run: npm run publish
+          node-version: 16
+      - name: Build UI
+        working-directory: ./ui
+        run: |
+          npm ci
+          npm run build
+      - name: Build windows installer
+        working-directory: ./electron
+        run: |
+          npm ci
+          npm run publish
+  build-electron-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Build UI
+        working-directory: ./ui
+        run: |
+          npm ci
+          npm run build
+      - name: Build macos binaries
+        working-directory: ./electron
+        run: |
+          npm ci
+          npm run publish
