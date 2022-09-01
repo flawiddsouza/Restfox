@@ -30,6 +30,7 @@
         "quickjs-emscripten-sync": "^1.2.0",
         "sass": "^1.43.4",
         "vue": "^3.2.16",
+        "vue-github-button": "^3.0.3",
         "vue-toast-notification": "^3.0.0",
         "vuex": "^4.0.2"
     },

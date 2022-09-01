@@ -23,6 +23,16 @@
             <a href="#" @click.prevent="showPluginsManager">Plugins</a>
             <span class="spacer"></span>
             <a href="#" @click.prevent="showSettings">Settings</a>
+            <span class="spacer-and-half"></span>
+            <div style="width: 80px; height: 10px; margin-top: -0.16rem">
+                <GithubButton
+                    title="Star Restfox"
+                    href="https://github.com/flawiddsouza/Restfox"
+                    data-show-count="true"
+                    data-text="Star"
+                    aria-label="Star Restfox on GitHub"
+                />
+            </div>
         </div>
     </div>
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
@@ -38,13 +48,15 @@ import SettingsModal from './modals/SettingsModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import { exportRestfoxCollection } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
+import GithubButton from 'vue-github-button'
 
 export default {
-     components: {
+    components: {
         PluginManagerModal,
         AddWorkspaceModal,
         SettingsModal,
-        EnvironmentModal
+        EnvironmentModal,
+        GithubButton
     },
     props: {
         nav: String,
@@ -105,6 +117,10 @@ export default {
 
 .spacer {
     margin-left: 1rem;
+}
+
+.spacer-and-half {
+    margin-left: 1.5rem;
 }
 
 .heading {
