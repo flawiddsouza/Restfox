@@ -42,7 +42,7 @@
         </div>
         <div class="request-panel-tabs-context">
             <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
-                <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem">
+                <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem" @change="bodyMimeTypeChanged($event.target.value)">
                     <option value="No Body">No Body</option>
                     <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
                     <option value="text/plain">Plain Text</option>
@@ -326,6 +326,40 @@ export default {
                     return 'Basic'
                 case 'bearer':
                     return 'Bearer'
+            }
+        },
+        bodyMimeTypeChanged(newMimeType) {
+            let mimeType = null
+
+            if(newMimeType === 'application/x-www-form-urlencoded') {
+                mimeType = 'application/x-www-form-urlencoded'
+            }
+
+            if(newMimeType === 'text/plain') {
+                mimeType = 'text/plain'
+            }
+
+            if(newMimeType === 'application/json' || newMimeType === 'application/graphql') {
+                mimeType = 'application/json'
+            }
+
+            if(mimeType === null) {
+                return
+            }
+
+            let contentTypeHeader = 'headers' in this.activeTab && this.activeTab.headers.find(header => header.name.toLowerCase() === 'content-type')
+
+            if(contentTypeHeader) {
+                contentTypeHeader.value = mimeType
+            } else {
+                if('headers' in this.activeTab == false) {
+                    this.activeTab.headers = []
+                }
+
+                this.activeTab.headers.push({
+                    name: 'Content-Type',
+                    value: mimeType
+                })
             }
         }
     }
