@@ -87,11 +87,7 @@ export async function handleRequest(request, environment, plugins, abortControll
         }
     }
 
-    if(request.body.mimeType === 'application/json') {
-        body = substituteEnvironmentVariables(environment, request.body.text)
-    }
-
-    if(request.body.mimeType === 'text/plain') {
+    if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
         body = substituteEnvironmentVariables(environment, request.body.text)
     }
 
@@ -230,14 +226,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 }
             }
 
-            if(item.body.mimeType === 'text/plain') {
-                body = {
-                    mimeType: item.body.mimeType,
-                    text: item.body.text
-                }
-            }
-
-            if(item.body.mimeType === 'application/json') {
+            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json' || item.body.mimeType === 'application/graphql') {
                 body = {
                     mimeType: item.body.mimeType,
                     text: item.body.text

@@ -15,6 +15,7 @@
         "@codemirror/search": "^6.2.0",
         "@codemirror/state": "^6.1.1",
         "@codemirror/view": "^6.2.2",
+        "altair-codemirror-graphql": "^4.6.4",
         "dayjs": "^1.10.7",
         "dexie": "^3.2.0",
         "jszip": "^3.7.1",

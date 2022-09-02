@@ -20,6 +20,7 @@
                     </template>
                     <template v-if="activeTab.body.mimeType === 'text/plain'"> (Plain)</template>
                     <template v-if="activeTab.body.mimeType === 'application/json'"> (JSON)</template>
+                    <template v-if="activeTab.body.mimeType === 'application/graphql'"> (GraphQL)</template>
                 </template>
                 <template v-if="requestPanelTab.name === 'Query'">
                     <template v-if="'parameters' in activeTab && activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
@@ -46,6 +47,7 @@
                     <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
                     <option value="text/plain">Plain Text</option>
                     <option value="application/json">JSON</option>
+                    <option value="application/graphql">GraphQL</option>
                 </select>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
                     <table>
@@ -78,6 +80,20 @@
                 </div>
                 <div class="request-panel-body-footer" v-if="activeTab.body.mimeType === 'application/json'">
                     <button @click="beautifyJSON">Beautify JSON</button>
+                </div>
+                <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%" v-if="activeTab.body.mimeType === 'application/graphql'">
+                    <div class="oy-a">
+                        <CodeMirrorEditor v-model="graphql.query" lang="graphql" class="code-editor" :key="'code-mirror-editor1-' + activeTab._id" ref="graphqlEditor"></CodeMirrorEditor>
+                    </div>
+                    <div style="margin-top: 0.5rem;display: grid; grid-template-rows: auto 1fr;">
+                        <div style="margin-bottom: 0.3rem; user-select: none;">Query Variables</div>
+                        <div class="oy-a">
+                            <CodeMirrorEditor v-model="graphql.variables" lang="json" class="code-editor" :key="'code-mirror-editor2-' + activeTab._id" ref="jsonEditor"></CodeMirrorEditor>
+                        </div>
+                    </div>
+                    <div class="request-panel-body-footer">
+                        <button @click="beautifyGraphQL">Beautify</button>
+                    </div>
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
@@ -227,12 +243,53 @@ export default {
                 'DELETE',
                 'OPTIONS',
                 'HEAD'
-            ]
+            ],
+            graphql: {
+                query: '',
+                variables: ''
+            },
+            disableGraphqlWatch: false
         }
     },
     computed: {
         activeTab() {
             return this.$store.state.activeTab
+        }
+    },
+    watch: {
+        'activeTab.body.mimeType'() {
+            if(this.activeTab.body.mimeType === 'application/graphql') {
+                this.disableGraphqlWatch = true
+                try {
+                    const parsedBodyText = JSON.parse(this.activeTab.body.text)
+                    this.graphql = {
+                        query: parsedBodyText.query ?? '',
+                        variables: parsedBodyText.variables !== '' ? JSON.stringify(parsedBodyText.variables, null, 4) : ''
+                    }
+                } catch {
+                    this.graphql = {
+                        query: '',
+                        variables: ''
+                    }
+                }
+            }
+        },
+        graphql: {
+            handler() {
+                if(this.disableGraphqlWatch) {
+                    this.disableGraphqlWatch = false
+                    return
+                }
+                let graphqlVariables = ''
+                try {
+                    graphqlVariables = JSON.parse(this.graphql.variables)
+                } catch {}
+                this.activeTab.body.text = JSON.stringify({
+                    query: this.graphql.query,
+                    variables: graphqlVariables
+                }, null, 4)
+            },
+            deep: true
         }
     },
     methods: {
@@ -249,6 +306,11 @@ export default {
         beautifyJSON() {
             try {
                 this.$refs.jsonEditor.setValue(JSON.stringify(JSON.parse(this.activeTab.body.text), null, 4))
+            } catch {} // catch all json parsing errors and ignore them
+        },
+        beautifyGraphQL() {
+            try {
+                this.$refs.jsonEditor.setValue(JSON.stringify(JSON.parse(this.graphql.variables), null, 4))
             } catch {} // catch all json parsing errors and ignore them
         },
         handleActiveTabAuthenticationTypeChange(event) {

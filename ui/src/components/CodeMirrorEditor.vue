@@ -7,6 +7,7 @@ import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNum
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript } from '@codemirror/lang-javascript'
+import { graphqlLanguage } from 'altair-codemirror-graphql'
 import { closeBrackets } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands'
@@ -21,6 +22,10 @@ function createState(language, documentText, vueInstance) {
 
     if(language === 'javascript') {
         languageFunc = javascript()
+    }
+
+    if(language === 'graphql') {
+        languageFunc = graphqlLanguage
     }
 
     return EditorState.create({
