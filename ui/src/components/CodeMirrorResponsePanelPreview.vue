@@ -3,16 +3,14 @@
 </template>
 
 <script>
-import { EditorView } from '@codemirror/view'
+import { EditorView, lineNumbers } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
-import { lineNumbers } from '@codemirror/gutter'
-import { foldGutter } from '@codemirror/fold'
-import { defaultHighlightStyle } from '@codemirror/highlight'
+import { foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 
 const extensions = [
     json(),
-    defaultHighlightStyle,
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     lineNumbers(),
     foldGutter({ openText: '▾', closedText: '▸' }),
     EditorView.lineWrapping,

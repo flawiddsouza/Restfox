@@ -5,7 +5,7 @@
 <script>
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { history, historyKeymap } from '@codemirror/history'
+import { history, historyKeymap } from '@codemirror/commands'
 
 function createState(vueInstance) {
     return EditorState.create({

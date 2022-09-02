@@ -3,19 +3,13 @@
 </template>
 
 <script>
-import { EditorView, highlightActiveLine, keymap, highlightSpecialChars } from '@codemirror/view'
+import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript } from '@codemirror/lang-javascript'
-import { lineNumbers, highlightActiveLineGutter } from '@codemirror/gutter'
-import { foldGutter } from '@codemirror/fold'
-import { defaultHighlightStyle } from '@codemirror/highlight'
-import { closeBrackets } from '@codemirror/closebrackets'
-import { bracketMatching } from '@codemirror/matchbrackets'
-import { indentOnInput, indentUnit } from '@codemirror/language'
-import { history, historyKeymap } from '@codemirror/history'
-import { defaultKeymap, indentWithTab } from '@codemirror/commands'
-import { commentKeymap } from '@codemirror/comment'
+import { closeBrackets } from '@codemirror/autocomplete'
+import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 
 function createState(language, documentText, vueInstance) {
@@ -33,7 +27,7 @@ function createState(language, documentText, vueInstance) {
         doc: documentText,
         extensions: [
             languageFunc,
-            defaultHighlightStyle,
+            syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
             lineNumbers(),
             highlightActiveLineGutter(),
             foldGutter({ openText: '▾', closedText: '▸' }),
@@ -55,7 +49,6 @@ function createState(language, documentText, vueInstance) {
             keymap.of([
                 ...defaultKeymap,
                 ...historyKeymap,
-                ...commentKeymap,
                 indentWithTab,
                 ...searchKeymap,
             ])
