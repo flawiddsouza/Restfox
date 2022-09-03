@@ -81,7 +81,7 @@
                 <div class="request-panel-body-footer" v-if="activeTab.body.mimeType === 'application/json'">
                     <button @click="beautifyJSON">Beautify JSON</button>
                 </div>
-                <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%" v-if="activeTab.body.mimeType === 'application/graphql'">
+                <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%; overflow: auto;" v-if="activeTab.body.mimeType === 'application/graphql'">
                     <div class="oy-a">
                         <CodeMirrorEditor v-model="graphql.query" lang="graphql" class="code-editor" :key="'code-mirror-editor1-' + activeTab._id" ref="graphqlEditor"></CodeMirrorEditor>
                     </div>
@@ -490,7 +490,7 @@ export default {
     height: 100%;
 }
 
-.request-panel-tabs-context-container > div, .request-panel-tabs-context-container > div > textarea {
+.request-panel-tabs-context-container > div > textarea {
     height: 100%;
 }
 
@@ -509,6 +509,5 @@ export default {
     justify-content: flex-end;
     align-items: center;
     margin-top: 0.5rem;
-    margin-bottom: -0.5rem
 }
 </style>
