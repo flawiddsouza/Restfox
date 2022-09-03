@@ -258,7 +258,7 @@ export default {
     },
     watch: {
         'activeTab.body.mimeType'() {
-            if(this.activeTab.body.mimeType === 'application/graphql') {
+            if(this.activeTab && this.activeTab.body.mimeType === 'application/graphql') {
                 this.disableGraphqlWatch = true
                 try {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)
