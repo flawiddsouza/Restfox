@@ -252,7 +252,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                     description: parameter.description,
                     disabled: parameter.disabled
                 })) : [],
-                authentication: 'authentication' in item ? item.authentication : {},
+                authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
                 description: 'description' in item ? item.description : undefined,
                 parentId: item.parentId,
                 workspaceId
