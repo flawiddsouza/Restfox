@@ -46,7 +46,8 @@ async function tabChanged() {
         },
         files: [
             'content-script.js'
-        ]
+        ],
+        world: 'MAIN'
     })
 }
 
