@@ -1,0 +1,38 @@
+{
+    "name": "Restfox CORS Helper",
+    "description": "Help bypass CORS when making requests from Restfox",
+    "version": "1.0.0",
+    "manifest_version": 2,
+    "icons": {
+        "512": "icons/favicon.png"
+    },
+    "permissions": [
+        "webRequest",
+        "webRequestBlocking",
+        "storage",
+        "tabs",
+        "*://*/*"
+    ],
+    "background": {
+        "scripts": [
+            "browser-polyfill.js",
+            "background.js"
+        ]
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://restfox.dev/*"],
+            "js": [
+                "browser-polyfill.js",
+                "content-script.js"
+            ]
+        }
+    ],
+    "page_action": {
+        "browser_style": true,
+        "default_icon": {
+            "512": "icons/favicon-disabled.png"
+        },
+        "show_matches": ["https://restfox.dev/*"]
+    }
+}
