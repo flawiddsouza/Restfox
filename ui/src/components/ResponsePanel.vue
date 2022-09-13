@@ -47,7 +47,7 @@
                 <div class="content-box">
                     <table>
                         <tr v-for="header in response.headers">
-                            <td>{{ header[0] }}</td>
+                            <td style="white-space: nowrap">{{ header[0] }}</td>
                             <td>{{ header[1] }}</td>
                         </tr>
                     </table>
