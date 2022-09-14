@@ -1,0 +1,5 @@
+{
+    "scripts": {
+        "zip": "cd src && zip -r - . > ../src.zip"
+    }
+}
