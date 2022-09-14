@@ -57,6 +57,11 @@ async function corsBypass(e) {
         return
     }
 
+    // fix for: localhost not accessible when extension enabled
+    if(e.url.startsWith('http://localhost')) {
+        return
+    }
+
     const headers = [
         {
             name: 'Access-Control-Allow-Origin',
