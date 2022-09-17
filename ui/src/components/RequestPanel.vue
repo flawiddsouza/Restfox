@@ -21,6 +21,7 @@
                     <template v-if="activeTab.body.mimeType === 'text/plain'"> (Plain)</template>
                     <template v-if="activeTab.body.mimeType === 'application/json'"> (JSON)</template>
                     <template v-if="activeTab.body.mimeType === 'application/graphql'"> (GraphQL)</template>
+                    <template v-if="activeTab.body.mimeType === 'application/octet-stream'"> (File)</template>
                 </template>
                 <template v-if="requestPanelTab.name === 'Query'">
                     <template v-if="'parameters' in activeTab && activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
@@ -48,6 +49,7 @@
                     <option value="text/plain">Plain Text</option>
                     <option value="application/json">JSON</option>
                     <option value="application/graphql">GraphQL</option>
+                    <option value="application/octet-stream">Binary File</option>
                 </select>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
                     <table>
@@ -94,6 +96,9 @@
                     <div class="request-panel-body-footer">
                         <button @click="beautifyGraphQL">Beautify</button>
                     </div>
+                </div>
+                <div v-if="activeTab.body.mimeType === 'application/octet-stream'">
+                    <input type="file" @change="activeTab.body.fileName = $event.target.files[0]" style="width: 100%;  padding: 0.5rem; border: 1px solid var(--default-border-color);">
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
@@ -341,6 +346,10 @@ export default {
 
             if(newMimeType === 'application/json' || newMimeType === 'application/graphql') {
                 mimeType = 'application/json'
+            }
+
+            if(newMimeType === 'application/octet-stream') {
+                mimeType = 'application/octet-stream'
             }
 
             if(mimeType === null) {

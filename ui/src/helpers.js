@@ -91,6 +91,10 @@ export async function handleRequest(request, environment, plugins, abortControll
         body = substituteEnvironmentVariables(environment, request.body.text)
     }
 
+    if(request.body.mimeType === 'application/octet-stream') {
+        body = request.body.fileName
+    }
+
     try {
         let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
 
