@@ -9,7 +9,12 @@
             </template>
         </div>
         <div v-if="sidebarItems.length === 0" class="sidebar-empty-message">
-            You can right click here to create a new request or a new folder
+            <template v-if="collectionFilter === ''">
+                You can right click here to create a new request or a new folder
+            </template>
+            <template v-else>
+                No results found
+            </template>
         </div>
     </div>
     <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" :x-offset="20" />
@@ -259,6 +264,10 @@ export default {
             this.showContextMenu = false
         },
         handleSidebarEmptyAreaContextMenu(event) {
+            if(this.collectionFilter !== '') {
+                return
+            }
+
             if(event.target.classList.contains('sidebar-list-container') === false && event.target.classList.contains('sidebar-empty-message') === false) {
                 return
             }
