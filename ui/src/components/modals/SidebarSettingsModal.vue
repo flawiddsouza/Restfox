@@ -1,6 +1,6 @@
 <template>
     <div v-if="showModalComp">
-        <modal :title="collectionItem._type === 'request_group' ? 'Folder Settings' : 'Request Settings'" v-model="showModalComp">
+        <modal :title="collectionItem._type === 'request_group' ? 'Folder Properties' : 'Request Properties'" v-model="showModalComp">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
                 <input type="text" style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="collectionItem.name" :placeholder="collectionItem._type === 'request_group' ? 'Folder Name' : 'Request Name'" spellcheck="false" v-focus>

@@ -127,8 +127,8 @@ export default {
                     },
                     {
                         'type': 'option',
-                        'label': 'Settings',
-                        'value': 'Settings',
+                        'label': 'Properties',
+                        'value': 'Properties',
                         'icon': 'fa fa-wrench',
                     }
                 ]
@@ -189,8 +189,8 @@ export default {
                     },
                     {
                         'type': 'option',
-                        'label': 'Settings',
-                        'value': 'Settings',
+                        'label': 'Properties',
+                        'value': 'Properties',
                         'icon': 'fa fa-wrench',
                     }
                 ]
@@ -251,7 +251,7 @@ export default {
                 this.$store.commit('showImportModal', true)
             }
 
-            if(clickedSidebarItem === 'Settings') {
+            if(clickedSidebarItem === 'Properties') {
                 this.settingsModalCollectionItem = this.activeSidebarItemForContextMenu
                 this.settingsModalShow = true
             }
