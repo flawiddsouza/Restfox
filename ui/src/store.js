@@ -186,9 +186,29 @@ const store = createStore({
                 await db.collections.update(collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
-        async updatWorkspaceEnvironment(_state, { workspaceId, environment }) {
+        async updateWorkspaceEnvironment(_state, { workspaceId, environment }) {
             if(environment) {
                 await db.workspaces.update(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
+            }
+        },
+        async updateCollectionItemEnvironments(_state, { collectionId, environments }) {
+            if(environments) {
+                await db.collections.update(collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
+            }
+        },
+        async updateWorkspaceEnvironments(_state, { workspaceId, environments }) {
+            if(environments) {
+                await db.workspaces.update(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) })
+            }
+        },
+        async updateCollectionItemCurrentEnvironment(_state, { collectionId, currentEnvironment }) {
+            if(currentEnvironment) {
+                await db.collections.update(collectionId, { currentEnvironment: currentEnvironment })
+            }
+        },
+        async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
+            if(currentEnvironment) {
+                await db.workspaces.update(workspaceId, { currentEnvironment: currentEnvironment })
             }
         },
         async updateCollectionItemName(_state, collectionItem) {

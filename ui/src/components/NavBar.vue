@@ -8,7 +8,12 @@
         </div>
         <div class="right-nav-container">
             <div v-if="nav === 'collection'">
-                <a href="#" @click.prevent="environmentModalShow = true">Environment</a>
+                <div style="display: inline-flex; align-items: center;">
+                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.5rem">Environment</a>
+                    <select v-model="currentEnvironment" style="border: 1px solid var(--default-border-color); outline: 0; background-color: inherit;" title="Change Environment">
+                        <option v-for="environment in environments">{{ environment.name }}</option>
+                    </select>
+                </div>
                 <span class="spacer"></span>
                 <a href="#" @click.prevent="showImportModal">Import</a>
                 <span class="spacer"></span>
@@ -24,7 +29,7 @@
             <span class="spacer"></span>
             <a href="#" @click.prevent="showSettings">Settings</a>
             <span class="spacer-and-half"></span>
-            <div style="width: 80px; height: 10px; margin-top: -0.16rem">
+            <div style="width: 80px; height: 10px; margin-top: -0.56rem">
                 <GithubButton
                     title="Star Restfox"
                     href="https://github.com/flawiddsouza/Restfox"
@@ -73,6 +78,32 @@ export default {
     computed: {
         activeWorkspace() {
             return this.$store.state.activeWorkspace
+        },
+        environments() {
+            return this.activeWorkspace.environments ?? [
+                {
+                    name: 'Default',
+                    environment: this.activeWorkspace.environment
+                }
+            ]
+        },
+        currentEnvironment: {
+            get() {
+                return this.activeWorkspace.currentEnvironment ?? 'Default'
+            },
+            set(value) {
+                this.activeWorkspace.currentEnvironment = value
+                this.$store.commit('updateWorkspaceCurrentEnvironment', {
+                    workspaceId: this.activeWorkspace._id,
+                    currentEnvironment: value
+                })
+                const selectedEnvironment = this.environments.find(environmentItem => environmentItem.name === value)
+                this.activeWorkspace.environment = selectedEnvironment.environment
+                this.$store.commit('updateWorkspaceEnvironment',  {
+                    workspaceId: this.activeWorkspace._id,
+                    environment: selectedEnvironment.environment
+                })
+            }
         }
     },
     methods: {
@@ -113,6 +144,8 @@ export default {
     padding-right: 1em;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    height: 31.5px;
 }
 
 .spacer {
@@ -133,5 +166,6 @@ export default {
 
 .right-nav-container {
     display: flex;
+    align-items: center;
 }
 </style>
