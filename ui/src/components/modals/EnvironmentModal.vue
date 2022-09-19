@@ -304,6 +304,14 @@ export default {
 
             this.clickedContextMenuEnvironment.name = newEnvironmentName
 
+            if(this.workspace && 'environment' in this.workspace === false) {
+                this.workspace.environments = this.environments
+            }
+
+            if(this.collectionItem && 'environment' in this.collectionItem === false) {
+                this.collectionItem.environments = this.environments
+            }
+
             this.saveEnvironments()
 
             if(changeCurrentEnvironment) {
