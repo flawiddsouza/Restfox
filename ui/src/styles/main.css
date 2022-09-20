@@ -57,3 +57,11 @@ body {
         scrollbar-width: thin;
     }
 }
+
+.code {
+    display: inline-block;
+    background-color: white;
+    padding: 0.1rem 0.2rem;
+    border: 1px solid var(--default-border-color);
+    font-family: var(--font-monospace);
+}
