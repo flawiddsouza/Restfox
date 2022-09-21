@@ -64,6 +64,11 @@
             </template>
         </div>
     </template>
+    <template v-else>
+        <div style="display: grid; place-items: center; height: 100%; grid-row: span 3;">
+            <div>Send request to see response here</div>
+        </div>
+    </template>
     <ContextMenu :options="responseHistoryContextMenuOptions" :element="responseHistoryContextMenuElement" v-model:show="showResponseHistoryContextMenu" @click="handleResponseHistoryContextMenuItemClick" />
 </template>
 

@@ -7,28 +7,27 @@
             </template>
         </div>
         <div class="right-nav-container">
-            <div v-if="nav === 'collection'">
-                <div style="display: inline-flex; align-items: center;">
-                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.5rem">Environment</a>
+            <div v-if="nav === 'collection'" style="height: 100%;">
+                <template v-if="activeTab">
+                    <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl">View: Column</a>
+                    <a href="#" @click.prevent="requestResponseLayout = 'left-right'" v-else class="bl">View: Row</a>
+                </template>
+                <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
+                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
                     <select v-model="currentEnvironment" style="border: 1px solid var(--default-border-color); outline: 0; background-color: inherit;" title="Change Environment">
                         <option v-for="environment in environments">{{ environment.name }}</option>
                     </select>
                 </div>
-                <span class="spacer"></span>
-                <a href="#" @click.prevent="showImportModal">Import</a>
-                <span class="spacer"></span>
-                <a href="#" @click.prevent="exportCollection">Export</a>
-                <span class="spacer"></span>
-                <a href="#" @click.prevent="clearCollection">Clear Collection</a>
+                <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
+                <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
+                <a href="#" @click.prevent="clearCollection" class="bl">Clear Collection</a>
             </div>
-            <div v-if="nav === 'workspaces'">
-                <a href="#" @click.prevent="showAddWorkspace">Add Workspace</a>
-            </div>
+            <template v-if="nav === 'workspaces'">
+                <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
+            </template>
+            <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
+            <a href="#" @click.prevent="showSettings" class="bl br">Settings</a>
             <span class="spacer"></span>
-            <a href="#" @click.prevent="showPluginsManager">Plugins</a>
-            <span class="spacer"></span>
-            <a href="#" @click.prevent="showSettings">Settings</a>
-            <span class="spacer-and-half"></span>
             <div style="width: 80px; height: 10px; margin-top: -0.56rem">
                 <GithubButton
                     title="Star Restfox"
@@ -54,6 +53,7 @@ import EnvironmentModal from './modals/EnvironmentModal.vue'
 import { exportRestfoxCollection } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import GithubButton from 'vue-github-button'
+import constants from '../constants'
 
 export default {
     components: {
@@ -104,6 +104,18 @@ export default {
                     environment: selectedEnvironment.environment
                 })
             }
+        },
+        requestResponseLayout: {
+            get() {
+                return this.$store.state.requestResponseLayout
+            },
+            set(value) {
+                this.$store.state.requestResponseLayout = value
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_RESPONSE_LAYOUT, value)
+            }
+        },
+        activeTab() {
+            return this.$store.state.activeTab
         }
     },
     methods: {
@@ -138,8 +150,6 @@ export default {
 
 <style scoped>
 .navbar {
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
     padding-left: 1em;
     padding-right: 1em;
     display: flex;
@@ -160,12 +170,38 @@ export default {
     font-weight: 500;
 }
 
-.heading a:not(:hover) {
-    text-decoration: none;
-}
-
 .right-nav-container {
     display: flex;
     align-items: center;
+    height: 100%;
+}
+
+.heading a:not(:hover), .right-nav-container a {
+    text-decoration: none;
+}
+
+.heading a {
+    color: rgb(0, 0, 238);
+}
+
+.right-nav-container a {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    color: black;
+}
+
+.right-nav-container a:hover {
+    background-color: #f1f1f147;
+}
+
+.right-nav-container a.bl {
+    border-left: 1px solid #f1f1f1;
+}
+
+.right-nav-container a.br {
+    border-right: 1px solid #f1f1f1;
 }
 </style>

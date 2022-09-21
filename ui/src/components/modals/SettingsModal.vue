@@ -7,8 +7,13 @@
             </div>
             <div style="padding-top: 1rem"></div>
             <div>
-                Request Panel Width:
-                <input type="text" :value="requestPanelWidth" disabled>
+                Request Panel Ratio:
+                <input type="text" :value="requestPanelRatio" disabled>
+            </div>
+            <div style="padding-top: 1rem"></div>
+            <div>
+                Response Panel Ratio:
+                <input type="text" :value="responsePanelRatio" disabled>
             </div>
             <div style="padding-top: 1rem"></div>
             <div>
@@ -33,7 +38,8 @@ export default {
     data() {
         return {
             sidebarWidth: null,
-            requestPanelWidth: null
+            requestPanelRatio: null,
+            responsePanelRatio: null
         }
     },
     computed: {
@@ -54,7 +60,11 @@ export default {
     methods: {
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
-            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_WIDTH)
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO)
+        },
+        resetLayout() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_RESPONSE_LAYOUT)
         },
         resetSettings(target=null) {
             if(target) {
@@ -66,18 +76,24 @@ export default {
             }
 
             this.resetWidths()
+            this.resetLayout()
             document.location.reload()
         },
         fetchSavedSettings() {
             const savedSidebarWidth = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
-            const savedRequestPanelWidth = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_WIDTH)
+            const savedRequestPanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
+            const savedResponsePanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
             }
 
-            if(savedRequestPanelWidth) {
-                this.requestPanelWidth = savedRequestPanelWidth
+            if(savedRequestPanelRatio) {
+                this.requestPanelRatio = savedRequestPanelRatio
+            }
+
+            if(savedResponsePanelRatio) {
+                this.responsePanelRatio = savedResponsePanelRatio
             }
         }
     }

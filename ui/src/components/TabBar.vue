@@ -113,7 +113,7 @@ export default {
             <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close">x</span>
         </div>
     </div>
-    <div class="tab-add" @click="addTab" style="visibility: hidden">+</div>
+    <!-- <div class="tab-add" @click="addTab" style="visibility: hidden">+</div> -->
 </template>
 
 <style scoped>

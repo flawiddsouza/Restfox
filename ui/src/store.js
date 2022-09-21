@@ -98,7 +98,8 @@ const store = createStore({
             sidebarContextMenuElement: null,
             workspaces: [],
             activeWorkspace: null,
-            plugins: []
+            plugins: [],
+            requestResponseLayout: 'left-right'
         }
     },
     getters: {

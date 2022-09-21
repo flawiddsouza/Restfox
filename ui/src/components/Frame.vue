@@ -5,23 +5,24 @@ import Sidebar from '@/components/Sidebar.vue'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
 import ImportModal from '@/components/ImportModal.vue'
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useStore } from 'vuex'
 import constants from '../constants'
+import { vResizable } from '@/directives/vResizable'
 
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
+const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
 
-function setContainerGridColumnWidths(sidebarWidth, requestPanelWidth, responsePanelWidth) {
+function setContainerGridColumnWidths(sidebarWidth) {
     const container = document.querySelector('.container')
-    let containerStyle = 'auto 1.2fr 1fr'
+    let containerStyle = 'auto 1fr'
     if(container.style.gridTemplateColumns) {
         containerStyle = container.style.gridTemplateColumns
     }
     let containerValueSplit = containerStyle.split(' ')
     containerValueSplit[0] = sidebarWidth ?? containerValueSplit[0]
-    containerValueSplit[1] = requestPanelWidth ?? containerValueSplit[1]
-    containerValueSplit[2] = responsePanelWidth ?? containerValueSplit[2]
+    containerValueSplit[1] = containerValueSplit[1]
     container.style.gridTemplateColumns = containerValueSplit.join(' ')
 }
 
@@ -34,45 +35,44 @@ function onSidebarResize(e) {
     }
 }
 
-function onRequestPanelResize(e) {
-    const requestPanel = e[0].target
-    if(requestPanel.style.width) {
-        const requestPanelWidth = getComputedStyle(requestPanel).width
-        localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_WIDTH, requestPanelWidth)
-        setContainerGridColumnWidths(undefined, requestPanelWidth)
-    }
+function requestPanelResized(e) {
+    localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO, e.detail.leftPanel)
+    localStorage.setItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO, e.detail.rightPanel)
 }
 
 let resizeObserverSidebar
-let resizeObserverRequestPanel
+
+const requestPanelRatio = ref(undefined)
+const responsePanelRatio = ref(undefined)
 
 onMounted(() => {
     const sidebar = document.querySelector('.sidebar')
-    const requestPanel = document.querySelector('.request-panel')
 
     const savedSidebarWidth = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
-    const savedRequestPanelWidth = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_WIDTH)
+    const savedRequestPanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
+    const savedResponsePanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO)
+    const savedRequestResponseLayout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_RESPONSE_LAYOUT)
 
     if(savedSidebarWidth) {
         sidebar.style.width = savedSidebarWidth
+        setContainerGridColumnWidths(savedSidebarWidth)
     }
 
-    if(savedRequestPanelWidth) {
-        requestPanel.style.width = savedRequestPanelWidth
+    if(savedRequestPanelRatio && savedResponsePanelRatio) {
+        requestPanelRatio.value = savedRequestPanelRatio
+        responsePanelRatio.value = savedResponsePanelRatio
     }
 
-    setContainerGridColumnWidths(savedSidebarWidth, savedRequestPanelWidth)
+    if(savedRequestResponseLayout) {
+        store.state.requestResponseLayout = savedRequestResponseLayout
+    }
 
     resizeObserverSidebar = new ResizeObserver(onSidebarResize)
     resizeObserverSidebar.observe(sidebar)
-
-    resizeObserverRequestPanel = new ResizeObserver(onRequestPanelResize)
-    resizeObserverRequestPanel.observe(requestPanel)
 })
 
 onBeforeUnmount(() => {
     resizeObserverSidebar.disconnect()
-    resizeObserverRequestPanel.disconnect()
 })
 </script>
 
@@ -90,12 +90,16 @@ onBeforeUnmount(() => {
             <Sidebar />
         </aside>
 
-        <section class="request-panel" v-show="activeTab">
-            <RequestPanel />
-        </section>
+        <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="activeTab" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
+            <section class="request-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{ 'flexGrow': requestPanelRatio }">
+                <RequestPanel />
+            </section>
 
-        <section class="response-panel" v-if="activeTab">
-            <ResponsePanel />
+            <section class="resizer" data-resizer></section>
+
+            <section class="response-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{ 'flexGrow': responsePanelRatio }">
+                <ResponsePanel />
+            </section>
         </section>
 
         <ImportModal />
@@ -107,11 +111,11 @@ onBeforeUnmount(() => {
     display: grid;
 
     grid-template-areas:
-      "header header header"
-      "sidebar tab-bar tab-bar"
-      "sidebar request-panel response-panel";
+      "header header"
+      "sidebar tab-bar"
+      "sidebar request-response-panels";
 
-    grid-template-columns: 300px 1.2fr 1fr;
+    grid-template-columns: 300px 1fr;
     grid-template-rows: auto auto 1fr;
 
     height: 100%;
@@ -139,25 +143,65 @@ header {
     border-right: 1px solid var(--default-border-color);
     resize: horizontal;
     min-width: 300px;
+    width: 300px;
     max-width: 500px;
 }
 
 .request-panel {
-    grid-area: request-panel;
     overflow: auto;
-    border-right: 1px solid var(--default-border-color);
     display: grid;
     grid-template-rows: auto auto 1fr;
-    resize: horizontal;
-    min-width: calc(100vw / 3);
-    max-width: 50vw;
 }
 
 .response-panel {
-    grid-area: response-panel;
     overflow: auto;
     position: relative;
     display: grid;
     grid-template-rows: auto auto 1fr;
+}
+
+.request-response-panels {
+    grid-area: request-response-panels;
+    display: flex;
+    height: 100%;
+    overflow: auto;
+}
+
+.request-response-panels.top-bottom {
+    flex-direction: column;
+}
+
+.request-response-panels.top-bottom > .request-panel {
+    border-bottom: 1px solid var(--default-border-color);
+}
+
+.request-response-panels.top-bottom > .request-panel,
+.request-response-panels.top-bottom > .response-panel {
+    flex: 0.5 1 0%;
+}
+
+.request-response-panels.left-right > .request-panel {
+    border-right: 1px solid var(--default-border-color);
+}
+
+.request-response-panels.left-right > .request-panel,
+.request-response-panels.left-right > .response-panel {
+    flex: 0.5 1 0%;
+}
+
+.request-response-panels.left-right > .resizer {
+    width: 4px;
+    background-color: #f1f1f1;
+    cursor: ew-resize;
+}
+
+.request-response-panels.top-bottom > .resizer {
+    height: 4px;
+    background-color: #f1f1f1;
+    cursor: ns-resize;
+}
+
+.request-response-panels > .resizer:hover {
+    background-color: darksalmon;
 }
 </style>
