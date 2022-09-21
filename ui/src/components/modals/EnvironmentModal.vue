@@ -30,7 +30,7 @@
 
             <template #footer>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 0.8rem; text-align: left; line-height: 1rem;" v-pre><span class="code">"key": "value"</span> pairs defined in the above JSON object can be referenced in any text input in the request panel using <span class="code">{{ key }}</span> for variable substitution</div>
+                    <div style="font-size: 0.75rem; text-align: left; line-height: 1rem; margin-right: 0.5rem;" v-pre><span class="code">"key": "value"</span> pairs defined in the above JSON object can be referenced in any text input in the request panel using <span class="code">{{ key }}</span> for variable substitution</div>
                     <div>
                         <button>Done</button>
                     </div>

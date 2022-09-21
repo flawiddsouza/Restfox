@@ -64,4 +64,5 @@ body {
     padding: 0.1rem 0.2rem;
     border: 1px solid var(--default-border-color);
     font-family: var(--font-monospace);
+    font-size: 0.9em;
 }
