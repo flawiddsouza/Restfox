@@ -5,7 +5,7 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <div class="code-mirror-input-container">
-                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" />
+                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" />
             </div>
             <button @click="sendRequest">Send</button>
         </div>
@@ -370,7 +370,26 @@ export default {
                     value: mimeType
                 })
             }
+        },
+        handleAddressBarKeyDown(e) {
+            if(e.ctrlKey === false && e.key === 'Enter') {
+                if(this.activeTab.url === '') {
+                    return
+                }
+                this.sendRequest()
+            }
+        },
+        handleGlobalKeydown(e) {
+            if(e.ctrlKey === true && e.key === 'Enter') {
+                this.sendRequest()
+            }
         }
+    },
+    mounted() {
+        window.addEventListener('keydown', this.handleGlobalKeydown)
+    },
+    beforeUnmount() {
+        window.removeEventListener('keydown', this.handleGlobalKeydown)
     }
 }
 </script>
