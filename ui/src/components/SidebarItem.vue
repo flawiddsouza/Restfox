@@ -7,7 +7,17 @@ defineProps({
 </script>
 
 <template>
-    <div class="sidebar-item" :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }" @click="handleSidebarItemClick(sidebarItem)" @contextmenu.prevent="handleContextMenu(sidebarItem, $event)" :draggable="collectionFilter === '' ? true : false" :data-parent-id="sidebarItem.parentId" :data-id="sidebarItem._id" :data-type="sidebarItem._type">
+    <div
+        class="sidebar-item"
+        :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }"
+        @click="handleSidebarItemClick(sidebarItem)"
+        @dblclick="handleSidebarItemDoubleClick(sidebarItem)"
+        @contextmenu.prevent="handleContextMenu(sidebarItem, $event)"
+        :draggable="collectionFilter === '' ? true : false"
+        :data-parent-id="sidebarItem.parentId"
+        :data-id="sidebarItem._id"
+        :data-type="sidebarItem._type"
+    >
         <template v-if="sidebarItem._type === 'request_group'">
             <div style="margin-right: 0.3rem">
                 <i class="fa space-right fa-folder-open" v-if="getSidebarItemExpandedState(sidebarItem)"></i>
@@ -17,7 +27,22 @@ defineProps({
         <template v-if="sidebarItem._type === 'request'">
             <div class="sidebar-item-method" :class="`request-method--${sidebarItem.method}`">{{ sidebarItem.method.slice(0, 4) }}</div>
         </template>
-        <div>{{ sidebarItem.name }}</div>
+        <div style="width: 100%; margin-right: 0.5rem">
+            <div v-if="!showInputToRenameRequest">
+                {{ sidebarItem.name }}
+                <span v-if="sidebarItem.name === ''" style="visibility: hidden;">Empty Name</span>
+            </div>
+            <input
+                type="text"
+                v-model="sidebarItem.name"
+                style="pointer-events: auto; border: 0; outline: 0; width: 100%; padding: 0; background-color: inherit; font-style: italic;"
+                spellcheck="false"
+                @keydown.enter="showInputToRenameRequest = false"
+                @blur="showInputToRenameRequest = false"
+                v-focus
+                v-else
+            >
+        </div>
     </div>
     <div class="sidebar-list" v-if="'children' in sidebarItem && sidebarItem.children.length && getSidebarItemExpandedState(sidebarItem)">
         <template v-for="sidebarItem1 in sidebarItem.children">
@@ -28,6 +53,19 @@ defineProps({
 
 <script>
 export default {
+    directives: {
+        focus: {
+            mounted(element) {
+                element.focus()
+                element.select()
+            }
+        }
+    },
+    data() {
+        return {
+            showInputToRenameRequest: false
+        }
+    },
     computed: {
         activeTab() {
             return this.$store.state.activeTab
@@ -45,6 +83,11 @@ export default {
             if(sidebarItem._type === 'request_group') {
                 sidebarItem.collapsed = !(sidebarItem.collapsed)
                 this.$store.dispatch('saveCollectionItemCollapsedState', { _id: sidebarItem._id, collapsed: sidebarItem.collapsed })
+            }
+        },
+        handleSidebarItemDoubleClick(sidebarItem) {
+            if(sidebarItem._type === 'request') {
+                this.showInputToRenameRequest = true
             }
         },
         handleContextMenu(sidebarItem, event) {
