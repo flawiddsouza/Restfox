@@ -202,7 +202,7 @@ header {
     cursor: ns-resize;
 }
 
-.request-response-panels > .resizer:hover {
+.request-response-panels > .resizer:hover, .request-response-panels > .resizer[data-resizing] {
     background-color: darksalmon;
 }
 </style>

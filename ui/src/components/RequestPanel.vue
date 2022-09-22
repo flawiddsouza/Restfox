@@ -84,7 +84,7 @@
                     <button @click="beautifyJSON">Beautify JSON</button>
                 </div>
                 <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%; overflow: auto;" v-if="activeTab.body.mimeType === 'application/graphql'">
-                    <div class="oy-a">
+                    <div class="oy-a" style="min-height: 130px;">
                         <CodeMirrorEditor v-model="graphql.query" lang="graphql" class="code-editor" :key="'code-mirror-editor1-' + activeTab._id" ref="graphqlEditor"></CodeMirrorEditor>
                     </div>
                     <div style="margin-top: 0.5rem;display: grid; grid-template-rows: auto 1fr;">

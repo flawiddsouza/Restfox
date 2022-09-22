@@ -15,6 +15,7 @@ const vResizable = {
                     activeResizer = resizer
                     leftPanelInitialRect = activeResizer.previousElementSibling.getBoundingClientRect()
                     document.body.style.cursor = !topBottom ? 'ew-resize' : 'ns-resize'
+                    activeResizer.setAttribute('data-resizing', '')
                 }
                 resizer.addEventListener('mousedown', mouseDown)
             })
@@ -69,6 +70,7 @@ const vResizable = {
             const mouseUp = e => {
                 if(activeResizer) {
                     e.preventDefault()
+                    activeResizer.removeAttribute('data-resizing')
                     activeResizer = null
                     document.body.style.removeProperty('cursor')
                 }
