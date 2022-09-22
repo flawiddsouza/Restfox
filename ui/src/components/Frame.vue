@@ -13,6 +13,8 @@ import { vResizable } from '@/directives/vResizable'
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
+const requestPanelRatio = ref(undefined)
+const responsePanelRatio = ref(undefined)
 
 function setContainerGridColumnWidths(sidebarWidth) {
     const container = document.querySelector('.container')
@@ -36,14 +38,13 @@ function onSidebarResize(e) {
 }
 
 function requestPanelResized(e) {
+    requestPanelRatio.value = e.detail.leftPanel
     localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO, e.detail.leftPanel)
+    responsePanelRatio.value = e.detail.rightPanel
     localStorage.setItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO, e.detail.rightPanel)
 }
 
 let resizeObserverSidebar
-
-const requestPanelRatio = ref(undefined)
-const responsePanelRatio = ref(undefined)
 
 onMounted(() => {
     const sidebar = document.querySelector('.sidebar')
