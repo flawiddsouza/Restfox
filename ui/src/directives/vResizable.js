@@ -40,7 +40,7 @@ const vResizable = {
 
                 let newLeftPanelWidth = ((leftPanelWidth !== 0 ? leftPanelWidth : 1) * x) / leftPanelCurrentRectWidth
 
-                if(newLeftPanelWidth < leftPanelWidth && leftPanelCurrentRectWidth <= Number(leftPanel.dataset.minWidthPx.replace('px', ''))) {
+                if(newLeftPanelWidth < leftPanelWidth && leftPanelCurrentRectWidth <= Number(leftPanel.dataset.minWidthPx)) {
                     newLeftPanelWidth = leftPanelWidth
                 }
 
@@ -48,7 +48,7 @@ const vResizable = {
                     newLeftPanelWidth = leftPanelWidth
                 }
 
-                if(newLeftPanelWidth > leftPanelWidth && rightPanelCurrentRectWidth <= Number(rightPanel.dataset.minWidthPx.replace('px', ''))) {
+                if(newLeftPanelWidth > leftPanelWidth && rightPanelCurrentRectWidth <= Number(rightPanel.dataset.minWidthPx)) {
                     newLeftPanelWidth = leftPanelWidth
                 }
 
