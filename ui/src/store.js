@@ -37,6 +37,10 @@ async function loadResponses(state) {
 }
 
 function setActiveTab(state, tab, scrollSidebarItemIntoView=false) {
+    // skip setActiveTab as it's already the active tab
+    if(state.activeTab && state.activeTab._id === tab._id) {
+        return
+    }
     state.activeTab = tab
     loadResponses(state)
     if(scrollSidebarItemIntoView) {
@@ -102,7 +106,8 @@ const store = createStore({
             workspaces: [],
             activeWorkspace: null,
             plugins: [],
-            requestResponseLayout: 'left-right'
+            requestResponseLayout: 'left-right',
+            sidebarItemTemporaryName: {}
         }
     },
     getters: {
@@ -119,13 +124,14 @@ const store = createStore({
     },
     mutations: {
         addTab(state, tab) {
-            const existingTab = state.tabs.find(tabItem => tabItem._id === tab._id)
+            const tabCopy = JSON.parse(JSON.stringify(tab))
+            const existingTab = state.tabs.find(tabItem => tabItem._id === tabCopy._id)
             if(!existingTab) {
-                state.tabs.push(tab)
+                state.tabs.push(tabCopy)
             }
-            setActiveTab(state, tab)
+            setActiveTab(state, tabCopy)
             nextTick(() => {
-                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tab._id}"]`)
+                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tabCopy._id}"]`)
                 activeTabElement.scrollIntoView()
             })
         },

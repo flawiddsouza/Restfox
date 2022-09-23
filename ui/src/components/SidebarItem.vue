@@ -1,11 +1,3 @@
-<script setup>
-import SidebarItem from './SidebarItem.vue'
-
-defineProps({
-    sidebarItem: Object
-})
-</script>
-
 <template>
     <div
         class="sidebar-item"
@@ -34,11 +26,13 @@ defineProps({
             </div>
             <input
                 type="text"
-                v-model="sidebarItem.name"
+                v-model="newSidebarItemName"
+                @input="updateTemporarySidebarItemName"
                 style="pointer-events: auto; border: 0; outline: 0; width: 100%; padding: 0; background-color: inherit; font-style: italic;"
                 spellcheck="false"
                 @keydown.enter="showInputToRenameRequest = false"
-                @blur="showInputToRenameRequest = false"
+                @blur="saveSidebarItemName(sidebarItem)"
+                @dblclick.stop
                 v-focus
                 v-else
             >
@@ -46,13 +40,16 @@ defineProps({
     </div>
     <div class="sidebar-list" v-if="'children' in sidebarItem && sidebarItem.children.length && getSidebarItemExpandedState(sidebarItem)">
         <template v-for="sidebarItem1 in sidebarItem.children">
-            <sidebar-item :sidebar-item="sidebarItem1" />
+            <SidebarItem :sidebar-item="sidebarItem1" />
         </template>
     </div>
 </template>
 
 <script>
+import { findItemInTreeById } from '../helpers'
+
 export default {
+    name: 'SidebarItem',
     directives: {
         focus: {
             mounted(element) {
@@ -61,9 +58,13 @@ export default {
             }
         }
     },
+    props: {
+        sidebarItem: Object
+    },
     data() {
         return {
-            showInputToRenameRequest: false
+            showInputToRenameRequest: false,
+            newSidebarItemName: null
         }
     },
     computed: {
@@ -87,6 +88,7 @@ export default {
         },
         handleSidebarItemDoubleClick(sidebarItem) {
             if(sidebarItem._type === 'request') {
+                this.newSidebarItemName = sidebarItem.name
                 this.showInputToRenameRequest = true
             }
         },
@@ -100,6 +102,30 @@ export default {
             }
 
             return sidebarItem.collapsed === undefined || sidebarItem.collapsed === false
+        },
+        saveSidebarItemName(sidebarItem) {
+            this.$store.commit('updateCollectionItemName', {
+                _id: sidebarItem._id,
+                _type: sidebarItem._type,
+                name: this.newSidebarItemName
+            })
+
+            const sidebarItemToUpdate = findItemInTreeById(this.$store.state.collectionTree, sidebarItem._id)
+            if(sidebarItemToUpdate) {
+                sidebarItemToUpdate.name = this.newSidebarItemName
+            }
+
+            const tab = this.$store.state.tabs.find(tab => tab._id === sidebarItem._id)
+            if(tab) {
+                tab.name = this.newSidebarItemName
+            }
+
+            delete this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id]
+            this.newSidebarItemName = null
+            this.showInputToRenameRequest = false
+        },
+        updateTemporarySidebarItemName() {
+            this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id] = this.newSidebarItemName
         }
     }
 }

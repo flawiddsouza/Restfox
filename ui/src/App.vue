@@ -2,7 +2,6 @@
 import WorkspacesFrame from '@/components/WorkspacesFrame.vue'
 import Frame from '@/components/Frame.vue'
 import ReloadPrompt from '@/components/ReloadPrompt.vue'
-import { nanoid } from 'nanoid'
 </script>
 
 <template>
@@ -12,8 +11,9 @@ import { nanoid } from 'nanoid'
 </template>
 
 <script>
-import { db, getCollectionForWorkspace } from './db'
+import { getCollectionForWorkspace } from './db'
 import constants from './constants'
+import { findItemInTreeById } from './helpers'
 
 export default {
     computed: {
@@ -66,6 +66,17 @@ export default {
                 // has changed, so we need to save the object
                 if(oldValue && newValue && oldValue._id === newValue._id) {
                     this.$store.commit('persistActiveTab')
+
+                    // keep method property in sync
+                    const sidebarItem = findItemInTreeById(this.$store.state.collectionTree, this.activeTab._id)
+                    if(sidebarItem) {
+                        sidebarItem.method = this.activeTab.method
+                    }
+
+                    const tab = this.$store.state.tabs.find(tab => tab._id === this.activeTab._id)
+                    if(tab) {
+                        tab.method = this.activeTab.method
+                    }
                 }
             },
             deep: true
