@@ -148,6 +148,10 @@ const store = createStore({
 
             state.tabs.splice(tabIndex, 1)
         },
+        closeAllTabs(state) {
+            state.activeTab = null
+            state.tabs = []
+        },
         showImportModal(state, value) {
             state.showImportModal = value
         },

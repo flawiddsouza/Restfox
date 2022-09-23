@@ -1,11 +1,18 @@
 <script>
+import ContextMenu from './ContextMenu.vue'
 import { arrayMove } from '@/helpers'
 
 export default {
+    components: {
+        ContextMenu
+    },
     data() {
         return {
             draggedTabElement: null,
-            indexOfDraggedTab: null
+            indexOfDraggedTab: null,
+            tabContextMenuElement: null,
+            tabContextMenuTab: null,
+            showTabContextMenu: false
         }
     },
     computed: {
@@ -14,6 +21,26 @@ export default {
         },
         activeTab() {
             return this.$store.state.activeTab
+        },
+        tabContextMenuOptions() {
+            return [
+                {
+                    'type': 'option',
+                    'label': 'Close',
+                    'value': 'Close'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Close Others',
+                    'value': 'Close Others',
+                    'disabled': this.tabs.length === 1
+                },
+                {
+                    'type': 'option',
+                    'label': 'Close All',
+                    'value': 'Close All'
+                }
+            ]
         }
     },
     methods: {
@@ -77,7 +104,27 @@ export default {
                 const indexOfTabToDropOn = this.tabs.findIndex(item => item._id === tabToDropOn.dataset.id)
                 arrayMove(this.tabs, this.indexOfDraggedTab, indexOfTabToDropOn)
             }
-        }
+        },
+        handleTabContextMenu(event, tab) {
+            this.tabContextMenuElement = event.target
+            this.tabContextMenuTab = tab
+            this.showTabContextMenu = true
+        },
+        handleTabContextMenuItemClick(clickedContextMenuitem) {
+            if(clickedContextMenuitem === 'Close') {
+                this.closeTab(this.tabContextMenuTab)
+            }
+
+            if(clickedContextMenuitem === 'Close Others') {
+                this.tabs.filter(tab => tab._id !== this.tabContextMenuTab._id).forEach(tab => {
+                    this.closeTab(tab)
+                })
+            }
+
+            if(clickedContextMenuitem === 'Close All') {
+                this.$store.commit('closeAllTabs')
+            }
+        },
     },
     mounted() {
         document.addEventListener('dragstart', this.dragStart)
@@ -108,12 +155,14 @@ export default {
             @mousedown.middle.prevent="closeTab(tab)"
             :data-id="tab._id"
             draggable="true"
+            @contextmenu.prevent="handleTabContextMenu($event, tab)"
         >
             <span :class="`request-method--${tab.method}`">{{ tab.method }}</span> {{ tab.name }}
             <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close">x</span>
         </div>
     </div>
     <!-- <div class="tab-add" @click="addTab" style="visibility: hidden">+</div> -->
+    <ContextMenu :options="tabContextMenuOptions" :element="tabContextMenuElement" v-model:show="showTabContextMenu" @click="handleTabContextMenuItemClick" />
 </template>
 
 <style scoped>
