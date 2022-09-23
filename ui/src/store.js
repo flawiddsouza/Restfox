@@ -21,10 +21,13 @@ import constants from './constants'
 import { emitter } from './event-bus'
 
 async function loadResponses(state) {
-    state.responses = await db.responses.where({ collectionId: state.activeTab._id }).reverse().sortBy('createdAt')
-    if(state.responses.length > 0) {
+    if(state.activeTab._id in state.responses) {
+        return
+    }
+    state.responses[state.activeTab._id] = await db.responses.where({ collectionId: state.activeTab._id }).reverse().sortBy('createdAt')
+    if(state.responses[state.activeTab._id].length > 0) {
         if((state.activeTab._id in state.requestResponses) === false || (state.activeTab._id in state.requestResponses && state.requestResponses[state.activeTab._id] === null)) {
-            state.requestResponses[state.activeTab._id] = state.responses[0]
+            state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
             state.requestResponseStatus[state.activeTab._id] = 'loaded'
         }
     } else {
@@ -90,7 +93,7 @@ const store = createStore({
             requestResponseStatus: {},
             requestResponses: {},
             requestAbortController: {},
-            responses: [],
+            responses: {},
             showImportModal: false,
             showImportModalSelectedRequestGroupId: null,
             collectionFilter: '',
@@ -140,8 +143,6 @@ const store = createStore({
             const tabIndexRight = tabIndex + 1
 
             if(state.activeTab && state.activeTab._id === collectionItemId) {
-                delete state.requestResponseStatus[state.activeTab._id]
-                delete state.requestResponses[state.activeTab._id]
                 state.activeTab = tabIndexLeft >= 0 ? state.tabs[tabIndexLeft] : (tabIndexRight <= state.tabs.length - 1 ? state.tabs[tabIndexRight] : null)
             }
 
@@ -260,22 +261,22 @@ const store = createStore({
         },
         async saveResponse(state, response) {
             if(response._id) {
-                state.responses.unshift(response)
+                state.responses[state.activeTab._id].unshift(response)
                 await db.responses.put(response)
             }
         },
         async clearResponseHistory(state) {
             await db.responses.where({ collectionId: state.activeTab._id }).delete()
-            state.responses = []
+            state.responses[state.activeTab._id] = []
             state.requestResponses[state.activeTab._id] = null
             state.requestResponseStatus[state.activeTab._id] = 'pending'
         },
         async deleteCurrentlyActiveResponse(state) {
             const responseId = state.requestResponses[state.activeTab._id]._id
             await db.responses.where({ _id: responseId }).delete()
-            state.responses = state.responses.filter(response => response._id !== responseId)
-            if(state.responses.length > 0) {
-                state.requestResponses[state.activeTab._id] = state.responses[0]
+            state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseId)
+            if(state.responses[state.activeTab._id].length > 0) {
+                state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
                 state.requestResponseStatus[state.activeTab._id] = 'loaded'
             } else {
                 state.requestResponses[state.activeTab._id] = null
@@ -291,9 +292,14 @@ const store = createStore({
             await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
+                // clear unneeded response cache
+                if(childId in context.state.responses) {
+                    delete context.state.responses[childId]
+                    delete context.state.requestResponses[childId]
+                    delete context.state.requestResponseStatus[childId]
+                }
             })
             context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
-            context.state.responses = context.state.responses.filter(item => childIds.includes(item.collectionId))
 
             if(collectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'deleted')

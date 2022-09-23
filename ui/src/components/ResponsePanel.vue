@@ -109,7 +109,7 @@ export default {
             return 'not loaded'
         },
         responses() {
-            return this.$store.state.responses
+            return this.$store.state.responses[this.activeTab._id]
         },
         response: {
             get() {
