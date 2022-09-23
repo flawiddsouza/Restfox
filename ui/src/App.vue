@@ -59,8 +59,14 @@ export default {
             deep: true
         },
         activeTab: {
-            handler() {
-                this.$store.commit('persistActiveTab')
+            handler(newValue, oldValue) {
+                // don't commit change when activeTab is set for the first time
+                // and when activeTab is changed from one tab to another,
+                // having same id in oldValue & newValue means same object
+                // has changed, so we need to save the object
+                if(oldValue && newValue && oldValue._id === newValue._id) {
+                    this.$store.commit('persistActiveTab')
+                }
             },
             deep: true
         },
