@@ -20,19 +20,19 @@ import { nextTick } from 'vue'
 import constants from './constants'
 import { emitter } from './event-bus'
 
-async function loadResponses(state) {
-    if(state.activeTab._id in state.responses) {
+async function loadResponses(state, tabId) {
+    if(tabId in state.responses) {
         return
     }
-    state.responses[state.activeTab._id] = await db.responses.where({ collectionId: state.activeTab._id }).reverse().sortBy('createdAt')
-    if(state.responses[state.activeTab._id].length > 0) {
-        if((state.activeTab._id in state.requestResponses) === false || (state.activeTab._id in state.requestResponses && state.requestResponses[state.activeTab._id] === null)) {
-            state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
-            state.requestResponseStatus[state.activeTab._id] = 'loaded'
+    state.responses[tabId] = await db.responses.where({ collectionId: tabId }).reverse().sortBy('createdAt')
+    if(state.responses[tabId].length > 0) {
+        if((tabId in state.requestResponses) === false || (tabId in state.requestResponses && state.requestResponses[tabId] === null)) {
+            state.requestResponses[tabId] = state.responses[tabId][0]
+            state.requestResponseStatus[tabId] = 'loaded'
         }
     } else {
-        state.requestResponses[state.activeTab._id] = null
-        state.requestResponseStatus[state.activeTab._id] = 'pending'
+        state.requestResponses[tabId] = null
+        state.requestResponseStatus[tabId] = 'pending'
     }
 }
 
@@ -42,7 +42,7 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView=false) {
         return
     }
     state.activeTab = tab
-    loadResponses(state)
+    loadResponses(state, tab._id)
     if(scrollSidebarItemIntoView) {
         nextTick(() => {
             const activeSidebarElement = document.querySelector(`.sidebar-list-container div[data-id="${tab._id}"]`)
