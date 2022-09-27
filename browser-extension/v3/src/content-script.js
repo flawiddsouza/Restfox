@@ -1,11 +1,31 @@
 function init() {
-    if('__EXTENSION_HOOK__' in window) {
+    if('contentScriptLoaded' in window) {
         return
     }
 
-    window.__EXTENSION_HOOK__ = 'Restfox CORS Helper Enabled'
+    window.contentScriptLoaded = true
 
-    console.log(window.__EXTENSION_HOOK__)
+    window.addEventListener('message', message => {
+        if(message.data.event === 'sendRequest') {
+            chrome.runtime.sendMessage(message.data, receivedMessage => {
+                receivedMessage.buffer = new Uint8Array(receivedMessage.buffer).buffer
+                window.postMessage({
+                    event: 'response',
+                    eventData: receivedMessage
+                })
+            })
+        }
+
+        if(message.data.event === 'cancelRequest') {
+            chrome.runtime.sendMessage(message.data)
+        }
+    })
+
+    chrome.runtime.onMessage.addListener((message) => {
+        if(message.event === '__EXTENSION_HOOK__' || message.event === '__EXTENSION_UN_HOOK__') {
+            window.postMessage(message)
+        }
+    })
 }
 
 init()

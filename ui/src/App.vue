@@ -108,6 +108,21 @@ export default {
         this.$store.dispatch('loadPlugins')
         await this.$store.dispatch('loadWorkspaces')
         await this.fetchSetCollectionForWorkspace()
+    },
+    mounted() {
+        const messageHandler = message => {
+            if(message.data.event === '__EXTENSION_HOOK__') {
+                window.__EXTENSION_HOOK__ = message.data.eventData
+                console.log(message.data.eventData)
+            }
+
+            if(message.data.event === '__EXTENSION_UN_HOOK__') {
+                delete window.__EXTENSION_HOOK__
+                console.log(message.data.eventData)
+            }
+        }
+
+        window.addEventListener('message', messageHandler)
     }
 }
 </script>

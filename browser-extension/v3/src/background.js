@@ -1,7 +1,7 @@
 import { getKey, setKey } from './helpers.js'
 
 const domains = [
-    'restfox.dev'
+    'https://restfox.dev'
 ]
 
 async function isRestfoxTab() {
@@ -15,7 +15,7 @@ async function isRestfoxTab() {
         return false
     }
 
-    if(tab.url.startsWith(`https://${domains[0]}`) === false) {
+    if(tab.url.startsWith(`${domains[0]}`) === false) {
         return false
     }
 
@@ -38,6 +38,11 @@ async function tabChanged() {
         chrome.action.setIcon({
             path: 'icons/favicon-128.png'
         })
+
+        chrome.tabs.sendMessage(tab.id, {
+            event: '__EXTENSION_HOOK__',
+            eventData: 'Restfox CORS Helper Enabled'
+        })
     }
 
     chrome.scripting.executeScript({
@@ -46,46 +51,14 @@ async function tabChanged() {
         },
         files: [
             'content-script.js'
-        ],
-        world: 'MAIN'
+        ]
     })
 }
 
-const corsBypassRule = {
-    id: 1,
-    priority: 1,
-    action: {
-        type: 'modifyHeaders',
-        responseHeaders: [
-            {
-                operation: 'set',
-                header: 'Access-Control-Allow-Origin',
-                value: '*'
-            },
-            {
-                operation: 'set',
-                header: 'Access-Control-Allow-Methods',
-                value: '*'
-            },
-            {
-                operation: 'set',
-                header: 'Access-Control-Allow-Headers',
-                value: '*'
-            },
-            {
-                operation: 'set',
-                header: 'Access-Control-Expose-Headers',
-                value: '*'
-            }
-        ]
-    },
-    condition: {
-        initiatorDomains: domains
-    }
-}
-
 async function handleAction() {
-    if(await isRestfoxTab() === false) {
+    const tab = await isRestfoxTab()
+
+    if(tab === false) {
         return
     }
 
@@ -94,20 +67,80 @@ async function handleAction() {
     await setKey('extensionDisabled', extensionDisabled)
 
     if(extensionDisabled) {
-        chrome.declarativeNetRequest.updateDynamicRules({
-            removeRuleIds: [1]
-        })
         chrome.action.setIcon({
             path: 'icons/favicon-disabled-128.png'
         })
-    } else {
-        chrome.declarativeNetRequest.updateDynamicRules({
-            addRules: [corsBypassRule]
+
+        chrome.tabs.sendMessage(tab.id, {
+            event: '__EXTENSION_UN_HOOK__',
+            eventData: 'Restfox CORS Helper Disabled'
         })
+    } else {
         chrome.action.setIcon({
             path: 'icons/favicon-128.png'
         })
+
+        chrome.tabs.sendMessage(tab.id, {
+            event: '__EXTENSION_HOOK__',
+            eventData: 'Restfox CORS Helper Enabled'
+        })
     }
+}
+
+let abortController = null
+
+async function handleSendRequest(message, sendResponse) {
+    abortController = new AbortController()
+    try {
+        const { url, method, headers, body } = message.eventData
+
+        const startTime = new Date()
+
+        const response = await fetch(url, {
+            method,
+            headers,
+            body: method !== 'GET' ? body : undefined,
+            signal: abortController.signal
+        })
+
+        const endTime = new Date()
+
+        const status = response.status
+        const statusText = response.statusText
+        const responseHeaders = [...response.headers.entries()]
+
+        const responseBlob = await response.blob()
+        const mimeType = responseBlob.type
+        const buffer = await responseBlob.arrayBuffer()
+
+        const timeTaken = endTime - startTime
+
+        const responseToSend = {
+            status,
+            statusText,
+            headers: responseHeaders,
+            mimeType,
+            buffer: Array.from(new Uint8Array(buffer)),
+            timeTaken
+        }
+
+        sendResponse(responseToSend)
+    } catch(e) {
+        console.log(e)
+    }
+}
+
+function messageHandler(message, _sender, sendResponse) {
+    if(message.event === 'sendRequest') {
+        handleSendRequest(message, sendResponse)
+    }
+
+    if(message.event === 'cancelRequest') {
+        abortController.abort()
+    }
+
+    // Needed because: https://stackoverflow.com/a/59915897
+    return true
 }
 
 async function init() {
@@ -130,14 +163,12 @@ async function init() {
             path: 'icons/favicon-128.png'
         })
     }
+
+    chrome.runtime.onMessage.removeListener(messageHandler)
+    chrome.runtime.onMessage.addListener(messageHandler)
 }
 
 chrome.runtime.onInstalled.addListener(async() => {
-    chrome.declarativeNetRequest.updateDynamicRules({
-        addRules: [corsBypassRule],
-        removeRuleIds: [1]
-    })
-
     init()
 })
 

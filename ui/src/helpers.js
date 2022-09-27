@@ -59,6 +59,69 @@ export function generateBasicAuthString(username, password) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
+export async function fetchWrapper(url, method, headers, body, abortControllerSignal) {
+    if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
+        return new Promise((resolve, reject) => {
+            window.postMessage({
+                event: 'sendRequest',
+                eventData: {
+                    url: url.toString(),
+                    method,
+                    headers,
+                    body
+                }
+            })
+
+            const messageHandler = message => {
+                if(message.data.event === 'response') {
+                    resolve(message.data.eventData)
+                    window.removeEventListener('message',  messageHandler)
+                }
+            }
+
+            window.addEventListener('message',  messageHandler)
+
+            abortControllerSignal.onabort = () => {
+                window.postMessage({
+                    event: 'cancelRequest'
+                })
+                reject(new DOMException('The user aborted a request.', 'AbortError' ))
+                window.removeEventListener('message',  messageHandler)
+            }
+        })
+    }
+
+    const startTime = new Date()
+
+    const response = await fetch(url, {
+        method,
+        headers,
+        body: method !== 'GET' ? body : undefined,
+        signal: abortControllerSignal
+    })
+
+    const endTime = new Date()
+
+    const status = response.status
+    const statusText = response.statusText
+    const responseHeaders = [...response.headers.entries()]
+
+    const responseBlob = await response.blob()
+    const mimeType = responseBlob.type
+    const buffer = await responseBlob.arrayBuffer()
+
+    const timeTaken = endTime - startTime
+
+    return {
+        status,
+        statusText,
+        headers: responseHeaders,
+        mimeType,
+        buffer,
+        timeTaken
+    }
+}
+
 export async function handleRequest(request, environment, plugins, abortControllerSignal) {
     for(const plugin of plugins) {
         const requestContext = createRequestContextForPlugin(request, environment)
@@ -83,7 +146,7 @@ export async function handleRequest(request, environment, plugins, abortControll
                         ]
                     })
                 )
-            )
+            ).toString()
         }
     }
 
@@ -137,21 +200,7 @@ export async function handleRequest(request, environment, plugins, abortControll
             }
         }
 
-        const startTime = new Date()
-
-        const response = await fetch(url, {
-            method: request.method,
-            headers,
-            body: request.method !== 'GET' ? body : undefined,
-            signal: abortControllerSignal
-        })
-
-        const endTime = new Date()
-        const timeTaken = endTime - startTime
-
-        const responseBlob = await response.blob()
-        const mimeType = responseBlob.type
-        const buffer = await responseBlob.arrayBuffer()
+        const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal)
 
         let responseToSend = {
             _id: nanoid(),
@@ -159,10 +208,10 @@ export async function handleRequest(request, environment, plugins, abortControll
             url: urlWithEnvironmentVariablesSubstituted,
             status: response.status,
             statusText: response.statusText,
-            headers: [...response.headers.entries()],
-            mimeType,
-            buffer,
-            timeTaken,
+            headers: response.headers,
+            mimeType: response.mimeType,
+            buffer: response.buffer,
+            timeTaken: response.timeTaken,
             createdAt: new Date().getTime()
         }
 
