@@ -77,6 +77,11 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                     resolve(message.data.eventData)
                     window.removeEventListener('message',  messageHandler)
                 }
+
+                if(message.data.event === 'responseError') {
+                    reject(message.data.eventData)
+                    window.removeEventListener('message',  messageHandler)
+                }
             }
 
             window.addEventListener('message',  messageHandler)

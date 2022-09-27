@@ -8,11 +8,15 @@ function init() {
     window.addEventListener('message', message => {
         if(message.data.event === 'sendRequest') {
             chrome.runtime.sendMessage(message.data, receivedMessage => {
-                receivedMessage.buffer = new Uint8Array(receivedMessage.buffer).buffer
-                window.postMessage({
-                    event: 'response',
-                    eventData: receivedMessage
-                })
+                if(receivedMessage.event === 'response') {
+                    receivedMessage.eventData.buffer = new Uint8Array(receivedMessage.eventData.buffer).buffer
+                    window.postMessage(receivedMessage)
+                }
+
+                if(receivedMessage.event === 'responseError') {
+                    receivedMessage.eventData = new Error(receivedMessage.eventData)
+                    window.postMessage(receivedMessage)
+                }
             })
         }
 

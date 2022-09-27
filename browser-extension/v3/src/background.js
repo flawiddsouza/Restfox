@@ -124,9 +124,15 @@ async function handleSendRequest(message, sendResponse) {
             timeTaken
         }
 
-        sendResponse(responseToSend)
+        sendResponse({
+            event: 'response',
+            eventData: responseToSend
+        })
     } catch(e) {
-        console.log(e)
+        sendResponse({
+            event: 'responseError',
+            eventData: e.message
+        })
     }
 }
 

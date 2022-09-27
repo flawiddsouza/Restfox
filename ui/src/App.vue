@@ -112,6 +112,10 @@ export default {
     mounted() {
         const messageHandler = message => {
             if(message.data.event === '__EXTENSION_HOOK__') {
+                // this keeps getting called whenever tab is changed, so we do this
+                if(window.__EXTENSION_HOOK__ === message.data.eventData) {
+                    return
+                }
                 window.__EXTENSION_HOOK__ = message.data.eventData
                 console.log(message.data.eventData)
             }
