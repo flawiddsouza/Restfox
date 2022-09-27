@@ -44,59 +44,6 @@ async function isRestfoxTab() {
     return tab
 }
 
-async function corsBypass(e) {
-    const tab = await isRestfoxTab()
-
-    if(tab === false) {
-        return
-    }
-
-    let extensionDisabled = await getKey('extensionDisabled')
-
-    if(extensionDisabled) {
-        return
-    }
-
-    // fix for: localhost not accessible when extension enabled
-    if(e.url.startsWith('http://localhost')) {
-        return
-    }
-
-    const headers = [
-        {
-            name: 'Access-Control-Allow-Origin',
-            value: '*'
-        },
-        {
-            name: 'Access-Control-Allow-Methods',
-            value: '*'
-        },
-        {
-            name: 'Access-Control-Allow-Headers',
-            value: '*'
-        },
-        {
-            name: 'Access-Control-Expose-Headers',
-            value: '*'
-        }
-    ]
-
-    e.responseHeaders.push(...headers)
-
-    return { responseHeaders: e.responseHeaders }
-}
-
-browser.webRequest.onHeadersReceived.addListener(
-    corsBypass,
-    {
-        urls: ['<all_urls>']
-    },
-    [
-        'blocking',
-        'responseHeaders'
-    ]
-)
-
 async function tabChanged() {
     const tab = await isRestfoxTab()
 
@@ -114,6 +61,11 @@ async function tabChanged() {
         await browser.pageAction.setIcon({
             path: 'icons/favicon-128.png',
             tabId: tab.id
+        })
+
+        browser.tabs.sendMessage(tab.id, {
+            event: '__EXTENSION_HOOK__',
+            eventData: 'Restfox CORS Helper Enabled'
         })
     }
 }
@@ -137,12 +89,85 @@ async function handleAction() {
             path: 'icons/favicon-disabled-128.png',
             tabId: tab.id
         })
+
+        browser.tabs.sendMessage(tab.id, {
+            event: '__EXTENSION_UN_HOOK__',
+            eventData: 'Restfox CORS Helper Disabled'
+        })
     } else {
         browser.pageAction.setIcon({
             path: 'icons/favicon-128.png',
             tabId: tab.id
         })
+
+        browser.tabs.sendMessage(tab.id, {
+            event: '__EXTENSION_HOOK__',
+            eventData: 'Restfox CORS Helper Enabled'
+        })
     }
 }
 
 browser.pageAction.onClicked.addListener(handleAction)
+
+let abortController = null
+
+async function handleSendRequest(message, sendResponse) {
+    abortController = new AbortController()
+    try {
+        const { url, method, headers, body } = message.eventData
+
+        const startTime = new Date()
+
+        const response = await fetch(url, {
+            method,
+            headers,
+            body: method !== 'GET' ? body : undefined,
+            signal: abortController.signal
+        })
+
+        const endTime = new Date()
+
+        const status = response.status
+        const statusText = response.statusText
+        const responseHeaders = [...response.headers.entries()]
+
+        const responseBlob = await response.blob()
+        const mimeType = responseBlob.type
+        const buffer = await responseBlob.arrayBuffer()
+
+        const timeTaken = endTime - startTime
+
+        const responseToSend = {
+            status,
+            statusText,
+            headers: responseHeaders,
+            mimeType,
+            buffer: Array.from(new Uint8Array(buffer)),
+            timeTaken
+        }
+
+        sendResponse({
+            event: 'response',
+            eventData: responseToSend
+        })
+    } catch(e) {
+        sendResponse({
+            event: 'responseError',
+            eventData: e.message
+        })
+    }
+}
+
+function messageHandler(message, _sender, sendResponse) {
+    if(message.event === 'sendRequest') {
+        handleSendRequest(message, sendResponse)
+    }
+
+    if(message.event === 'cancelRequest') {
+        abortController.abort()
+    }
+
+    return true
+}
+
+browser.runtime.onMessage.addListener(messageHandler)

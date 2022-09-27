@@ -1,14 +1,12 @@
 {
     "name": "Restfox CORS Helper",
     "description": "Help bypass CORS when making requests from Restfox",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "manifest_version": 2,
     "icons": {
         "512": "icons/favicon.png"
     },
     "permissions": [
-        "webRequest",
-        "webRequestBlocking",
         "storage",
         "tabs",
         "*://*/*"
