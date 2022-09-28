@@ -33,6 +33,17 @@ async function tabChanged() {
         return
     }
 
+    // chrome.scripting.executeScript needs to come before chrome.tabs.sendMessage
+    // if there's a message that the injected content script has to receive
+    chrome.scripting.executeScript({
+        target: {
+            tabId: tab.id
+        },
+        files: [
+            'content-script.js'
+        ]
+    })
+
     const extensionDisabled = await getKey('extensionDisabled')
     if(!extensionDisabled) {
         chrome.action.setIcon({
@@ -44,15 +55,6 @@ async function tabChanged() {
             eventData: 'Restfox CORS Helper Enabled'
         })
     }
-
-    chrome.scripting.executeScript({
-        target: {
-            tabId: tab.id
-        },
-        files: [
-            'content-script.js'
-        ]
-    })
 }
 
 async function handleAction() {
@@ -143,6 +145,12 @@ function messageHandler(message, _sender, sendResponse) {
 
     if(message.event === 'cancelRequest') {
         abortController.abort()
+    }
+
+    if(message.event === 'ping') {
+        sendResponse({
+            event: 'pong'
+        })
     }
 
     // Needed because: https://stackoverflow.com/a/59915897

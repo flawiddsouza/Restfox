@@ -30,6 +30,17 @@ function init() {
             window.postMessage(message)
         }
     })
+
+    const wakeup = () => {
+        setTimeout(function(){
+            try {
+                chrome.runtime.sendMessage({ event: 'ping' })
+            } catch {}
+            wakeup()
+        }, 1000)
+    }
+
+    wakeup()
 }
 
 init()
