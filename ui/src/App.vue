@@ -67,15 +67,16 @@ export default {
                 if(oldValue && newValue && oldValue._id === newValue._id) {
                     this.$store.commit('persistActiveTab')
 
-                    // keep method property in sync
+                    // keep sidebarItem properties in sync with activeTab
                     const sidebarItem = findItemInTreeById(this.$store.state.collectionTree, this.activeTab._id)
                     if(sidebarItem) {
-                        sidebarItem.method = this.activeTab.method
+                        Object.assign(sidebarItem, this.activeTab)
                     }
 
+                    // keep tab properties in tabs in sync with activeTab
                     const tab = this.$store.state.tabs.find(tab => tab._id === this.activeTab._id)
                     if(tab) {
-                        tab.method = this.activeTab.method
+                        Object.assign(tab, this.activeTab)
                     }
                 }
             },
