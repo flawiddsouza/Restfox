@@ -80,5 +80,11 @@
                 }
             ]
         }
+    },
+    "build": {
+        "linux": {
+            "category": "Development",
+            "icon": "ui/favicon.png"
+        }
     }
 }
