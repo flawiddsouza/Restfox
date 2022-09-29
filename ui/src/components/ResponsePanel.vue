@@ -47,8 +47,18 @@
                         <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
                         <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
                         <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
-                        <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">3) No CORS headers present for the requested url and requested http method (Can be bypassed using the <a href="https://chrome.google.com/webstore/detail/restfox-cors-helper/pgoncladmcclnmilkbnmmbldcihdgfnf" target="_blank">Chrome</a> or <a href="https://addons.mozilla.org/en-US/firefox/addon/restfox-cors-helper/" target="_blank">Firefox</a> extension for Restfox)</div>
-                        <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">4) On the browser version, only https urls and localhost can be loaded at the moment. So if you're hitting a http url, the request will fail because https doesn't like requesting http urls.</div>
+                        <template v-if="flags.isBrowser">
+                            <template v-if="!flags.hideBrowserRelatedResponsePanelErrors">
+                                <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">3) No CORS headers present for the requested url and requested http method</div>
+                                <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">4) On the browser version, only https urls and localhost can be loaded at the moment. So if you're hitting a http url, the request will fail because https doesn't like requesting http urls.</div>
+                            </template>
+                            <div v-show="!flags.browserExtensionEnabled" style="margin-top: 1.5rem; line-height: 1rem;">
+                                Points 3 & 4 can be bypassed using the <a href="https://chrome.google.com/webstore/detail/restfox-cors-helper/pgoncladmcclnmilkbnmmbldcihdgfnf" target="_blank">Chrome</a> or <a href="https://addons.mozilla.org/en-US/firefox/addon/restfox-cors-helper/" target="_blank">Firefox</a> extension for Restfox
+                            </div>
+                            <div v-show="flags.browserExtensionEnabled" style="margin-top: 1.5rem; line-height: 1rem;">
+                                Browser extension is active. CORS will be bypassed and http requests will also work now.
+                            </div>
+                        </template>
                     </div>
                 </div>
             </template>
@@ -145,6 +155,9 @@ export default {
                     'icon': 'fa fa-trash',
                 }
             ]
+        },
+        flags() {
+            return this.$store.state.flags
         }
     },
     methods: {

@@ -118,11 +118,15 @@ export default {
                     return
                 }
                 window.__EXTENSION_HOOK__ = message.data.eventData
+                this.$store.state.flags.hideBrowserRelatedResponsePanelErrors = true
+                this.$store.state.flags.browserExtensionEnabled = true
                 console.log(message.data.eventData)
             }
 
             if(message.data.event === '__EXTENSION_UN_HOOK__') {
                 delete window.__EXTENSION_HOOK__
+                this.$store.state.flags.hideBrowserRelatedResponsePanelErrors = false
+                this.$store.state.flags.browserExtensionEnabled = false
                 console.log(message.data.eventData)
             }
         }

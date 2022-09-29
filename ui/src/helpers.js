@@ -234,7 +234,7 @@ export async function handleRequest(request, environment, plugins, abortControll
     } catch(e) {
         console.log(e)
 
-        let error = `Error: Couldn't resolve host name`
+        let error = `Error: Request failed`
 
         if(typeof e !== 'string')  {
             if(e.message.includes('Invalid URL')) {

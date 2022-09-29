@@ -107,7 +107,12 @@ const store = createStore({
             activeWorkspace: null,
             plugins: [],
             requestResponseLayout: 'left-right',
-            sidebarItemTemporaryName: {}
+            sidebarItemTemporaryName: {},
+            flags: {
+                hideBrowserRelatedResponsePanelErrors: false,
+                browserExtensionEnabled: false,
+                isBrowser: true
+            }
         }
     },
     getters: {
