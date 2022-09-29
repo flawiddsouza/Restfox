@@ -5,7 +5,10 @@ require('update-electron-app')()
 if(require('electron-squirrel-startup')) return app.quit()
 
 function createWindow() {
-    const win = new BrowserWindow({ show: false })
+    const win = new BrowserWindow({
+        show: false,
+        autoHideMenuBar: true
+    })
     win.on('show', () => { win.focus() })
     win.maximize()
     win.show()
