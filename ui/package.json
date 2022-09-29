@@ -4,6 +4,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
+        "build-desktop": "vite build --mode desktop",
         "serve": "vite preview"
     },
     "dependencies": {

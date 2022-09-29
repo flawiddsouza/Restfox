@@ -19,7 +19,7 @@ jobs:
         working-directory: ./ui
         run: |
           npm ci
-          npm run build
+          npm run build-desktop
       - name: Build deb, rpm
         working-directory: ./electron
         run: |
@@ -37,7 +37,7 @@ jobs:
         working-directory: ./ui
         run: |
           npm ci
-          npm run build
+          npm run build-desktop
       - name: Build windows installer
         working-directory: ./electron
         run: |
@@ -55,7 +55,7 @@ jobs:
         working-directory: ./ui
         run: |
           npm ci
-          npm run build
+          npm run build-desktop
       - name: Build macos binaries
         working-directory: ./electron
         run: |
