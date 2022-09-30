@@ -19,7 +19,8 @@
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText }}
                 </div>
-                <div class="tag" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
+                <div class="tag plr-0 ml-0_6rem" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
+                <div class="tag plr-0 ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
@@ -85,7 +86,7 @@
 <script>
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
-import { dateFormat, humanFriendlyTime } from '@/helpers'
+import { dateFormat, humanFriendlyTime, humanFriendlySize } from '@/helpers'
 
 export default {
     components: {
@@ -158,6 +159,13 @@ export default {
         },
         flags() {
             return this.$store.state.flags
+        },
+        responseSize() {
+            if(this.response) {
+                return this.response.buffer.byteLength
+            }
+
+            return null
         }
     },
     methods: {
@@ -178,6 +186,7 @@ export default {
         },
         dateFormat,
         humanFriendlyTime,
+        humanFriendlySize,
         handleResponseHistoryContextMenu(event) {
             this.responseHistoryContextMenuElement = event.target
             this.showResponseHistoryContextMenu = true
@@ -268,6 +277,15 @@ export default {
 .response-panel-address-bar .tag.red {
     background: #e15251;
     color: white;
+}
+
+.response-panel-address-bar .tag.plr-0 {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.response-panel-address-bar .tag.ml-0_6rem {
+    margin-left: 0.6rem;
 }
 
 .response-panel-address-bar .response-panel-address-bar-select-container {

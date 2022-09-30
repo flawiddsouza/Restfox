@@ -903,3 +903,29 @@ export function exportRestfoxCollection(collection) {
         collection
     })
 }
+
+// From: https://github.com/Kong/insomnia/blob/fac2627d695a10865d0f7f9ea7b2c04a77d92194/packages/insomnia/src/common/misc.ts#L169-L192
+export function humanFriendlySize(bytes, long=false) {
+    bytes = Math.round(bytes * 10) / 10
+    let size
+    // NOTE: We multiply these by 2 so we don't end up with
+    // values like 0 GB
+    let unit
+
+    if (bytes < 1024 * 2) {
+        size = bytes
+        unit = long ? 'bytes' : 'B'
+    } else if (bytes < 1024 * 1024 * 2) {
+        size = bytes / 1024
+        unit = long ? 'kilobytes' : 'KB'
+    } else if (bytes < 1024 * 1024 * 1024 * 2) {
+        size = bytes / 1024 / 1024
+        unit = long ? 'megabytes' : 'MB'
+    } else {
+        size = bytes / 1024 / 1024 / 1024
+        unit = long ? 'gigabytes' : 'GB'
+    }
+
+    const rounded = Math.round(size * 10) / 10
+    return `${rounded} ${unit}`
+}
