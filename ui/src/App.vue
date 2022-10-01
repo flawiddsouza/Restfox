@@ -103,12 +103,13 @@ export default {
             if(collections.length > 0) {
                 this.$store.commit('setCollection', collections)
             }
+
+            this.$store.commit('loadWorkspaceTabs')
         }
     },
     async created() {
         this.$store.dispatch('loadPlugins')
         await this.$store.dispatch('loadWorkspaces')
-        await this.fetchSetCollectionForWorkspace()
 
         if(import.meta.env.MODE === 'desktop') {
             this.$store.state.flags.isBrowser = false

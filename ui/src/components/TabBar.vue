@@ -50,8 +50,12 @@ export default {
         setActiveTab(tab) {
             this.$store.commit('setActiveTab', tab)
         },
-        closeTab(tab) {
+        closeTab(tab, persist=true) {
             this.$store.commit('closeTab', tab._id)
+
+            if(persist) {
+                this.$store.commit('persistActiveWorkspaceTabs')
+            }
         },
         dragStart(event) {
             this.draggedTabElement = event.target.closest('.tab')
@@ -106,6 +110,7 @@ export default {
                 tabToDropOn.style.background = ''
                 const indexOfTabToDropOn = this.tabs.findIndex(item => item._id === tabToDropOn.dataset.id)
                 arrayMove(this.tabs, this.indexOfDraggedTab, indexOfTabToDropOn)
+                this.$store.commit('persistActiveWorkspaceTabs')
             }
         },
         handleTabContextMenu(event, tab) {
@@ -120,8 +125,9 @@ export default {
 
             if(clickedContextMenuitem === 'Close Others') {
                 this.tabs.filter(tab => tab._id !== this.tabContextMenuTab._id).forEach(tab => {
-                    this.closeTab(tab)
+                    this.closeTab(tab, false)
                 })
+                this.$store.commit('persistActiveWorkspaceTabs')
             }
 
             if(clickedContextMenuitem === 'Close All') {

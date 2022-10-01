@@ -36,7 +36,7 @@ async function loadResponses(state, tabId) {
     }
 }
 
-function setActiveTab(state, tab, scrollSidebarItemIntoView=false) {
+function setActiveTab(state, tab, scrollSidebarItemIntoView=false, persistActiveWorkspaceTabsBool=true) {
     // skip setActiveTab as it's already the active tab
     if(state.activeTab && state.activeTab._id === tab._id) {
         return
@@ -53,7 +53,15 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView=false) {
                     inline: 'center'
                 })
             }
+
+            // also scroll active tab element into view
+            const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tab._id}"]`)
+            activeTabElement.scrollIntoView()
         })
+    }
+
+    if(persistActiveWorkspaceTabsBool) {
+        persistActiveWorkspaceTabs(state)
     }
 }
 
@@ -85,6 +93,66 @@ async function getEnvironmentForRequest(requestWorkspace, request) {
     }
 
     return environment
+}
+
+let workspaceCache = {
+    tabs: {},
+    activeTab: {}
+}
+
+async function loadWorkspaceTabs(state, workspaceId) {
+    if(workspaceId in workspaceCache.tabs) {
+        state.tabs = workspaceCache.tabs[workspaceId]
+        if(workspaceCache.activeTab[workspaceId]) {
+            setActiveTab(state, workspaceCache.activeTab[workspaceId], true, false)
+        } else {
+            state.activeTab = null
+        }
+        return
+    }
+
+    const tabIds = state.activeWorkspace.tabIds ?? []
+    const activeTabId = state.activeWorkspace.activeTabId ?? null
+
+    let tabIdsOrder = {}
+
+    // to restore tab ordering
+    tabIds.forEach((tabId, index) => {
+        tabIdsOrder[tabId] = index
+    })
+
+    workspaceCache.tabs[workspaceId] = state.collection.filter(collectionItem => tabIds.includes(collectionItem._id)).sort((a, b) => tabIdsOrder[a._id] - tabIdsOrder[b._id])
+    workspaceCache.activeTab[workspaceId] = workspaceCache.tabs[workspaceId].find(tab => tab._id === activeTabId) ?? null
+
+    state.tabs = workspaceCache.tabs[workspaceId]
+    state.activeTab = null
+
+    if(workspaceCache.activeTab[workspaceId]) {
+        setActiveTab(state, workspaceCache.activeTab[workspaceId], true, false)
+    }
+}
+
+// Called when
+// - Tab added
+// - Tab made active / switched to
+// - Tab closed
+// - Tab reordered
+async function persistActiveWorkspaceTabs(state) {
+    workspaceCache.tabs[state.activeWorkspace._id] = state.tabs
+    workspaceCache.activeTab[state.activeWorkspace._id] = state.activeTab
+
+    const tabIds = state.tabs.map(tab => tab._id)
+    const activeTabId = state.activeTab ? state.activeTab._id : null
+
+    // persist to already loaded workspace state
+    state.activeWorkspace.tabIds = tabIds
+    state.activeWorkspace.activeTabId = activeTabId
+
+    // persist to db
+    await db.workspaces.update(state.activeWorkspace._id, {
+        tabIds,
+        activeTabId
+    })
 }
 
 const store = createStore({
@@ -162,6 +230,7 @@ const store = createStore({
         closeAllTabs(state) {
             state.activeTab = null
             state.tabs = []
+            persistActiveWorkspaceTabs(state)
         },
         showImportModal(state, value) {
             state.showImportModal = value
@@ -240,6 +309,10 @@ const store = createStore({
         },
         setActiveWorkspace(state, workspace) {
             state.activeWorkspace = workspace
+            if(workspace === null) {
+                state.tabs = []
+                state.activeTab = null
+            }
         },
         async addPlugin(state, plugin) {
             const newPlugin = {
@@ -297,6 +370,12 @@ const store = createStore({
                 state.requestResponses[state.activeTab._id] = null
                 state.requestResponseStatus[state.activeTab._id] = 'pending'
             }
+        },
+        persistActiveWorkspaceTabs(state) {
+            persistActiveWorkspaceTabs(state)
+        },
+        loadWorkspaceTabs(state) {
+            loadWorkspaceTabs(state, state.activeWorkspace._id)
         }
     },
     actions: {
@@ -318,6 +397,10 @@ const store = createStore({
 
             if(collectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'deleted')
+            }
+
+            if(childIds.length > 0) {
+                persistActiveWorkspaceTabs(context.state)
             }
         },
         async duplicateCollectionItem(context, collectionItem) {
