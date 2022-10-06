@@ -16,12 +16,12 @@ jobs:
         with:
           node-version: 16
       - name: Build UI
-        working-directory: ./ui
+        working-directory: ./packages/ui
         run: |
           npm ci
           npm run build-desktop
       - name: Build deb, rpm
-        working-directory: ./electron
+        working-directory: ./packages/electron
         run: |
           npm ci
           npm run publish
@@ -34,12 +34,12 @@ jobs:
         with:
           node-version: 16
       - name: Build UI
-        working-directory: ./ui
+        working-directory: ./packages/ui
         run: |
           npm ci
           npm run build-desktop
       - name: Build windows installer
-        working-directory: ./electron
+        working-directory: ./packages/electron
         run: |
           npm ci
           npm run publish
@@ -52,12 +52,12 @@ jobs:
         with:
           node-version: 16
       - name: Build UI
-        working-directory: ./ui
+        working-directory: ./packages/ui
         run: |
           npm ci
           npm run build-desktop
       - name: Build macos binaries
-        working-directory: ./electron
+        working-directory: ./packages/electron
         run: |
           npm ci
           npm run publish
