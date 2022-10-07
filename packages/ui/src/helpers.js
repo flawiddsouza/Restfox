@@ -252,14 +252,25 @@ export async function handleRequest(request, environment, plugins, abortControll
                 method: request.method,
                 query: url.search,
                 headers: headersToSave,
-                bodyMimeType: request.body.mimeType,
-                body
+                body: request.method !== 'GET' ? body : null,
+                original: {
+                    url: request.url,
+                    body: JSON.parse(JSON.stringify(request.body))
+                }
             },
             createdAt: new Date().getTime()
         }
 
+        if(request.parameters) {
+            responseToSend.request.original.parameters = JSON.parse(JSON.stringify(request.parameters))
+        }
+
+        if(request.headers) {
+            responseToSend.request.original.headers = JSON.parse(JSON.stringify(request.headers))
+        }
+
         if(request.authentication) {
-            responseToSend.request.authentication = JSON.parse(JSON.stringify(request.authentication))
+            responseToSend.request.original.authentication = JSON.parse(JSON.stringify(request.authentication))
         }
 
         for(const plugin of plugins) {
