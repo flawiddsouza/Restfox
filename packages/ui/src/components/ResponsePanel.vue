@@ -161,7 +161,7 @@ export default {
             return this.$store.state.flags
         },
         responseSize() {
-            if(this.response) {
+            if(this.response && 'buffer' in this.response) {
                 return this.response.buffer.byteLength
             }
 
