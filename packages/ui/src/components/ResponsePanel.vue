@@ -84,6 +84,9 @@
                     </table>
                 </div>
                 <div style="margin-top: 1rem" v-html="responseRequestBodyOutput"></div>
+                <div style="margin-top: 1rem">
+                    <button @click="restoreCurrentResponseRequest">Restore</button>
+                </div>
             </div>
         </div>
     </template>
@@ -252,6 +255,26 @@ export default {
             }
             await navigator.clipboard.writeText(this.bufferToJSONString(this.response.buffer))
             this.$toast.success('Copied to clipboard')
+        },
+        restoreCurrentResponseRequest() {
+            if(!confirm('Are you sure? Restoring a request will reset your existing request and make it the same as the saved response\'s request.')) {
+                return
+            }
+
+            this.activeTab.url = this.response.request.original.url
+            this.activeTab.body = JSON.parse(JSON.stringify(this.response.request.original.body))
+
+            if(this.response.request.original.parameters) {
+                this.activeTab.parameters = JSON.parse(JSON.stringify(this.response.request.original.parameters))
+            }
+
+            if(this.response.request.original.headers) {
+                this.activeTab.headers = JSON.parse(JSON.stringify(this.response.request.original.headers))
+            }
+
+            if(this.response.request.original.authentication) {
+                this.activeTab.authentication = JSON.parse(JSON.stringify(this.response.request.original.authentication))
+            }
         }
     }
 }
