@@ -68,7 +68,7 @@
                     <table>
                         <tr v-for="header in response.headers">
                             <td style="white-space: nowrap">{{ header[0] }}</td>
-                            <td>{{ header[1] }}</td>
+                            <td style="word-break: break-word">{{ header[1] }}</td>
                         </tr>
                     </table>
                 </div>
@@ -79,7 +79,7 @@
                     <table>
                         <tr v-for="header in Object.keys(response.request.headers)">
                             <td style="white-space: nowrap">{{ header }}</td>
-                            <td>{{ response.request.headers[header] }}</td>
+                            <td style="word-break: break-word">{{ response.request.headers[header] }}</td>
                         </tr>
                     </table>
                 </div>
