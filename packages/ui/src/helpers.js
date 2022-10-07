@@ -159,7 +159,7 @@ export async function handleRequest(request, environment, plugins, abortControll
         body = substituteEnvironmentVariables(environment, request.body.text)
     }
 
-    if(request.body.mimeType === 'application/octet-stream') {
+    if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
         body = request.body.fileName
     }
 
@@ -207,17 +207,59 @@ export async function handleRequest(request, environment, plugins, abortControll
 
         const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal)
 
+        const headersToSave = JSON.parse(JSON.stringify(headers))
+
+        // From: https://fetch.spec.whatwg.org/#forbidden-header-name
+        const forbiddenHeaders = [
+            'Accept-Charset',
+            'Accept-Encoding',
+            'Access-Control-Request-Headers',
+            'Access-Control-Request-Method',
+            'Connection',
+            'Content-Length',
+            'Cookie',
+            'Cookie2',
+            'Date',
+            'DNT',
+            'Expect',
+            'Host',
+            'Keep-Alive',
+            'Origin',
+            'Referer',
+            'Set-Cookie',
+            'TE',
+            'Trailer',
+            'Transfer-Encoding',
+            'Upgrade',
+            'Via',
+        ]
+
+        forbiddenHeaders.forEach(forbiddenHeader => {
+            delete headersToSave[forbiddenHeader.toLowerCase()]
+        })
+
         let responseToSend = {
             _id: nanoid(),
             collectionId: request._id,
-            url: urlWithEnvironmentVariablesSubstituted,
+            url: url.origin + url.pathname,
             status: response.status,
             statusText: response.statusText,
             headers: response.headers,
             mimeType: response.mimeType,
             buffer: response.buffer,
             timeTaken: response.timeTaken,
+            request: {
+                method: request.method,
+                query: url.search,
+                headers: headersToSave,
+                bodyMimeType: request.body.mimeType,
+                body
+            },
             createdAt: new Date().getTime()
+        }
+
+        if(request.authentication) {
+            responseToSend.request.authentication = JSON.parse(JSON.stringify(request.authentication))
         }
 
         for(const plugin of plugins) {

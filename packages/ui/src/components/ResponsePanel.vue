@@ -73,6 +73,18 @@
                     </table>
                 </div>
             </template>
+            <div class="content-box" v-if="activeResponsePanelTab === 'Request'">
+                <div><span :class="`request-method--${response.request.method}`" style="padding-right: 0.25rem;">{{ response.request.method }}</span> {{ response.url }}{{ response.request.query }}</div>
+                <div style="margin-top: 0.5rem">
+                    <table>
+                        <tr v-for="header in Object.keys(response.request.headers)">
+                            <td style="white-space: nowrap">{{ header }}</td>
+                            <td>{{ response.request.headers[header] }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div style="margin-top: 1rem" v-html="responseRequestBodyOutput"></div>
+            </div>
         </div>
     </template>
     <template v-else>
@@ -95,20 +107,30 @@ export default {
     },
     data() {
         return {
-            responsePanelTabs: [
-                {
-                    name: 'Preview'
-                },
-                {
-                    name: 'Header'
-                }
-            ],
             activeResponsePanelTab: 'Preview',
             responseHistoryContextMenuElement: null,
             showResponseHistoryContextMenu: false
         }
     },
     computed: {
+        responsePanelTabs() {
+            let tabs = [
+                {
+                    name: 'Preview'
+                },
+                {
+                    name: 'Header'
+                }
+            ]
+
+            if(this.response && 'request' in this.response) {
+                tabs.push({
+                    name: 'Request'
+                })
+            }
+
+            return tabs
+        },
         activeTab() {
             return this.$store.state.activeTab
         },
@@ -166,6 +188,29 @@ export default {
             }
 
             return null
+        },
+        responseRequestBodyOutput() {
+            if(this.response.request.body === null) {
+                return null
+            }
+
+            if(this.response.request.body instanceof File) {
+                // prevent memory leak
+                if('responseRequestBodyObjectUrl' in window) {
+                    URL.revokeObjectURL(window.responseRequestBodyObjectUrl)
+                }
+                window.responseRequestBodyObjectUrl = URL.createObjectURL(this.response.request.body)
+                return `<div><a href="${window.responseRequestBodyObjectUrl}" download="${this.response.request.body.name}">${this.response.request.body.name}</a></div>`
+            } else {
+                return `<div>${this.response.request.body}</div>`
+            }
+        }
+    },
+    watch: {
+        response() {
+            if(this.responsePanelTabs.length === 2 && this.activeResponsePanelTab === 'Request') {
+                this.activeResponsePanelTab = 'Preview'
+            }
         }
     },
     methods: {
