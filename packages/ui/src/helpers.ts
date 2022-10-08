@@ -982,3 +982,49 @@ export function humanFriendlySize(bytes, long=false) {
     const rounded = Math.round(size * 10) / 10
     return `${rounded} ${unit}`
 }
+
+export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent) {
+    let keys: string[] = hotkey.split(' + ')
+    let ctrlKeyRequired: boolean = keys.includes('Ctrl')
+    let altKeyRequired: boolean = keys.includes('Alt')
+    let shiftKeyRequired: boolean = keys.includes('Shift')
+    const requiredKey = keys.filter(key => !['Ctrl', 'Alt', 'Shift'].includes(key)).pop()
+
+    let hotkeyMatched: boolean = true
+
+    if(ctrlKeyRequired) {
+        if(!event.ctrlKey) {
+            hotkeyMatched = false
+        }
+    } else {
+        if(event.ctrlKey) {
+            hotkeyMatched = false
+        }
+    }
+
+    if(altKeyRequired) {
+        if(!event.altKey) {
+            hotkeyMatched = false
+        }
+    } else {
+        if(event.altKey) {
+            hotkeyMatched = false
+        }
+    }
+
+    if(shiftKeyRequired) {
+        if(!event.shiftKey) {
+            hotkeyMatched = false
+        }
+    } else {
+        if(event.shiftKey) {
+            hotkeyMatched = false
+        }
+    }
+
+    if(event.key.toLowerCase() !== requiredKey?.toLowerCase()) {
+        hotkeyMatched = false
+    }
+
+    return hotkeyMatched
+}

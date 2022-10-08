@@ -13,7 +13,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 <script>
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
-import { findItemInTreeById } from './helpers'
+import { checkHotkeyAgainstKeyEvent, findItemInTreeById } from './helpers'
 
 export default {
     computed: {
@@ -22,6 +22,9 @@ export default {
         },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
+        },
+        tabs() {
+            return this.$store.state.tabs
         }
     },
     watch: {
@@ -105,6 +108,67 @@ export default {
             }
 
             this.$store.commit('loadWorkspaceTabs')
+        },
+        handleGlobalKeydown(event) {
+            const hotkeys = constants.HOTKEYS
+
+            // all keyboard shortcuts below depend on the active tab, so we return if there's no active tab
+            if(!this.activeTab) {
+                return
+            }
+
+            if(checkHotkeyAgainstKeyEvent(hotkeys.SEND_REQUEST, event)) {
+                event.preventDefault()
+                event.stopPropagation()
+
+                this.$store.dispatch('sendRequest', this.activeTab)
+
+                return
+            }
+
+            if(checkHotkeyAgainstKeyEvent(hotkeys.CLOSE_TAB, event) || checkHotkeyAgainstKeyEvent(hotkeys.CLOSE_TAB_ALTERNATE, event)) {
+                event.preventDefault()
+                event.stopPropagation()
+
+                this.$store.commit('closeTab', this.activeTab._id)
+                this.$store.commit('persistActiveWorkspaceTabs')
+
+                return
+            }
+
+            if(checkHotkeyAgainstKeyEvent(hotkeys.SWITCH_TO_NEXT_TAB, event) || checkHotkeyAgainstKeyEvent(hotkeys.SWITCH_TO_NEXT_TAB_ALTERNATE, event)) {
+                event.preventDefault()
+                event.stopPropagation()
+
+                const tabIndex = this.tabs.findIndex(tab => tab._id === this.activeTab._id)
+
+                const nextTabIndex = tabIndex + 1
+
+                const nextTab = nextTabIndex <= this.tabs.length - 1 ? this.tabs[nextTabIndex] : this.tabs[0]
+
+                if(nextTab) {
+                    this.$store.commit('setActiveTab', nextTab)
+                }
+
+                return
+            }
+
+            if(checkHotkeyAgainstKeyEvent(hotkeys.SWITCH_TO_PREVIOUS_TAB, event) || checkHotkeyAgainstKeyEvent(hotkeys.SWITCH_TO_PREVIOUS_TAB_ALTERNATE, event)) {
+                event.preventDefault()
+                event.stopPropagation()
+
+                const tabIndex = this.tabs.findIndex(tab => tab._id === this.activeTab._id)
+
+                const previousTabIndex = tabIndex - 1
+
+                const previousTab = previousTabIndex >= 0 ? this.tabs[previousTabIndex] : this.tabs[this.tabs.length - 1]
+
+                if(previousTab) {
+                    this.$store.commit('setActiveTab', previousTab)
+                }
+
+                return
+            }
         }
     },
     async created() {
@@ -137,6 +201,11 @@ export default {
         }
 
         window.addEventListener('message', messageHandler)
+
+        window.addEventListener('keydown', this.handleGlobalKeydown)
+    },
+    beforeUnmount() {
+        window.removeEventListener('keydown', this.handleGlobalKeydown)
     }
 }
 </script>

@@ -367,11 +367,6 @@ export default {
                 this.sendRequest()
             }
         },
-        handleGlobalKeydown(e) {
-            if(e.ctrlKey === true && e.key === 'Enter') {
-                this.sendRequest()
-            }
-        },
         loadGraphql() {
             if(this.activeTab && this.activeTab.body.mimeType === 'application/graphql') {
                 this.disableGraphqlWatch = true
@@ -397,11 +392,9 @@ export default {
         }
     },
     mounted() {
-        window.addEventListener('keydown', this.handleGlobalKeydown)
         emitter.on('response_panel', this.handleResponsePanelEmitter)
     },
     beforeUnmount() {
-        window.removeEventListener('keydown', this.handleGlobalKeydown)
         emitter.off('response_panel', this.handleResponsePanelEmitter)
     }
 }
