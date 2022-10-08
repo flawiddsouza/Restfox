@@ -102,6 +102,7 @@
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
 import { dateFormat, humanFriendlyTime, humanFriendlySize } from '@/helpers'
+import { emitter } from '@/event-bus'
 
 export default {
     components: {
@@ -275,6 +276,8 @@ export default {
             if(this.response.request.original.authentication) {
                 this.activeTab.authentication = JSON.parse(JSON.stringify(this.response.request.original.authentication))
             }
+
+            emitter.emit('response_panel', 'request restored')
         }
     }
 }

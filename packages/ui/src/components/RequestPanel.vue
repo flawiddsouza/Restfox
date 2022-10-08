@@ -78,19 +78,19 @@
                     <textarea v-model="activeTab.body.text" style="width: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/json'" class="oy-a">
-                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id" ref="jsonEditor"></CodeMirrorEditor>
+                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="jsonEditor"></CodeMirrorEditor>
                 </div>
                 <div class="request-panel-body-footer" v-if="activeTab.body.mimeType === 'application/json'">
                     <button @click="beautifyJSON">Beautify JSON</button>
                 </div>
                 <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%; overflow: auto;" v-if="activeTab.body.mimeType === 'application/graphql'">
                     <div class="oy-a" style="min-height: 130px;">
-                        <CodeMirrorEditor v-model="graphql.query" lang="graphql" class="code-editor" :key="'code-mirror-editor1-' + activeTab._id" ref="graphqlEditor"></CodeMirrorEditor>
+                        <CodeMirrorEditor v-model="graphql.query" lang="graphql" class="code-editor" :key="'code-mirror-editor1-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="graphqlEditor"></CodeMirrorEditor>
                     </div>
                     <div style="margin-top: 0.5rem;display: grid; grid-template-rows: auto 1fr;">
                         <div style="margin-bottom: 0.3rem; user-select: none;">Query Variables</div>
                         <div class="oy-a">
-                            <CodeMirrorEditor v-model="graphql.variables" lang="json" class="code-editor" :key="'code-mirror-editor2-' + activeTab._id" ref="jsonEditor"></CodeMirrorEditor>
+                            <CodeMirrorEditor v-model="graphql.variables" lang="json" class="code-editor" :key="'code-mirror-editor2-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="jsonEditor"></CodeMirrorEditor>
                         </div>
                     </div>
                     <div class="request-panel-body-footer">
@@ -214,6 +214,7 @@
 <script>
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
+import { emitter } from '@/event-bus'
 
 export default {
     components: {
@@ -253,7 +254,8 @@ export default {
                 query: '',
                 variables: ''
             },
-            disableGraphqlWatch: false
+            disableGraphqlWatch: false,
+            refreshCodeMirrorEditors: 1
         }
     },
     computed: {
@@ -263,21 +265,7 @@ export default {
     },
     watch: {
         'activeTab.body.mimeType'() {
-            if(this.activeTab && this.activeTab.body.mimeType === 'application/graphql') {
-                this.disableGraphqlWatch = true
-                try {
-                    const parsedBodyText = JSON.parse(this.activeTab.body.text)
-                    this.graphql = {
-                        query: parsedBodyText.query ?? '',
-                        variables: parsedBodyText.variables !== '' ? JSON.stringify(parsedBodyText.variables, null, 4) : ''
-                    }
-                } catch {
-                    this.graphql = {
-                        query: '',
-                        variables: ''
-                    }
-                }
-            }
+            this.loadGraphql()
         },
         graphql: {
             handler() {
@@ -383,13 +371,38 @@ export default {
             if(e.ctrlKey === true && e.key === 'Enter') {
                 this.sendRequest()
             }
+        },
+        loadGraphql() {
+            if(this.activeTab && this.activeTab.body.mimeType === 'application/graphql') {
+                this.disableGraphqlWatch = true
+                try {
+                    const parsedBodyText = JSON.parse(this.activeTab.body.text)
+                    this.graphql = {
+                        query: parsedBodyText.query ?? '',
+                        variables: parsedBodyText.variables !== '' ? JSON.stringify(parsedBodyText.variables, null, 4) : ''
+                    }
+                } catch {
+                    this.graphql = {
+                        query: '',
+                        variables: ''
+                    }
+                }
+            }
+        },
+        handleResponsePanelEmitter(event) {
+            if(event === 'request restored') {
+                this.loadGraphql()
+                this.refreshCodeMirrorEditors++
+            }
         }
     },
     mounted() {
         window.addEventListener('keydown', this.handleGlobalKeydown)
+        emitter.on('response_panel', this.handleResponsePanelEmitter)
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)
+        emitter.off('response_panel', this.handleResponsePanelEmitter)
     }
 }
 </script>
