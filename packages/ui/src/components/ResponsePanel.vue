@@ -24,7 +24,7 @@
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
-                    <option v-for="response in responses" :value="response">{{ dateFormat(response.createdAt, true) }} | {{ response.url }}</option>
+                    <option v-for="response in responses" :value="response">{{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}</option>
                 </select>
             </div>
         </div>
@@ -171,6 +171,12 @@ export default {
             return [
                 {
                     'type': 'option',
+                    'label': 'Rename Current Response',
+                    'value': 'Rename Current Response',
+                    'icon': 'fa fa-edit',
+                },
+                {
+                    'type': 'option',
                     'label': 'Delete Current Response',
                     'value': 'Delete Current Response',
                     'icon': 'fa fa-trash',
@@ -240,7 +246,15 @@ export default {
             this.responseHistoryContextMenuElement = event.target
             this.showResponseHistoryContextMenu = true
         },
-        handleResponseHistoryContextMenuItemClick(clickedContextMenuitem) {
+        async handleResponseHistoryContextMenuItemClick(clickedContextMenuitem) {
+            if(clickedContextMenuitem === 'Rename Current Response') {
+                const newResponseName = await window.createPrompt('Enter new response name', this.response.name)
+                if(newResponseName === null) {
+                    return
+                }
+                this.$store.commit('renameCurrentlyActiveResponse', newResponseName)
+            }
+
             if(clickedContextMenuitem === 'Delete Current Response') {
                 this.$store.commit('deleteCurrentlyActiveResponse')
             }

@@ -8,7 +8,13 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig(({ mode }) => {
     const config = {
         plugins: [
-            vue(),
+            vue({
+                template: {
+                    compilerOptions: {
+                        isCustomElement: (tag) => ['alert-confirm-prompt'].includes(tag)
+                    }
+                }
+            }),
             VitePWA({
                 includeAssets: ['favicon.png', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png', 'css/fontawesome-free-5.15.4-web/webfonts/fa-solid-900.woff2'],
                 manifest: {

@@ -359,6 +359,11 @@ const store = createStore({
             state.requestResponses[state.activeTab._id] = null
             state.requestResponseStatus[state.activeTab._id] = 'pending'
         },
+        async renameCurrentlyActiveResponse(state, newResponseName) {
+            const activeResponse = state.requestResponses[state.activeTab._id]
+            activeResponse.name = newResponseName !== '' ? newResponseName : null
+            await db.responses.update(activeResponse._id, { name: activeResponse.name })
+        },
         async deleteCurrentlyActiveResponse(state) {
             const responseId = state.requestResponses[state.activeTab._id]._id
             await db.responses.where({ _id: responseId }).delete()

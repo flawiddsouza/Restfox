@@ -8,12 +8,14 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
     <WorkspacesFrame v-if="activeWorkspace === null" />
     <Frame v-if="activeWorkspace" />
     <ReloadPrompt />
+    <alert-confirm-prompt />
 </template>
 
 <script>
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
 import { checkHotkeyAgainstKeyEvent, findItemInTreeById } from './helpers'
+import './web-components/alert-confirm-prompt'
 
 export default {
     computed: {

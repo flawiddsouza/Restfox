@@ -153,8 +153,8 @@ export default {
         async done() {
             this.showModalComp = false
         },
-        addEnvironment() {
-            const newEnvironmentName = prompt('Enter new environment name')
+        async addEnvironment() {
+            const newEnvironmentName = await window.createPrompt('Enter new environment name')
 
             if(!newEnvironmentName || newEnvironmentName.trim() === '') {
                 return
@@ -285,8 +285,8 @@ export default {
                 this.clickedContextMenuEnvironment = { name: '' }
             }
         },
-        renameEnvironment() {
-            const newEnvironmentName = prompt('Enter new environment name', this.clickedContextMenuEnvironment.name)
+        async renameEnvironment() {
+            const newEnvironmentName = await window.createPrompt('Enter new environment name', this.clickedContextMenuEnvironment.name)
 
             if(!newEnvironmentName || newEnvironmentName.trim() === '') {
                 this.hideEnvironmentContextMenu()
