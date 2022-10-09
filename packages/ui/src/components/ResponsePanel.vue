@@ -168,24 +168,30 @@ export default {
             return null
         },
         responseHistoryContextMenuOptions() {
+            if(!this.response) {
+                return []
+            }
+
             return [
                 {
                     'type': 'option',
                     'label': 'Rename Current Response',
                     'value': 'Rename Current Response',
                     'icon': 'fa fa-edit',
+                    'disabled': '_id' in this.response === false
                 },
                 {
                     'type': 'option',
                     'label': 'Delete Current Response',
                     'value': 'Delete Current Response',
                     'icon': 'fa fa-trash',
+                    'disabled': '_id' in this.response === false
                 },
                 {
                     'type': 'option',
                     'label': 'Clear History',
                     'value': 'Clear History',
-                    'icon': 'fa fa-trash',
+                    'icon': 'fa fa-trash'
                 }
             ]
         },
