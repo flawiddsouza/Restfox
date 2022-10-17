@@ -128,42 +128,46 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
 }
 
 export async function handleRequest(request, environment, plugins, abortControllerSignal) {
-    for(const plugin of plugins) {
-        const requestContext = createRequestContextForPlugin(request, environment)
-
-        await usePlugin(requestContext, {
-            code: plugin.code
-        })
-
-        request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
-    }
-
-    let body = null
-
-    if(request.body.mimeType === 'application/x-www-form-urlencoded') {
-        if('params' in request.body) {
-            body = new URLSearchParams(
-                Object.fromEntries(
-                    request.body.params.filter(item => !item.disabled).map(item => {
-                        return [
-                            substituteEnvironmentVariables(environment, item.name),
-                            substituteEnvironmentVariables(environment, item.value)
-                        ]
-                    })
-                )
-            ).toString()
-        }
-    }
-
-    if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
-        body = substituteEnvironmentVariables(environment, request.body.text)
-    }
-
-    if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
-        body = request.body.fileName
-    }
+    let currentPlugin = null
 
     try {
+        for(const plugin of plugins) {
+            const requestContext = createRequestContextForPlugin(request, environment)
+
+            currentPlugin = plugin.name
+
+            await usePlugin(requestContext, {
+                code: plugin.code
+            })
+
+            request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
+        }
+
+        let body = null
+
+        if(request.body.mimeType === 'application/x-www-form-urlencoded') {
+            if('params' in request.body) {
+                body = new URLSearchParams(
+                    Object.fromEntries(
+                        request.body.params.filter(item => !item.disabled).map(item => {
+                            return [
+                                substituteEnvironmentVariables(environment, item.name),
+                                substituteEnvironmentVariables(environment, item.value)
+                            ]
+                        })
+                    )
+                ).toString()
+            }
+        }
+
+        if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
+            body = substituteEnvironmentVariables(environment, request.body.text)
+        }
+
+        if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
+            body = request.body.fileName
+        }
+
         let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
 
         const url = new URL(urlWithEnvironmentVariablesSubstituted)
@@ -296,6 +300,11 @@ export async function handleRequest(request, environment, plugins, abortControll
 
             if(e.name === 'AbortError') {
                 error = 'Error: Request Cancelled'
+            }
+
+            if(e.message === 'Unable to parse plugin') {
+                const lineNumber = e.originalError.lineNumber ?? /\(eval\.js:(.*?)\)/.exec(e.originalError.stack)[1]
+                error = `Error: Plugin "${currentPlugin}" has an error at line number ${lineNumber}\n\n${e.originalError.name}: ${e.originalError.message}`
             }
         }
 

@@ -69,7 +69,9 @@ export async function usePlugin(context, plugin) {
     } catch(e) {
         console.log(e)
         // console.log(plugin.code.split('\n').slice(e.lineNumber - 3, e.lineNumber + 3).join('\n'))
-        throw new Error('Unable to parse plugin')
+        const error = new Error('Unable to parse plugin')
+        error.originalError = e
+        throw error
     }
 
     arena.dispose()
