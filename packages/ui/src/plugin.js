@@ -20,7 +20,7 @@ export function createRequestContextForPlugin(request, environment) {
                 state.body = requestBody
             },
             getQueryParams() {
-                return state.parameters
+                return state.parameters ?? []
             },
             setQueryParams(queryParams) {
                 state.parameters = queryParams
