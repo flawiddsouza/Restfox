@@ -133,6 +133,7 @@ export default {
         },
         showModal() {
             if(this.showModal) {
+                this.parseError = ''
                 if(this.collectionItem) {
                     this.environment = this.collectionItem.environment ? JSON.stringify(this.collectionItem.environment, null, 4) : '{}'
                 }
@@ -309,11 +310,11 @@ export default {
 
             this.clickedContextMenuEnvironment.name = newEnvironmentName
 
-            if(this.workspace && 'environment' in this.workspace === false) {
+            if(this.workspace && 'environments' in this.workspace === false) {
                 this.workspace.environments = this.environments
             }
 
-            if(this.collectionItem && 'environment' in this.collectionItem === false) {
+            if(this.collectionItem && 'environments' in this.collectionItem === false) {
                 this.collectionItem.environments = this.environments
             }
 
