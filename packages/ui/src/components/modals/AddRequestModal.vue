@@ -48,6 +48,13 @@ export default {
             }
         }
     },
+    watch: {
+        showModal() {
+            if(this.showModal) {
+                this.requestName = 'New Request'
+            }
+        }
+    },
     methods: {
         async createRequest() {
             this.$store.dispatch('createCollectionItem', {

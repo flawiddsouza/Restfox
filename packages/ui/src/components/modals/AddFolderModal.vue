@@ -47,6 +47,13 @@ export default {
             }
         }
     },
+    watch: {
+        showModal() {
+            if(this.showModal) {
+                this.folderName = 'New Folder'
+            }
+        }
+    },
     methods: {
         async createFolder() {
             this.$store.dispatch('createCollectionItem', {

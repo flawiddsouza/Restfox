@@ -58,6 +58,11 @@ export default {
             if(this.workspace) {
                 this.workspaceName = this.workspace.name
             }
+        },
+        showModal() {
+            if(this.showModal && this.workspace === undefined) {
+                this.workspaceName = 'New Workspace'
+            }
         }
     },
     methods: {
