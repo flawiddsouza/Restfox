@@ -18,6 +18,11 @@ import { checkHotkeyAgainstKeyEvent, findItemInTreeById } from './helpers'
 import './web-components/alert-confirm-prompt'
 
 export default {
+    data() {
+        return {
+            currentlySelectedContextMenuItemIndex: -1
+        }
+    },
     computed: {
         activeTab() {
             return this.$store.state.activeTab
@@ -27,6 +32,9 @@ export default {
         },
         tabs() {
             return this.$store.state.tabs
+        },
+        openContextMenuElement() {
+            return this.$store.state.openContextMenuElement
         }
     },
     watch: {
@@ -94,6 +102,11 @@ export default {
                 localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ACTIVE_WORKSPACE_ID)
             }
             await this.fetchSetCollectionForWorkspace()
+        },
+        openContextMenuElement() {
+            if(this.openContextMenuElement === null) {
+                this.currentlySelectedContextMenuItemIndex = -1
+            }
         }
     },
     methods: {
@@ -112,6 +125,39 @@ export default {
             this.$store.commit('loadWorkspaceTabs')
         },
         handleGlobalKeydown(event) {
+            if(this.openContextMenuElement) {
+                const enabledContextMenuItems = Array.from(this.openContextMenuElement.querySelectorAll('.context-menu > div > button:not(:disabled)'))
+
+                if(event.key === 'ArrowUp') {
+                    this.currentlySelectedContextMenuItemIndex = this.currentlySelectedContextMenuItemIndex > 0 ? this.currentlySelectedContextMenuItemIndex - 1 : enabledContextMenuItems.length - 1
+                    enabledContextMenuItems[this.currentlySelectedContextMenuItemIndex].focus()
+                    return
+                }
+
+                if(event.key === 'ArrowDown') {
+                    this.currentlySelectedContextMenuItemIndex = this.currentlySelectedContextMenuItemIndex < enabledContextMenuItems.length - 1 ? this.currentlySelectedContextMenuItemIndex + 1 : 0
+                    enabledContextMenuItems[this.currentlySelectedContextMenuItemIndex].focus()
+                    return
+                }
+
+                if(event.key === 'Home') {
+                    this.currentlySelectedContextMenuItemIndex = 0
+                    enabledContextMenuItems[this.currentlySelectedContextMenuItemIndex].focus()
+                    return
+                }
+
+                if(event.key === 'End') {
+                    this.currentlySelectedContextMenuItemIndex = enabledContextMenuItems.length - 1
+                    enabledContextMenuItems[this.currentlySelectedContextMenuItemIndex].focus()
+                    return
+                }
+
+                if(event.key === 'Escape') {
+                    this.openContextMenuElement.querySelector('.context-menu-background').click()
+                    return
+                }
+            }
+
             const hotkeys = constants.HOTKEYS
 
             // all keyboard shortcuts below depend on the active tab, so we return if there's no active tab

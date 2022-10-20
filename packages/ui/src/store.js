@@ -180,7 +180,8 @@ const store = createStore({
                 hideBrowserRelatedResponsePanelErrors: false,
                 browserExtensionEnabled: false,
                 isBrowser: true
-            }
+            },
+            openContextMenuElement: null
         }
     },
     getters: {

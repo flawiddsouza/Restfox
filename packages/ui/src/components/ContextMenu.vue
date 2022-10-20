@@ -84,8 +84,11 @@ export default {
         show() {
             if(this.show) {
                 nextTick(() => {
+                    this.$store.state.openContextMenuElement = this.$el
                     this.setContextMenuStyle()
                 })
+            } else {
+                this.$store.state.openContextMenuElement = null
             }
         }
     },
@@ -146,6 +149,11 @@ button.context-menu-item {
     display: block;
     width: 100%;
     text-align: left;
+}
+
+button.context-menu-item:not(:active):focus {
+    outline: 1px solid black;
+    background: #82828240;
 }
 
 button.context-menu-item:hover:not(:disabled),
