@@ -44,7 +44,18 @@ export default {
             if(e.target.closest('.modal__content') === null && document.body.contains(e.target)) {
                 this.$emit('update:modelValue', false)
             }
+        },
+        handleKeydown(event) {
+            if(event.key === 'Escape') {
+                this.$emit('update:modelValue', false)
+            }
         }
+    },
+    mounted() {
+        window.addEventListener('keydown', this.handleKeydown)
+    },
+    beforeUnmount() {
+        window.removeEventListener('keydown', this.handleKeydown)
     }
 }
 </script>
