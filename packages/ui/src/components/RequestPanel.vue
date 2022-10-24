@@ -374,7 +374,7 @@ export default {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)
                     this.graphql = {
                         query: parsedBodyText.query ?? '',
-                        variables: JSON.stringify(parsedBodyText.variables ?? '{}', null, 4)
+                        variables: JSON.stringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {}, null, 4)
                     }
                 } catch {
                     this.graphql = {
