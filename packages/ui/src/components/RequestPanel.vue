@@ -264,6 +264,9 @@ export default {
         }
     },
     watch: {
+        'activeTab._id'() {
+            this.loadGraphql()
+        },
         'activeTab.body.mimeType'() {
             this.loadGraphql()
         },
