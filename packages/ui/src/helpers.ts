@@ -651,14 +651,7 @@ function importRestfoxV1(collections, workspaceId) {
                 }
             }
 
-            if(item.body.mimeType === 'text/plain') {
-                body = {
-                    mimeType: item.body.mimeType,
-                    text: item.body.text
-                }
-            }
-
-            if(item.body.mimeType === 'application/json') {
+            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json' || item.body.mimeType === 'application/graphql') {
                 body = {
                     mimeType: item.body.mimeType,
                     text: item.body.text
