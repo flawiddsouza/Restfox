@@ -10,8 +10,8 @@ export default {
         SEND_REQUEST: 'Ctrl + Enter',
         SWITCH_TO_NEXT_TAB: 'Ctrl + Tab',
         SWITCH_TO_PREVIOUS_TAB: 'Ctrl + Shift + Tab',
-        SWITCH_TO_NEXT_TAB_ALTERNATE: 'Ctrl + ArrowRight',
-        SWITCH_TO_PREVIOUS_TAB_ALTERNATE: 'Ctrl + ArrowLeft',
+        SWITCH_TO_NEXT_TAB_ALTERNATE: 'Ctrl + Alt + ArrowRight',
+        SWITCH_TO_PREVIOUS_TAB_ALTERNATE: 'Ctrl + Alt + ArrowLeft',
         CLOSE_TAB: 'Ctrl + W',
         CLOSE_TAB_ALTERNATE: 'Ctrl + Alt + W'
     }
