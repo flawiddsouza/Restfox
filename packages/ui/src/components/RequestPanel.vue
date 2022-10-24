@@ -252,7 +252,7 @@ export default {
             ],
             graphql: {
                 query: '',
-                variables: ''
+                variables: '{}'
             },
             disableGraphqlWatch: false,
             refreshCodeMirrorEditors: 1
@@ -273,7 +273,7 @@ export default {
                     this.disableGraphqlWatch = false
                     return
                 }
-                let graphqlVariables = ''
+                let graphqlVariables = {}
                 try {
                     graphqlVariables = JSON.parse(this.graphql.variables)
                 } catch {}
@@ -374,12 +374,12 @@ export default {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)
                     this.graphql = {
                         query: parsedBodyText.query ?? '',
-                        variables: parsedBodyText.variables !== '' ? JSON.stringify(parsedBodyText.variables, null, 4) : ''
+                        variables: JSON.stringify(parsedBodyText.variables ?? '{}', null, 4)
                     }
                 } catch {
                     this.graphql = {
                         query: '',
-                        variables: ''
+                        variables: '{}'
                     }
                 }
             }
