@@ -283,7 +283,22 @@ export default {
             }
 
             this.activeTab.url = this.response.request.original.url
-            this.activeTab.body = JSON.parse(JSON.stringify(this.response.request.original.body))
+
+            const originalRequestBody = this.response.request.original.body
+
+            this.activeTab.body = JSON.parse(JSON.stringify(originalRequestBody))
+
+            if(originalRequestBody.mimeType === 'multipart/form-data') {
+                let params = []
+                for(const param of originalRequestBody.params) {
+                    let paramExtracted = {...param}
+                    if('files' in paramExtracted) {
+                        paramExtracted.files = [...paramExtracted.files]
+                    }
+                    params.push(paramExtracted)
+                }
+                this.activeTab.body.params = params
+            }
 
             if(this.response.request.original.parameters) {
                 this.activeTab.parameters = JSON.parse(JSON.stringify(this.response.request.original.parameters))

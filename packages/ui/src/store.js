@@ -199,6 +199,17 @@ const store = createStore({
     mutations: {
         addTab(state, tab) {
             const tabCopy = JSON.parse(JSON.stringify(tab))
+            if(tab.body.mimeType === 'multipart/form-data') {
+                let params = []
+                for(const param of tab.body.params) {
+                    let paramExtracted = {...param}
+                    if('files' in paramExtracted) {
+                        paramExtracted.files = [...paramExtracted.files]
+                    }
+                    params.push(paramExtracted)
+                }
+                tabCopy.body.params = params
+            }
             const existingTab = state.tabs.find(tabItem => tabItem._id === tabCopy._id)
             if(!existingTab) {
                 state.tabs.push(tabCopy)
@@ -257,7 +268,19 @@ const store = createStore({
         },
         persistActiveTab(state) {
             if(state.activeTab) {
-                db.collections.update(state.activeTab._id, JSON.parse(JSON.stringify(state.activeTab)))
+                const activeTabToSave = JSON.parse(JSON.stringify(state.activeTab))
+                if(state.activeTab.body.mimeType === 'multipart/form-data') {
+                    let params = []
+                    for(const param of state.activeTab.body.params) {
+                        let paramExtracted = {...param}
+                        if('files' in paramExtracted) {
+                            paramExtracted.files = [...paramExtracted.files]
+                        }
+                        params.push(paramExtracted)
+                    }
+                    activeTabToSave.body.params = params
+                }
+                db.collections.update(state.activeTab._id, activeTabToSave)
             }
         },
         setActiveSidebarItemForContextMenu(state, payload) {

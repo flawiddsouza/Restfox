@@ -143,7 +143,7 @@ export async function handleRequest(request, environment, plugins, abortControll
             request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
         }
 
-        let body = null
+        let body: any = null
 
         if(request.body.mimeType === 'application/x-www-form-urlencoded') {
             if('params' in request.body) {
@@ -157,6 +157,22 @@ export async function handleRequest(request, environment, plugins, abortControll
                         })
                     )
                 ).toString()
+            }
+        }
+
+        if(request.body.mimeType === 'multipart/form-data') {
+            if('params' in request.body) {
+                const formData = new FormData()
+                request.body.params.filter(item => !item.disabled).forEach(param => {
+                    if(param.type === 'text') {
+                        formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
+                    } else {
+                        for(const file of param.files) {
+                            formData.append(substituteEnvironmentVariables(environment, param.name), file)
+                        }
+                    }
+                })
+                body = formData
             }
         }
 
@@ -190,9 +206,15 @@ export async function handleRequest(request, environment, plugins, abortControll
         }
 
         if('headers' in request) {
-            request.headers.filter(header => !header.disabled).forEach(header => {
-                headers[substituteEnvironmentVariables(environment, header.name.toLowerCase())] = substituteEnvironmentVariables(environment, header.value)
-            })
+            const enabledHeaders = request.headers.filter(header => !header.disabled)
+            for(const header of enabledHeaders) {
+                const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
+                const headerValue = substituteEnvironmentVariables(environment, header.value)
+                if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
+                    continue
+                }
+                headers[headerName] = headerValue
+            }
         }
 
         if('authentication' in request && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
@@ -242,6 +264,20 @@ export async function handleRequest(request, environment, plugins, abortControll
             delete headersToSave[forbiddenHeader.toLowerCase()]
         })
 
+        let originRequestBodyToSave = JSON.parse(JSON.stringify(request.body))
+
+        if(request.body.mimeType === 'multipart/form-data') {
+            let params: any = []
+            for(const param of request.body.params) {
+                let paramExtracted = {...param}
+                if('files' in paramExtracted) {
+                    paramExtracted.files = [...paramExtracted.files]
+                }
+                params.push(paramExtracted)
+            }
+            originRequestBodyToSave.params = params
+        }
+
         let responseToSend = {
             _id: nanoid(),
             collectionId: request._id,
@@ -256,10 +292,10 @@ export async function handleRequest(request, environment, plugins, abortControll
                 method: request.method,
                 query: url.search,
                 headers: headersToSave,
-                body: request.method !== 'GET' ? body : null,
+                body: request.method !== 'GET' && request.body.mimeType === 'multipart/form-data' === false ? body : null,
                 original: {
                     url: request.url,
-                    body: JSON.parse(JSON.stringify(request.body))
+                    body: originRequestBodyToSave
                 }
             },
             createdAt: new Date().getTime()
@@ -317,7 +353,7 @@ export async function handleRequest(request, environment, plugins, abortControll
 }
 
 export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
-    let collection = []
+    let collection: any = []
 
     json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment'].includes(item._type) == false).forEach(item => {
         if(item._type === 'workspace' || item._type === 'request_group') {
@@ -330,7 +366,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 workspaceId
             })
         } else {
-            let body = {
+            let body: any = {
                 mimeType: 'No Body'
             }
 

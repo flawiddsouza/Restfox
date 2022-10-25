@@ -18,6 +18,11 @@
                             <span> ({{ activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
                         </template>
                     </template>
+                    <template v-if="activeTab.body.mimeType === 'multipart/form-data'">
+                        <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
+                            <span> ({{ activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
+                        </template>
+                    </template>
                     <template v-if="activeTab.body.mimeType === 'text/plain'"> (Plain)</template>
                     <template v-if="activeTab.body.mimeType === 'application/json'"> (JSON)</template>
                     <template v-if="activeTab.body.mimeType === 'application/graphql'"> (GraphQL)</template>
@@ -46,6 +51,7 @@
                 <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem" @change="bodyMimeTypeChanged($event.target.value)">
                     <option value="No Body">No Body</option>
                     <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
+                    <option value="multipart/form-data">Multipart Form</option>
                     <option value="text/plain">Plain Text</option>
                     <option value="application/json">JSON</option>
                     <option value="application/graphql">GraphQL</option>
@@ -69,6 +75,49 @@
                         </tr>
                         <tr>
                             <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab.body, 'params', { name: '', value: '' })">
+                                + Add Item
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div v-if="activeTab.body.mimeType === 'multipart/form-data'">
+                    <table>
+                        <tr v-for="(param, index) in activeTab.body.params">
+                            <td>
+                                <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                            </td>
+                            <td>
+                                <div style="display: flex">
+                                    <template v-if="param.type === 'text'">
+                                        <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                                    </template>
+                                    <template v-else>
+                                        <label style="width: 100%; display: flex; align-items: center;">
+                                            <div :style="{ filter: !param.disabled ? undefined : 'opacity(0.4)' }">
+                                                <span style="border: 1px solid lightgrey; padding: 3px;">Choose Files</span>
+                                                <span style="margin-left: 0.5rem">
+                                                    <template v-if="param.files && param.files.length > 0">{{ param.files.length === 1 ? param.files[0].name : `${param.files.length} files selected` }}</template>
+                                                    <template v-else>No File Selected</template>
+                                                </span>
+                                            </div>
+                                            <input type="file" @change="setFilesForParam($event.target.files, param)" multiple :disabled="param.disabled" style="display: none;">
+                                        </label>
+                                    </template>
+                                    <select v-model="param.type" style="padding: 0;" :disabled="param.disabled">
+                                        <option value="text">Text</option>
+                                        <option value="file">File</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
+                            </td>
+                            <td @click="activeTab.body.params.splice(index, 1)">
+                                <i class="fa fa-trash"></i>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab.body, 'params', { name: '', value: '', type: 'text' })">
                                 + Add Item
                             </td>
                         </tr>
@@ -268,6 +317,17 @@ export default {
             this.loadGraphql()
         },
         'activeTab.body.mimeType'() {
+            if(this.activeTab.body.mimeType === 'multipart/form-data') {
+                if('params' in this.activeTab.body) {
+                    // set type to text by default if type does not exist int he params array
+                    this.activeTab.body.params.forEach(param => {
+                        if('type' in param === false) {
+                            param.type = 'text'
+                        }
+                    })
+                }
+                return
+            }
             this.loadGraphql()
         },
         graphql: {
@@ -331,6 +391,10 @@ export default {
                 mimeType = 'application/x-www-form-urlencoded'
             }
 
+            if(newMimeType === 'multipart/form-data') {
+                mimeType = 'multipart/form-data'
+            }
+
             if(newMimeType === 'text/plain') {
                 mimeType = 'text/plain'
             }
@@ -392,6 +456,9 @@ export default {
                 this.loadGraphql()
                 this.refreshCodeMirrorEditors++
             }
+        },
+        setFilesForParam(files, param) {
+            param.files = Array.from(files)
         }
     },
     mounted() {
