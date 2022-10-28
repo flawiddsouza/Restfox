@@ -94,7 +94,21 @@ let abortController = null
 async function handleSendRequest(message, sendResponse) {
     abortController = new AbortController()
     try {
-        const { url, method, headers, body } = message.eventData
+        const { url, method, headers, bodyHint } = message.eventData
+        let { body } = message.eventData
+
+        if(bodyHint === 'FormData') {
+            const formData = new FormData()
+            for(const item of body) {
+                const value = typeof item[1] !== 'object' ? item[1] : new File([new Uint8Array(item[1].buffer)], item[1].name, { type: item[1].type })
+                formData.append(item[0], value)
+            }
+            body = formData
+        }
+
+        if(bodyHint === 'File') {
+            body = new File([new Uint8Array(body.buffer)], body.name, { type: body.type })
+        }
 
         const startTime = new Date()
 

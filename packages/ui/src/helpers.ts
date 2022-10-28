@@ -61,6 +61,33 @@ export function generateBasicAuthString(username, password) {
 
 export async function fetchWrapper(url, method, headers, body, abortControllerSignal) {
     if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
+        let bodyHint: any = null
+
+        if(body instanceof FormData) {
+            bodyHint = 'FormData'
+            body = Array.from(body.entries())
+            let i = 0
+            for(const item of body) {
+                if(item[1] instanceof File) {
+                    body[i][1] = {
+                        name: item[1].name,
+                        type: item[1].type,
+                        buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
+                    }
+                }
+                i++
+            }
+        }
+
+        if(body instanceof File) {
+            bodyHint = 'File'
+            body = {
+                name: body.name,
+                type: body.type,
+                buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
+            }
+        }
+
         return new Promise((resolve, reject) => {
             window.postMessage({
                 event: 'sendRequest',
@@ -68,7 +95,8 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                     url: url.toString(),
                     method,
                     headers,
-                    body
+                    body,
+                    bodyHint
                 }
             })
 
