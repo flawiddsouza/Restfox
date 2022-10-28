@@ -269,7 +269,7 @@ const store = createStore({
         persistActiveTab(state) {
             if(state.activeTab) {
                 const activeTabToSave = JSON.parse(JSON.stringify(state.activeTab))
-                if(state.activeTab.body.mimeType === 'multipart/form-data') {
+                if('params' in state.activeTab.body) {
                     let params = []
                     for(const param of state.activeTab.body.params) {
                         let paramExtracted = {...param}
