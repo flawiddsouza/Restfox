@@ -295,7 +295,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 
         let originRequestBodyToSave = JSON.parse(JSON.stringify(request.body))
 
-        if(request.body.mimeType === 'multipart/form-data') {
+        if(request.body.mimeType === 'multipart/form-data' && 'params' in request.body) {
             let params: any = []
             for(const param of request.body.params) {
                 let paramExtracted = {...param}
