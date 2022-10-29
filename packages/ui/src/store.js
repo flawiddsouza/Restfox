@@ -13,7 +13,8 @@ import {
     generateNewIdsForTreeItemChildren,
     isFirstIdIndirectOrDirectParentOfSecondIdInTree,
     generateNewIdsForTree,
-    substituteEnvironmentVariables
+    substituteEnvironmentVariables,
+    setObjectPathValue
 } from './helpers'
 import { db, getCollectionForWorkspace } from './db'
 import { nextTick } from 'vue'
@@ -573,8 +574,34 @@ const store = createStore({
         async sendRequest(context, activeTab) {
             context.state.requestResponseStatus[activeTab._id] = 'loading'
             const environment = await getEnvironmentForRequest(context.state.activeWorkspace, activeTab)
+            const setEnvironmentVariable = (objectPath, value) => {
+                try {
+                    const environmentToModify = context.state.activeWorkspace.environment ?? {}
+                    const environmentsToModify = context.state.activeWorkspace.environments ?? [
+                        {
+                            name: 'Default',
+                            environment: {}
+                        }
+                    ]
+                    setObjectPathValue(environmentToModify, objectPath, value)
+                    context.state.activeWorkspace.environment = environmentToModify
+                    context.commit('updateWorkspaceEnvironment',  {
+                        workspaceId: context.state.activeWorkspace._id,
+                        environment: environmentToModify
+                    })
+                    const currentEnvironment = environmentsToModify.find(environmentItem => environmentItem.name === (context.state.activeWorkspace.currentEnvironment ?? 'Default'))
+                    currentEnvironment.environment = environmentToModify
+                    context.commit('updateWorkspaceEnvironments',  {
+                        workspaceId: context.state.activeWorkspace._id,
+                        environments: environmentsToModify
+                    })
+                } catch(e) {
+                    console.log('Failed to set environment variable:')
+                    console.log(e)
+                }
+            }
             context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, context.getters.enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
+            const response = await handleRequest(activeTab, environment, setEnvironmentVariable, context.getters.enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'

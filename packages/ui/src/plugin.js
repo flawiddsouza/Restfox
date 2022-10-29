@@ -2,7 +2,7 @@ import { getQuickJS } from 'quickjs-emscripten'
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 
-export function createRequestContextForPlugin(request, environment) {
+export function createRequestContextForPlugin(request, environment, setEnvironmentVariable) {
     let state = JSON.parse(JSON.stringify(request))
 
     return {
@@ -19,6 +19,9 @@ export function createRequestContextForPlugin(request, environment) {
             setBody(requestBody) {
                 state.body = requestBody
             },
+            setEnvironmentVariable(objectPath, value) {
+                setEnvironmentVariable(objectPath, value)
+            },
             getQueryParams() {
                 return state.parameters ?? []
             },
@@ -29,7 +32,7 @@ export function createRequestContextForPlugin(request, environment) {
     }
 }
 
-export function createResponseContextForPlugin(response, environment) {
+export function createResponseContextForPlugin(response, environment, setEnvironmentVariable) {
     let bufferCopy = response.buffer.slice(0)
 
     return {
@@ -48,6 +51,9 @@ export function createResponseContextForPlugin(response, environment) {
             },
             setBodyText(bodyText) {
                 bufferCopy = (new TextEncoder('utf-8')).encode(bodyText)
+            },
+            setEnvironmentVariable(objectPath, value) {
+                setEnvironmentVariable(objectPath, value)
             }
         }
     }

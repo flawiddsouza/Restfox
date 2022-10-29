@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import dayjs from 'dayjs'
 import getObjectPathValue from 'lodash.get'
+import setObjectPathValueLodash from 'lodash.set'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -155,12 +156,12 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
     }
 }
 
-export async function handleRequest(request, environment, plugins, abortControllerSignal) {
+export async function handleRequest(request, environment, setEnvironmentVariable, plugins, abortControllerSignal) {
     let currentPlugin = null
 
     try {
         for(const plugin of plugins) {
-            const requestContext = createRequestContextForPlugin(request, environment)
+            const requestContext = createRequestContextForPlugin(request, environment, setEnvironmentVariable)
 
             currentPlugin = plugin.name
 
@@ -342,7 +343,7 @@ export async function handleRequest(request, environment, plugins, abortControll
         }
 
         for(const plugin of plugins) {
-            const responseContext = createResponseContextForPlugin(responseToSend, environment)
+            const responseContext = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable)
 
             await usePlugin(responseContext, {
                 code: plugin.code
@@ -991,7 +992,7 @@ export function getObjectPaths(object) {
     let paths = []
 
     function recurse(obj, keyParent='') {
-        if(typeof obj === 'number' || typeof obj === 'string') {
+        if(typeof obj === 'number' || typeof obj === 'string' || obj === null) {
             return
         }
         const isArray = Array.isArray(obj)
@@ -1093,4 +1094,8 @@ export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent)
     }
 
     return hotkeyMatched
+}
+
+export function setObjectPathValue(object, path, value) {
+    setObjectPathValueLodash(object, path, value)
 }
