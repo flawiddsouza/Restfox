@@ -199,7 +199,7 @@ const store = createStore({
     mutations: {
         addTab(state, tab) {
             const tabCopy = JSON.parse(JSON.stringify(tab))
-            if(tab.body.mimeType === 'multipart/form-data') {
+            if('params' in tab.body) {
                 let params = []
                 for(const param of tab.body.params) {
                     let paramExtracted = {...param}
