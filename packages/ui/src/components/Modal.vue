@@ -47,7 +47,13 @@ export default {
         },
         handleKeydown(event) {
             if(event.key === 'Escape') {
-                this.$emit('update:modelValue', false)
+                const rect = this.$el.getBoundingClientRect()
+                const x = rect.left
+                const y = rect.top
+                const topElement = document.elementFromPoint(x, y)
+                if(this.$el === topElement) {
+                    this.$emit('update:modelValue', false)
+                }
             }
         }
     },
