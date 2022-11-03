@@ -3,7 +3,7 @@
         <modal :title="collectionItem._type === 'request_group' ? 'Folder Properties' : 'Request Properties'" v-model="showModalComp">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request'">(also rename by double-clicking in sidebar)</span></div>
-                <input type="text" style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="collectionItem.name" :placeholder="collectionItem._type === 'request_group' ? 'Folder Name' : 'Request Name'" spellcheck="false" v-focus>
+                <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="collectionItem._type === 'request_group' ? 'Folder Name' : 'Request Name'" spellcheck="false" v-focus>
             </label>
             <div style="padding-bottom: 1rem"></div>
             <template #footer>

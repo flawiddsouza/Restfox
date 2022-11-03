@@ -2,24 +2,24 @@
     <div v-if="showModalComp">
         <modal title="Settings" v-model="showModalComp">
             <div>
-                Sidebar Width:
-                <input type="text" :value="sidebarWidth" disabled>
+                Sidebar Width<br>
+                <input type="text" :value="sidebarWidth" class="full-width-input" disabled>
             </div>
             <div style="padding-top: 1rem"></div>
             <div>
-                Request Panel Ratio:
-                <input type="text" :value="requestPanelRatio" disabled>
+                Request Panel Ratio<br>
+                <input type="text" :value="requestPanelRatio" class="full-width-input" disabled>
             </div>
             <div style="padding-top: 1rem"></div>
             <div>
-                Response Panel Ratio:
-                <input type="text" :value="responsePanelRatio" disabled>
+                Response Panel Ratio<br>
+                <input type="text" :value="responsePanelRatio" class="full-width-input" disabled>
             </div>
             <div style="padding-top: 1rem"></div>
-            <div>
+            <template #footer>
                 <button @click="resetSettings('widths')">Reset Widths</button>
                 <button @click="resetSettings()" style="margin-left: 1rem">Reset All</button>
-            </div>
+            </template>
         </modal>
     </div>
 </template>

@@ -320,8 +320,8 @@ export default {
 
 <style scoped>
 .loading-overlay {
-    background-color: #29292969;
-    color: #292929;
+    background-color: var(--response-panel-loader-background-color);
+    color: var(--response-panel-loader-color);
     opacity: 1;
     transition: opacity 200ms ease-out;
     position: absolute;
@@ -409,7 +409,7 @@ export default {
 }
 
 .response-panel-address-bar  .response-panel-address-bar-select-container select:hover {
-    background-color: #f7f7f7;
+    background-color: var(--response-panel-history-select-hover-color);
 }
 
 .response-panel-tabs {

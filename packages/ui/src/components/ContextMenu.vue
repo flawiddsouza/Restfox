@@ -172,7 +172,7 @@ button.context-menu-item > i {
 }
 
 .context-menu-separator {
-    border-bottom: 1px solid var(--default-border-color);
+    border-bottom: 1px solid var(--modal-border-color);
     margin-top: 5px;
     margin-bottom: 5px;
 }

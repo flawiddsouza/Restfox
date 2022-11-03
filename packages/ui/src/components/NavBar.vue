@@ -181,7 +181,7 @@ export default {
 }
 
 .heading a {
-    color: rgb(0, 0, 238);
+    color: var(--link-color);
 }
 
 .right-nav-container a {
@@ -190,18 +190,18 @@ export default {
     height: 100%;
     padding-left: 0.5rem;
     padding-right: 0.5rem;
-    color: black;
+    color: var(--text-color);
 }
 
 .right-nav-container a:hover {
-    background-color: #f1f1f147;
+    background-color: var(--border-color-lighter-darkened);
 }
 
 .right-nav-container a.bl {
-    border-left: 1px solid #f1f1f1;
+    border-left: 1px solid var(--border-color-lighter);
 }
 
 .right-nav-container a.br {
-    border-right: 1px solid #f1f1f1;
+    border-right: 1px solid var(--border-color-lighter);
 }
 </style>

@@ -2,7 +2,7 @@
     <form @submit.prevent="done" v-if="showModalComp">
         <modal :title="`Environment (JSON Format) — ${collectionItem ? collectionItem.name : workspace.name}`" v-model="showModalComp" height="70vh" width="55rem">
             <div style="display: grid; grid-template-columns: auto 1fr; height: 100%; overflow: auto;">
-                <div style="display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: auto; margin-right: 1rem; border-right: 1px solid var(--default-border-color)">
+                <div style="display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: auto; margin-right: 1rem; border-right: 1px solid var(--modal-border-color)">
                     <button type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
                         <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
@@ -424,7 +424,8 @@ export default {
     z-index: 10;
     top: 0;
     left: 0;
-    background-color: white;
+    background-color: var(--modal-background-color);
+    color: var(--modal-text-color);
     border-radius: 5px;
     box-shadow: 1px 1px 8px -4px black;
 }

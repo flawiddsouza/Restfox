@@ -122,7 +122,8 @@ class AlertConfirmPrompt extends HTMLElement {
             }
 
             .dialog {
-                background-color: white;
+                background-color: var(--modal-background-color);
+                color: var(--modal-text-color);
                 padding: 1rem;
                 /* box-shadow: 1px 1px 3px 1px lightgrey; */
                 box-shadow: 1px 1px 42px -16px black;

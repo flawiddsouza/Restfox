@@ -4,7 +4,7 @@
             <div class="plugin-manager-edit-modal-container">
                 <label>
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
-                    <input type="text" style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="name" placeholder="My Plugin" required spellcheck="false" v-focus>
+                    <input type="text" class="full-width-input" v-model="name" placeholder="My Plugin" required spellcheck="false" v-focus>
                 </label>
                 <div style="padding-bottom: 1rem"></div>
                 <label style="overflow: auto;">
@@ -125,6 +125,6 @@ export default {
 .code-editor {
     height: calc(100% - 1.2rem);
     overflow-y: auto;
-    border: 1px solid var(--default-border-color);
+    border: 1px solid var(--modal-border-color);
 }
 </style>

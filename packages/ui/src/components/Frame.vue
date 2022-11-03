@@ -201,13 +201,13 @@ header {
 
 .request-response-panels.left-right > .resizer {
     width: 4px;
-    background-color: #f1f1f1;
+    background-color: var(--resizer-background-color);
     cursor: ew-resize;
 }
 
 .request-response-panels.top-bottom > .resizer {
     height: 4px;
-    background-color: #f1f1f1;
+    background-color: var(--resizer-background-color);
     cursor: ns-resize;
 }
 

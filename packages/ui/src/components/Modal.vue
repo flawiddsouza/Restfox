@@ -89,7 +89,8 @@ export default {
     overflow: hidden;
     border-radius: 4px;
     margin: 0 auto;
-    background-color: #ffffff;
+    background-color: var(--modal-background-color);
+    color: var(--modal-text-color);
     display: flex;
     flex-direction: column;
 }
@@ -99,7 +100,7 @@ export default {
     padding: var(--gutter);
     align-items: center;
     grid-template-columns: auto 20px;
-    border-bottom: 1px solid var(--default-border-color)
+    border-bottom: 1px solid var(--modal-border-color)
 }
 
 .modal__container header h3 {
@@ -150,5 +151,13 @@ export default {
     display: flex;
     flex-direction: column;
     max-height: 90vh;
+}
+
+.modal ::-webkit-scrollbar {
+    background-color: var(--modal-scrollbar-background);
+}
+
+.modal ::-webkit-scrollbar-thumb {
+    background: var(--modal-scrollbar);
 }
 </style>

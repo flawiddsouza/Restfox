@@ -414,11 +414,11 @@ export default {
 }
 
 .sidebar .sidebar-item-active {
-    background-color: #f3f3f3;
+    background-color: var(--sidebar-item-active-color);
 }
 
 .sidebar .sidebar-item:hover {
-    background-color: #f3f3f3;
+    background-color: var(--sidebar-item-active-color);
 }
 
 .sidebar .sidebar-list > .sidebar-item {

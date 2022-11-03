@@ -130,7 +130,7 @@ table {
 }
 
 table, table th, table td {
-    border: 1px solid var(--default-border-color);
+    border: 1px solid var(--modal-border-color);
 }
 
 table th, table td {

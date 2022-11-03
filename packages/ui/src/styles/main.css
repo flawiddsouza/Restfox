@@ -11,27 +11,74 @@ html {
     'Droid Sans Fallback';
     --font-default: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light',
     'Ubuntu', 'Droid Sans', sans-serif;
-    --font-ligatures: normal;
     --default-border-color: lightgrey;
+    --border-color-lighter: #f1f1f1;
+    --border-color-lighter-darkened: #f1f1f147;
     --base-color-success: #0cbb52;
     --base-color-info: #097bed;
     --base-color-warning: #ffb400;
     --base-color-error: #eb2013;
+    --background-color: white;
+    --text-color: black;
+    --scrollbar: #dfdfdf;
+    --scrollbar-background: #f3f2f2;
+    --link-color: rgb(0, 0, 238);
+    --input-disabled-background-color: rgba(239, 239, 239, 0.3);
+    --input-disabled-color: rgb(84, 84, 84);
+    --modal-background-color: white;
+    --modal-text-color: black;
+    --modal-border-color: lightgrey;
+    --modal-scrollbar: #dfdfdf;
+    --modal-scrollbar-background: #f3f2f2;
+    --sidebar-item-active-color: #f3f3f3;
+    --resizer-background-color: #f1f1f1;
+    --response-panel-history-select-hover-color: #f7f7f7;
+    --response-panel-loader-background-color: #29292969;
+    --response-panel-loader-color: #292929;
+}
+
+html.theme-dark {
+    --default-border-color: #484848;
+    --border-color-lighter: #484848;
+    --border-color-lighter-darkened: #48484847;
+    --base-color-success: #0cbb52;
+    --base-color-info: #097bed;
+    --base-color-warning: #ffb400;
+    --base-color-error: #eb2013;
+    --background-color: #292929;
+    --text-color: #e0e0e0;
+    --scrollbar: #505050;
+    --scrollbar-background: #353535;
+    --link-color: #d9c9ff;
+    --input-disabled-background-color: rgba(59, 59, 59, 0.3);
+    --input-disabled-color:  rgb(170, 170, 170);
+    --modal-background-color: white;
+    --modal-text-color: black;
+    --modal-border-color: lightgrey;
+    --modal-scrollbar: #dfdfdf;
+    --modal-scrollbar-background: #f3f2f2;
+    --sidebar-item-active-color: #353535;
+    --resizer-background-color: #353535;
+    --response-panel-history-select-hover-color: #353535;
+    --response-panel-loader-background-color: #29292969;
+    --response-panel-loader-color: white;
 }
 
 body {
     font-family: var(--font-default);
     font-size: 13px;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
 ::-webkit-scrollbar {
     width: 9px;
     height: 5px;
-    background-color: #f3f2f2;
+    background-color: var(--scrollbar-background);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #dfdfdf;
+    background: var(--scrollbar);
     height: 70%;
 }
 
@@ -60,9 +107,32 @@ body {
 
 .code {
     display: inline-block;
-    background-color: white;
+    background-color: var(--modal-background-color);
     padding: 0.1rem 0.2rem;
-    border: 1px solid var(--default-border-color);
+    border: 1px solid var(--modal-border-color);
     font-family: var(--font-monospace);
     font-size: 0.9em;
+}
+
+input, textarea, select {
+    background-color: inherit;
+    color: inherit;
+}
+
+select option {
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+input:disabled {
+    background-color: var(--input-disabled-background-color);
+    color: var(--input-disabled-color);
+    border: 1px solid var(--default-border-color);
+}
+
+input.full-width-input {
+    width: 100%;
+    border: 1px solid var(--modal-border-color);
+    outline: 0; padding: 0.3rem;
+    background: inherit;
 }
