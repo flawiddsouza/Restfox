@@ -136,8 +136,8 @@ export default {
             const collection = await getCollectionForWorkspace(this.activeWorkspace._id)
             exportRestfoxCollection(collection)
         },
-        clearCollection() {
-            if(confirm('Are you sure?')) {
+        async clearCollection() {
+            if(await window.createPrompt('Are you sure? Type "clear everything in workspace" to confirm') === 'clear everything in workspace') {
                 this.$store.commit('clearCollection')
             }
         },
