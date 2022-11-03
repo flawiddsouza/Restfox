@@ -253,11 +253,24 @@ export default {
         window.addEventListener('keydown', this.handleGlobalKeydown)
 
         const savedTheme = localStorage.getItem(constants.LOCAL_STORAGE_KEY.THEME)
+        const savedGithubStarCount = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
             applyTheme(savedTheme)
         }
+
+        if(savedGithubStarCount) {
+            this.$store.state.githubStarCount = savedGithubStarCount
+        }
+
+        fetch('https://api.github.com/repos/flawiddsouza/Restfox').then(async response => {
+            if(response.ok) {
+                const responseData = await response.json()
+                this.$store.state.githubStarCount = responseData.stargazers_count
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT, this.$store.state.githubStarCount)
+            }
+        })
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)

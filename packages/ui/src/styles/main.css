@@ -35,6 +35,7 @@ html {
     --response-panel-history-select-hover-color: #f7f7f7;
     --response-panel-loader-background-color: #29292969;
     --response-panel-loader-color: #292929;
+    --github-button-icon-fill-color: black;
 }
 
 html.theme-dark {
@@ -62,6 +63,7 @@ html.theme-dark {
     --response-panel-history-select-hover-color: #353535;
     --response-panel-loader-background-color: #29292969;
     --response-panel-loader-color: white;
+    --github-button-icon-fill-color: white;
 }
 
 body {

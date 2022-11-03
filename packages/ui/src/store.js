@@ -177,6 +177,7 @@ const store = createStore({
             plugins: [],
             requestResponseLayout: 'left-right',
             theme: 'light',
+            githubStarCount: '0',
             sidebarItemTemporaryName: {},
             flags: {
                 hideBrowserRelatedResponsePanelErrors: false,
