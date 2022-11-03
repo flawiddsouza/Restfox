@@ -4,7 +4,8 @@ export default {
         SIDEBAR_WIDTH: 'Restfox-SidebarWidth',
         REQUEST_PANEL_RATIO: 'Restfox-RequestPanelRatio',
         RESPONSE_PANEL_RATIO: 'Restfox-ResponsePanelRatio',
-        REQUEST_RESPONSE_LAYOUT: 'Restfox-RequestResponseLayout'
+        REQUEST_RESPONSE_LAYOUT: 'Restfox-RequestResponseLayout',
+        THEME: 'Restfox-Theme'
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

@@ -1099,3 +1099,13 @@ export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent)
 export function setObjectPathValue(object, path, value) {
     setObjectPathValueLodash(object, path, value)
 }
+
+export function applyTheme(themeName: 'light' | 'dark') {
+    if(themeName === 'light') {
+        document.documentElement.className = `theme-${themeName}`
+    }
+
+    if(themeName === 'dark') {
+        document.documentElement.className = `theme-${themeName}`
+    }
+}

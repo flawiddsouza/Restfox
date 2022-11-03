@@ -176,6 +176,7 @@ const store = createStore({
             activeWorkspace: null,
             plugins: [],
             requestResponseLayout: 'left-right',
+            theme: 'light',
             sidebarItemTemporaryName: {},
             flags: {
                 hideBrowserRelatedResponsePanelErrors: false,

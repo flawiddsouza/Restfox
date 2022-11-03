@@ -7,6 +7,8 @@
             </template>
         </div>
         <div class="right-nav-container">
+            <a href="#" @click.prevent="theme = 'dark'" v-if="theme === 'light'" class="bl">Theme: Light</a>
+            <a href="#" @click.prevent="theme = 'light'" v-else class="bl">Theme: Dark (alpha)</a>
             <div v-if="nav === 'collection'" style="height: 100%;">
                 <template v-if="activeTab">
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl">View: Column</a>
@@ -50,7 +52,7 @@ import PluginManagerModal from './modals/PluginManagerModal.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
-import { exportRestfoxCollection } from '@/helpers'
+import { exportRestfoxCollection, applyTheme } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import GithubButton from 'vue-github-button'
 import constants from '../constants'
@@ -112,6 +114,16 @@ export default {
             set(value) {
                 this.$store.state.requestResponseLayout = value
                 localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_RESPONSE_LAYOUT, value)
+            }
+        },
+        theme: {
+            get() {
+                return this.$store.state.theme
+            },
+            set(value) {
+                this.$store.state.theme = value
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.THEME, value)
+                applyTheme(value)
             }
         },
         activeTab() {

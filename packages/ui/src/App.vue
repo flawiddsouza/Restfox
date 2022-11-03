@@ -14,7 +14,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 <script>
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
-import { checkHotkeyAgainstKeyEvent, findItemInTreeById } from './helpers'
+import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme } from './helpers'
 import './web-components/alert-confirm-prompt'
 
 export default {
@@ -251,6 +251,13 @@ export default {
         window.addEventListener('message', messageHandler)
 
         window.addEventListener('keydown', this.handleGlobalKeydown)
+
+        const savedTheme = localStorage.getItem(constants.LOCAL_STORAGE_KEY.THEME)
+
+        if(savedTheme) {
+            this.$store.state.theme = savedTheme
+            applyTheme(savedTheme)
+        }
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)
