@@ -167,6 +167,7 @@ class AlertConfirmPrompt extends HTMLElement {
                 width: 25rem;
                 border-radius: var(--border-radius);
                 border: 1px solid lightgrey;
+                caret-color: var(--modal-caret-color);
             }
 
             .dialog-input:focus, .dialog-primary-button:focus, .dialog-secondary-button:focus {

@@ -3,7 +3,7 @@
         <modal title="Import" v-model="showImportModal">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Import From</div>
-                <select style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="importFrom">
+                <select class="full-width-input" v-model="importFrom">
                     <option>Restfox</option>
                     <option>Postman</option>
                     <option>Postman URL</option>
@@ -16,14 +16,14 @@
                     <input type="file" @change="fileToImport = $event.target.files[0]" accept=".json, .zip" required>
                 </template>
                 <template v-else>
-                    <input type="url" v-model="urlToImport" required placeholder="https://postman.com/collections/{collectionId}" style="width: 100%; border: 1px solid var(--default-border-color); outline: 0px; padding: 0.3rem; background: inherit;">
+                    <input type="url" v-model="urlToImport" required placeholder="https://postman.com/collections/{collectionId}" class="full-width-input">
                 </template>
             </div>
 
             <div style="margin-top: 1.5rem">
                 <label>
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Import Into</div>
-                    <select style="width: 100%; border: 1px solid var(--default-border-color); outline: 0; padding: 0.3rem; background: inherit;" v-model="selectedRequestGroupId">
+                    <select class="full-width-input" v-model="selectedRequestGroupId">
                         <option :value="null">Root of the workspace</option>
                         <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
                     </select>

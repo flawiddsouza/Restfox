@@ -20,6 +20,7 @@ html {
     --base-color-error: #eb2013;
     --background-color: white;
     --text-color: black;
+    --caret-color: black;
     --scrollbar: #dfdfdf;
     --scrollbar-background: #f3f2f2;
     --link-color: rgb(0, 0, 238);
@@ -27,6 +28,7 @@ html {
     --input-disabled-color: rgb(84, 84, 84);
     --modal-background-color: white;
     --modal-text-color: black;
+    --modal-caret-color: black;
     --modal-border-color: lightgrey;
     --modal-scrollbar: #dfdfdf;
     --modal-scrollbar-background: #f3f2f2;
@@ -48,6 +50,7 @@ html.theme-dark {
     --base-color-error: #eb2013;
     --background-color: #292929;
     --text-color: #e0e0e0;
+    --caret-color: #e0e0e0;
     --scrollbar: #505050;
     --scrollbar-background: #353535;
     --link-color: #d9c9ff;
@@ -55,6 +58,7 @@ html.theme-dark {
     --input-disabled-color:  rgb(170, 170, 170);
     --modal-background-color: white;
     --modal-text-color: black;
+    --modal-caret-color: black;
     --modal-border-color: lightgrey;
     --modal-scrollbar: #dfdfdf;
     --modal-scrollbar-background: #f3f2f2;
@@ -64,6 +68,10 @@ html.theme-dark {
     --response-panel-loader-background-color: #29292969;
     --response-panel-loader-color: white;
     --github-button-icon-fill-color: white;
+}
+
+* {
+    caret-color: var(--caret-color);
 }
 
 body {
@@ -132,9 +140,19 @@ input:disabled {
     border: 1px solid var(--default-border-color);
 }
 
-input.full-width-input {
+input.full-width-input, select.full-width-input {
     width: 100%;
     border: 1px solid var(--modal-border-color);
-    outline: 0; padding: 0.3rem;
+    outline: 0;
+    padding: 0.3rem;
     background: inherit;
+}
+
+select.full-width-input option {
+    background-color: var(--modal-background-color);
+    color: var(--modal-text-color);
+}
+
+.modal * {
+    caret-color: var(--modal-caret-color);
 }
