@@ -50,6 +50,8 @@ html {
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
     --modal-cm-number: #164;
+    --drop-target-background-color: #ffc0cb1f;
+    --workspace-menu-hover-background-color: #dbedff;
 }
 
 html.theme-dark {
@@ -92,6 +94,8 @@ html.theme-dark {
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
     --modal-cm-number: #164;
+    --drop-target-background-color: #f8889b41;
+    --workspace-menu-hover-background-color: #505050;
 }
 
 * {

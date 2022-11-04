@@ -284,7 +284,7 @@ export default {
             if(!this.draggedSidebarElement) {
                 return
             }
-            this.draggedSidebarElement.style.backgroundColor = 'white'
+            this.draggedSidebarElement.style.backgroundColor = 'var(--background-color)'
             this.draggedSidebarElement.style.opacity = '0.5'
         },
         dragEnd(event) {
@@ -310,7 +310,7 @@ export default {
             const location = Math.abs(offset - y)
             if (location < (elementHeight / 2)) {
                 this.sidebarItemCursorPositition = 'top'
-                sidebarItemToDropOn.style.borderTop = '1px dashed black'
+                sidebarItemToDropOn.style.borderTop = '1px dashed var(--text-color)'
                 sidebarItemToDropOn.style.borderBottom = ''
                 sidebarItemToDropOn.style.backgroundColor = ''
             } else {
@@ -318,10 +318,10 @@ export default {
                 if(sidebarItemToDropOn.dataset.type === 'request_group') {
                     sidebarItemToDropOn.style.borderTop = ''
                     sidebarItemToDropOn.style.borderBottom = ''
-                    sidebarItemToDropOn.style.backgroundColor = '#ffc0cb1f'
+                    sidebarItemToDropOn.style.backgroundColor = 'var(--drop-target-background-color)'
                 } else {
                     sidebarItemToDropOn.style.borderTop = ''
-                    sidebarItemToDropOn.style.borderBottom = '1px dashed black'
+                    sidebarItemToDropOn.style.borderBottom = '1px dashed var(--text-color)'
                     sidebarItemToDropOn.style.backgroundColor = ''
                 }
             }

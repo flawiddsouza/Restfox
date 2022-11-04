@@ -64,7 +64,7 @@ export default {
             }
             this.indexOfDraggedTab = this.tabs.findIndex(item => item._id === this.draggedTabElement.dataset.id)
             this.setActiveTab(this.tabs[this.indexOfDraggedTab])
-            this.draggedTabElement.style.background = 'white'
+            this.draggedTabElement.style.background = 'var(--background-color)'
             this.draggedTabElement.style.opacity = '0.5'
         },
         dragEnd(event) {
@@ -87,7 +87,7 @@ export default {
             const tabToDropOn = event.target.closest('.tab')
             if(tabToDropOn) {
                 tabToDropOn.classList.add('disable-pointer-events')
-                tabToDropOn.style.background = '#ffc0cb1f'
+                tabToDropOn.style.background = 'var(--drop-target-background-color)'
             }
         },
         dragLeave(event) {

@@ -124,8 +124,8 @@ export default {
 }
 
 .workspace svg {
-    fill: black;
-    color: black;
+    fill: var(--text-color);
+    color: var(--text-color);
 }
 
 .workspace-settings-button-container {
@@ -149,6 +149,6 @@ export default {
 }
 
 .workspace-settings-button:hover {
-    background-color: #dbedff;
+    background-color: var(--workspace-menu-hover-background-color);
 }
 </style>
