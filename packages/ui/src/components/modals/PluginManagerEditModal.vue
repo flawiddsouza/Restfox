@@ -13,7 +13,7 @@
                 </label>
             </div>
             <template #footer>
-                <button>Save</button>
+                <button class="button">Save</button>
             </template>
         </modal>
     </form>

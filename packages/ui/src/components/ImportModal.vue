@@ -31,7 +31,7 @@
             </div>
 
             <template #footer>
-                <button>Import</button>
+                <button class="button">Import</button>
             </template>
         </modal>
     </form>

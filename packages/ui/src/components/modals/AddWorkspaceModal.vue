@@ -7,8 +7,8 @@
             </label>
 
             <template #footer>
-                <button v-if="!workspace">Create</button>
-                <button v-else>Rename</button>
+                <button class="button" v-if="!workspace">Create</button>
+                <button class="button" v-else>Rename</button>
             </template>
         </modal>
     </form>

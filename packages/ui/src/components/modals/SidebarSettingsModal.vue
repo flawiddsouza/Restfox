@@ -7,7 +7,7 @@
             </label>
             <div style="padding-bottom: 1rem"></div>
             <template #footer>
-                <button @click="showModalComp = false">Done</button>
+                <button class="button" @click="showModalComp = false">Done</button>
             </template>
         </modal>
     </div>

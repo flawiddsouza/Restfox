@@ -17,8 +17,8 @@
             </div>
             <div style="padding-top: 1rem"></div>
             <template #footer>
-                <button @click="resetSettings('widths')">Reset Widths</button>
-                <button @click="resetSettings()" style="margin-left: 1rem">Reset All</button>
+                <button class="button" @click="resetSettings('widths')">Reset Widths</button>
+                <button class="button" @click="resetSettings()" style="margin-left: 1rem">Reset All</button>
             </template>
         </modal>
     </div>

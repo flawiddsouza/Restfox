@@ -3,7 +3,7 @@
         <modal :title="`Environment (JSON Format) — ${collectionItem ? collectionItem.name : workspace.name}`" v-model="showModalComp" height="70vh" width="55rem">
             <div style="display: grid; grid-template-columns: auto 1fr; height: 100%; overflow: auto;">
                 <div style="display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: auto; margin-right: 1rem; border-right: 1px solid var(--modal-border-color)">
-                    <button type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment">Add Environment</button>
+                    <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
                         <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
                             <div>{{ environment.name }}</div>
@@ -32,7 +32,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-size: 0.75rem; text-align: left; line-height: 1rem; margin-right: 0.5rem;" v-pre><span class="code">"key": "value"</span> pairs defined in the above JSON object can be referenced in any text input in the request panel using <span class="code">{{ key }}</span> for variable substitution</div>
                     <div>
-                        <button>Done</button>
+                        <button class="button">Done</button>
                     </div>
                 </div>
             </template>

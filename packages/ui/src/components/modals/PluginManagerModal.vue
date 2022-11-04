@@ -2,7 +2,7 @@
     <div v-if="showModalComp">
         <modal title="Plugin Manager" v-model="showModalComp">
             <div style="text-align: right;">
-                <button type="button" @click="startAddPlugin">Add Plugin</button>
+                <button class="button" type="button" @click="startAddPlugin">Add Plugin</button>
             </div>
             <div style="padding-top: 1rem"></div>
             <table>
@@ -18,7 +18,7 @@
                 <tbody>
                     <tr v-for="plugin in plugins">
                         <td>
-                            <select :value="plugin.enabled ? '1' : '0'" @change="updatePluginStatus(plugin._id, $event.target.value)">
+                            <select :value="plugin.enabled ? '1' : '0'" @change="updatePluginStatus(plugin._id, $event.target.value)" class="full-width-input slim">
                                 <option value="1">Enabled</option>
                                 <option value="0">Disabled</option>
                             </select>
@@ -27,10 +27,10 @@
                         <td>{{ dateFormat(plugin.createdAt) }}</td>
                         <td>{{ dateFormat(plugin.updatedAt) }}</td>
                         <td>
-                            <button type="button" @click="startEditPlugin(plugin)">
+                            <button class="button" type="button" @click="startEditPlugin(plugin)">
                                 <i class="fa fa-edit"></i>
                             </button>
-                            <button type="button" style="margin-left: 0.5rem" @click="deletePlugin(plugin._id)">
+                            <button class="button" type="button" style="margin-left: 0.5rem" @click="deletePlugin(plugin._id)">
                                 <i class="fa fa-trash"></i>
                             </button>
                         </td>
@@ -136,9 +136,5 @@ table, table th, table td {
 table th, table td {
     padding: 0.5rem;
     text-align: center;
-}
-
-select {
-    outline: 0;
 }
 </style>

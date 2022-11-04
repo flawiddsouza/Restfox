@@ -5,7 +5,7 @@
             <i class="fas fa-sync fa-spin"></i>
         </div>
         <div class="pad">
-            <button @click="cancelRequest">Cancel Request</button>
+            <button class="button" @click="cancelRequest">Cancel Request</button>
         </div>
     </div>
     <template v-if="status !== 'not loaded' && response !== null">
@@ -85,7 +85,7 @@
                 </div>
                 <div style="margin-top: 1rem" v-html="responseRequestBodyOutput"></div>
                 <div style="margin-top: 1rem">
-                    <button @click="restoreCurrentResponseRequest">Restore</button>
+                    <button class="button" @click="restoreCurrentResponseRequest">Restore</button>
                 </div>
             </div>
         </div>

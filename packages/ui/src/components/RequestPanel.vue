@@ -130,7 +130,7 @@
                     <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="jsonEditor"></CodeMirrorEditor>
                 </div>
                 <div class="request-panel-body-footer" v-if="activeTab.body.mimeType === 'application/json'">
-                    <button @click="beautifyJSON">Beautify JSON</button>
+                    <button class="button" @click="beautifyJSON">Beautify JSON</button>
                 </div>
                 <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%; overflow: auto;" v-if="activeTab.body.mimeType === 'application/graphql'">
                     <div class="oy-a" style="min-height: 130px;">
@@ -143,7 +143,7 @@
                         </div>
                     </div>
                     <div class="request-panel-body-footer">
-                        <button @click="beautifyGraphQL">Beautify</button>
+                        <button class="button" @click="beautifyGraphQL">Beautify</button>
                     </div>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/octet-stream'">

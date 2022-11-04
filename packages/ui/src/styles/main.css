@@ -26,6 +26,10 @@ html {
     --link-color: rgb(0, 0, 238);
     --input-disabled-background-color: rgba(239, 239, 239, 0.3);
     --input-disabled-color: rgb(84, 84, 84);
+    --button-background-color: #efefef;
+    --button-hover-background-color: #f8f8f8;
+    --button-text-color: black;
+    --button-border-color: #8c8c8c;
     --modal-background-color: white;
     --modal-text-color: black;
     --modal-caret-color: black;
@@ -56,6 +60,10 @@ html.theme-dark {
     --link-color: #d9c9ff;
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
     --input-disabled-color:  rgb(170, 170, 170);
+    --button-background-color: #efefef;
+    --button-hover-background-color: #f8f8f8;
+    --button-text-color: black;
+    --button-border-color: #8c8c8c;
     --modal-background-color: white;
     --modal-text-color: black;
     --modal-caret-color: black;
@@ -153,6 +161,22 @@ select.full-width-input option {
     color: var(--modal-text-color);
 }
 
+.full-width-input.slim {
+    padding: 0.1rem;
+}
+
 .modal * {
     caret-color: var(--modal-caret-color);
+}
+
+button.button {
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    border: 1px solid var(--button-border-color);
+    padding: 3px 10px;
+    border-radius: 3px;
+}
+
+button.button:hover {
+    background-color: var(--button-hover-background-color);
 }

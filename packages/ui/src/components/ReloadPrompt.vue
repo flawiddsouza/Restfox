@@ -24,10 +24,10 @@ const close = async() => {
                 New update available, click on reload button to update.
             </span>
         </div>
-        <button v-if="needRefresh" @click="updateServiceWorker()">
+        <button class="button" v-if="needRefresh" @click="updateServiceWorker()">
             Reload
         </button>
-        <button @click="close">
+        <button class="button" @click="close">
             Close
         </button>
     </div>

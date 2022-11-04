@@ -7,7 +7,7 @@
             </label>
 
             <template #footer>
-                <button>Create</button>
+                <button class="button">Create</button>
             </template>
         </modal>
     </form>
