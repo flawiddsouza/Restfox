@@ -42,6 +42,14 @@ html {
     --response-panel-loader-background-color: #29292969;
     --response-panel-loader-color: #292929;
     --github-button-icon-fill-color: black;
+    --cm-string: #a11;
+    --cm-boolean: #219;
+    --cm-null: #708;
+    --cm-number: #164;
+    --modal-cm-string: #a11;
+    --modal-cm-boolean: #219;
+    --modal-cm-null: #708;
+    --modal-cm-number: #164;
 }
 
 html.theme-dark {
@@ -76,6 +84,14 @@ html.theme-dark {
     --response-panel-loader-background-color: #29292969;
     --response-panel-loader-color: white;
     --github-button-icon-fill-color: white;
+    --cm-string: #ff6464;
+    --cm-boolean: #b0a4ff;
+    --cm-null: #f190ff;
+    --cm-number: #1cd58b;
+    --modal-cm-string: #a11;
+    --modal-cm-boolean: #219;
+    --modal-cm-null: #708;
+    --modal-cm-number: #164;
 }
 
 * {
@@ -179,4 +195,36 @@ button.button {
 
 button.button:hover {
     background-color: var(--button-hover-background-color);
+}
+
+.cm-editor .cm-string:not(.cm-property) {
+    color: var(--cm-string);
+}
+
+.cm-editor .cm-boolean {
+    color: var(--cm-boolean);
+}
+
+.cm-editor .cm-null {
+    color: var(--cm-null);
+}
+
+.cm-editor .cm-number {
+    color: var(--cm-number);
+}
+
+.modal .cm-editor .cm-string:not(.cm-property) {
+    color: var(--modal-cm-string);
+}
+
+.modal .cm-editor .cm-boolean {
+    color: var(--modal-cm-boolean);
+}
+
+.modal .cm-editor .cm-null {
+    color: var(--modal-cm-null);
+}
+
+.modal .cm-editor .cm-number {
+    color: var(--modal-cm-number);
 }

@@ -8,7 +8,7 @@
         </div>
         <div class="right-nav-container">
             <a href="#" @click.prevent="theme = 'dark'" v-if="theme === 'light'" class="bl">Theme: Light</a>
-            <a href="#" @click.prevent="theme = 'light'" v-else class="bl">Theme: Dark (alpha)</a>
+            <a href="#" @click.prevent="theme = 'light'" v-else class="bl">Theme: Dark</a>
             <div v-if="nav === 'collection'" style="height: 100%;">
                 <template v-if="activeTab">
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl">View: Column</a>

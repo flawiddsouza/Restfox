@@ -12,12 +12,15 @@ import { closeBrackets } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
+import { codeMirrorSyntaxHighlighting } from '@/helpers'
 
 function createState(language, documentText, vueInstance) {
     let languageFunc = null
+    let highlightStyle = defaultHighlightStyle
 
     if(language === 'json') {
         languageFunc = json()
+        highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
     if(language === 'javascript') {
@@ -26,13 +29,14 @@ function createState(language, documentText, vueInstance) {
 
     if(language === 'graphql') {
         languageFunc = graphqlLanguage
+        highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
     return EditorState.create({
         doc: documentText,
         extensions: [
             languageFunc,
-            syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+            syntaxHighlighting(highlightStyle, { fallback: true }),
             lineNumbers(),
             highlightActiveLineGutter(),
             foldGutter({ openText: '▾', closedText: '▸' }),

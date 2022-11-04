@@ -6,11 +6,12 @@
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
-import { foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { foldGutter, syntaxHighlighting } from '@codemirror/language'
+import { codeMirrorSyntaxHighlighting } from '@/helpers'
 
 const extensions = [
     json(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    syntaxHighlighting(codeMirrorSyntaxHighlighting(), { fallback: true }),
     lineNumbers(),
     foldGutter({ openText: '▾', closedText: '▸' }),
     EditorView.lineWrapping,

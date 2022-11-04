@@ -4,6 +4,8 @@ import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugi
 import dayjs from 'dayjs'
 import getObjectPathValue from 'lodash.get'
 import setObjectPathValueLodash from 'lodash.set'
+import { HighlightStyle } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -1108,4 +1110,31 @@ export function applyTheme(themeName: 'light' | 'dark') {
     if(themeName === 'dark') {
         document.documentElement.className = `theme-${themeName}`
     }
+}
+
+export function codeMirrorSyntaxHighlighting() {
+    const highlightStyle = HighlightStyle.define([
+        {
+            tag: tags.string,
+            class: 'cm-string'
+        },
+        {
+            tag: tags.number,
+            class: 'cm-number'
+        },
+        {
+            tag: tags.bool,
+            class: 'cm-boolean'
+        },
+        {
+            tag: tags.null,
+            class: 'cm-null'
+        },
+        {
+            tag: tags.propertyName,
+            class: 'cm-property'
+        }
+    ])
+
+    return highlightStyle
 }
