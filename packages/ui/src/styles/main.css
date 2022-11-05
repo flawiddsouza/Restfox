@@ -232,3 +232,7 @@ button.button:hover {
 .modal .cm-editor .cm-number {
     color: var(--modal-cm-number);
 }
+
+a {
+    color: var(--link-color);
+}

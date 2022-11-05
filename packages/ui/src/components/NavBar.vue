@@ -189,10 +189,6 @@ export default {
     text-decoration: none;
 }
 
-.heading a {
-    color: var(--link-color);
-}
-
 .right-nav-container a {
     display: inline-flex;
     align-items: center;
