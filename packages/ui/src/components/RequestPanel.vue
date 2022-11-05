@@ -147,7 +147,16 @@
                     </div>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/octet-stream'">
-                    <input type="file" @change="activeTab.body.fileName = $event.target.files[0]" style="width: 100%;  padding: 0.5rem; border: 1px solid var(--default-border-color);">
+                    <label style="width: 100%; display: flex; align-items: center; border: 1px solid var(--default-border-color);  padding: 0.5rem;">
+                        <div style="display: flex; align-items: center;">
+                            <span style="border: 1px solid lightgrey; padding: 3px; white-space: nowrap;">Choose File</span>
+                            <span style="margin-left: 0.5rem">
+                                <template v-if="activeTab.body.fileName">{{ activeTab.body.fileName.name }}</template>
+                                <template v-else>No File Selected</template>
+                            </span>
+                        </div>
+                        <input type="file" @change="activeTab.body.fileName = $event.target.files[0]" style="display: none;">
+                    </label>
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">

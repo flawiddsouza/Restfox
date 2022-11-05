@@ -5,6 +5,22 @@ import getObjectPathValue from 'lodash.get'
 export function createRequestContextForPlugin(request, environment, setEnvironmentVariable) {
     let state = JSON.parse(JSON.stringify(request))
 
+    if('params' in request) {
+        let params = []
+        for(const param of request.params) {
+            let paramExtracted = {...param}
+            if('files' in paramExtracted) {
+                paramExtracted.files = [...paramExtracted.files]
+            }
+            params.push(paramExtracted)
+        }
+        state.body.params = params
+    }
+
+    if('fileName' in request.body) {
+        state.body.fileName = request.body.fileName
+    }
+
     return {
         request: {
             getMethod() {

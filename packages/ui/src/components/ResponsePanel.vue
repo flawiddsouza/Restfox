@@ -300,6 +300,10 @@ export default {
                 this.activeTab.body.params = params
             }
 
+            if(originalRequestBody.mimeType === 'application/octet-stream') {
+                this.activeTab.body.fileName = this.response.request.body
+            }
+
             if(this.response.request.original.parameters) {
                 this.activeTab.parameters = JSON.parse(JSON.stringify(this.response.request.original.parameters))
             }

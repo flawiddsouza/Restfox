@@ -202,6 +202,7 @@ const store = createStore({
     mutations: {
         addTab(state, tab) {
             const tabCopy = JSON.parse(JSON.stringify(tab))
+
             if('params' in tab.body) {
                 let params = []
                 for(const param of tab.body.params) {
@@ -213,6 +214,11 @@ const store = createStore({
                 }
                 tabCopy.body.params = params
             }
+
+            if('fileName' in tab.body) {
+                tabCopy.body.fileName = tab.body.fileName
+            }
+
             const existingTab = state.tabs.find(tabItem => tabItem._id === tabCopy._id)
             if(!existingTab) {
                 state.tabs.push(tabCopy)
@@ -272,6 +278,7 @@ const store = createStore({
         persistActiveTab(state) {
             if(state.activeTab) {
                 const activeTabToSave = JSON.parse(JSON.stringify(state.activeTab))
+
                 if('params' in state.activeTab.body) {
                     let params = []
                     for(const param of state.activeTab.body.params) {
@@ -283,6 +290,11 @@ const store = createStore({
                     }
                     activeTabToSave.body.params = params
                 }
+
+                if('fileName' in state.activeTab.body) {
+                    activeTabToSave.body.fileName = state.activeTab.body.fileName
+                }
+
                 db.collections.update(state.activeTab._id, activeTabToSave)
             }
         },
