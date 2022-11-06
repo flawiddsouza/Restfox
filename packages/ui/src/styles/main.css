@@ -26,7 +26,7 @@ html {
     --link-color: rgb(0, 0, 238);
     --input-disabled-background-color: rgba(239, 239, 239, 0.3);
     --input-disabled-color: rgb(84, 84, 84);
-    --button-background-color: #efefef;
+    --button-background-color: white;
     --button-hover-background-color: #f8f8f8;
     --button-text-color: black;
     --button-border-color: #8c8c8c;
@@ -36,7 +36,7 @@ html {
     --modal-border-color: lightgrey;
     --modal-scrollbar: #dfdfdf;
     --modal-scrollbar-background: #f3f2f2;
-    --modal-button-background-color: #efefef;
+    --modal-button-background-color: white;
     --modal-button-hover-background-color: #f8f8f8;
     --modal-button-text-color: black;
     --modal-button-border-color: #8c8c8c;
@@ -84,7 +84,7 @@ html.theme-dark {
     --modal-border-color: lightgrey;
     --modal-scrollbar: #dfdfdf;
     --modal-scrollbar-background: #f3f2f2;
-    --modal-button-background-color: #efefef;
+    --modal-button-background-color: white;
     --modal-button-hover-background-color: #f8f8f8;
     --modal-button-text-color: black;
     --modal-button-border-color: #8c8c8c;
