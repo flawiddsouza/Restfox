@@ -209,13 +209,13 @@ button.button:hover {
     background-color: var(--button-hover-background-color);
 }
 
-.modal button.button {
+.modal button.button, .pwa-toast button.button {
     background-color: var(--modal-button-background-color);
     color: var(--modal-button-text-color);
     border: 1px solid var(--modal-button-border-color);
 }
 
-.modal button.button:hover {
+.modal button.button:hover, .pwa-toast button.button:hover  {
     background-color: var(--modal-button-hover-background-color);
 }
 
