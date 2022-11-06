@@ -36,6 +36,10 @@ html {
     --modal-border-color: lightgrey;
     --modal-scrollbar: #dfdfdf;
     --modal-scrollbar-background: #f3f2f2;
+    --modal-button-background-color: #efefef;
+    --modal-button-hover-background-color: #f8f8f8;
+    --modal-button-text-color: black;
+    --modal-button-border-color: #8c8c8c;
     --sidebar-item-active-color: #f3f3f3;
     --resizer-background-color: #f1f1f1;
     --response-panel-history-select-hover-color: #f7f7f7;
@@ -70,9 +74,9 @@ html.theme-dark {
     --link-color: #d9c9ff;
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
     --input-disabled-color:  rgb(170, 170, 170);
-    --button-background-color: #efefef;
-    --button-hover-background-color: #f8f8f8;
-    --button-text-color: black;
+    --button-background-color: #292929;
+    --button-hover-background-color: #595858;
+    --button-text-color: #e0e0e0;
     --button-border-color: #8c8c8c;
     --modal-background-color: white;
     --modal-text-color: black;
@@ -80,6 +84,10 @@ html.theme-dark {
     --modal-border-color: lightgrey;
     --modal-scrollbar: #dfdfdf;
     --modal-scrollbar-background: #f3f2f2;
+    --modal-button-background-color: #efefef;
+    --modal-button-hover-background-color: #f8f8f8;
+    --modal-button-text-color: black;
+    --modal-button-border-color: #8c8c8c;
     --sidebar-item-active-color: #353535;
     --resizer-background-color: #353535;
     --response-panel-history-select-hover-color: #353535;
@@ -199,6 +207,16 @@ button.button {
 
 button.button:hover {
     background-color: var(--button-hover-background-color);
+}
+
+.modal button.button {
+    background-color: var(--modal-button-background-color);
+    color: var(--modal-button-text-color);
+    border: 1px solid var(--modal-button-border-color);
+}
+
+.modal button.button:hover {
+    background-color: var(--modal-button-hover-background-color);
 }
 
 .cm-editor .cm-string:not(.cm-property) {
