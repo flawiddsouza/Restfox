@@ -29,10 +29,19 @@ Offline-first web HTTP client
 ## ui
 
 ### Development
+```
 npm run dev
+```
 
 ### Distribution
+```
 npm run build
+```
+
+### Desktop distribution and development
+```
+npm run build-desktop
+```
 
 ## electron
 
