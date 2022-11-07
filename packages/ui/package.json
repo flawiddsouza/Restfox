@@ -19,6 +19,7 @@
         "altair-codemirror-graphql": "^4.6.4",
         "dayjs": "^1.10.7",
         "dexie": "^3.2.0",
+        "dexie-export-import": "^1.0.3",
         "jszip": "^3.7.1",
         "lodash.get": "^4.4.2",
         "lodash.set": "^4.3.2",

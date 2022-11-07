@@ -26,6 +26,7 @@
             </div>
             <template v-if="nav === 'workspaces'">
                 <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
+                <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
             <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
             <a href="#" @click.prevent="showSettings" class="bl br">Settings</a>
@@ -45,6 +46,7 @@
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" />
     <SettingsModal v-model:showModal="showSettingsModal" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" />
+    <BackupAndRestoreModal />
 </template>
 
 <script>
@@ -52,6 +54,7 @@ import PluginManagerModal from './modals/PluginManagerModal.vue'
 import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
+import BackupAndRestoreModal from './modals/BackupAndRestoreModal.vue'
 import { exportRestfoxCollection, applyTheme } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
@@ -61,7 +64,8 @@ export default {
         PluginManagerModal,
         AddWorkspaceModal,
         SettingsModal,
-        EnvironmentModal
+        EnvironmentModal,
+        BackupAndRestoreModal
     },
     props: {
         nav: String,
@@ -156,6 +160,9 @@ export default {
         showImportModal() {
             this.$store.commit('showImportModalSelectedRequestGroupId', null)
             this.$store.commit('showImportModal', true)
+        },
+        backupAndRestore() {
+            this.$store.commit('showBackupAndRestoreModal', true)
         }
     }
 }

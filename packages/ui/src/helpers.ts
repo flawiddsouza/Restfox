@@ -1138,3 +1138,19 @@ export function codeMirrorSyntaxHighlighting() {
 
     return highlightStyle
 }
+
+export function downloadBlob(filename, blob) {
+    const link = document.createElement('a')
+
+    link.download = filename
+    link.href = window.URL.createObjectURL(blob)
+
+    const event = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+    })
+
+    link.dispatchEvent(event)
+    link.remove()
+}

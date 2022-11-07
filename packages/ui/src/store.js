@@ -169,6 +169,7 @@ const store = createStore({
             responses: {},
             showImportModal: false,
             showImportModalSelectedRequestGroupId: null,
+            showBackupAndRestoreModal: false,
             collectionFilter: '',
             activeSidebarItemForContextMenu: '',
             sidebarContextMenuElement: null,
@@ -258,6 +259,9 @@ const store = createStore({
         },
         showImportModalSelectedRequestGroupId(state, value) {
             state.showImportModalSelectedRequestGroupId = value
+        },
+        showBackupAndRestoreModal(state, value) {
+            state.showBackupAndRestoreModal = value
         },
         setCollection(state, collection) {
             state.collection = collection
