@@ -127,6 +127,38 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
         })
     }
 
+    if(import.meta.env.MODE === 'web-standalone') {
+        const proxyHeaders = {
+            'x-proxy-req-url': url,
+            'x-proxy-req-method': method
+        }
+
+        Object.keys(headers).forEach(header => {
+            proxyHeaders[`x-proxy-req-header-${header}`] = headers[header]
+        })
+
+        const response = await fetch('/proxy', {
+            method: 'POST',
+            headers: proxyHeaders,
+            body: method !== 'GET' ? body : undefined,
+            signal: abortControllerSignal
+        })
+
+        const responseBody = await response.json()
+
+        return new Promise((resolve, reject) => {
+            if(responseBody.event === 'response') {
+                responseBody.eventData.buffer = new Uint8Array(responseBody.eventData.buffer).buffer
+                resolve(responseBody.eventData)
+            }
+
+            if(responseBody.event === 'responseError') {
+                responseBody.eventData = new Error(responseBody.eventData)
+                reject(responseBody.eventData)
+            }
+        })
+    }
+
     const startTime = new Date()
 
     const response = await fetch(url, {

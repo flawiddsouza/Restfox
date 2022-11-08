@@ -70,5 +70,16 @@ export default defineConfig(({ mode }) => {
         )
     }
 
+    if(mode === 'web-standalone') {
+        config.plugins.push(
+            copy({
+                targets: [
+                    { src: 'dist/*', dest: '../web-standalone/public' },
+                ],
+                hook: 'buildEnd'
+            })
+        )
+    }
+
     return config
 })

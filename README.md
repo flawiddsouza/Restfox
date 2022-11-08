@@ -43,6 +43,11 @@ npm run build
 npm run build-desktop
 ```
 
+### Web Standalone distribution and development
+```
+npm run build-web-standalone
+```
+
 ## electron
 
 ### To upgrade electron to latest version
@@ -104,3 +109,16 @@ npm run dev
 ```
 npm run build
 ```
+
+## Using web-standalone
+```
+git clone https://github.com/flawiddsouza/Restfox
+cd packages/ui
+npm i
+npm run build-web-standalone
+cd ../web-standalone
+npm i
+npm start
+```
+
+By default npm start will run Restfox at port 4004. You can override the port by passing port like so `PORT=5040 npm start`.
