@@ -2,7 +2,13 @@ module.exports = {
     packagerConfig: {
         name: 'Restfox',
         icon: 'ui/favicon',
-        osxSign: {},
+        osxSign: {
+            entitlements: 'entitlements.plist',
+            'entitlements-inherit': 'entitlements.plist',
+            'gatekeeper-assess': false,
+            hardenedRuntime: true,
+            identity: 'Developer ID Application: Athanasios Plastiras (Y46L589C5C)'
+        },
         osxNotarize: {
             tool: 'notarytool',
             appleId: process.env.APPLE_ID,
