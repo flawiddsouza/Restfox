@@ -1,6 +1,26 @@
+# ![Restfox](https://raw.github.com/flawiddsouza/Restfox/main/packages/ui/public/pwa-192x192.png "Restfox")
+
 # Restfox
 
+[**Website**](https://restfox.dev) **|** [**Install**](#installation) **|** [**Releases/Downloads**](https://github.com/flawiddsouza/Restfox/releases) **|** [**Screenshots**](#screenshots) **|** [**Compiling**](#compiling) **|** [**Compiling Web Standalone**](#using-web-standalone) 
+
 Offline-first web HTTP client
+
+## Installation
+
+### MacOS
+Package available in homebrew by using:
+`brew install restfox`
+
+### Ubuntu and other distributions supporting snap
+Package available through snap can be installed using:
+`sudo snap install restfox`
+
+### RPM, DEB and NuPKG
+There are precompiled binaries in the [releases](https://github.com/flawiddsouza/Restfox/releases) page.
+
+### Windows
+There are precompiled binaries in the [releases](https://github.com/flawiddsouza/Restfox/releases) page.
 
 ## Screenshots
 
@@ -25,6 +45,8 @@ Offline-first web HTTP client
 
 <img src="screenshots/6.png?raw=true">
 <img src="screenshots/7.png?raw=true">
+
+# Compiling
 
 ## ui
 
@@ -69,7 +91,7 @@ or
 npm run publish
 ```
 
-## tauri
+## tauri(optional)
 
 ### fetch polyfill for tauri
 
