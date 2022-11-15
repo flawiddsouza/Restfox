@@ -44,7 +44,7 @@
                 </template>
                 <div class="content-box" v-else>
                     <div style="white-space: pre-line;">{{ response.error }}</div>
-                    <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error: Plugin ') === false">
+                    <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error !== 'Error: Invalid URL' && response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error: Plugin ') === false">
                         <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
                         <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
                         <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
@@ -60,6 +60,9 @@
                                 Browser extension is active. CORS will be bypassed and http requests will also work now.
                             </div>
                         </template>
+                    </div>
+                    <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error === 'Error: Invalid URL'">
+                        <div style="line-height: 1rem;">Please make sure the protocol (http/https) is present in the URL</div>
                     </div>
                 </div>
             </template>
