@@ -290,7 +290,8 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 
             if(request.authentication.type === 'bearer') {
                 const authenticationBearerPrefix = request.authentication.prefix !== undefined && request.authentication.prefix !== '' ? request.authentication.prefix : 'Bearer'
-                headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, request.authentication.token)}`
+                const authenticationBearerToken = request.authentication.token !== undefined ? request.authentication.token : ''
+                headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
             }
         }
 
@@ -680,6 +681,23 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             url = typeof request.request.url === 'string' ? request.request.url : request.request.url.raw
         }
 
+        let authentication = { type: 'No Auth' }
+
+        if('auth' in request.request) {
+            if(request.request.auth.type === 'bearer') {
+                authentication = {
+                    type: 'bearer'
+                }
+                const bearerAuth = 'bearer' in request.request.auth ? request.request.auth.bearer : []
+                if(bearerAuth.length > 0) {
+                    authentication = {
+                        type: 'bearer',
+                        token: bearerAuth[0].value
+                    }
+                }
+            }
+        }
+
         requests.push({
             _id: requestId,
             _type: 'request',
@@ -689,6 +707,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             body,
             headers,
             parameters,
+            authentication,
             description: 'description' in request.request ? request.request.description : undefined,
             parentId,
             workspaceId
