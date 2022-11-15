@@ -50,9 +50,9 @@ export function substituteEnvironmentVariables(environment, string) {
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
         const objectPathValue = getObjectPathValue(environment, objectPath)
-        substitutedString = substitutedString.replace(`{{ _.${objectPath} }}`, objectPathValue)
-        substitutedString = substitutedString.replace(`{{${objectPath}}}`, objectPathValue)
-        substitutedString = substitutedString.replace(`{{ ${objectPath} }}`, objectPathValue)
+        substitutedString = substitutedString.replaceAll(`{{ _.${objectPath} }}`, objectPathValue)
+        substitutedString = substitutedString.replaceAll(`{{${objectPath}}}`, objectPathValue)
+        substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
 
     return substitutedString
