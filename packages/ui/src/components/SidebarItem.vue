@@ -31,6 +31,7 @@
                 style="pointer-events: auto; border: 0; outline: 0; width: 100%; padding: 0; background-color: inherit; font-style: italic;"
                 spellcheck="false"
                 @keydown.enter="saveSidebarItemName(sidebarItem); showInputToRenameRequest = false"
+                @keydown.esc="showInputToRenameRequest = false"
                 @blur="saveSidebarItemName(sidebarItem)"
                 @dblclick.stop
                 v-focus
