@@ -311,6 +311,10 @@ export default {
                 this.activeTab.parameters = JSON.parse(JSON.stringify(this.response.request.original.parameters))
             }
 
+            if(this.response.request.original.pathParameters) {
+                this.activeTab.pathParameters = JSON.parse(JSON.stringify(this.response.request.original.pathParameters))
+            }
+
             if(this.response.request.original.headers) {
                 this.activeTab.headers = JSON.parse(JSON.stringify(this.response.request.original.headers))
             }

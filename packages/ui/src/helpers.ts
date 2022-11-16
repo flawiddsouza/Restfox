@@ -377,6 +377,10 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             responseToSend.request.original.parameters = JSON.parse(JSON.stringify(request.parameters))
         }
 
+        if(request.pathParameters) {
+            responseToSend.request.original.pathParameters = JSON.parse(JSON.stringify(request.pathParameters))
+        }
+
         if(request.headers) {
             responseToSend.request.original.headers = JSON.parse(JSON.stringify(request.headers))
         }
