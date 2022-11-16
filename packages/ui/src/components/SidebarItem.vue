@@ -30,7 +30,8 @@
                 @input="updateTemporarySidebarItemName"
                 style="pointer-events: auto; border: 0; outline: 0; width: 100%; padding: 0; background-color: inherit; font-style: italic;"
                 spellcheck="false"
-                @keydown.enter="showInputToRenameRequest = false"
+                @keydown.enter="saveSidebarItemName(sidebarItem); showInputToRenameRequest = false;"
+                @keydown.esc="cancelSidebarItemNameRename()"
                 @blur="saveSidebarItemName(sidebarItem)"
                 @dblclick.stop
                 v-focus
@@ -104,6 +105,10 @@ export default {
             return sidebarItem.collapsed === undefined || sidebarItem.collapsed === false
         },
         saveSidebarItemName(sidebarItem) {
+            if(!this.showInputToRenameRequest) {
+                return
+            }
+
             this.$store.commit('updateCollectionItemName', {
                 _id: sidebarItem._id,
                 _type: sidebarItem._type,
@@ -126,6 +131,10 @@ export default {
         },
         updateTemporarySidebarItemName() {
             this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id] = this.newSidebarItemName
+        },
+        cancelSidebarItemNameRename() {
+            delete this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id]
+            this.showInputToRenameRequest = false;
         }
     }
 }
