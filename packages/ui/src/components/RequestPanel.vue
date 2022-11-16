@@ -181,6 +181,33 @@
                         </td>
                     </tr>
                 </table>
+                <div style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    Path Parameters
+                    <template v-if="'pathParameters' in activeTab && activeTab.pathParameters.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
+                        <span> ({{ activeTab.pathParameters.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
+                    </template>
+                </div>
+                <table>
+                    <tr v-for="(param, index) in activeTab.pathParameters">
+                        <td>
+                            <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                        </td>
+                        <td>
+                            <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                        </td>
+                        <td>
+                            <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
+                        </td>
+                        <td @click="activeTab.pathParameters.splice(index, 1)">
+                            <i class="fa fa-trash"></i>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab, 'pathParameters', { name: '', value: '' })">
+                            + Add Item
+                        </td>
+                    </tr>
+                </table>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
                 <table>

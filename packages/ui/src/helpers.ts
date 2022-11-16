@@ -249,6 +249,14 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 
         let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
 
+        if('pathParameters' in request) {
+            request.pathParameters.forEach(pathParameter => {
+                urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
+                    `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
+                )
+            })
+        }
+
         const url = new URL(urlWithEnvironmentVariablesSubstituted)
 
         if('parameters' in request && request.parameters) {
