@@ -300,6 +300,7 @@
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import { emitter } from '@/event-bus'
+import { jsonPrettify } from '../utils/prettify-json'
 
 export default {
     components: {
@@ -397,12 +398,14 @@ export default {
         },
         beautifyJSON() {
             try {
-                this.$refs.jsonEditor.setValue(JSON.stringify(JSON.parse(this.activeTab.body.text), null, 4))
+                const formattedJSON = jsonPrettify(this.activeTab.body.text, '    ')
+                this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
         beautifyGraphQL() {
             try {
-                this.$refs.jsonEditor.setValue(JSON.stringify(JSON.parse(this.graphql.variables), null, 4))
+                const formattedJSON = jsonPrettify(this.graphql.variables, '    ')
+                this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
         handleActiveTabAuthenticationTypeChange(event) {
