@@ -31,7 +31,8 @@
         "lint-fix": "eslint src/*.ts --fix",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "build-snap": "electron-builder --linux snap"
+        "build-snap": "electron-builder --linux snap",
+        "build-appx": "electron-builder --windows appx"
     },
     "dependencies": {
         "electron-squirrel-startup": "^1.0.0",
@@ -44,6 +45,19 @@
         "linux": {
             "category": "Development",
             "icon": "ui/favicon.png"
-        }
+        },
+        "win": {
+            "icon": "ui/favicon.png"
+        },
+        "appx": {
+            "identityName": "57520Artelin.RestfoxApp",
+            "publisher": "CN=C01B6C7C-C0E3-4A87-B162-83B3296CA0E6",
+            "publisherDisplayName": "Artelin",
+            "applicationId": "Artelin.Restfox"
+        },
+        "files": [
+            "**/*",
+            "!out"
+        ]
     }
 }
