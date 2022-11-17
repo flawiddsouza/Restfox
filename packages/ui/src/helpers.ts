@@ -431,7 +431,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
     let collection: any = []
 
-    json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment'].includes(item._type) == false).forEach(item => {
+    json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment', 'proto_file'].includes(item._type) == false).forEach(item => {
         if(item._type === 'workspace' || item._type === 'request_group') {
             collection.push({
                 _id: item._id,

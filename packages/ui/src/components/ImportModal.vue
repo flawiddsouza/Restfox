@@ -13,7 +13,7 @@
 
             <div style="margin-top: 1rem">
                 <template v-if="importFrom !== 'Postman URL'">
-                    <input type="file" @change="fileToImport = $event.target.files[0]" accept=".json, .zip" required>
+                    <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip" multiple required>
                 </template>
                 <template v-else>
                     <input type="url" v-model="urlToImport" required placeholder="https://postman.com/collections/{collectionId}" class="full-width-input">
@@ -66,7 +66,7 @@ export default {
     data() {
         return {
             activeWorkspaceFolders: [],
-            fileToImport: null,
+            filesToImport: [],
             urlToImport: '',
             importFrom: 'Restfox'
         }
@@ -113,34 +113,40 @@ export default {
             this.selectedRequestGroupId = null
         },
         async importFile() {
+            let fileBeingImported = ''
+
             try {
                 let json = null
 
-                if(this.fileToImport && this.fileToImport.name.endsWith('.json')) {
-                    json = await fileToJSON(this.fileToImport)
-                } else {
-                    json = this.fileToImport
-                }
-
                 let collectionTree = []
-
-                if(this.importFrom === 'Postman') {
-                    collectionTree = await convertPostmanExportToRestfoxCollection(json, this.fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
-                }
 
                 if(this.importFrom === 'Postman URL') {
                     const response = await fetch(this.urlToImport)
                     json = await response.json()
 
                     collectionTree = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
-                }
+                } else {
+                    for(const fileToImport of this.filesToImport) {
+                        fileBeingImported = fileToImport.name
 
-                if(this.importFrom === 'Insomnia') {
-                    collectionTree = convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id)
-                }
+                        if(fileToImport.name.endsWith('.json')) {
+                            json = await fileToJSON(fileToImport)
+                        } else {
+                            json = fileToImport
+                        }
 
-                if(this.importFrom === 'Restfox') {
-                    collectionTree = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
+                        if(this.importFrom === 'Postman') {
+                            collectionTree = collectionTree.concat(await convertPostmanExportToRestfoxCollection(json, fileToImport.name.endsWith('.zip'), this.activeWorkspace._id))
+                        }
+
+                        if(this.importFrom === 'Insomnia') {
+                            collectionTree = collectionTree.concat(convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id))
+                        }
+
+                        if(this.importFrom === 'Restfox') {
+                            collectionTree = collectionTree.concat(convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id))
+                        }
+                    }
                 }
 
                 if(this.selectedRequestGroupId) {
@@ -153,13 +159,28 @@ export default {
 
                 this.$store.dispatch('setCollectionTree', { collectionTree, parentId: this.selectedRequestGroupId })
 
-                this.fileToImport = null
+                const importedFileCount = this.filesToImport.length
+
+                this.urlToImport = ''
+                this.filesToImport = []
                 this.showImportModal = false
 
-                alert('File imported successfully')
+                if(this.importFrom === 'Postman URL') {
+                    alert('URL imported successfully')
+                } else {
+                    if(importedFileCount === 1) {
+                        alert('File imported successfully')
+                    } else {
+                        alert(`${importedFileCount} files imported successfully`)
+                    }
+                }
             } catch(e) {
                 console.log(e)
-                alert('Invalid import file given')
+                if(this.importFrom === 'Postman URL') {
+                    alert(`Invalid import url given: ${this.urlToImport}`)
+                } else {
+                    alert(`Invalid import file given: ${fileBeingImported}`)
+                }
             }
         }
     },
