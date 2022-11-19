@@ -67,7 +67,7 @@ export default {
             this.draggedTabElement.style.background = 'var(--background-color)'
             this.draggedTabElement.style.opacity = '0.5'
         },
-        dragEnd(event) {
+        dragEnd() {
             if(!this.draggedTabElement) {
                 return
             }

@@ -10,9 +10,10 @@ module.exports = {
     ],
     'overrides': [
     ],
-    'parser': '@typescript-eslint/parser',
+    'parser': 'vue-eslint-parser',
     'parserOptions': {
         'ecmaVersion': 'latest',
+        'parser': '@typescript-eslint/parser',
         'sourceType': 'module'
     },
     'plugins': [
@@ -22,7 +23,8 @@ module.exports = {
     'rules': {
         'indent': [
             'error',
-            4
+            4,
+            { 'SwitchCase': 1 }
         ],
         'linebreak-style': [
             'error',
@@ -35,6 +37,15 @@ module.exports = {
         'semi': [
             'error',
             'never'
-        ]
+        ],
+        'no-empty': [
+            'error',
+            {
+                'allowEmptyCatch': true
+            }
+        ],
+        'vue/require-v-for-key': 'off',
+        'vue/multi-word-component-names': 'off',
+        'vue/no-mutating-props': 'warn', // this is a valid issue, so fix and change this from warn to on when you can
     }
 }

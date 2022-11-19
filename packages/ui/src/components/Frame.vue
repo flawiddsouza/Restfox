@@ -24,7 +24,6 @@ function setContainerGridColumnWidths(sidebarWidth) {
     }
     let containerValueSplit = containerStyle.split(' ')
     containerValueSplit[0] = sidebarWidth ?? containerValueSplit[0]
-    containerValueSplit[1] = containerValueSplit[1]
     container.style.gridTemplateColumns = containerValueSplit.join(' ')
 }
 

@@ -19,7 +19,7 @@ import Modal from '@/components/Modal.vue'
 export default {
     directives: {
         focus: {
-            mounted(element, binding) {
+            mounted(element) {
                 element.focus()
                 element.select()
             }

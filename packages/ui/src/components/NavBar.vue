@@ -68,8 +68,7 @@ export default {
         BackupAndRestoreModal
     },
     props: {
-        nav: String,
-        required: false
+        nav: String
     },
     data() {
         return {

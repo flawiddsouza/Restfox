@@ -4,7 +4,7 @@
     </div>
     <div class="sidebar-list-container" @contextmenu.prevent="handleSidebarEmptyAreaContextMenu">
         <div class="sidebar-list">
-            <template v-for="sidebarItem in sidebarItems">
+            <template v-for="sidebarItem in sidebarItems" :key="sidebarItem._id">
                 <sidebar-item :sidebar-item="sidebarItem" />
             </template>
         </div>
@@ -200,6 +200,8 @@ export default {
                     }
                 ]
             }
+
+            return []
         }
     },
     watch: {
@@ -287,7 +289,7 @@ export default {
             this.draggedSidebarElement.style.backgroundColor = 'var(--background-color)'
             this.draggedSidebarElement.style.opacity = '0.5'
         },
-        dragEnd(event) {
+        dragEnd() {
             if(!this.draggedSidebarElement) {
                 return
             }

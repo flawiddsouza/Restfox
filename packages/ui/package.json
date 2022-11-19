@@ -8,8 +8,8 @@
         "build-web-standalone": "vite build --mode web-standalone",
         "serve": "vite preview",
         "test": "vitest",
-        "lint": "eslint src",
-        "lint-fix": "eslint src --fix"
+        "lint": "eslint src --ext .js,.ts,.vue",
+        "lint-fix": "eslint src --ext .js,.ts,.vue --fix"
     },
     "dependencies": {
         "@codemirror/autocomplete": "^6.1.0",

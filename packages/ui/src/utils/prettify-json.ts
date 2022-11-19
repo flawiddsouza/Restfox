@@ -112,51 +112,51 @@ export const jsonPrettify = (json?: string, indentChars = '\t', replaceUnicode =
         }
 
         switch (currentChar) {
-        case ',':
-            newJson += currentChar + '\n' + repeatString(tab, indentLevel)
-            continue
-        case '{':
-            if (nextChar === '}') {
-                newJson += currentChar + nextChar
-                i++
-            } else {
-                indentLevel++
+            case ',':
                 newJson += currentChar + '\n' + repeatString(tab, indentLevel)
-            }
-            continue
-        case '[':
-            if (nextChar === ']') {
-                newJson += currentChar + nextChar
-                i++
-            } else {
-                indentLevel++
-                newJson += currentChar + '\n' + repeatString(tab, indentLevel)
-            }
-            continue
-        case '}':
-            indentLevel--
-            newJson += '\n' + repeatString(tab, indentLevel) + currentChar
-            continue
-        case ']':
-            indentLevel--
-            newJson += '\n' + repeatString(tab, indentLevel) + currentChar
-            continue
-        case ':':
-            newJson += ': '
-            continue
-        case '"':
-            state = STATE_IN_STRING
-            newJson += currentChar
-            continue
-        case ' ':
-        case '\n':
-        case '\t':
-        case '\r':
+                continue
+            case '{':
+                if (nextChar === '}') {
+                    newJson += currentChar + nextChar
+                    i++
+                } else {
+                    indentLevel++
+                    newJson += currentChar + '\n' + repeatString(tab, indentLevel)
+                }
+                continue
+            case '[':
+                if (nextChar === ']') {
+                    newJson += currentChar + nextChar
+                    i++
+                } else {
+                    indentLevel++
+                    newJson += currentChar + '\n' + repeatString(tab, indentLevel)
+                }
+                continue
+            case '}':
+                indentLevel--
+                newJson += '\n' + repeatString(tab, indentLevel) + currentChar
+                continue
+            case ']':
+                indentLevel--
+                newJson += '\n' + repeatString(tab, indentLevel) + currentChar
+                continue
+            case ':':
+                newJson += ': '
+                continue
+            case '"':
+                state = STATE_IN_STRING
+                newJson += currentChar
+                continue
+            case ' ':
+            case '\n':
+            case '\t':
+            case '\r':
             // Don't add whitespace
-            continue
-        default:
-            newJson += currentChar
-            continue
+                continue
+            default:
+                newJson += currentChar
+                continue
         }
     }
 

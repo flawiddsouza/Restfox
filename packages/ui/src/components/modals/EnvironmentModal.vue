@@ -102,6 +102,8 @@ export default {
                     }
                 ]
             }
+
+            return undefined
         },
         currentEnvironment() {
             if(this.collectionItem) {
@@ -111,6 +113,8 @@ export default {
             if(this.workspace) {
                 return this.workspace.currentEnvironment ?? 'Default'
             }
+
+            return undefined
         }
     },
     watch: {

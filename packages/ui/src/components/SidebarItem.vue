@@ -40,7 +40,7 @@
         </div>
     </div>
     <div class="sidebar-list" v-if="'children' in sidebarItem && sidebarItem.children.length && getSidebarItemExpandedState(sidebarItem)">
-        <template v-for="sidebarItem1 in sidebarItem.children">
+        <template v-for="sidebarItem1 in sidebarItem.children" :key="sidebarItem1._id">
             <SidebarItem :sidebar-item="sidebarItem1" />
         </template>
     </div>
@@ -134,7 +134,7 @@ export default {
         },
         cancelSidebarItemNameRename() {
             delete this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id]
-            this.showInputToRenameRequest = false;
+            this.showInputToRenameRequest = false
         }
     }
 }

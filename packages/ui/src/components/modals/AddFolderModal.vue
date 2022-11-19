@@ -27,7 +27,10 @@ export default {
     },
     props: {
         showModal: Boolean,
-        parentId: String | null
+        parentId: {
+            type: String,
+            default: null
+        }
     },
     components: {
         Modal
