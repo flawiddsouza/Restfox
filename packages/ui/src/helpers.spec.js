@@ -1,28 +1,6 @@
 import { assert, test, describe, expect } from 'vitest'
-import { substituteEnvironmentVariables, stringifyArray } from './helpers.ts'
+import { substituteEnvironmentVariables } from './helpers.ts'
 
-
-describe(`Function: ${stringifyArray.name}`, () => {
-
-    const arrObj = [
-        [1,2,3],
-        [ 'a', 'b', 'c' ],
-        { keyObj: { nestedObj: 'nest object value', nestedArr: [ 1, 2, 3 ] } }
-    ]
-
-    test('Generic Test', () => {
-        function stringifyArrayTestFunction(arr) {
-            const arrStr = JSON.stringify(arr)
-            return arrStr.slice(1, arrStr.length-1)
-        }
-
-        assert.equal(stringifyArray(arrObj) , stringifyArrayTestFunction(arrObj))
-        for (const subArr of arrObj) {
-            assert.equal(stringifyArray(subArr) , stringifyArrayTestFunction(subArr))
-        }
-    })
-
-})
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
@@ -30,6 +8,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
     const env = {}
 
     env.i = 1
+    env.nothing = null
     env.num = 1234
     env.str = 'This is string'
 
@@ -57,19 +36,22 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "i": {{i}},
             "_i": {{ i }},
 
+            "nothing": {{nothing}},
+            "nothing": {{ nothing }},
+
             "num": {{num}},
             "_num": {{ num }},
 
             "str": "{{str}}",
             "_str": "{{ str }}",
 
-            "arrNum": [{{arrNum}}],
-            "_arrNum": [ {{ arrNum }} ],
+            "arrNum": {{arrNum}},
+            "_arrNum": {{ arrNum }},
             "arrNum[0]": "{{arrNum[0]}}",
             "_arrNum[0]": "{{ arrNum[0] }}",
 
-            "arrStr": [{{arrStr}}],
-            "arrStr_": [ {{arrStr}} ],
+            "arrStr": {{arrStr}},
+            "arrStr_": {{arrStr}},
             "arrStr[0]": "{{arrStr[0]}}",
 
             "arrObj[0]": "{{arrObj[0]}}",
@@ -77,10 +59,10 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "arrObj[2]": "{{arrObj[2]}}",
             "arrObj[2].keyObj": "{{arrObj[2].keyObj}}",
 
-            "arr2dMix": [{{arr2dMix}}],
-            "arr2dMix_": [ {{arr2dMix}} ],
+            "arr2dMix": {{arr2dMix}},
+            "arr2dMix_": {{arr2dMix}},
 
-            "arr2dMix[2][2].keyObj.nestedArr": [{{arr2dMix[2][2].keyObj.nestedArr}}],
+            "arr2dMix[2][2].keyObj.nestedArr": {{arr2dMix[2][2].keyObj.nestedArr}},
             "arr2dMix[2][2].keyObj.nestedArr[0]": {{arr2dMix[2][2].keyObj.nestedArr[0]}},
 
             "strCamelCase":   "{{strCamelCase}}",
@@ -94,19 +76,22 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "i": ${env.i},
             "_i": ${env.i},
 
+            "nothing": ${env.nothing},
+            "nothing": ${env.nothing},
+
             "num": ${env.num},
             "_num": ${env.num},
 
             "str": "${env.str}",
             "_str": "${env.str}",
 
-            "arrNum": [${stringifyArray(env.arrNum)}],
-            "_arrNum": [ ${stringifyArray(env.arrNum)} ],
+            "arrNum": ${JSON.stringify(env.arrNum)},
+            "_arrNum": ${JSON.stringify(env.arrNum)},
             "arrNum[0]": "${env.arrNum[0]}",
             "_arrNum[0]": "${env.arrNum[0]}",
 
-            "arrStr": [${stringifyArray(env.arrStr)}],
-            "arrStr_": [ ${stringifyArray(env.arrStr)} ],
+            "arrStr": ${JSON.stringify(env.arrStr)},
+            "arrStr_": ${JSON.stringify(env.arrStr)},
             "arrStr[0]": "${env.arrStr[0]}",
 
             "arrObj[0]": "${JSON.stringify(env.arrObj[0])}",
@@ -114,10 +99,10 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "arrObj[2]": "${JSON.stringify(env.arrObj[2])}",
             "arrObj[2].keyObj": "${JSON.stringify(env.arrObj[2].keyObj)}",
 
-            "arr2dMix": [${stringifyArray(env.arr2dMix)}],
-            "arr2dMix_": [ ${stringifyArray(env.arr2dMix)} ],
+            "arr2dMix": ${JSON.stringify(env.arr2dMix)},
+            "arr2dMix_": ${JSON.stringify(env.arr2dMix)},
 
-            "arr2dMix[2][2].keyObj.nestedArr": [${stringifyArray(env.arr2dMix[2][2].keyObj.nestedArr)}],
+            "arr2dMix[2][2].keyObj.nestedArr": ${JSON.stringify(env.arr2dMix[2][2].keyObj.nestedArr)},
             "arr2dMix[2][2].keyObj.nestedArr[0]": ${env.arr2dMix[2][2].keyObj.nestedArr[0]},
 
             "strCamelCase":   "${env.strCamelCase}",
@@ -128,6 +113,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "messyKey": "${env[extremelyMessyKey]}",
         }`
         assert.equal(substituteEnvironmentVariables(env, input), expectedOutput)
+
     })
 
     test('Negative Case', () => {
@@ -238,10 +224,10 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "str": "{{_.str}}",
             "_str": "{{ _.str }}",
 
-            "arr2dMix": [{{_.arr2dMix}}],
-            "arr2dMix_": [ {{ _.arr2dMix }} ],
+            "arr2dMix": {{_.arr2dMix}},
+            "arr2dMix_": {{ _.arr2dMix }},
 
-            "arr2dMix[2][2].keyObj.nestedArr": [{{ _.arr2dMix[2][2].keyObj.nestedArr }}],
+            "arr2dMix[2][2].keyObj.nestedArr": {{ _.arr2dMix[2][2].keyObj.nestedArr }},
             "arr2dMix[2][2].keyObj.nestedArr[0]": {{_.arr2dMix[2][2].keyObj.nestedArr[0]}},
 
             "strCamelCase":   "{{_.strCamelCase}}",
@@ -258,10 +244,10 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "str": "${env.str}",
             "_str": "${env.str}",
 
-            "arr2dMix": [${stringifyArray(env.arr2dMix)}],
-            "arr2dMix_": [ ${stringifyArray(env.arr2dMix)} ],
+            "arr2dMix": ${JSON.stringify(env.arr2dMix)},
+            "arr2dMix_": ${JSON.stringify(env.arr2dMix)},
 
-            "arr2dMix[2][2].keyObj.nestedArr": [${stringifyArray(env.arr2dMix[2][2].keyObj.nestedArr)}],
+            "arr2dMix[2][2].keyObj.nestedArr": ${JSON.stringify(env.arr2dMix[2][2].keyObj.nestedArr)},
             "arr2dMix[2][2].keyObj.nestedArr[0]": ${env.arr2dMix[2][2].keyObj.nestedArr[0]},
 
             "strCamelCase":   "${env.strCamelCase}",
