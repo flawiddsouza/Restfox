@@ -6,7 +6,8 @@
         "build": "vite build",
         "build-desktop": "vite build --mode desktop",
         "build-web-standalone": "vite build --mode web-standalone",
-        "serve": "vite preview"
+        "serve": "vite preview",
+        "test": "vitest"
     },
     "dependencies": {
         "@codemirror/autocomplete": "^6.1.0",
@@ -37,6 +38,7 @@
         "@vitejs/plugin-vue": "^3.1.2",
         "rollup-plugin-copy": "^3.4.0",
         "vite": "^3.1.8",
-        "vite-plugin-pwa": "^0.13.1"
+        "vite-plugin-pwa": "^0.13.1",
+        "vitest": "^0.25.2"
     }
 }
