@@ -7,13 +7,6 @@ import setObjectPathValueLodash from 'lodash.set'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 
-/**
- * stringifies arr and removes brackets at both ends
- */
-export function stringifyArray(arr: any[]): string {
-    const arrStr = JSON.stringify(arr)
-    return arrStr.slice(1, arrStr.length-1)
-}
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -70,11 +63,7 @@ export function substituteEnvironmentVariables(environment: object, string: stri
             return
         }
 
-        if (Array.isArray(objectPathValue)) {
-            objectPathValue = stringifyArray(objectPathValue)
-        }
-
-        if (!Array.isArray(objectPathValue) && typeof objectPathValue === 'object') {
+        if (typeof objectPathValue === 'object') {
             objectPathValue = JSON.stringify(objectPathValue)
         }
 
