@@ -58,13 +58,13 @@ export function flattenTree(array) {
     return level
 }
 
-export function substituteEnvironmentVariables(env: object, str: string) {
-    let substitutedString = String(str)
+export function substituteEnvironmentVariables(environment: object, string: string) {
+    let substitutedString = String(string)
 
-    const possibleEnvironmentObjectPaths = getObjectPaths(env)
+    const possibleEnvironmentObjectPaths = getObjectPaths(environment)
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
-        let objectPathValue:any = getObjectPathValue(env, objectPath)
+        let objectPathValue:any = getObjectPathValue(environment, objectPath)
 
         if (typeof objectPathValue === 'undefined') {
             return
@@ -83,7 +83,7 @@ export function substituteEnvironmentVariables(env: object, str: string) {
          * if "env" doesn't have "_" key, then prefix "objectPath" with "_."
          * and replace occurrences of "_.objectPath"
          */
-        if (!env['_']) {
+        if (!environment['_']) {
             substitutedString = substitutedString.replaceAll(`{{ _.${objectPath} }}`, objectPathValue)
             substitutedString = substitutedString.replaceAll(`{{_.${objectPath}}}`, objectPathValue)
         }
