@@ -7,6 +7,14 @@ import setObjectPathValueLodash from 'lodash.set'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 
+/**
+ * stringifies arr and removes brackets at both ends
+ */
+function stringifyArray(arr: any[]): string {
+    const arrStr = JSON.stringify(arr)
+    return arrStr.slice(1, arrStr.length-1)
+}
+
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
     const map = {}
@@ -50,14 +58,36 @@ export function flattenTree(array) {
     return level
 }
 
-export function substituteEnvironmentVariables(environment, string) {
-    let substitutedString = String(string)
+export function substituteEnvironmentVariables(env: object, str: string) {
+    let substitutedString = String(str)
 
-    const possibleEnvironmentObjectPaths = getObjectPaths(environment)
+    const possibleEnvironmentObjectPaths = getObjectPaths(env)
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
-        const objectPathValue = getObjectPathValue(environment, objectPath)
-        substitutedString = substitutedString.replaceAll(`{{ _.${objectPath} }}`, objectPathValue)
+        let objectPathValue:any = getObjectPathValue(env, objectPath)
+
+        if (typeof objectPathValue === 'undefined') {
+            return
+        }
+
+        if (Array.isArray(objectPathValue)) {
+            objectPathValue = stringifyArray(objectPathValue)
+        }
+
+        if (!Array.isArray(objectPathValue) && typeof objectPathValue === 'object') {
+            objectPathValue = JSON.stringify(objectPathValue)
+        }
+
+        /**
+         * Insomnia support
+         * if "env" doesn't have "_" key, then prefix "objectPath" with "_."
+         * and replace occurrences of "_.objectPath"
+         */
+        if (!env['_']) {
+            substitutedString = substitutedString.replaceAll(`{{ _.${objectPath} }}`, objectPathValue)
+            substitutedString = substitutedString.replaceAll(`{{_.${objectPath}}}`, objectPathValue)
+        }
+
         substitutedString = substitutedString.replaceAll(`{{${objectPath}}}`, objectPathValue)
         substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
@@ -1062,7 +1092,7 @@ export function humanFriendlyTime(milliseconds) {
     return `${number} ${unit}`
 }
 
-export function getObjectPaths(object) {
+export function getObjectPaths(object: object): string[] {
     const paths = []
 
     function recurse(obj, keyParent='') {
