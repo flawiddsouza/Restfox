@@ -1,12 +1,29 @@
 import { assert, test, describe, expect } from 'vitest'
-import { substituteEnvironmentVariables } from './helpers.ts'
-
-function stringifyArray(arr) {
-    const arrStr = JSON.stringify(arr)
-    return arrStr.slice(1, arrStr.length-1)
-}
+import { substituteEnvironmentVariables, stringifyArray } from './helpers.ts'
 
 describe ('ui/src/helpers.ts', () => {
+
+    describe(`Function: ${stringifyArray.name}`, () => {
+
+        const arrObj = [
+            [1,2,3],
+            [ 'a', 'b', 'c' ],
+            { keyObj: { nestedObj: 'nest object value', nestedArr: [ 1, 2, 3 ] } }
+        ]
+
+        test('Generic Test', () => {
+            function stringifyArrayTestFunction(arr) {
+                const arrStr = JSON.stringify(arr)
+                return arrStr.slice(1, arrStr.length-1)
+            }
+
+            assert.equal(stringifyArray(arrObj) , stringifyArrayTestFunction(arrObj))
+            for (const subArr of arrObj) {
+                assert.equal(stringifyArray(subArr) , stringifyArrayTestFunction(subArr))
+            }
+        })
+
+    })
 
     describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
