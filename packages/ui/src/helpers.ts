@@ -9,21 +9,28 @@ import { tags } from '@lezer/highlight'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
-    let map = {}, node, res = [], i
+    const map = {}
+    let i
+
     for(i = 0; i < array.length; i += 1) {
         map[array[i]._id] = i
         if(array[i]._type === 'request_group') {
             array[i].children = []
         }
     }
+
+    let node
+    const res = []
+
     for(i = 0; i < array.length; i += 1) {
-       node = array[i]
-       if(node.parentId !== null) {
-          array[map[node.parentId]].children.push(node)
-       } else {
-          res.push(node)
-       }
+        node = array[i]
+        if(node.parentId !== null) {
+            array[map[node.parentId]].children.push(node)
+        } else {
+            res.push(node)
+        }
     }
+
     return res
 }
 
@@ -31,7 +38,7 @@ export function flattenTree(array) {
     const level = []
 
     array.forEach(item => {
-        let newItem = Object.assign({}, item)
+        const newItem = Object.assign({}, item)
         delete newItem.children
         level.push(newItem)
 
@@ -268,7 +275,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             })
         }
 
-        let headers = {}
+        const headers = {}
 
         if('GLOBAL_HEADERS' in environment) {
             Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
@@ -336,12 +343,12 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             delete headersToSave[forbiddenHeader.toLowerCase()]
         })
 
-        let originRequestBodyToSave = JSON.parse(JSON.stringify(request.body))
+        const originRequestBodyToSave = JSON.parse(JSON.stringify(request.body))
 
         if(request.body.mimeType === 'multipart/form-data' && 'params' in request.body) {
-            let params: any = []
+            const params: any = []
             for(const param of request.body.params) {
-                let paramExtracted = {...param}
+                const paramExtracted = {...param}
                 if('files' in paramExtracted) {
                     paramExtracted.files = [...paramExtracted.files]
                 }
@@ -403,7 +410,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
     } catch(e) {
         console.log(e)
 
-        let error = `Error: Request failed`
+        let error = 'Error: Request failed'
 
         if(typeof e !== 'string')  {
             if(e.message.includes('Invalid URL')) {
@@ -429,7 +436,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 }
 
 export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
-    let collection: any = []
+    const collection: any = []
 
     json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment', 'proto_file'].includes(item._type) == false).forEach(item => {
         if(item._type === 'workspace' || item._type === 'request_group') {
@@ -508,9 +515,9 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip, works
 
         let archive = await extractedZip.files[filePathMap['archive.json']].async('text')
         archive = JSON.parse(archive)
-        let archiveCollection = archive.collection
+        const archiveCollection = archive.collection
 
-        let collections = []
+        const collections = []
 
         for(const collectionId of Object.keys(archiveCollection)) {
             collections.push(JSON.parse(await extractedZip.files[filePathMap[`collection/${collectionId}.json`]].async('text')))
@@ -530,10 +537,10 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip, works
 }
 
 function importPostmanV1(collections, workspaceId) {
-    let collection = []
+    const collection = []
 
     collections.forEach(item => {
-        let requests = []
+        const requests = []
 
         item.requests.forEach(request => {
             let body = {
@@ -541,7 +548,7 @@ function importPostmanV1(collections, workspaceId) {
             }
 
             if(request.dataMode === 'urlencoded') {
-                let params = []
+                const params = []
                 const requestData = request.data !== null ? request.data : []
                 requestData.forEach(requestDataItem => {
                     params.push({
@@ -564,7 +571,7 @@ function importPostmanV1(collections, workspaceId) {
                 }
             }
 
-            let headers = []
+            const headers = []
             request.headerData.forEach(header => {
                 headers.push({
                     name: header.key,
@@ -574,7 +581,7 @@ function importPostmanV1(collections, workspaceId) {
                 })
             })
 
-            let parameters = []
+            const parameters = []
             const queryParams = request.queryParams !== null ? request.queryParams : []
             queryParams.forEach(queryParam => {
                 parameters.push({
@@ -613,7 +620,7 @@ function importPostmanV1(collections, workspaceId) {
 }
 
 function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, workspaceId) {
-    let requests = []
+    const requests = []
 
     postmanCollectionItem.item.forEach(request => {
         const requestId = request.id ?? nanoid()
@@ -635,7 +642,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
 
         if('body' in request.request && 'mode' in request.request.body) {
             if(request.request.body.mode === 'urlencoded') {
-                let params = []
+                const params = []
                 const requestData = request.request.body.urlencoded
                 requestData.forEach(requestDataItem => {
                     params.push({
@@ -665,7 +672,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             }
         }
 
-        let headers = []
+        const headers = []
         request.request.header.forEach(header => {
             headers.push({
                 name: header.key,
@@ -675,7 +682,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
             })
         })
 
-        let parameters = []
+        const parameters = []
         const queryParams = 'url' in request.request && typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
         queryParams.forEach(queryParam => {
             parameters.push({
@@ -730,7 +737,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, wor
 }
 
 function importPostmanV2(collections, workspaceId) {
-    let collection = []
+    const collection = []
 
     collections.forEach(postmanCollectionItem => {
         collection.push({
@@ -751,7 +758,7 @@ function importPostmanV2(collections, workspaceId) {
 }
 
 function importRestfoxV1(collections, workspaceId) {
-    let collection = []
+    const collection = []
 
     collections.forEach(item => {
         if(item._type === 'request_group') {
@@ -893,19 +900,19 @@ export function removeFromTree(array, key, keyValue) {
 // Note: the final array includes the initially passed id as well
 export function getChildIds(arr, id) {
     arr = arr || data
-    var ret = []
-    for (var i = 0; i < arr.length; i++) {
-        var item = arr[i]
+    const ret = []
+    for (let i = 0; i < arr.length; i++) {
+        const item = arr[i]
         if (item.parentId == id || item._id == id) {
             if (ret.indexOf(item._id) < 0) {
                 ret.push(item._id)
-                var newret = []
-                for (var x = 0; x < arr.length; x++) {
+                const newret = []
+                for (let x = 0; x < arr.length; x++) {
                     if (x != i) newret.push(arr[x])
                 }
-                var children = getChildIds(newret, item._id)
+                const children = getChildIds(newret, item._id)
                 if (children.length > 0) {
-                    for (var j = 0; j < children.length; j++) {
+                    for (let j = 0; j < children.length; j++) {
                         if (!(ret.indexOf(children[j]) >= 0)) {
                             ret.push(children[j])
                         }
@@ -963,7 +970,7 @@ export function generateNewIdsForTree(array) {
 
 // From: https://stackoverflow.com/a/6470794/4932305
 export function arrayMove(array, fromIndex, toIndex) {
-    var element = array[fromIndex]
+    const element = array[fromIndex]
     array.splice(fromIndex, 1)
     array.splice(toIndex, 0, element)
 }
@@ -1043,18 +1050,18 @@ export function humanFriendlyTime(milliseconds) {
 
     // Round to 0, 1, 2 decimal places depending on how big the number is
     if (number > 100) {
-        number = Math.round(number);
+        number = Math.round(number)
     } else if (number > 10) {
-        number = Math.round(number * 10) / 10;
+        number = Math.round(number * 10) / 10
     } else {
-        number = Math.round(number * 100) / 100;
+        number = Math.round(number * 100) / 100
     }
 
     return `${number} ${unit}`
 }
 
 export function getObjectPaths(object) {
-    let paths = []
+    const paths = []
 
     function recurse(obj, keyParent='') {
         if(typeof obj === 'number' || typeof obj === 'string' || obj === null) {
@@ -1116,13 +1123,13 @@ export function humanFriendlySize(bytes, long=false) {
 }
 
 export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent) {
-    let keys: string[] = hotkey.split(' + ')
-    let ctrlKeyRequired: boolean = keys.includes('Ctrl')
-    let altKeyRequired: boolean = keys.includes('Alt')
-    let shiftKeyRequired: boolean = keys.includes('Shift')
+    const keys: string[] = hotkey.split(' + ')
+    const ctrlKeyRequired: boolean = keys.includes('Ctrl')
+    const altKeyRequired: boolean = keys.includes('Alt')
+    const shiftKeyRequired: boolean = keys.includes('Shift')
     const requiredKey = keys.filter(key => !['Ctrl', 'Alt', 'Shift'].includes(key)).pop()
 
-    let hotkeyMatched: boolean = true
+    let hotkeyMatched = true
 
     if(ctrlKeyRequired) {
         if(!event.ctrlKey) {
