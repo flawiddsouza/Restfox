@@ -10,7 +10,7 @@ import { tags } from '@lezer/highlight'
 /**
  * stringifies arr and removes brackets at both ends
  */
-function stringifyArray(arr: any[]): string {
+export function stringifyArray(arr: any[]): string {
     const arrStr = JSON.stringify(arr)
     return arrStr.slice(1, arrStr.length-1)
 }
