@@ -5,7 +5,7 @@ module.exports = {
     },
     'extends': [
         'eslint:recommended',
-        'plugin:vue/vue3-essential',
+        'plugin:vue/vue3-recommended',
         'plugin:@typescript-eslint/recommended'
     ],
     'overrides': [
@@ -44,8 +44,27 @@ module.exports = {
                 'allowEmptyCatch': true
             }
         ],
+        'curly': 'error',
+        'brace-style': 'error',
+        'space-before-function-paren': [
+            'error',
+            'never'
+        ],
+        'space-in-parens': [
+            'error',
+            'never'
+        ],
         'vue/require-v-for-key': 'off',
         'vue/multi-word-component-names': 'off',
-        'vue/no-mutating-props': 'warn', // this is a valid issue, so fix and change this from warn to on when you can
+        'vue/no-mutating-props': 'warn', // this is a valid issue, so fix and change this from warn to on when you can,
+        'vue/html-indent': [
+            'error',
+            4
+        ],
+        'vue/html-self-closing': 'off',
+        'vue/max-attributes-per-line': 'off',
+        'vue/attributes-order': 'off',
+        'vue/singleline-html-element-content-newline': 'off',
+        'vue/order-in-components': 'off'
     }
 }

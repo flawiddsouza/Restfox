@@ -1,7 +1,7 @@
 <template>
     <div
         class="sidebar-item"
-        :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id  }"
+        :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id }"
         @click="handleSidebarItemClick(sidebarItem)"
         @dblclick="handleSidebarItemDoubleClick(sidebarItem)"
         @contextmenu.prevent="handleContextMenu(sidebarItem, $event)"

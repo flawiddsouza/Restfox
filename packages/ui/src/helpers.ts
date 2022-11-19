@@ -128,7 +128,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 window.postMessage({
                     event: 'cancelRequest'
                 })
-                reject(new DOMException('The user aborted a request.', 'AbortError' ))
+                reject(new DOMException('The user aborted a request.', 'AbortError'))
                 window.removeEventListener('message',  messageHandler)
             }
         })
@@ -908,7 +908,9 @@ export function getChildIds(arr, id) {
                 ret.push(item._id)
                 const newret = []
                 for (let x = 0; x < arr.length; x++) {
-                    if (x != i) newret.push(arr[x])
+                    if (x != i) {
+                        newret.push(arr[x])
+                    }
                 }
                 const children = getChildIds(newret, item._id)
                 if (children.length > 0) {

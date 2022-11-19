@@ -91,21 +91,25 @@ onBeforeUnmount(() => {
         </aside>
 
         <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="activeTab" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
-            <section class="request-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
-                'flexGrow': requestPanelRatio,
-                'minWidth': !requestResponseLayoutTopBottom ? '250px' : null,
-                'minHeight': requestResponseLayoutTopBottom ? '100px' : null
-            }">
+            <section
+                class="request-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
+                    'flexGrow': requestPanelRatio,
+                    'minWidth': !requestResponseLayoutTopBottom ? '250px' : null,
+                    'minHeight': requestResponseLayoutTopBottom ? '100px' : null
+                }"
+            >
                 <RequestPanel />
             </section>
 
             <section class="resizer" data-resizer></section>
 
-            <section class="response-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
-                'flexGrow': responsePanelRatio,
-                'minWidth': !requestResponseLayoutTopBottom ? '250px' : null,
-                'minHeight': requestResponseLayoutTopBottom ? '100px' : null
-            }">
+            <section
+                class="response-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
+                    'flexGrow': responsePanelRatio,
+                    'minWidth': !requestResponseLayoutTopBottom ? '250px' : null,
+                    'minHeight': requestResponseLayoutTopBottom ? '100px' : null
+                }"
+            >
                 <ResponsePanel />
             </section>
         </section>
