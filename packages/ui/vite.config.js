@@ -55,7 +55,10 @@ export default defineConfig(({ mode }) => {
         define: {
             'process.env': {}
         },
-        base: ''
+        base: '',
+        test: {
+            reporters: 'verbose'
+        }
     }
 
     if(mode === 'desktop') {
