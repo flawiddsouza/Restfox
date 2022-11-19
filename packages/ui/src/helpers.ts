@@ -59,10 +59,6 @@ export function substituteEnvironmentVariables(environment: object, string: stri
     possibleEnvironmentObjectPaths.forEach(objectPath => {
         let objectPathValue:any = getObjectPathValue(environment, objectPath)
 
-        if (typeof objectPathValue === 'undefined') {
-            return
-        }
-
         if (typeof objectPathValue === 'object') {
             objectPathValue = JSON.stringify(objectPathValue)
         }
