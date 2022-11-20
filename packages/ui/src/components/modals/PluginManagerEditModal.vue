@@ -75,7 +75,7 @@ export default {
             required: true
         },
         plugin: {
-            type: Object,
+            type: [Object, null],
             required: true
         }
     },

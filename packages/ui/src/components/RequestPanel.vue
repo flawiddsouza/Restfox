@@ -339,7 +339,7 @@ export default {
             this.loadGraphql()
         },
         'activeTab.body.mimeType'() {
-            if(this.activeTab.body.mimeType === 'multipart/form-data') {
+            if(this.activeTab && this.activeTab.body.mimeType === 'multipart/form-data') {
                 if('params' in this.activeTab.body) {
                     // set type to text by default if type does not exist int he params array
                     this.activeTab.body.params.forEach(param => {
