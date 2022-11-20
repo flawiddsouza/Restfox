@@ -1,4 +1,4 @@
-import { assert, test, describe, expect } from 'vitest'
+import { assert, test, describe } from 'vitest'
 import { substituteEnvironmentVariables } from './helpers.ts'
 
 
@@ -20,7 +20,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
         { keyObj: { nestedObj: 'nest object value', nestedArr: [ 1, 2, 3 ] } }
     ]
 
-    env.arr2dMix= [ env.arrNum, env.arrStr, env.arrObj ]
+    env.arr2dMix = [ env.arrNum, env.arrStr, env.arrObj ]
 
     env.strCamelCase      = 'This is camelCase'
     env.str_snake_case    = 'This is snake-case'
@@ -32,7 +32,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
 
     test('Positive Case', () => {
-        const input =`{
+        const input = `{
             "i": {{i}},
             "_i": {{ i }},
 
@@ -117,7 +117,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
     })
 
     test('Negative Case', () => {
-        const input =`{
+        const input = `{
             "": "",
             "{": "}",
             "{{": "}}",
@@ -197,7 +197,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "arrNum": "{{arrNum[999]}}",
         }`
 
-        const extraForRegExSpecific =`{
+        const extraForRegExSpecific = `{
             "num": {{ num    }}, "num": {{num  }}, "num": {{  num }},
                                                             "num": {{  num }},
             "num": {{ num  }},
@@ -217,7 +217,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
     })
 
     test('Insomnia support', () => {
-        const input =`{
+        const input = `{
             "num": {{_.num}},
             "_num": {{ _.num }},
 
@@ -263,7 +263,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
     test('Insomnia support will not be used if "_" is present as a key in "environment"', () => {
         env._ = { someKey: '"_" will be used treated as the key, if its present in the env' }
 
-        const input =`{
+        const input = `{
             "_.someKey": {{_.someKey}},
             "_.someKey": {{ _.someKey }},
 

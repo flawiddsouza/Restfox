@@ -67,8 +67,14 @@ function createState(language, documentText, vueInstance) {
 
 export default {
     props: {
-        modelValue: String,
-        lang: String
+        modelValue: {
+            type: String,
+            required: true
+        },
+        lang: {
+            type: String,
+            required: true
+        }
     },
     data() {
         return {

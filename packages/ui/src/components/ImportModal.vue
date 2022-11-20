@@ -50,7 +50,7 @@ import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
 import { flattenTree, sortTree, toTree } from '../helpers'
 
-function prependParentTitleToChildTitle(array, prepend='') {
+function prependParentTitleToChildTitle(array, prepend = '') {
     array.forEach(item => {
         item.name = `${prepend ? prepend + ' ' : ''}${item.name}`
         if('children' in item) {

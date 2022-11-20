@@ -37,7 +37,7 @@ async function loadResponses(state, tabId) {
     }
 }
 
-function setActiveTab(state, tab, scrollSidebarItemIntoView=false, persistActiveWorkspaceTabsBool=true) {
+function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActiveWorkspaceTabsBool = true) {
     // skip setActiveTab as it's already the active tab
     if(state.activeTab && state.activeTab._id === tab._id) {
         return
@@ -704,7 +704,7 @@ const store = createStore({
             generateNewIdsForTree(collectionTree)
             await db.collections.bulkPut(flattenTree(collectionTree))
         },
-        async setCollectionTree(context, { collectionTree, parentId=null }) {
+        async setCollectionTree(context, { collectionTree, parentId = null }) {
             if(parentId) {
                 const parentCollection = findItemInTreeById(context.state.collectionTree, parentId)
                 collectionTree = parentCollection.children.concat(collectionTree)

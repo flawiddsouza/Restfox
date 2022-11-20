@@ -60,7 +60,10 @@ export default {
         }
     },
     props: {
-        sidebarItem: Object
+        sidebarItem: {
+            type: Object,
+            required: true
+        }
     },
     data() {
         return {

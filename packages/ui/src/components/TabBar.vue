@@ -50,7 +50,7 @@ export default {
         setActiveTab(tab) {
             this.$store.commit('setActiveTab', tab)
         },
-        closeTab(tab, persist=true) {
+        closeTab(tab, persist = true) {
             this.$store.commit('closeTab', tab._id)
 
             if(persist) {

@@ -281,7 +281,7 @@ export default {
             this.showEnvironmentContextMenuPopupCoords.y = (clientY + clientRect.height + 5) + 'px'
             this.showEnvironmentContextMenuPopup = true
         },
-        hideEnvironmentContextMenu(clearClickedContextMenuEnvironment=true) {
+        hideEnvironmentContextMenu(clearClickedContextMenuEnvironment = true) {
             if(this.showEnvironmentContextMenuPopup === false) {
                 return
             }

@@ -30,8 +30,14 @@ function createState(vueInstance) {
 
 export default {
     props: {
-        modelValue: String,
-        placeholder: String
+        modelValue: {
+            type: String,
+            required: true
+        },
+        placeholder: {
+            type: String,
+            default: ''
+        }
     },
     data() {
         return {

@@ -10,7 +10,7 @@ db.version(4).stores({
     responses: '_id, collectionId'
 })
 
-export async function getCollectionForWorkspace(workspaceId, type=null) {
+export async function getCollectionForWorkspace(workspaceId, type = null) {
     let where = {
         workspaceId
     }

@@ -28,7 +28,10 @@ function createState(documentText) {
 
 export default {
     props: {
-        modelValue: String
+        modelValue: {
+            type: String,
+            required: true
+        }
     },
     data() {
         return {

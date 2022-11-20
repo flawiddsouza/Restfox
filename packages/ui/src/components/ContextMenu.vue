@@ -18,7 +18,7 @@
 
 <script>
 // From: https://stackoverflow.com/a/11802841/4932305
-function getContextMenuPostion(x, y, contextMenuElement, yOffset=0) {
+function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0) {
     var mousePosition = {}
     var menuPostion = {}
     var menuDimension = {}

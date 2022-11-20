@@ -54,6 +54,8 @@ module.exports = {
             'error',
             'never'
         ],
+        'space-infix-ops': 'error',
+        '@typescript-eslint/no-unused-vars': 'error',
         'vue/require-v-for-key': 'off',
         'vue/multi-word-component-names': 'off',
         'vue/no-mutating-props': 'warn', // this is a valid issue, so fix and change this from warn to on when you can,

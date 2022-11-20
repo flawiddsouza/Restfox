@@ -66,9 +66,18 @@ export default {
         }
     },
     props: {
-        showModal: Boolean,
-        type: String,
-        plugin: Object
+        showModal: {
+            type: Boolean,
+            required: true
+        },
+        type: {
+            type: String,
+            required: true
+        },
+        plugin: {
+            type: Object,
+            required: true
+        }
     },
     components: {
         Modal,

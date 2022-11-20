@@ -5,7 +5,7 @@ class AlertConfirmPrompt extends HTMLElement {
         this.attachShadow({ mode: 'open' })
     }
 
-    createPrompt = (title, defaultValue='') => {
+    createPrompt = (title, defaultValue = '') => {
         const div = document.createElement('div')
 
         div.innerHTML  = `

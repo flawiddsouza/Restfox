@@ -66,7 +66,7 @@ export default {
         resetLayout() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_RESPONSE_LAYOUT)
         },
-        resetSettings(target=null) {
+        resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
                     this.resetWidths()

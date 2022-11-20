@@ -634,7 +634,7 @@ function importPostmanV1(collections, workspaceId) {
     return collection
 }
 
-function handlePostmanV2CollectionItem(postmanCollectionItem, parentId=null, workspaceId) {
+function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, workspaceId) {
     const requests = []
 
     postmanCollectionItem.item.forEach(request => {
@@ -945,7 +945,7 @@ export function getChildIds(arr, id) {
 export function findItemInTreeById(array, id) {
     let result = null
     function findItemInTreeByIdRecurse(array2, id2) {
-        for(let i=0; i<array2.length; i++) {
+        for(let i = 0; i < array2.length; i++) {
             if(array2[i]._id === id2) {
                 result = array2[i]
             }
@@ -1042,7 +1042,7 @@ export function isFirstIdIndirectOrDirectParentOfSecondIdInTree(array, firstId, 
     return result
 }
 
-export function dateFormat(date, includeSeconds=false) {
+export function dateFormat(date, includeSeconds = false) {
     let format = 'DD-MMM-YY hh:mm A'
 
     if(includeSeconds) {
@@ -1080,7 +1080,7 @@ export function humanFriendlyTime(milliseconds) {
 export function getObjectPaths(object: object): string[] {
     const paths = []
 
-    function recurse(obj, keyParent='') {
+    function recurse(obj, keyParent = '') {
         if(typeof obj === 'number' || typeof obj === 'string' || obj === null) {
             return
         }
@@ -1114,7 +1114,7 @@ export function exportRestfoxCollection(collection) {
 }
 
 // From: https://github.com/Kong/insomnia/blob/fac2627d695a10865d0f7f9ea7b2c04a77d92194/packages/insomnia/src/common/misc.ts#L169-L192
-export function humanFriendlySize(bytes, long=false) {
+export function humanFriendlySize(bytes, long = false) {
     bytes = Math.round(bytes * 10) / 10
     let size
     // NOTE: We multiply these by 2 so we don't end up with
