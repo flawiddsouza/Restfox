@@ -9,42 +9,20 @@
             </div>
             <button @click="sendRequest">Send</button>
         </div>
-        <div class="request-panel-tabs">
+        <div class="request-panel-tabs" v-show="tabView === 'full'">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs">
-                <span>{{ requestPanelTab.name }}</span>
-                <template v-if="requestPanelTab.name === 'Body'">
-                    <template v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
-                        <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
-                            <span> ({{ activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
-                        </template>
-                    </template>
-                    <template v-if="activeTab.body.mimeType === 'multipart/form-data'">
-                        <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
-                            <span> ({{ activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
-                        </template>
-                    </template>
-                    <template v-if="activeTab.body.mimeType === 'text/plain'"> (Plain)</template>
-                    <template v-if="activeTab.body.mimeType === 'application/json'"> (JSON)</template>
-                    <template v-if="activeTab.body.mimeType === 'application/graphql'"> (GraphQL)</template>
-                    <template v-if="activeTab.body.mimeType === 'application/octet-stream'"> (File)</template>
-                </template>
-                <template v-if="requestPanelTab.name === 'Query'">
-                    <template v-if="'parameters' in activeTab && activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
-                        <span> ({{ activeTab.parameters.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
-                    </template>
-                </template>
-                <template v-if="requestPanelTab.name === 'Header'">
-                    <template v-if="'headers' in activeTab && activeTab.headers.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
-                        <span> ({{ activeTab.headers.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
-                    </template>
-                </template>
-                <template v-if="requestPanelTab.name === 'Auth'">
-                    <template v-if="'authentication' in activeTab && activeTab.authentication.type !== 'No Auth'">
-                        <span> ({{ getAuthenticationTypeLabel(activeTab.authentication.type) }})</span>
-                    </template>
-                </template>
+                <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab"></RequestPanelTabTitle>
             </div>
             <div class="request-panel-tab-fill"></div>
+        </div>
+        <div class="request-panel-tabs" v-show="tabView === 'portable'">
+            <div class="request-panel-tab" style="width: 100%; border-color: transparent; padding-bottom: 0;">
+                <select v-model="activeRequestPanelTab" style="border: 1px solid var(--default-border-color); outline: 0px; padding: 0.3rem;">
+                    <option v-for="requestPanelTab in requestPanelTabs" :value="requestPanelTab.name">
+                        <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab"></RequestPanelTabTitle>
+                    </option>
+                </select>
+            </div>
         </div>
         <div class="request-panel-tabs-context">
             <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
@@ -299,13 +277,15 @@
 <script>
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
+import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 
 export default {
     components: {
         CodeMirrorSingleLine,
-        CodeMirrorEditor
+        CodeMirrorEditor,
+        RequestPanelTabTitle
     },
     data() {
         return {
@@ -341,7 +321,9 @@ export default {
                 variables: '{}'
             },
             disableGraphqlWatch: false,
-            refreshCodeMirrorEditors: 1
+            refreshCodeMirrorEditors: 1,
+            rootElementResizeObserver: null,
+            tabView: 'full'
         }
     },
     computed: {
@@ -350,6 +332,9 @@ export default {
         }
     },
     watch: {
+        activeTab() {
+            this.attachRootElementResizeObserver()
+        },
         'activeTab._id'() {
             this.loadGraphql()
         },
@@ -414,14 +399,6 @@ export default {
             }
 
             this.activeTab.authentication.type = event.target.value
-        },
-        getAuthenticationTypeLabel(authenticationType) {
-            switch(authenticationType) {
-                case 'basic':
-                    return 'Basic'
-                case 'bearer':
-                    return 'Bearer'
-            }
         },
         bodyMimeTypeChanged(newMimeType) {
             let mimeType = null
@@ -498,13 +475,40 @@ export default {
         },
         setFilesForParam(files, param) {
             param.files = Array.from(files)
+        },
+        onRootElementResize() {
+            const computedStyle = window.getComputedStyle(this.$el.parentElement)
+            const requestPanelWidth = computedStyle.width.replace('px', '')
+            if(requestPanelWidth < 400) {
+                this.tabView = 'portable'
+            } else {
+                this.tabView = 'full'
+            }
+        },
+        attachRootElementResizeObserver() {
+            if(this.activeTab) {
+                this.$nextTick(() => {
+                    this.rootElementResizeObserver = new ResizeObserver(this.onRootElementResize)
+                    this.rootElementResizeObserver.observe(this.$el.parentElement)
+                })
+            } else {
+                if(this.rootElementResizeObserver) {
+                    this.rootElementResizeObserver.disconnect()
+                    this.rootElementResizeObserver = null
+                }
+            }
         }
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
+
+        this.attachRootElementResizeObserver()
     },
     beforeUnmount() {
         emitter.off('response_panel', this.handleResponsePanelEmitter)
+        if(this.rootElementResizeObserver) {
+            this.rootElementResizeObserver.disconnect()
+        }
     }
 }
 </script>
