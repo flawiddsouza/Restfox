@@ -10,9 +10,28 @@ import { javascript } from '@codemirror/lang-javascript'
 import { graphqlLanguage } from 'altair-codemirror-graphql'
 import { closeBrackets } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
-import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selectLineBoundaryForward } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
+
+/**
+ * "Mod-Enter" is "Ctrl-Enter" inside codemirror
+ * "Ctrl-Enter" hotkey is used to send the request
+ * but codemirror has the same hotkey to add a new line, therefore disable codemirror hotkey
+ */
+defaultKeymap.find(keyObj => keyObj.key == 'Mod-Enter').run = false
+
+// to mimic VS-Code hotkey, works only if codemirror editor has focus
+// Known issue: doesn't work when cursor is at extreme right end of the text
+const selectLineKeyMap = { key: 'Ctrl-l', run: _ => selectLineBoundaryForward(_) && selectLine(_) }
+
+// to prevent default behavior of browser on certain hotkeys
+document.onkeydown = function(evt) {
+    evt = evt || window.event
+    if ((evt.ctrlKey) && ('lL'.includes(evt.key))) {
+        evt.preventDefault()
+    }
+}
 
 function createState(language, documentText, vueInstance) {
     let languageFunc = null
@@ -31,7 +50,6 @@ function createState(language, documentText, vueInstance) {
         languageFunc = graphqlLanguage
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
-
     return EditorState.create({
         doc: documentText,
         extensions: [
@@ -60,6 +78,7 @@ function createState(language, documentText, vueInstance) {
                 ...historyKeymap,
                 indentWithTab,
                 ...searchKeymap,
+                selectLineKeyMap
             ])
         ]
     })
