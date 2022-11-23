@@ -16,5 +16,8 @@ export default {
         SWITCH_TO_PREVIOUS_TAB_ALTERNATE: 'Ctrl + Alt + ArrowLeft',
         CLOSE_TAB: 'Ctrl + W',
         CLOSE_TAB_ALTERNATE: 'Ctrl + Alt + W'
+    },
+    DEFAULT_LIMITS: {
+        RESPONSE_HISTORY: 20
     }
 }

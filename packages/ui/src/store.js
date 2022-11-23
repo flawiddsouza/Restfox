@@ -393,6 +393,11 @@ const store = createStore({
         async saveResponse(state, response) {
             if(response._id) {
                 state.responses[state.activeTab._id].unshift(response)
+                if(state.responses[state.activeTab._id].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
+                    const responsesToDelete = state.responses[state.activeTab._id].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
+                    const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
+                    await db.responses.where(':id').anyOf(responseIdsToDelete).delete()
+                }
                 await db.responses.put(response)
             }
         },
