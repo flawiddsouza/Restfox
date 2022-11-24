@@ -9,7 +9,8 @@
         "serve": "vite preview",
         "test": "vitest",
         "lint": "eslint src --ext .js,.ts,.vue",
-        "lint-fix": "eslint src --ext .js,.ts,.vue --fix"
+        "lint-fix": "eslint src --ext .js,.ts,.vue --fix",
+        "save-bundle-size": "node scripts/save-bundle-size.mjs"
     },
     "dependencies": {
         "@codemirror/autocomplete": "^6.1.0",
