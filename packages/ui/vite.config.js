@@ -66,7 +66,8 @@ export default defineConfig(({ mode }) => {
             copy({
                 targets: [
                     { src: 'dist/*', dest: '../electron/ui' },
-                    { src: 'dist/*', dest: '../tauri/ui' }
+                    { src: 'dist/*', dest: '../tauri/ui' },
+                    { src: 'dist/*', dest: '../browser-extension/v3-app/src/ui' }
                 ],
                 hook: 'writeBundle'
             })
