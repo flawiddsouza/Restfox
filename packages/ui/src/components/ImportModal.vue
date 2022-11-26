@@ -8,12 +8,13 @@
                     <option>Postman</option>
                     <option>Postman URL</option>
                     <option>Insomnia</option>
+                    <option>OpenAPI</option>
                 </select>
             </label>
 
             <div style="margin-top: 1rem">
                 <template v-if="importFrom !== 'Postman URL'">
-                    <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip" multiple required>
+                    <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip, .yml, .yaml" multiple required>
                 </template>
                 <template v-else>
                     <input type="url" v-model="urlToImport" required placeholder="https://postman.com/collections/{collectionId}" class="full-width-input">
@@ -40,9 +41,11 @@
 <script>
 import {
     fileToJSON,
+    fileToString,
     convertInsomniaExportToRestfoxCollection,
     convertPostmanExportToRestfoxCollection,
     convertRestfoxExportToRestfoxCollection,
+    convertOpenAPIExportToRestfoxCollection,
     generateNewIdsForTree
 } from '@/helpers'
 import Modal from '@/components/Modal.vue'
@@ -145,6 +148,11 @@ export default {
 
                         if(this.importFrom === 'Restfox') {
                             collectionTree = collectionTree.concat(convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id))
+                        }
+
+                        if(this.importFrom === 'OpenAPI') {
+                            const exportAsString = await fileToString(fileToImport)
+                            collectionTree = collectionTree.concat(await convertOpenAPIExportToRestfoxCollection(exportAsString, this.activeWorkspace._id))
                         }
                     }
                 }
