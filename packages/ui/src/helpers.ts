@@ -7,7 +7,6 @@ import setObjectPathValueLodash from 'lodash.set'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 
-
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
     const map = {}
@@ -471,12 +470,12 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
             if(item.body.mimeType === 'application/x-www-form-urlencoded') {
                 body = {
                     mimeType: item.body.mimeType,
-                    params: item.body.params.map(parameter => ({
+                    params: 'params' in item.body ? item.body.params.map(parameter => ({
                         name: parameter.name,
                         value: parameter.value,
                         description: parameter.description,
                         disabled: parameter.disabled
-                    }))
+                    })) : []
                 }
             }
 
@@ -852,11 +851,26 @@ export function convertRestfoxExportToRestfoxCollection(json, workspaceId) {
     throw new Error('Invalid Restfox Export')
 }
 
+export async function convertOpenAPIExportToRestfoxCollection(exportString: string, workspaceId: string) {
+    const { convert: insomniaImporter } = await import('insomnia-importers-browser')
+    const insomniaExport = await insomniaImporter(exportString)
+    return convertInsomniaExportToRestfoxCollection(insomniaExport.data, workspaceId)
+}
+
 // From: https://stackoverflow.com/a/66387148/4932305
 export async function fileToJSON(file) {
     return new Promise((resolve, reject) => {
         const fileReader = new FileReader()
         fileReader.onload = event => resolve(JSON.parse(event.target.result))
+        fileReader.onerror = error => reject(error)
+        fileReader.readAsText(file)
+    })
+}
+
+export async function fileToString(file) {
+    return new Promise((resolve, reject) => {
+        const fileReader = new FileReader()
+        fileReader.onload = event => resolve(event.target.result)
         fileReader.onerror = error => reject(error)
         fileReader.readAsText(file)
     })

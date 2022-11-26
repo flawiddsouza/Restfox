@@ -1,6 +1,6 @@
 {
     "apple-touch-icon.png": 13790,
-    "assets": 2879614,
+    "assets": 5626572,
     "credits.html": 309,
     "css": 3278959,
     "favicon.icns": 358277,
@@ -11,8 +11,10 @@
     "pwa-192x192.png": 14762,
     "pwa-512x512.png": 32943,
     "robots.txt": 23,
-    "sw.js": 3173,
+    "sw.js": 3241,
     "workbox.xxxxxxxx.js": 14986,
-    "totalSize": 6646186,
-    "totalSizeHuman": "6.34 MB"
+    "totalSize": 9393212,
+    "totalSizeHuman": "8.96 MB",
+    "totalSizeDiff": 2747026,
+    "totalSizeDiffHuman": "2.62 MB"
 }
