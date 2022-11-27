@@ -33,7 +33,10 @@ const savedBundleSize = existsSync(bundleSizeFilePath) ? JSON.parse(readFileSync
 
 if(savedBundleSize) {
     fileList['totalSizeDiff'] = fileList['totalSize'] - savedBundleSize['totalSize']
-    fileList['totalSizeDiffHuman'] = humanFileSize(fileList['totalSizeDiff'])
+    fileList['totalSizeDiffHuman'] = humanFileSize(Math.abs(fileList['totalSizeDiff']))
+    if(fileList['totalSizeDiff'] < 0) {
+        fileList['totalSizeDiffHuman'] = `-${fileList['totalSizeDiffHuman']}`
+    }
 }
 
 writeFileSync(bundleSizeFilePath, JSON.stringify(fileList, null, 4) + '\n')
