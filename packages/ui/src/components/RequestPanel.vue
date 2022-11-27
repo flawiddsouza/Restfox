@@ -477,11 +477,14 @@ export default {
             param.files = Array.from(files)
         },
         onRootElementResize() {
-            const computedStyle = window.getComputedStyle(this.$el.parentElement)
-            const requestPanelWidth = computedStyle.width.replace('px', '')
-            if(requestPanelWidth < 400) {
+            const scrollWidth = 'requestPanelTabViewSwitchedScrollWidth' in window ? window.requestPanelTabViewSwitchedScrollWidth : this.$el.parentElement.scrollWidth
+            if(this.$el.parentElement.clientWidth < scrollWidth) {
                 this.tabView = 'portable'
+                if('requestPanelTabViewSwitchedScrollWidth' in window === false) {
+                    window.requestPanelTabViewSwitchedScrollWidth = this.$el.parentElement.scrollWidth
+                }
             } else {
+                delete window.requestPanelTabViewSwitchedScrollWidth
                 this.tabView = 'full'
             }
         },
