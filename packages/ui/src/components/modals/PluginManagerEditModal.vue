@@ -1,11 +1,21 @@
 <template>
     <form @submit.prevent="savePlugin" v-if="showModalComp">
         <modal :title="(type === 'Add' ? 'Add' : 'Edit') + ' Plugin'" v-model="showModalComp" height="70vh" width="55rem" :full-height="true">
-            <div class="plugin-manager-edit-modal-container">
+            <div class="plugin-manager-edit-modal-container" :class="{ 'plugin-manager-edit-modal-container-collection-item': collectionItem ? true : false }">
                 <label>
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
                     <input type="text" class="full-width-input" v-model="name" placeholder="My Plugin" required spellcheck="false" v-focus>
                 </label>
+                <template v-if="!collectionItem">
+                    <div style="padding-bottom: 1rem"></div>
+                    <label>
+                        <div style="font-weight: 500; margin-bottom: 0.25rem">Scope</div>
+                        <select class="full-width-input" v-model="workspaceId" required>
+                            <option :value="null">All Workspaces</option>
+                            <option :value="activeWorkspace._id">Current Workspace</option>
+                        </select>
+                    </label>
+                </template>
                 <div style="padding-bottom: 1rem"></div>
                 <label style="overflow: auto;">
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Code</div>
@@ -77,6 +87,14 @@ export default {
         plugin: {
             type: [Object, null],
             required: true
+        },
+        collectionItem: {
+            type: Object,
+            required: false
+        },
+        activeWorkspace: {
+            type: Object,
+            required: true
         }
     },
     components: {
@@ -86,7 +104,8 @@ export default {
     data() {
         return {
             name: '',
-            code: examplePluginCode
+            code: examplePluginCode,
+            workspaceId: this.activeWorkspace._id
         }
     },
     computed: {
@@ -104,20 +123,28 @@ export default {
             if(this.plugin) {
                 this.name = this.plugin.name
                 this.code = this.plugin.code
+                this.workspaceId = this.plugin.workspaceId ?? null
             } else {
-                this.name = ''
-                this.code = examplePluginCode
+                this.resetPlugin()
             }
         }
     },
     methods: {
+        resetPlugin() {
+            this.name = ''
+            this.code = examplePluginCode
+            this.workspaceId = this.activeWorkspace._id
+        },
         savePlugin() {
             this.$emit('savePlugin', {
                 type: this.type,
                 _id: this.plugin ? this.plugin._id : null,
                 name: this.name,
-                code: this.code
+                code: this.code,
+                workspaceId: this.workspaceId
             })
+
+            this.resetPlugin()
             this.showModalComp = false
         }
     }
@@ -127,8 +154,12 @@ export default {
 <style scoped>
 .plugin-manager-edit-modal-container {
     display: grid;
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto auto auto auto 1fr;
     height: 100%;
+}
+
+.plugin-manager-edit-modal-container-collection-item {
+    grid-template-rows: auto auto 1fr;
 }
 
 .code-editor {

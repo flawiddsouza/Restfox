@@ -3,10 +3,10 @@ import 'dexie-export-import'
 
 export const db = new Dexie('Restfox')
 
-db.version(4).stores({
+db.version(5).stores({
     workspaces: '_id',
     collections: '_id, workspaceId',
-    plugins: '_id',
+    plugins: '_id, workspaceId, collectionId',
     responses: '_id, collectionId'
 })
 

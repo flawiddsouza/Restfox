@@ -77,14 +77,10 @@ async function getAllParents(parentArray, request) {
     }
 }
 
-async function getEnvironmentForRequest(requestWorkspace, request) {
+async function getEnvironmentForRequest(requestWorkspace, requestParentArray) {
     let environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
-    let parentArray = []
-    await getAllParents(parentArray, request)
-    parentArray = parentArray.reverse()
-
-    for(const parent of parentArray) {
+    for(const parent of requestParentArray) {
         if(parent.environment) {
             let tempEnvironment = JSON.stringify(parent.environment)
             tempEnvironment = substituteEnvironmentVariables(environment, tempEnvironment)
@@ -362,6 +358,8 @@ const store = createStore({
                 _id: nanoid(),
                 name: plugin.name,
                 code: plugin.code,
+                workspaceId: plugin.workspaceId,
+                collectionId: plugin.collectionId,
                 enabled: true,
                 createdAt: new Date().getTime(),
                 updatedAt: new Date().getTime()
@@ -373,12 +371,14 @@ const store = createStore({
             const updatePlugin = {
                 name: plugin.name,
                 code: plugin.code,
+                workspaceId: plugin.workspaceId,
                 updatedAt: new Date().getTime()
             }
             await db.plugins.update(plugin._id, updatePlugin)
             const foundPlugin = state.plugins.find(item => item._id === plugin._id)
             foundPlugin.name = updatePlugin.name
             foundPlugin.code = updatePlugin.code
+            foundPlugin.workspaceId = updatePlugin.workspaceId
             foundPlugin.updatedAt = updatePlugin.updatedAt
         },
         async updatePluginStatus(state, plugin) {
@@ -435,6 +435,8 @@ const store = createStore({
         async deleteCollectionItem(context, collectionItem) {
             const childIds = getChildIds(context.state.collection, collectionItem._id)
             await db.responses.where('collectionId').anyOf(childIds).delete()
+            await db.plugins.where('collectionId').anyOf(childIds).delete()
+            context.state.plugins = context.state.plugins.filter(plugin => childIds.includes(plugin.collectionId) === false)
             await db.collections.where(':id').anyOf(childIds).delete()
             await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
@@ -596,7 +598,13 @@ const store = createStore({
         },
         async sendRequest(context, activeTab) {
             context.state.requestResponseStatus[activeTab._id] = 'loading'
-            const environment = await getEnvironmentForRequest(context.state.activeWorkspace, activeTab)
+
+            let requestParentArray = []
+            await getAllParents(requestParentArray, activeTab)
+            requestParentArray = requestParentArray.reverse()
+
+            const environment = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
+
             const setEnvironmentVariable = (objectPath, value) => {
                 try {
                     const environmentToModify = context.state.activeWorkspace.environment ?? {}
@@ -623,8 +631,39 @@ const store = createStore({
                     console.log(e)
                 }
             }
+
+            const globalPlugins = []
+            const workspacePlugins = []
+            const requestGroupPlugins = []
+            const requestPlugins = []
+
+            context.getters.enabledPlugins.forEach(enabledPlugin => {
+                if(!enabledPlugin.workspaceId && !enabledPlugin.collectionId) {
+                    globalPlugins.push(enabledPlugin)
+                }
+
+                if(enabledPlugin.workspaceId === context.state.activeWorkspace._id) {
+                    workspacePlugins.push(enabledPlugin)
+                }
+
+                if(requestParentArray.map(collectionItem => collectionItem._id).includes(enabledPlugin.collectionId)) {
+                    requestGroupPlugins.push(enabledPlugin)
+                }
+
+                if(enabledPlugin.collectionId === activeTab._id) {
+                    requestPlugins.push(enabledPlugin)
+                }
+            })
+
+            const enabledPlugins = [
+                ...globalPlugins,
+                ...workspacePlugins,
+                ...requestGroupPlugins,
+                ...requestPlugins
+            ]
+
             context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, setEnvironmentVariable, context.getters.enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
+            const response = await handleRequest(activeTab, environment, setEnvironmentVariable, enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
@@ -663,6 +702,10 @@ const store = createStore({
         async deleteWorkspace(context, workspaceId) {
             const collectionIds = await db.collections.where({ workspaceId: workspaceId }).primaryKeys()
             await db.responses.where('collectionId').anyOf(collectionIds).delete()
+            await db.plugins.where('collectionId').anyOf(collectionIds).delete()
+            context.state.plugins = context.state.plugins.filter(plugin => collectionIds.includes(plugin.collectionId) === false)
+            await db.plugins.where({ workspaceId: workspaceId }).delete()
+            context.state.plugins = context.state.plugins.filter(plugin => plugin.workspaceId !== workspaceId)
             await db.collections.where({ workspaceId: workspaceId }).delete()
             await db.workspaces.where({ _id: workspaceId }).delete()
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)

@@ -21,6 +21,7 @@
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
+    <PluginManagerModal v-model:showModal="pluginManagerShow" :collection-item="pluginManagerCollectionItem" />
     <SettingsModal v-model:showModal="settingsModalShow" :collection-item="settingsModalCollectionItem" />
     <DuplicateCollectionItemModal v-model:showModal="showDuplicateCollectionItemModal" :collection-item-to-duplicate="collectionItemToDuplicate" />
 </template>
@@ -31,6 +32,7 @@ import ContextMenu from './ContextMenu.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
+import PluginManagerModal from './modals/PluginManagerModal.vue'
 import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import { mapState } from 'vuex'
@@ -43,6 +45,7 @@ export default {
         AddRequestModal,
         AddFolderModal,
         EnvironmentModal,
+        PluginManagerModal,
         SettingsModal,
         DuplicateCollectionItemModal
     },
@@ -63,7 +66,9 @@ export default {
             draggedSidebarElement: null,
             sidebarItemCursorPositition: 'below',
             showDuplicateCollectionItemModal: false,
-            collectionItemToDuplicate: null
+            collectionItemToDuplicate: null,
+            pluginManagerCollectionItem: null,
+            pluginManagerShow: false,
         }
     },
     computed: {
@@ -123,6 +128,12 @@ export default {
                     },
                     {
                         'type': 'option',
+                        'label': 'Plugins',
+                        'value': 'Plugins',
+                        'icon': 'fa fa-plug',
+                    },
+                    {
+                        'type': 'option',
                         'label': 'Delete',
                         'value': 'Delete',
                         'icon': 'fa fa-trash',
@@ -173,6 +184,12 @@ export default {
                         'label': 'Environment',
                         'value': 'Environment',
                         'icon': 'fa fa-code',
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Plugins',
+                        'value': 'Plugins',
+                        'icon': 'fa fa-plug',
                     },
                     {
                         'type': 'option',
@@ -251,6 +268,11 @@ export default {
             if(clickedSidebarItem === 'Environment') {
                 this.environmentModalCollectionItem = this.activeSidebarItemForContextMenu
                 this.environmentModalShow = true
+            }
+
+            if(clickedSidebarItem === 'Plugins') {
+                this.pluginManagerCollectionItem = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.pluginManagerShow = true
             }
 
             if(clickedSidebarItem === 'Import Into') {
