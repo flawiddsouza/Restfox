@@ -452,14 +452,22 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
     const collection: any = []
 
+    const workspace = json.resources.find(item => item._type === 'workspace')
+
     json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment', 'proto_file'].includes(item._type) == false).forEach(item => {
         if(item._type === 'workspace' || item._type === 'request_group') {
+            let parentId = item.parentId
+
+            if(item.parentId === '__WORKSPACE_ID__' && !workspace) {
+                parentId = null
+            }
+
             collection.push({
                 _id: item._id,
                 _type: 'request_group',
                 name: item.name,
                 environment: item.environment,
-                parentId: item.parentId === '__WORKSPACE_ID__' ? null : item.parentId,
+                parentId,
                 workspaceId
             })
         } else {
