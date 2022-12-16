@@ -14,6 +14,12 @@ import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selec
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 
+const styleOverrides = EditorView.theme({
+    '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
+        fontSize: '1em !important'
+    }
+})
+
 /**
  * "Mod-Enter" is "Ctrl-Enter" inside codemirror
  * "Ctrl-Enter" hotkey is used to send the request
@@ -73,6 +79,7 @@ function createState(language, documentText, vueInstance) {
                     vueInstance.$emit('update:modelValue', v.state.doc.toString())
                 }
             }),
+            styleOverrides,
             keymap.of([
                 ...defaultKeymap,
                 ...historyKeymap,

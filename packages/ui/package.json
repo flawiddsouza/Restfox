@@ -18,7 +18,7 @@
         "@codemirror/lang-javascript": "^6.0.2",
         "@codemirror/lang-json": "^6.0.0",
         "@codemirror/language": "^6.2.1",
-        "@codemirror/search": "^6.2.0",
+        "@codemirror/search": "^6.2.3",
         "@codemirror/state": "^6.1.1",
         "@codemirror/view": "^6.2.2",
         "altair-codemirror-graphql": "^4.6.4",
