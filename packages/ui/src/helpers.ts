@@ -836,6 +836,7 @@ function importRestfoxV1(collections, workspaceId) {
                     description: parameter.description,
                     disabled: parameter.disabled
                 })) : [],
+                authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
                 parentId: item.parentId,
                 workspaceId,
                 sortOrder: item.sortOrder
