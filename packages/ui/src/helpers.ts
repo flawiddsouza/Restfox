@@ -271,7 +271,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
         let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
 
         if('pathParameters' in request) {
-            request.pathParameters.forEach(pathParameter => {
+            request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
                 urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
                     `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
                 )
