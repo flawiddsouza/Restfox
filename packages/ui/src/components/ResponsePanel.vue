@@ -48,6 +48,9 @@
                     <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
                         <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
                     </div>
+                    <div class="content-box" style="height: 100%" v-else-if="responseContentType.startsWith('text/html')">
+                        <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
+                    </div>
                     <template v-else>
                         <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" />
                     </template>
@@ -115,6 +118,7 @@
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
+import IframeFromBuffer from './IframeFromBuffer.vue'
 import { dateFormat, humanFriendlyTime, humanFriendlySize } from '@/helpers'
 import { emitter } from '@/event-bus'
 
@@ -123,6 +127,7 @@ export default {
         CodeMirrorResponsePanelPreview,
         ContextMenu,
         ImageFromBuffer,
+        IframeFromBuffer,
     },
     data() {
         return {
