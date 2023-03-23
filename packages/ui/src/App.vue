@@ -55,7 +55,7 @@ export default {
         'activeTab.parameters': {
             handler() {
                 // sync query params in url with query params in collection if they are the same
-                if(this.activeTab && 'url' in this.activeTab && this.activeTab.url) {
+                if(this.activeTab && 'url' in this.activeTab && this.activeTab.url && this.activeTab.parameters) {
                     let urlParamsSplit = this.activeTab.url.split('?')
                     if(urlParamsSplit.length > 1) {
                         const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
