@@ -42,7 +42,15 @@
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
                 <template v-if="response.statusText !== 'Error'">
-                    <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" />
+                    <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
+                        <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
+                    </div>
+                    <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
+                        <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
+                    </div>
+                    <template v-else>
+                        <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" />
+                    </template>
                 </template>
                 <div class="content-box" v-else>
                     <div style="white-space: pre-line;">{{ response.error }}</div>
@@ -106,13 +114,15 @@
 <script>
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
+import ImageFromBuffer from './ImageFromBuffer.vue'
 import { dateFormat, humanFriendlyTime, humanFriendlySize } from '@/helpers'
 import { emitter } from '@/event-bus'
 
 export default {
     components: {
         CodeMirrorResponsePanelPreview,
-        ContextMenu
+        ContextMenu,
+        ImageFromBuffer,
     },
     data() {
         return {
@@ -225,6 +235,19 @@ export default {
             } else {
                 return `<div>${this.response.request.body}</div>`
             }
+        },
+        responseContentType() {
+            if(!this.response) {
+                return ''
+            }
+
+            const contentTypeHeader = this.response.headers.find(header => header[0].toLowerCase() === 'content-type')
+
+            if(contentTypeHeader) {
+                return contentTypeHeader[1]
+            }
+
+            return ''
         }
     },
     watch: {
