@@ -144,3 +144,18 @@ npm start
 ```
 
 By default npm start will run Restfox at port 4004. You can override the port by passing port like so `PORT=5040 npm start`.
+
+## Built and used by Docker
+
+First refer to [**Compiling Web Standalone**](#using-web-standalone) to build successfully locally and use it normally.  
+Then in the project root directory (directory with Dockerfile), execute:  
+```
+docker build -t restfox:xx .
+```
+> Note: xx is the version number
+
+After the build is complete, use the following command to start the service:  
+```
+docker run -d -p:4004:4004 restfox:xx
+```
+Visit after successful startup: localhost:4004
