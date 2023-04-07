@@ -108,17 +108,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
       - name: Extract version from tag
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-      - name: Build UI
-        working-directory: ./packages/ui
-        run: |
-          npm ci
-          npm run build-web-standalone
       - name: Build and tag docker image
         working-directory: .
         run: |
