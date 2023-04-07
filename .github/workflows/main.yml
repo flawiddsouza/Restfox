@@ -73,6 +73,37 @@ jobs:
         run: |
           npm ci
           npm run publish
+  build-electron-snap:
+    needs: [build-electron-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Build UI
+        working-directory: ./packages/ui
+        run: |
+          npm ci
+          npm run build-desktop
+      - name: Build snap package
+        working-directory: ./packages/electron
+        run: |
+          npm ci
+          npm run build-snap
+      - name: Install Snapcraft
+        run: sudo apt-get install snapd snapcraft
+      - name: Set up Snap Store credentials & publish snap package
+        run: |
+          echo "${{ secrets.SNAP_STORE_TOKEN }}" | base64 -d > credentials.snapcraft
+          export SNAPCRAFT_STORE_CREDENTIALS=$(cat credentials.snapcraft)
+      #     snapcraft push --release=stable ./packages/electron/dist/*.snap
+      - name: Set asset name
+        run: echo "SNAP_FILE_NAME=$(basename $(ls ./packages/electron/dist/*.snap))" >> $GITHUB_ENV
+      - name: Upload snap to GitHub release
+        run: |
+          node scripts/upload-file-to-latest-draft-release.js ./packages/electron/dist/${{ env.SNAP_FILE_NAME }}
   build-docker-image:
     runs-on: ubuntu-latest
     steps:
@@ -101,7 +132,7 @@ jobs:
         run: |
           docker push flawiddsouza/restfox:${{ env.VERSION }}
   update-release-notes:
-    needs: [build-electron-linux, build-electron-windows, build-electron-mac, build-docker-image]
+    needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
