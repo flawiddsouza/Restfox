@@ -2,7 +2,7 @@
 
 # Restfox
 
-[**Website**](https://restfox.dev) **|** [**Install**](#installation) **|** [**Releases/Downloads**](https://github.com/flawiddsouza/Restfox/releases) **|** [**Screenshots**](#screenshots) **|** [**Compiling**](#compiling) **|** [**Compiling Web Standalone**](#using-web-standalone) 
+[**Website**](https://restfox.dev) **|** [**Install**](#installation) **|** [**Releases/Downloads**](https://github.com/flawiddsouza/Restfox/releases) **|** [**Screenshots**](#screenshots) **|** [**Compiling**](#compiling) **|** [**Compiling Web Standalone**](#using-web-standalone)
 
 Offline-first web HTTP client
 
@@ -21,6 +21,11 @@ There are precompiled binaries in the [releases](https://github.com/flawiddsouza
 
 ### Windows
 There are precompiled binaries in the [releases](https://github.com/flawiddsouza/Restfox/releases) page.
+
+### [Docker](https://hub.docker.com/r/flawiddsouza/restfox)
+```
+docker run --name Restfox -d -p 4004:4004 flawiddsouza/restfox:0.0.8
+```
 
 ## Screenshots
 
@@ -147,15 +152,17 @@ By default npm start will run Restfox at port 4004. You can override the port by
 
 ## Built and used by Docker
 
-First refer to [**Compiling Web Standalone**](#using-web-standalone) to build successfully locally and use it normally.  
-Then in the project root directory (directory with Dockerfile), execute:  
+First refer to [**Compiling Web Standalone**](#using-web-standalone) to build successfully locally and use it normally.
+Then in the project root directory (directory with Dockerfile), execute:
 ```
 docker build -t restfox:xx .
 ```
 > Note: xx is the version number
 
-After the build is complete, use the following command to start the service:  
+After the build is complete, use the following command to start the service:
 ```
 docker run -d -p:4004:4004 restfox:xx
 ```
 Visit after successful startup: localhost:4004
+
+Alternatively, you can also use the pre-built Docker image available on [Docker Hub](https://hub.docker.com/r/flawiddsouza/restfox). See: [**Docker**](#docker).
