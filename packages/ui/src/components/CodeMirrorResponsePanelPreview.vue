@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { EditorView, lineNumbers, keymap } from '@codemirror/view'
+import { EditorView, lineNumbers, keymap, drawSelection } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { foldGutter, syntaxHighlighting } from '@codemirror/language'
@@ -11,6 +11,9 @@ import { codeMirrorSyntaxHighlighting } from '@/helpers'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 
 const styleOverrides = EditorView.theme({
+    '&.cm-focused .cm-selectionBackground, ::selection': {
+        backgroundColor: 'rgb(51, 153, 255)'
+    },
     '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
         fontSize: '1em !important'
     }
@@ -22,6 +25,7 @@ const extensions = [
     lineNumbers(),
     foldGutter({ openText: '▾', closedText: '▸' }),
     highlightSelectionMatches(),
+    drawSelection(),
     EditorView.lineWrapping,
     EditorView.editable.of(true),
     EditorState.readOnly.of(true),

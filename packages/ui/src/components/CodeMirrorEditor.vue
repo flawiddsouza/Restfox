@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
+import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter, drawSelection } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript } from '@codemirror/lang-javascript'
@@ -15,6 +15,9 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 
 const styleOverrides = EditorView.theme({
+    '&.cm-focused .cm-selectionBackground, ::selection': {
+        backgroundColor: 'rgb(51, 153, 255)'
+    },
     '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
         fontSize: '1em !important'
     }
@@ -71,6 +74,7 @@ function createState(language, documentText, vueInstance) {
             history(),
             highlightSpecialChars(),
             highlightSelectionMatches(),
+            drawSelection(),
             indentUnit.of('    '), // 4 spaces
             EditorView.lineWrapping,
             EditorView.updateListener.of(v => {
