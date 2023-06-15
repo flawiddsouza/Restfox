@@ -20,6 +20,19 @@ function createState(vueInstance) {
             }),
             // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
             EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
+            EditorView.domEventHandlers({
+                paste: (event, view) => {
+                    const content = event.clipboardData.getData('text/plain')
+
+                    if(content.includes('\n')) {
+                        event.preventDefault()
+                        const contentWithoutNewLines = content.replace(/[\n\r]/g, '')
+                        const transaction = view.state.replaceSelection(contentWithoutNewLines)
+                        const update = view.state.update(transaction)
+                        view.update([update])
+                    }
+                }
+            }),
             keymap.of([
                 ...historyKeymap
             ]),
