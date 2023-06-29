@@ -16,7 +16,34 @@ import {
     substituteEnvironmentVariables,
     setObjectPathValue
 } from './helpers'
-import { db, getCollectionForWorkspace } from './db'
+import {
+    getResponsesByCollectionId,
+    getCollectionById,
+    getCollectionForWorkspace,
+    getAllWorkspaces,
+    putWorkspace,
+    updateWorkspace,
+    deleteWorkspace,
+    getAllCollectionIdsForGivenWorkspace,
+    createCollection,
+    createCollections,
+    updateCollection,
+    createResponse,
+    updateResponse,
+    deleteResponsesByCollectionIds,
+    deleteResponsesByCollectionId,
+    deleteResponse,
+    deleteResponsesByIds,
+    deletePluginsByWorkspace,
+    deletePluginsByCollectionIds,
+    modifyCollections,
+    deleteCollectionsByWorkspaceId,
+    getAllPlugins,
+    deleteCollectionsByIds,
+    createPlugin,
+    updatePlugin,
+    deletePlugin,
+} from './db'
 import { nextTick } from 'vue'
 import constants from './constants'
 import { emitter } from './event-bus'
@@ -25,7 +52,7 @@ async function loadResponses(state, tabId) {
     if(tabId in state.responses) {
         return
     }
-    state.responses[tabId] = await db.responses.where({ collectionId: tabId }).reverse().sortBy('createdAt')
+    state.responses[tabId] = await getResponsesByCollectionId(tabId)
     if(state.responses[tabId].length > 0) {
         if((tabId in state.requestResponses) === false || (tabId in state.requestResponses && state.requestResponses[tabId] === null)) {
             state.requestResponses[tabId] = state.responses[tabId][0]
@@ -70,7 +97,7 @@ async function getAllParents(parentArray, request) {
     if(!request.parentId) {
         return
     }
-    const requestParent = await db.collections.where({ ':id': request.parentId }).first()
+    const requestParent = await getCollectionById(request.parentId)
     if(requestParent) {
         parentArray.push(requestParent)
         await getAllParents(parentArray, requestParent)
@@ -146,7 +173,7 @@ async function persistActiveWorkspaceTabs(state) {
     state.activeWorkspace.activeTabId = activeTabId
 
     // persist to db
-    await db.workspaces.update(state.activeWorkspace._id, {
+    await updateWorkspace(state.activeWorkspace._id, {
         tabIds,
         activeTabId
     })
@@ -267,7 +294,7 @@ const store = createStore({
         },
         clearCollection(state) {
             state.collection = []
-            db.collections.where({ workspaceId: state.activeWorkspace._id }).delete()
+            deleteCollectionsByWorkspaceId(state.activeWorkspace._id)
             state.collectionTree = []
             state.activeTab = null
             state.tabs = []
@@ -295,7 +322,7 @@ const store = createStore({
                     activeTabToSave.body.fileName = state.activeTab.body.fileName
                 }
 
-                db.collections.update(state.activeTab._id, activeTabToSave)
+                updateCollection(state.activeTab._id, activeTabToSave)
             }
         },
         setActiveSidebarItemForContextMenu(state, payload) {
@@ -308,36 +335,36 @@ const store = createStore({
         },
         async updateCollectionItemEnvironment(_state, { collectionId, environment }) {
             if(environment) {
-                await db.collections.update(collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
+                await updateCollection(collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
         async updateWorkspaceEnvironment(_state, { workspaceId, environment }) {
             if(environment) {
-                await db.workspaces.update(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
+                await updateWorkspace(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
         async updateCollectionItemEnvironments(_state, { collectionId, environments }) {
             if(environments) {
-                await db.collections.update(collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
+                await updateCollection(collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
             }
         },
         async updateWorkspaceEnvironments(_state, { workspaceId, environments }) {
             if(environments) {
-                await db.workspaces.update(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) })
+                await updateWorkspace(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) })
             }
         },
         async updateCollectionItemCurrentEnvironment(_state, { collectionId, currentEnvironment }) {
             if(currentEnvironment) {
-                await db.collections.update(collectionId, { currentEnvironment: currentEnvironment })
+                await updateCollection(collectionId, { currentEnvironment: currentEnvironment })
             }
         },
         async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
             if(currentEnvironment) {
-                await db.workspaces.update(workspaceId, { currentEnvironment: currentEnvironment })
+                await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment })
             }
         },
         async updateCollectionItemName(_state, collectionItem) {
-            await db.collections.update(collectionItem._id, { name: collectionItem.name })
+            await updateCollection(collectionItem._id, { name: collectionItem.name })
 
             if(collectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'renamed')
@@ -364,7 +391,7 @@ const store = createStore({
                 createdAt: new Date().getTime(),
                 updatedAt: new Date().getTime()
             }
-            await db.plugins.put(newPlugin)
+            await createPlugin(newPlugin)
             state.plugins.push(newPlugin)
         },
         async updatePlugin(state, plugin) {
@@ -374,7 +401,7 @@ const store = createStore({
                 workspaceId: plugin.workspaceId,
                 updatedAt: new Date().getTime()
             }
-            await db.plugins.update(plugin._id, updatePlugin)
+            await updatePlugin(plugin._id, updatePlugin)
             const foundPlugin = state.plugins.find(item => item._id === plugin._id)
             foundPlugin.name = updatePlugin.name
             foundPlugin.code = updatePlugin.code
@@ -382,12 +409,12 @@ const store = createStore({
             foundPlugin.updatedAt = updatePlugin.updatedAt
         },
         async updatePluginStatus(state, plugin) {
-            await db.plugins.update(plugin._id, { enabled: plugin.enabled })
+            await updatePlugin(plugin._id, { enabled: plugin.enabled })
             const foundPlugin = state.plugins.find(item => item._id === plugin._id)
             foundPlugin.enabled = plugin.enabled
         },
         async deletePlugin(state, pluginId) {
-            await db.plugins.where({ _id: pluginId }).delete()
+            await deletePlugin(pluginId)
             state.plugins = state.plugins.filter(plugin => plugin._id !== pluginId)
         },
         async saveResponse(state, response) {
@@ -396,13 +423,13 @@ const store = createStore({
                 if(state.responses[state.activeTab._id].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
                     const responsesToDelete = state.responses[state.activeTab._id].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
                     const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
-                    await db.responses.where(':id').anyOf(responseIdsToDelete).delete()
+                    await deleteResponsesByIds(responseIdsToDelete)
                 }
-                await db.responses.put(response)
+                await createResponse(response)
             }
         },
         async clearResponseHistory(state) {
-            await db.responses.where({ collectionId: state.activeTab._id }).delete()
+            await deleteResponsesByCollectionId(state.activeTab._id)
             state.responses[state.activeTab._id] = []
             state.requestResponses[state.activeTab._id] = null
             state.requestResponseStatus[state.activeTab._id] = 'pending'
@@ -410,11 +437,11 @@ const store = createStore({
         async renameCurrentlyActiveResponse(state, newResponseName) {
             const activeResponse = state.requestResponses[state.activeTab._id]
             activeResponse.name = newResponseName !== '' ? newResponseName : null
-            await db.responses.update(activeResponse._id, { name: activeResponse.name })
+            await updateResponse(activeResponse._id, { name: activeResponse.name })
         },
         async deleteCurrentlyActiveResponse(state) {
             const responseId = state.requestResponses[state.activeTab._id]._id
-            await db.responses.where({ _id: responseId }).delete()
+            await deleteResponse(responseId)
             state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseId)
             if(state.responses[state.activeTab._id].length > 0) {
                 state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
@@ -434,10 +461,10 @@ const store = createStore({
     actions: {
         async deleteCollectionItem(context, collectionItem) {
             const childIds = getChildIds(context.state.collection, collectionItem._id)
-            await db.responses.where('collectionId').anyOf(childIds).delete()
-            await db.plugins.where('collectionId').anyOf(childIds).delete()
+            await deleteResponsesByCollectionIds(childIds)
+            await deletePluginsByCollectionIds(childIds)
             context.state.plugins = context.state.plugins.filter(plugin => childIds.includes(plugin.collectionId) === false)
-            await db.collections.where(':id').anyOf(childIds).delete()
+            await deleteCollectionsByIds(childIds)
             await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
@@ -467,7 +494,7 @@ const store = createStore({
             }
 
             const collectionItemsToSave = flattenTree([newCollectionItem])
-            await db.collections.bulkPut(collectionItemsToSave)
+            await createCollections(collectionItemsToSave)
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
 
             if(collectionItem.parentId) {
@@ -477,7 +504,7 @@ const store = createStore({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    db.collections.update(item._id, { sortOrder: index })
+                    updateCollection(item._id, { sortOrder: index })
                 })
             } else {
                 const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
@@ -485,7 +512,7 @@ const store = createStore({
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    db.collections.update(item._id, { sortOrder: index })
+                    updateCollection(item._id, { sortOrder: index })
                 })
             }
 
@@ -525,7 +552,7 @@ const store = createStore({
                 }
             }
 
-            await db.collections.put(newCollectionItem)
+            await createCollection(newCollectionItem)
             context.state.collection.push(newCollectionItem)
 
             if(newCollectionItem.parentId) {
@@ -534,14 +561,14 @@ const store = createStore({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    db.collections.update(item._id, { sortOrder: index })
+                    updateCollection(item._id, { sortOrder: index })
                 })
             } else {
                 context.state.collectionTree.splice(0, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    db.collections.update(item._id, { sortOrder: index })
+                    updateCollection(item._id, { sortOrder: index })
                 })
             }
 
@@ -585,15 +612,15 @@ const store = createStore({
             }
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
-            await db.collections.update(sourceItem._id, { parentId: sourceItem.parentId })
+            await updateCollection(sourceItem._id, { parentId: sourceItem.parentId })
 
             targetParentCollection.forEach((item, index) => {
                 item.sortOrder = index
-                db.collections.update(item._id, { sortOrder: index })
+                updateCollection(item._id, { sortOrder: index })
             })
         },
         async loadPlugins(context) {
-            const plugins = await db.plugins.toArray()
+            const plugins = await getAllPlugins()
             context.state.plugins = plugins
         },
         async sendRequest(context, activeTab) {
@@ -678,7 +705,7 @@ const store = createStore({
                 updatedAt: new Date().getTime()
             }
 
-            await db.workspaces.put(newWorkspace)
+            await putWorkspace(newWorkspace)
 
             context.state.workspaces.unshift(newWorkspace)
 
@@ -690,7 +717,7 @@ const store = createStore({
         },
         async updateWorkspace(context, payload) {
             const updatedAt = new Date().getTime()
-            await db.workspaces.update(payload._id, {
+            await updateWorkspace(payload._id, {
                 name: payload.name,
                 updatedAt
             })
@@ -700,21 +727,21 @@ const store = createStore({
             context.state.workspaces.sort((a, b) => b.updatedAt - a.updatedAt)
         },
         async deleteWorkspace(context, workspaceId) {
-            const collectionIds = await db.collections.where({ workspaceId: workspaceId }).primaryKeys()
-            await db.responses.where('collectionId').anyOf(collectionIds).delete()
-            await db.plugins.where('collectionId').anyOf(collectionIds).delete()
+            const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
+            await deleteResponsesByCollectionIds(collectionIds)
+            await deletePluginsByCollectionIds(collectionIds)
             context.state.plugins = context.state.plugins.filter(plugin => collectionIds.includes(plugin.collectionId) === false)
-            await db.plugins.where({ workspaceId: workspaceId }).delete()
+            await deletePluginsByWorkspace(workspaceId)
             context.state.plugins = context.state.plugins.filter(plugin => plugin.workspaceId !== workspaceId)
-            await db.collections.where({ workspaceId: workspaceId }).delete()
-            await db.workspaces.where({ _id: workspaceId }).delete()
+            await deleteCollectionsByWorkspaceId(workspaceId)
+            await deleteWorkspace(workspaceId)
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
             collectionIds.forEach(collectionId => {
                 context.commit('closeTab', collectionId)
             })
         },
         async loadWorkspaces(context) {
-            let workspaces = await db.workspaces.toCollection().reverse().sortBy('updatedAt')
+            let workspaces = await getAllWorkspaces()
 
             if(workspaces.length > 0) {
                 context.commit('setWorkspaces', workspaces)
@@ -734,11 +761,11 @@ const store = createStore({
 
                 // update pre-existing collections with a default workspaceId, so as to not break
                 // collections created before the introduction of workspaces
-                await db.collections.toCollection().modify({ workspaceId: context.state.activeWorkspace._id })
+                await modifyCollections(context.state.activeWorkspace._id)
             }
         },
         async saveCollectionItemCollapsedState(_context, payload) {
-            await db.collections.update(payload._id, { collapsed: payload.collapsed })
+            await updateCollection(payload._id, { collapsed: payload.collapsed })
         },
         async duplicateWorkspace(context, workspace) {
             const newWorkspaceId = await context.dispatch('createWorkspace', {
@@ -750,7 +777,7 @@ const store = createStore({
             })
             const collectionTree = toTree(workspaceCollectionItems)
             generateNewIdsForTree(collectionTree)
-            await db.collections.bulkPut(flattenTree(collectionTree))
+            await createCollections(flattenTree(collectionTree))
         },
         async setCollectionTree(context, { collectionTree, parentId = null }) {
             if(parentId) {
@@ -761,7 +788,7 @@ const store = createStore({
             }
             addSortOrderToTree(collectionTree)
             const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
-            await db.collections.bulkPut(flattenedCollectionTree)
+            await createCollections(flattenedCollectionTree)
             context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))
         }
     }
