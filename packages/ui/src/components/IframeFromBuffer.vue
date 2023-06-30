@@ -1,5 +1,5 @@
 <template>
-    <iframe :src="src"></iframe>
+    <iframe sandbox :src="src"></iframe>
 </template>
 
 <script>
