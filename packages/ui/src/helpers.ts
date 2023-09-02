@@ -274,6 +274,8 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
                 urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
                     `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
+                ).replaceAll(
+                    `{${substituteEnvironmentVariables(environment, pathParameter.name)}}`, substituteEnvironmentVariables(environment, pathParameter.value)
                 )
             })
         }
