@@ -36,6 +36,7 @@
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
+                <i class="fas fa-download" @click="downloadResponse" title="Download response as a file"></i>
                 <i class="fas fa-paste" @click="copyResponseToClipboard" title="Copy response to clipboard"></i>
             </div>
         </div>
@@ -309,6 +310,16 @@ export default {
             }
             await navigator.clipboard.writeText(this.bufferToJSONString(this.response.buffer))
             this.$toast.success('Copied to clipboard')
+        },
+        async downloadResponse() {
+            const blob = new Blob([this.response.buffer], { type: this.responseContentType })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = this.response.name ?? 'response'
+            a.download = this.response.headers.find(header => header[0].toLowerCase() === 'content-disposition')?.[1]?.split('filename=')?.[1]?.replace(/"/g, '') ?? a.download
+            a.click()
+            URL.revokeObjectURL(url)
         },
         restoreCurrentResponseRequest() {
             if(!confirm('Are you sure? Restoring a request will reset your existing request and make it the same as the saved response\'s request.')) {
