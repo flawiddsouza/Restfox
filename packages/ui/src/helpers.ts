@@ -794,36 +794,13 @@ function importRestfoxV1(collections, workspaceId) {
                 sortOrder: item.sortOrder
             })
         } else {
-            let body = {
-                mimeType: 'No Body'
-            }
-
-            if(item.body.mimeType === 'application/x-www-form-urlencoded') {
-                body = {
-                    mimeType: item.body.mimeType,
-                    params: 'params' in item.body ? item.body.params.map(parameter => ({
-                        name: parameter.name,
-                        value: parameter.value,
-                        description: parameter.description,
-                        disabled: parameter.disabled
-                    })) : []
-                }
-            }
-
-            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json' || item.body.mimeType === 'application/graphql') {
-                body = {
-                    mimeType: item.body.mimeType,
-                    text: item.body.text
-                }
-            }
-
             collection.push({
                 _id: item._id,
                 _type: item._type,
                 name: item.name,
                 url: item.url,
                 method: item.method,
-                body: body,
+                body: item.body,
                 headers: item.headers ? item.headers.map(header => ({
                     name: header.name,
                     value: header.value,
