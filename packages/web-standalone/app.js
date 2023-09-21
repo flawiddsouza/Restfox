@@ -6,6 +6,7 @@ const app = express()
 const port = process.env.PORT || 4004
 
 app.use(express.static('public'))
+app.use(express.raw())
 
 app.post('/proxy', async(req, res) => {
     const url = req.headers['x-proxy-req-url']
