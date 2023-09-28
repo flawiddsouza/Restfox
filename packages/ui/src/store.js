@@ -395,18 +395,18 @@ const store = createStore({
             state.plugins.push(newPlugin)
         },
         async updatePlugin(state, plugin) {
-            const updatePlugin = {
+            const updatePluginData = {
                 name: plugin.name,
                 code: plugin.code,
                 workspaceId: plugin.workspaceId,
                 updatedAt: new Date().getTime()
             }
-            await updatePlugin(plugin._id, updatePlugin)
+            await updatePlugin(plugin._id, updatePluginData)
             const foundPlugin = state.plugins.find(item => item._id === plugin._id)
-            foundPlugin.name = updatePlugin.name
-            foundPlugin.code = updatePlugin.code
-            foundPlugin.workspaceId = updatePlugin.workspaceId
-            foundPlugin.updatedAt = updatePlugin.updatedAt
+            foundPlugin.name = updatePluginData.name
+            foundPlugin.code = updatePluginData.code
+            foundPlugin.workspaceId = updatePluginData.workspaceId
+            foundPlugin.updatedAt = updatePluginData.updatedAt
         },
         async updatePluginStatus(state, plugin) {
             await updatePlugin(plugin._id, { enabled: plugin.enabled })
