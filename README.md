@@ -8,7 +8,7 @@ Offline-first web HTTP client
 
 ## Installation
 
-### MacOS
+### macOS
 Package available in homebrew by using:
 `brew install restfox`
 

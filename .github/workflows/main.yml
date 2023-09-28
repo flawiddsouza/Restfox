@@ -59,7 +59,7 @@ jobs:
         run: |
           npm ci
           npm run build-desktop
-      - name: Add MacOS certs
+      - name: Add macOS certs
         run: chmod +x scripts/add-osx-cert.sh && ./scripts/add-osx-cert.sh
         env:
           CERTIFICATE_OSX_APPLICATION: ${{ secrets.CERTIFICATE_OSX_APPLICATION }}
