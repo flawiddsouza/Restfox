@@ -43,7 +43,7 @@ For **Ubuntu**, snap can be installed using:
 sudo snap install restfox
 \`\`\`
 
-For **MacOS**, the app can be installed using homebrew:
+For **macOS**, the app can be installed using homebrew:
 \`\`\`
 brew install restfox
 \`\`\`
