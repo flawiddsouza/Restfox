@@ -2,15 +2,15 @@
     box-sizing: border-box;
 }
 
-html, body, #app {
+html,body,#app {
     height: 100%;
 }
 
 html {
     --font-monospace: Menlo, Monaco, Consolas, 'Droid Sans Mono', 'Courier New', monospace,
-    'Droid Sans Fallback';
+        'Droid Sans Fallback';
     --font-default: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light',
-    'Ubuntu', 'Droid Sans', sans-serif;
+        'Ubuntu', 'Droid Sans', sans-serif;
     --default-border-color: lightgrey;
     --border-color-lighter: #f1f1f1;
     --border-color-lighter-darkened: #f1f1f147;
@@ -56,6 +56,13 @@ html {
     --modal-cm-number: #164;
     --drop-target-background-color: #ffc0cb1f;
     --workspace-menu-hover-background-color: #dbedff;
+    --method-get: #9e86c8;
+    --method-post: #9ed06c;
+    --method-put: #e87d3e;
+    --method-delete: #f86882;
+    --method-patch: #f8cd40;
+    --method-options: #7ad5f1;
+    --method-head: #6c99bb;
 }
 
 html.theme-dark {
@@ -73,7 +80,7 @@ html.theme-dark {
     --scrollbar-background: #353535;
     --link-color: #d9c9ff;
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
-    --input-disabled-color:  rgb(170, 170, 170);
+    --input-disabled-color: rgb(170, 170, 170);
     --button-background-color: #292929;
     --button-hover-background-color: #595858;
     --button-text-color: #e0e0e0;
@@ -129,19 +136,31 @@ body {
 }
 
 .request-method--GET {
-    color: var(--base-color-success);
-}
-
-.request-method--PUT {
-    color: var(--base-color-info);
+    color: var(--method-get);
 }
 
 .request-method--POST {
-    color: var(--base-color-warning);
+    color: var(--method-post);
+}
+
+.request-method--PUT {
+    color: var(--method-put);
+}
+
+.request-method--PATCH {
+    color: var(--method-patch);
 }
 
 .request-method--DELETE {
-    color: var(--base-color-error);
+    color: var(--method-delete);
+}
+
+.request-method--OPTIONS {
+    color: var(--method-options);
+}
+
+.request-method--HEAD {
+    color: var(--method-head);
 }
 
 /* firefox fixes */
@@ -160,7 +179,9 @@ body {
     font-size: 0.9em;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
     background-color: inherit;
     color: inherit;
 }
@@ -176,7 +197,8 @@ input:disabled {
     border: 1px solid var(--default-border-color);
 }
 
-input.full-width-input, select.full-width-input {
+input.full-width-input,
+select.full-width-input {
     width: 100%;
     border: 1px solid var(--modal-border-color);
     outline: 0;
@@ -209,13 +231,15 @@ button.button:hover {
     background-color: var(--button-hover-background-color);
 }
 
-.modal button.button, .pwa-toast button.button {
+.modal button.button,
+.pwa-toast button.button {
     background-color: var(--modal-button-background-color);
     color: var(--modal-button-text-color);
     border: 1px solid var(--modal-button-border-color);
 }
 
-.modal button.button:hover, .pwa-toast button.button:hover  {
+.modal button.button:hover,
+.pwa-toast button.button:hover {
     background-color: var(--modal-button-hover-background-color);
 }
 

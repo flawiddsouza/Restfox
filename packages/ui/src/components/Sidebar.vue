@@ -457,7 +457,7 @@ export default {
 .sidebar .sidebar-item-method {
     width: 1.5rem;
     font-size: 0.7rem;
-    margin-right: 0.4rem;
+    margin-right: 0.8rem;
 }
 
 .sidebar .sidebar-item * {
