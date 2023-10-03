@@ -80,14 +80,14 @@ export default {
         }
     },
     methods: {
-         getMethodShortName(method) {
+        getMethodShortName(method) {
             const methods = {
                 'DELETE':  'DEL',
                 'PATCH':   'PTCH',
                 'OPTIONS': 'OPT',
-            };
+            }
 
-            return methods[method] || method;
+            return methods[method] || method
         },
         handleSidebarItemClick(sidebarItem) {
             if(sidebarItem._type === 'request') {
