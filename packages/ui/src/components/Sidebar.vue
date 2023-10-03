@@ -447,6 +447,9 @@ export default {
 
 .sidebar .sidebar-list > .sidebar-item {
     padding-left: calc(1rem * 0.6);
+    min-height: 1.8rem;
+    display: flex;
+    align-items: end;
 }
 
 /* handle nested sidebar lists */
@@ -455,7 +458,7 @@ export default {
 }
 
 .sidebar .sidebar-item-method {
-    width: 1.5rem;
+    min-width: 1.8rem;
     font-size: 0.7rem;
     margin-right: 0.8rem;
 }

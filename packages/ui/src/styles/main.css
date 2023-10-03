@@ -2,7 +2,7 @@
     box-sizing: border-box;
 }
 
-html,body,#app {
+html, body, #app {
     height: 100%;
 }
 
@@ -56,13 +56,13 @@ html {
     --modal-cm-number: #164;
     --drop-target-background-color: #ffc0cb1f;
     --workspace-menu-hover-background-color: #dbedff;
-    --method-get: #9e86c8;
+    --method-get: #833ff8;
     --method-post: #9ed06c;
-    --method-put: #e87d3e;
-    --method-delete: #f86882;
-    --method-patch: #f8cd40;
-    --method-options: #7ad5f1;
-    --method-head: #6c99bb;
+    --method-put: #e17611;
+    --method-delete: #d02141;
+    --method-patch: #fcca25;
+    --method-options: #2bc2f0;
+    --method-head: #267aba;
 }
 
 html.theme-dark {
@@ -135,6 +135,10 @@ body {
     height: 70%;
 }
 
+[class*='request-method--'] {
+    font-weight: 600;
+}
+
 .request-method--GET {
     color: var(--method-get);
 }
@@ -179,9 +183,7 @@ body {
     font-size: 0.9em;
 }
 
-input,
-textarea,
-select {
+input, textarea, select {
     background-color: inherit;
     color: inherit;
 }
@@ -197,8 +199,7 @@ input:disabled {
     border: 1px solid var(--default-border-color);
 }
 
-input.full-width-input,
-select.full-width-input {
+input.full-width-input, select.full-width-input {
     width: 100%;
     border: 1px solid var(--modal-border-color);
     outline: 0;
@@ -231,15 +232,13 @@ button.button:hover {
     background-color: var(--button-hover-background-color);
 }
 
-.modal button.button,
-.pwa-toast button.button {
+.modal button.button, .pwa-toast button.button {
     background-color: var(--modal-button-background-color);
     color: var(--modal-button-text-color);
     border: 1px solid var(--modal-button-border-color);
 }
 
-.modal button.button:hover,
-.pwa-toast button.button:hover {
+.modal button.button:hover, .pwa-toast button.button:hover {
     background-color: var(--modal-button-hover-background-color);
 }
 
