@@ -17,7 +17,7 @@
             </div>
         </template>
         <template v-if="sidebarItem._type === 'request'">
-            <div class="sidebar-item-method" :class="`request-method--${sidebarItem.method}`">{{ sidebarItem.method.slice(0, 4) }}</div>
+            <div class="sidebar-item-method" :class="`request-method--${sidebarItem.method}`">{{ getMethodShortName(sidebarItem.method) }}</div>
         </template>
         <div style="width: 100%; margin-right: 0.5rem">
             <div v-if="!showInputToRenameRequest">
@@ -80,6 +80,15 @@ export default {
         }
     },
     methods: {
+        getMethodShortName(method) {
+            const methods = {
+                'DELETE':  'DEL',
+                'PATCH':   'PTCH',
+                'OPTIONS': 'OPT',
+            }
+
+            return methods[method] || method
+        },
         handleSidebarItemClick(sidebarItem) {
             if(sidebarItem._type === 'request') {
                 this.$store.commit('addTab', sidebarItem)
