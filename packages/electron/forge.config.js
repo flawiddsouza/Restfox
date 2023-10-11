@@ -38,7 +38,30 @@ module.exports = {
         {
             name: '@electron-forge/maker-rpm',
             config: {}
-        }
+        },
+        {
+            name: '@electron-forge/maker-flatpak',
+            config: {
+                options: {
+                    categories: [
+                        'Utility',
+                        'Development'
+                    ]
+                },
+                modules: [
+                    {
+                        name: "zypak",
+                        sources: [
+                            {
+                                type: "git",
+                                url: "https://github.com/refi64/zypak",
+                                tag: "v2022.03"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
     ],
     publishers: [
         {
