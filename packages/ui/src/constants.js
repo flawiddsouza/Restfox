@@ -6,7 +6,8 @@ export default {
         RESPONSE_PANEL_RATIO: 'Restfox-ResponsePanelRatio',
         REQUEST_RESPONSE_LAYOUT: 'Restfox-RequestResponseLayout',
         THEME: 'Restfox-Theme',
-        GITHUB_STAR_COUNT: 'Restfox-GithubStarCount'
+        GITHUB_STAR_COUNT: 'Restfox-GithubStarCount',
+        DISABLE_PAGE_VIEW_ANALYTICS_TRACKING: 'Restfox-DisablePageViewAnalyticsTracking',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

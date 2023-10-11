@@ -254,6 +254,7 @@ export default {
 
         const savedTheme = localStorage.getItem(constants.LOCAL_STORAGE_KEY.THEME)
         const savedGithubStarCount = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT)
+        let savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -271,6 +272,23 @@ export default {
                 localStorage.setItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT, this.$store.state.githubStarCount)
             }
         })
+
+        if(savedDisablePageViewAnalyticsTracking) {
+            try {
+                savedDisablePageViewAnalyticsTracking = JSON.parse(savedDisablePageViewAnalyticsTracking)
+            } catch(e) {
+                savedDisablePageViewAnalyticsTracking = false
+            }
+        }
+
+        if(!savedDisablePageViewAnalyticsTracking) {
+            const script = document.createElement('script')
+            script.async = true
+            script.defer = true
+            script.dataset.websiteId = 'ed9e95fd-48af-4aac-a929-2a9f04ce9883'
+            script.src = 'https://umami.artelin.dev/umami-analytics.js'
+            document.body.appendChild(script)
+        }
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)
