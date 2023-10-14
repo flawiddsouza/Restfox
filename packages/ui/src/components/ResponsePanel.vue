@@ -120,7 +120,7 @@ import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
-import { dateFormat, humanFriendlyTime, humanFriendlySize } from '@/helpers'
+import { dateFormat, humanFriendlyTime, humanFriendlySize, parseContentDispositionHeaderAndGetFileName } from '@/helpers'
 import { emitter } from '@/event-bus'
 
 export default {
@@ -317,7 +317,10 @@ export default {
             const a = document.createElement('a')
             a.href = url
             a.download = this.response.name ?? 'response'
-            a.download = this.response.headers.find(header => header[0].toLowerCase() === 'content-disposition')?.[1]?.split('filename=')?.[1]?.replace(/"/g, '') ?? a.download
+            const contentDispositionHeader = this.response.headers.find(header => header[0].toLowerCase() === 'content-disposition')
+            if(contentDispositionHeader && contentDispositionHeader[1]) {
+                a.download = parseContentDispositionHeaderAndGetFileName(contentDispositionHeader[1], a.download)
+            }
             a.click()
             URL.revokeObjectURL(url)
         },

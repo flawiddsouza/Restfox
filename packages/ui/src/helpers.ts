@@ -1243,3 +1243,15 @@ export function downloadBlob(filename, blob) {
     link.dispatchEvent(event)
     link.remove()
 }
+
+export function parseContentDispositionHeaderAndGetFileName(headerValue: string, fallbackFileName: string) {
+    const filenameItem = headerValue.split(';').map(item => item.trim()).find(item => item.startsWith('filename='))
+    if (filenameItem) {
+        let fileNameToReturn = filenameItem.split('=')[1]
+        if (fileNameToReturn.startsWith('"') && fileNameToReturn.endsWith('"')) {
+            fileNameToReturn = fileNameToReturn.slice(1, -1)
+        }
+        return fileNameToReturn
+    }
+    return fallbackFileName
+}

@@ -1,5 +1,8 @@
 import { assert, test, describe } from 'vitest'
-import { substituteEnvironmentVariables } from './helpers.ts'
+import {
+    substituteEnvironmentVariables,
+    parseContentDispositionHeaderAndGetFileName,
+} from './helpers.ts'
 
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
@@ -286,5 +289,25 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "_.someKey": {{  _.someKey  }},
         }`
         assert.equal(substituteEnvironmentVariables(env, input), expectedOutput)
+    })
+})
+
+describe(`Function: ${parseContentDispositionHeaderAndGetFileName.name}`, () => {
+    test('Type 1', () => {
+        const input = `inline; filename="file.txt"`
+        const expectedOutput = 'file.txt'
+        assert.equal(parseContentDispositionHeaderAndGetFileName(input), expectedOutput)
+    })
+
+    test('Type 2', () => {
+        const input = `attachment; filename="image.jpg"`
+        const expectedOutput = 'image.jpg'
+        assert.equal(parseContentDispositionHeaderAndGetFileName(input), expectedOutput)
+    })
+
+    test('Type 3', () => {
+        const input = `attachment; filename=annacerrato_vbb_ritratti-02056.jpg; filename*=UTF-8''annacerrato_vbb_ritratti-02056.jpg`
+        const expectedOutput = 'annacerrato_vbb_ritratti-02056.jpg'
+        assert.equal(parseContentDispositionHeaderAndGetFileName(input), expectedOutput)
     })
 })
