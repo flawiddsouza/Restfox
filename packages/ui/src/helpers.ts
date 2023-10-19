@@ -6,6 +6,7 @@ import getObjectPathValue from 'lodash.get'
 import setObjectPathValueLodash from 'lodash.set'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
+import { convert as curlConvert } from './parsers/curl'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -496,6 +497,12 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 }
             }
 
+            let parentId = item.parentId
+
+            if(item.parentId === '__WORKSPACE_ID__' && !workspace) {
+                parentId = null
+            }
+
             collection.push({
                 _id: item._id,
                 _type: item._type,
@@ -517,7 +524,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 })) : [],
                 authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
                 description: 'description' in item ? item.description : undefined,
-                parentId: item.parentId,
+                parentId,
                 workspaceId
             })
         }
@@ -843,6 +850,17 @@ export async function convertOpenAPIExportToRestfoxCollection(exportString: stri
     const { convert: insomniaImporter } = await import('insomnia-importers-browser')
     const insomniaExport = await insomniaImporter(exportString)
     return convertInsomniaExportToRestfoxCollection(insomniaExport.data, workspaceId)
+}
+
+export async function convertCurlCommandToRestfoxCollection(curlCommand: string, workspaceId: string) {
+    const insomniaExport = curlConvert(curlCommand)
+    if('body' in insomniaExport[0]) {
+        if('text' in insomniaExport[0].body) {
+            // for some reason we get \\n instead of \n in the text field
+            insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+        }
+    }
+    return convertInsomniaExportToRestfoxCollection({ resources: insomniaExport }, workspaceId)
 }
 
 // From: https://stackoverflow.com/a/66387148/4932305

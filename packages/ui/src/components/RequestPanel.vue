@@ -5,7 +5,7 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <div class="code-mirror-input-container">
-                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" />
+                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" @paste="handleAdressBarPaste" />
             </div>
             <button @click="sendRequest">Send</button>
         </div>
@@ -280,6 +280,7 @@ import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
+import { convertCurlCommandToRestfoxCollection } from '@/helpers'
 
 export default {
     components: {
@@ -329,7 +330,10 @@ export default {
     computed: {
         activeTab() {
             return this.$store.state.activeTab
-        }
+        },
+        activeWorkspace() {
+            return this.$store.state.activeWorkspace
+        },
     },
     watch: {
         activeTab() {
@@ -448,6 +452,24 @@ export default {
                     return
                 }
                 this.sendRequest()
+            }
+        },
+        async handleAdressBarPaste(e) {
+            e.preventDefault()
+            e.stopPropagation()
+            const content = e.clipboardData.getData('text/plain').trim()
+            if (content.startsWith('curl')) {
+                if(!confirm(`We've detected that you've pasted a curl command. Do you want to import the curl command into the current request?`)) {
+                    return
+                }
+                const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
+                if(result.length) {
+                    delete result[0].name
+                    delete result[0]._id
+                    delete result[0]._type
+                    delete result[0].workspaceId
+                    Object.assign(this.activeTab, result[0])
+                }
             }
         },
         loadGraphql() {

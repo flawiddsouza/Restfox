@@ -1,20 +1,20 @@
 {
     "apple-touch-icon.png": 13790,
-    "assets": 5610413,
+    "assets": 5622657,
     "credits.html": 309,
     "css": 3278959,
     "favicon.icns": 358277,
     "favicon.ico": 15086,
     "favicon.png": 32660,
-    "index.html": 1178,
+    "index.html": 1038,
     "manifest.webmanifest": 426,
     "pwa-192x192.png": 14762,
     "pwa-512x512.png": 32943,
     "robots.txt": 23,
     "sw.js": 3241,
     "workbox.xxxxxxxx.js": 14986,
-    "totalSize": 9377053,
-    "totalSizeHuman": "8.94 MB",
-    "totalSizeDiff": 4813,
-    "totalSizeDiffHuman": "4.7 kB"
+    "totalSize": 9389157,
+    "totalSizeHuman": "8.95 MB",
+    "totalSizeDiff": 12104,
+    "totalSizeDiffHuman": "11.82 kB"
 }
