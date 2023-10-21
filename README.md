@@ -79,7 +79,7 @@ npm run build-web-standalone
 
 ### To upgrade electron to latest version
 ```bash
-npm install --save-dev electron@latest @electron-forge/cli@latest @electron-forge/maker-deb@latest @electron-forge/maker-rpm@latest @electron-forge/maker-squirrel@latest @electron-forge/maker-zip@latest
+npm install --save-dev electron@latest @electron-forge/cli@latest @electron-forge/maker-deb@latest @electron-forge/maker-rpm@latest @electron-forge/maker-squirrel@latest @electron-forge/maker-zip@latest @electron-forge/publisher-github@latest electron-builder@latest
 ```
 
 ### Development
