@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
                 },
                 workbox: {
                     // default limit is 2 MB (https://vite-plugin-pwa.netlify.app/guide/faq.html#missing-assets-from-sw-precache-manifest)
-                    maximumFileSizeToCacheInBytes: 3000000 // increase to 3 MB
+                    maximumFileSizeToCacheInBytes: 4000000 // increase to 4 MB
                 }
             })
         ],
