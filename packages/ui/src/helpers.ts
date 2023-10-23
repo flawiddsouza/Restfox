@@ -212,120 +212,132 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
     }
 }
 
+export async function createRequestData(state, request, environment, setEnvironmentVariable, plugins) {
+    for(const plugin of plugins) {
+        const requestContext = createRequestContextForPlugin(request, environment, setEnvironmentVariable)
+
+        state.currentPlugin = plugin.name
+
+        await usePlugin(requestContext, {
+            code: plugin.code
+        })
+
+        request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
+    }
+
+    let body: any = null
+
+    if(request.body.mimeType === 'application/x-www-form-urlencoded') {
+        if('params' in request.body) {
+            body = new URLSearchParams(
+                Object.fromEntries(
+                    request.body.params.filter(item => !item.disabled).map(item => {
+                        return [
+                            substituteEnvironmentVariables(environment, item.name),
+                            substituteEnvironmentVariables(environment, item.value)
+                        ]
+                    })
+                )
+            ).toString()
+        }
+    }
+
+    if(request.body.mimeType === 'multipart/form-data') {
+        if('params' in request.body) {
+            const formData = new FormData()
+            request.body.params.filter(item => !item.disabled).forEach(param => {
+                if(param.type === 'text') {
+                    formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
+                } else {
+                    for(const file of param.files) {
+                        formData.append(substituteEnvironmentVariables(environment, param.name), file)
+                    }
+                }
+            })
+            body = formData
+        }
+    }
+
+    if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
+        body = substituteEnvironmentVariables(environment, request.body.text)
+    }
+
+    if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
+        body = request.body.fileName
+    }
+
+    let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
+
+    if('pathParameters' in request) {
+        request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
+            urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
+                `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
+            ).replaceAll(
+                `{${substituteEnvironmentVariables(environment, pathParameter.name)}}`, substituteEnvironmentVariables(environment, pathParameter.value)
+            )
+        })
+    }
+
+    const url = new URL(urlWithEnvironmentVariablesSubstituted)
+
+    if('parameters' in request && request.parameters) {
+        request.parameters.filter(item => !item.disabled).forEach(param => {
+            url.searchParams.append(
+                substituteEnvironmentVariables(environment, param.name),
+                substituteEnvironmentVariables(environment, param.value)
+            )
+        })
+    }
+
+    const headers = {}
+
+    if('GLOBAL_HEADERS' in environment) {
+        Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
+            headers[header.toLowerCase()] = environment.GLOBAL_HEADERS[header]
+        })
+    }
+
+    if('headers' in request) {
+        const enabledHeaders = request.headers.filter(header => !header.disabled)
+        for(const header of enabledHeaders) {
+            const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
+            const headerValue = substituteEnvironmentVariables(environment, header.value)
+            if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
+                continue
+            }
+            headers[headerName] = headerValue
+        }
+    }
+
+    if('authentication' in request && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
+        if(request.authentication.type === 'basic') {
+            headers['Authorization'] = generateBasicAuthString(
+                substituteEnvironmentVariables(environment, request.authentication.username),
+                substituteEnvironmentVariables(environment, request.authentication.password)
+            )
+        }
+
+        if(request.authentication.type === 'bearer') {
+            const authenticationBearerPrefix = request.authentication.prefix !== undefined && request.authentication.prefix !== '' ? request.authentication.prefix : 'Bearer'
+            const authenticationBearerToken = request.authentication.token !== undefined ? request.authentication.token : ''
+            headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
+        }
+    }
+
+    return {
+        url,
+        headers,
+        body,
+    }
+}
+
 export async function handleRequest(request, environment, setEnvironmentVariable, plugins, abortControllerSignal) {
-    let currentPlugin = null
+    const state = {
+        currentPlugin: null
+    }
 
     try {
-        for(const plugin of plugins) {
-            const requestContext = createRequestContextForPlugin(request, environment, setEnvironmentVariable)
-
-            currentPlugin = plugin.name
-
-            await usePlugin(requestContext, {
-                code: plugin.code
-            })
-
-            request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
-        }
-
-        let body: any = null
-
-        if(request.body.mimeType === 'application/x-www-form-urlencoded') {
-            if('params' in request.body) {
-                body = new URLSearchParams(
-                    Object.fromEntries(
-                        request.body.params.filter(item => !item.disabled).map(item => {
-                            return [
-                                substituteEnvironmentVariables(environment, item.name),
-                                substituteEnvironmentVariables(environment, item.value)
-                            ]
-                        })
-                    )
-                ).toString()
-            }
-        }
-
-        if(request.body.mimeType === 'multipart/form-data') {
-            if('params' in request.body) {
-                const formData = new FormData()
-                request.body.params.filter(item => !item.disabled).forEach(param => {
-                    if(param.type === 'text') {
-                        formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
-                    } else {
-                        for(const file of param.files) {
-                            formData.append(substituteEnvironmentVariables(environment, param.name), file)
-                        }
-                    }
-                })
-                body = formData
-            }
-        }
-
-        if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
-            body = substituteEnvironmentVariables(environment, request.body.text)
-        }
-
-        if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
-            body = request.body.fileName
-        }
-
-        let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
-
-        if('pathParameters' in request) {
-            request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
-                urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
-                    `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
-                ).replaceAll(
-                    `{${substituteEnvironmentVariables(environment, pathParameter.name)}}`, substituteEnvironmentVariables(environment, pathParameter.value)
-                )
-            })
-        }
-
-        const url = new URL(urlWithEnvironmentVariablesSubstituted)
-
-        if('parameters' in request && request.parameters) {
-            request.parameters.filter(item => !item.disabled).forEach(param => {
-                url.searchParams.append(
-                    substituteEnvironmentVariables(environment, param.name),
-                    substituteEnvironmentVariables(environment, param.value)
-                )
-            })
-        }
-
-        const headers = {}
-
-        if('GLOBAL_HEADERS' in environment) {
-            Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
-                headers[header.toLowerCase()] = environment.GLOBAL_HEADERS[header]
-            })
-        }
-
-        if('headers' in request) {
-            const enabledHeaders = request.headers.filter(header => !header.disabled)
-            for(const header of enabledHeaders) {
-                const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
-                const headerValue = substituteEnvironmentVariables(environment, header.value)
-                if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
-                    continue
-                }
-                headers[headerName] = headerValue
-            }
-        }
-
-        if('authentication' in request && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
-            if(request.authentication.type === 'basic') {
-                headers['Authorization'] = generateBasicAuthString(
-                    substituteEnvironmentVariables(environment, request.authentication.username),
-                    substituteEnvironmentVariables(environment, request.authentication.password)
-                )
-            }
-
-            if(request.authentication.type === 'bearer') {
-                const authenticationBearerPrefix = request.authentication.prefix !== undefined && request.authentication.prefix !== '' ? request.authentication.prefix : 'Bearer'
-                const authenticationBearerToken = request.authentication.token !== undefined ? request.authentication.token : ''
-                headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
-            }
-        }
+        const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins)
 
         const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal)
 
@@ -440,7 +452,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 
             if(e.message === 'Unable to parse plugin') {
                 const lineNumber = e.originalError.lineNumber ?? /\(eval\.js:(.*?)\)/.exec(e.originalError.stack)[1]
-                error = `Error: Plugin "${currentPlugin}" has an error at line number ${lineNumber}\n\n${e.originalError.name}: ${e.originalError.message}`
+                error = `Error: Plugin "${state.currentPlugin}" has an error at line number ${lineNumber}\n\n${e.originalError.name}: ${e.originalError.message}`
             }
         }
 

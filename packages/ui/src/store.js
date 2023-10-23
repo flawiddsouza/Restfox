@@ -623,14 +623,19 @@ const store = createStore({
             const plugins = await getAllPlugins()
             context.state.plugins = plugins
         },
-        async sendRequest(context, activeTab) {
-            context.state.requestResponseStatus[activeTab._id] = 'loading'
-
+        async getEnvironmentForRequest(context, request) {
             let requestParentArray = []
-            await getAllParents(requestParentArray, activeTab)
+            await getAllParents(requestParentArray, request)
             requestParentArray = requestParentArray.reverse()
 
             const environment = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
+
+            return { environment, requestParentArray }
+        },
+        async sendRequest(context, activeTab) {
+            context.state.requestResponseStatus[activeTab._id] = 'loading'
+
+            const { environment, requestParentArray } = await context.dispatch('getEnvironmentForRequest', activeTab)
 
             const setEnvironmentVariable = (objectPath, value) => {
                 try {

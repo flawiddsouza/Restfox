@@ -37,6 +37,7 @@ import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import { mapState } from 'vuex'
 import { flattenTree, exportRestfoxCollection } from '@/helpers'
+import { generateCode } from '@/utils/generate-code'
 
 export default {
     components: {
@@ -125,6 +126,12 @@ export default {
                         'label': 'Export',
                         'value': 'Export',
                         'icon': 'fa fa-download'
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Copy as Curl',
+                        'value': 'Copy as Curl',
+                        'icon': 'fa fa-copy'
                     },
                     {
                         'type': 'option',
@@ -253,6 +260,25 @@ export default {
                 const collectionItemToExport = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
                 collectionItemToExport.parentId = null
                 exportRestfoxCollection(flattenTree([collectionItemToExport]))
+            }
+
+            if(clickedSidebarItem === 'Copy as Curl') {
+                const request = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
+                try {
+                    const curlCommand = await generateCode(request, environment, 'shell', 'curl')
+                    await navigator.clipboard.writeText(curlCommand)
+                    this.$toast.success('Copied to clipboard')
+                } catch (e) {
+                    let errorAdditional = ''
+                    if(e.message.includes('Invalid URL')) {
+                        errorAdditional = ' : Invalid URL'
+                    } else {
+                        errorAdditional = ' : ' + e.message
+                        console.error(e)
+                    }
+                    this.$toast.error('Failed to copy to clipboard' + errorAdditional)
+                }
             }
 
             if(clickedSidebarItem === 'New Request') {
