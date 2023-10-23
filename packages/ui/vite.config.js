@@ -52,7 +52,9 @@ export default defineConfig(({ mode }) => {
                 '@': path.resolve(__dirname, './src')
             }
         },
-        define: {
+        define: process.env.VITEST ? {
+            'window': {},
+        } : {
             'process.env': {}
         },
         base: '',
