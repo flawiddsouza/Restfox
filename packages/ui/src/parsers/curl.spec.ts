@@ -1,5 +1,7 @@
 // From: https://github.com/Kong/insomnia/blob/6bd54b5b70259de0f65663eaa33418df0b3d6ebc/packages/insomnia/src/utils/importers/importers/curl.test.ts
 
+/* eslint-disable no-useless-escape */
+
 import { describe, it, expect } from 'vitest'
 import { quote } from 'shell-quote'
 
