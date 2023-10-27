@@ -461,6 +461,7 @@ export default {
     align-items: center;
     border-top: 1px solid transparent;
     border-bottom: 1px solid transparent;
+    position: relative;
 }
 
 .sidebar .sidebar-item-active {
@@ -488,6 +489,25 @@ export default {
 
 .sidebar .sidebar-item * {
     pointer-events: none;
+}
+
+.sidebar .sidebar-item .clickable-context-menu {
+    display: none;
+}
+
+.sidebar .sidebar-item:hover .clickable-context-menu {
+    display: block;
+    position: absolute;
+    right: 0;
+}
+
+.sidebar .sidebar-item .clickable-context-menu i {
+    pointer-events: auto;
+    cursor: pointer;
+    height: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    color: var(--text-color);
 }
 
 .sidebar-empty-message {
