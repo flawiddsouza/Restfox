@@ -1,6 +1,9 @@
 <template>
     <div class="sidebar-filter">
         <input type="search" placeholder="Filter" spellcheck="false" v-model="collectionFilter">
+        <div style="cursor: pointer; align-self: center; padding-left: 0.5rem; padding-right: 0.5rem;" @click="handleSidebarCreateButton" title="Create New Request / Folder" v-if="collectionFilter === ''">
+            <i class="fa fa-plus-circle"></i>
+        </div>
     </div>
     <div class="sidebar-list-container" @contextmenu.prevent="handleSidebarEmptyAreaContextMenu">
         <div class="sidebar-list">
@@ -326,6 +329,12 @@ export default {
             this.enableOptionsForEmptyContextMenu = true
             this.showContextMenu = true
         },
+        handleSidebarCreateButton(event) {
+            this.contextMenuX = event.target.getBoundingClientRect().left
+            this.contextMenuY = event.target.getBoundingClientRect().top + event.target.getBoundingClientRect().height
+            this.enableOptionsForEmptyContextMenu = true
+            this.showContextMenu = true
+        },
         dragStart(event) {
             if(this.collectionFilter) { // disable drag functionality if collection is being filtered
                 return
@@ -436,12 +445,16 @@ export default {
 </script>
 
 <style>
+.sidebar .sidebar-filter {
+    display: flex;
+    border-bottom: 1px solid var(--default-border-color);
+}
+
 .sidebar .sidebar-filter > input  {
     width: 100%;
     padding: 5px;
     outline: 0;
     border: 0;
-    border-bottom: 1px solid var(--default-border-color);
 }
 
 .sidebar .sidebar-list-container {
