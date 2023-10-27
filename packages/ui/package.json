@@ -25,7 +25,7 @@
         "dayjs": "^1.10.7",
         "dexie": "^3.2.0",
         "dexie-export-import": "^1.0.3",
-        "httpsnippet-browser": "github:flawiddsouza/httpsnippet-browser",
+        "httpsnippet-browser": "github:flawiddsouza/httpsnippet-browser#e40dbea",
         "insomnia-importers-browser": "github:flawiddsouza/insomnia-importers-browser",
         "jszip": "^3.7.1",
         "lodash.get": "^4.4.2",
