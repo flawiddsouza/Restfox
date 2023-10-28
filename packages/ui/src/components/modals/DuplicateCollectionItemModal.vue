@@ -58,6 +58,8 @@ export default {
             if(this.collectionItemToDuplicate._type === 'socket') {
                 return 'Duplicate Socket'
             }
+
+            return ''
         },
         placeholder() {
             if(this.collectionItemToDuplicate._type === 'request_group') {
@@ -71,6 +73,8 @@ export default {
             if(this.collectionItemToDuplicate._type === 'socket') {
                 return 'New Socket Name'
             }
+
+            return ''
         }
     },
     watch: {

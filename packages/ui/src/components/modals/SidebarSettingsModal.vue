@@ -52,6 +52,8 @@ export default {
             if(this.collectionItem._type === 'socket') {
                 return 'Socket Properties'
             }
+
+            return ''
         },
         placeholder() {
             if(this.collectionItem._type === 'request_group') {
@@ -65,6 +67,8 @@ export default {
             if(this.collectionItem._type === 'socket') {
                 return 'Socket Name'
             }
+
+            return ''
         }
     },
     watch: {

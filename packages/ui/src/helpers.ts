@@ -815,30 +815,34 @@ function importRestfoxV1(collections, workspaceId) {
                 sortOrder: item.sortOrder
             })
         } else {
-            collection.push({
-                _id: item._id,
-                _type: item._type,
-                name: item.name,
-                url: item.url,
-                method: item.method,
-                body: item.body,
-                headers: item.headers ? item.headers.map(header => ({
-                    name: header.name,
-                    value: header.value,
-                    description: header.description,
-                    disabled: header.disabled
-                })) : [],
-                parameters: item.parameters ? item.parameters.map(parameter => ({
-                    name: parameter.name,
-                    value: parameter.value,
-                    description: parameter.description,
-                    disabled: parameter.disabled
-                })) : [],
-                authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
-                parentId: item.parentId,
-                workspaceId,
-                sortOrder: item.sortOrder
-            })
+            if(item._type === 'socket') {
+                collection.push(item)
+            } else {
+                collection.push({
+                    _id: item._id,
+                    _type: item._type,
+                    name: item.name,
+                    url: item.url,
+                    method: item.method,
+                    body: item.body,
+                    headers: item.headers ? item.headers.map(header => ({
+                        name: header.name,
+                        value: header.value,
+                        description: header.description,
+                        disabled: header.disabled
+                    })) : [],
+                    parameters: item.parameters ? item.parameters.map(parameter => ({
+                        name: parameter.name,
+                        value: parameter.value,
+                        description: parameter.description,
+                        disabled: parameter.disabled
+                    })) : [],
+                    authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
+                    parentId: item.parentId,
+                    workspaceId,
+                    sortOrder: item.sortOrder
+                })
+            }
         }
     })
 
@@ -1284,4 +1288,12 @@ export function parseContentDispositionHeaderAndGetFileName(headerValue: string,
         return fileNameToReturn
     }
     return fallbackFileName
+}
+
+export function formatTimestamp(epoch: number) {
+    return dayjs(epoch).format('YYYY-MM-DD hh:mm:ss A')
+}
+
+export function generateId() {
+    return nanoid()
 }

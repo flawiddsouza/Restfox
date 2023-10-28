@@ -36,6 +36,7 @@
         "quickjs-emscripten-sync": "^1.2.0",
         "sass": "^1.43.4",
         "shell-quote": "^1.8.1",
+        "socket.io-client": "^4.7.2",
         "vue": "^3.2.41",
         "vue-toast-notification": "^3.0.0",
         "vuex": "^4.0.2"

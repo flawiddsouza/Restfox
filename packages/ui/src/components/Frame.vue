@@ -115,8 +115,8 @@ onBeforeUnmount(() => {
             </section>
         </section>
 
-        <section class="request-response-panels" v-show="activeTab && activeTab._type === 'socket'">
-            <SocketPanel />
+        <section class="request-response-panels" v-if="activeTab && activeTab._type === 'socket'">
+            <SocketPanel :key="activeTab._id" />
         </section>
 
         <ImportModal />
