@@ -12,7 +12,7 @@
                         <div style="font-weight: 500; margin-bottom: 0.25rem">Scope</div>
                         <select class="full-width-input" v-model="workspaceId" required>
                             <option :value="null">All Workspaces</option>
-                            <option :value="activeWorkspace._id">Current Workspace</option>
+                            <option :value="activeWorkspace._id" v-if="activeWorkspace">Current Workspace</option>
                         </select>
                     </label>
                 </template>
@@ -93,7 +93,7 @@ export default {
             required: false
         },
         activeWorkspace: {
-            type: Object,
+            type: [Object, null],
             required: true
         }
     },
@@ -105,7 +105,7 @@ export default {
         return {
             name: '',
             code: examplePluginCode,
-            workspaceId: this.activeWorkspace._id
+            workspaceId: this.activeWorkspace?._id ?? null
         }
     },
     computed: {
@@ -133,7 +133,7 @@ export default {
         resetPlugin() {
             this.name = ''
             this.code = examplePluginCode
-            this.workspaceId = this.activeWorkspace._id
+            this.workspaceId = this.activeWorkspace?._id ?? null
         },
         savePlugin() {
             this.$emit('savePlugin', {

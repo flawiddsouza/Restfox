@@ -41,7 +41,7 @@
                     </tr>
                 </tbody>
             </table>
-            <template v-if="!collectionItem">
+            <template v-if="!collectionItem && activeWorkspace">
                 <div style="padding-top: 1rem; padding-bottom: 0.5rem;">Workspace Plugins</div>
                 <table>
                     <thead>
@@ -145,6 +145,9 @@ export default {
             return plugins
         },
         currentWorkspacePlugins() {
+            if(!this.activeWorkspace) {
+                return []
+            }
             return this.$store.state.plugins.filter(plugin => plugin.workspaceId === this.activeWorkspace._id)
         },
         activeWorkspace() {
