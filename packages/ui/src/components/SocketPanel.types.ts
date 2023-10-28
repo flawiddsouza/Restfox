@@ -3,7 +3,7 @@ import { Socket } from 'socket.io-client'
 export interface ClientMessage {
     timestamp: number
     message: string
-    type: 'SEND' | 'RECEIVE'
+    type: 'SEND' | 'RECEIVE' | 'INFO'
 }
 
 export interface ClientPayload {

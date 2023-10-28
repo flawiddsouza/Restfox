@@ -163,6 +163,11 @@
                                     >
                                         <td style="width: 1px; white-space: nowrap">
                                             <div
+                                                v-if="message.type === 'INFO'"
+                                            >
+                                                <svg  viewBox="0 0 24 24" width="1.2em" height="1.2em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4m0-4h.01"></path></g></svg>
+                                            </div>
+                                            <div
                                                 v-if="message.type === 'SEND'"
                                                 style="color: green"
                                             >
@@ -311,7 +316,21 @@ async function connect(client: Client) {
         return
     }
 
+    addClientMessage(client, {
+        timestamp: new Date().getTime(),
+        message: `Connecting to ${clientUrlWithEnvironmentVariablesSubtituted}`,
+        type: 'INFO'
+    })
+
     if (client.ws instanceof WebSocket) {
+        client.ws.addEventListener('open', async() => {
+            addClientMessage(client, {
+                timestamp: new Date().getTime(),
+                message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
+                type: 'INFO'
+            })
+        })
+
         client.ws.addEventListener('message', async(e) => {
             let receivedMessage = e.data
 
@@ -320,6 +339,12 @@ async function connect(client: Client) {
 
         client.ws.addEventListener('close', async() => {
             disconnect(client)
+
+            addClientMessage(client, {
+                timestamp: new Date().getTime(),
+                message: `Disconnected from ${client.url}`,
+                type: 'INFO'
+            })
         })
     }
 
@@ -331,6 +356,12 @@ async function connect(client: Client) {
 
         client.ws.on('disconnect', async() => {
             disconnect(client)
+
+            addClientMessage(client, {
+                timestamp: new Date().getTime(),
+                message: `Disconnected from ${client.url}`,
+                type: 'INFO'
+            })
         })
     }
 }
