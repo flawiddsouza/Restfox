@@ -1,9 +1,9 @@
 <template>
     <form @submit.prevent="duplicateCollectionItem" v-if="showModalComp">
-        <modal :title="collectionItemToDuplicate._type === 'request_group' ? 'Duplicate Folder' : 'Duplicate Request'" v-model="showModalComp">
+        <modal :title="title" v-model="showModalComp">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
-                <input type="text" class="full-width-input" v-model="newName" :placeholder="collectionItemToDuplicate._type === 'request_group' ? 'Folder Name' : 'Request Name'" required spellcheck="false" v-focus>
+                <input type="text" class="full-width-input" v-model="newName" :placeholder="placeholder" required spellcheck="false" v-focus>
             </label>
 
             <template #footer>
@@ -44,6 +44,32 @@ export default {
             },
             set(value) {
                 this.$emit('update:showModal', value)
+            }
+        },
+        title() {
+            if(this.collectionItemToDuplicate._type === 'request_group') {
+                return 'Duplicate Folder'
+            }
+
+            if(this.collectionItemToDuplicate._type === 'request') {
+                return 'Duplicate Request'
+            }
+
+            if(this.collectionItemToDuplicate._type === 'socket') {
+                return 'Duplicate Socket'
+            }
+        },
+        placeholder() {
+            if(this.collectionItemToDuplicate._type === 'request_group') {
+                return 'New Folder Name'
+            }
+
+            if(this.collectionItemToDuplicate._type === 'request') {
+                return 'New Request Name'
+            }
+
+            if(this.collectionItemToDuplicate._type === 'socket') {
+                return 'New Socket Name'
             }
         }
     },

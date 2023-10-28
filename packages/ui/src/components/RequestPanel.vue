@@ -1,5 +1,5 @@
 <template>
-    <template v-if="activeTab">
+    <template v-if="activeTab && activeTab._type === 'request'">
         <div class="request-panel-address-bar">
             <select v-model="activeTab.method">
                 <option v-for="method in methods">{{ method }}</option>
@@ -343,7 +343,7 @@ export default {
             this.loadGraphql()
         },
         'activeTab.body.mimeType'() {
-            if(this.activeTab && this.activeTab.body.mimeType === 'multipart/form-data') {
+            if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'multipart/form-data') {
                 if('params' in this.activeTab.body) {
                     // set type to text by default if type does not exist int he params array
                     this.activeTab.body.params.forEach(param => {
@@ -473,7 +473,7 @@ export default {
             }
         },
         loadGraphql() {
-            if(this.activeTab && this.activeTab.body.mimeType === 'application/graphql') {
+            if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {
                 this.disableGraphqlWatch = true
                 try {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)

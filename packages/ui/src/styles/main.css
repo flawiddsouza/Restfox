@@ -139,7 +139,7 @@ body {
     font-weight: 600;
 }
 
-.request-method--GET {
+.request-method--GET, .request-method--SOCK {
     color: var(--method-get);
 }
 

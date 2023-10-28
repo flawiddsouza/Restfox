@@ -19,6 +19,9 @@
         <template v-if="sidebarItem._type === 'request'">
             <div class="sidebar-item-method" :class="`request-method--${sidebarItem.method}`">{{ getMethodShortName(sidebarItem.method) }}</div>
         </template>
+        <template v-if="sidebarItem._type === 'socket'">
+            <div class="sidebar-item-method" :class="`request-method--SOCK`">SOCK</div>
+        </template>
         <div style="width: 100%; margin-right: 0.5rem">
             <div v-if="!showInputToRenameRequest">
                 {{ sidebarItem.name }}
@@ -93,7 +96,7 @@ export default {
             return methods[method] || method
         },
         handleSidebarItemClick(sidebarItem) {
-            if(sidebarItem._type === 'request') {
+            if(sidebarItem._type === 'request' || sidebarItem._type === 'socket') {
                 this.$store.commit('addTab', sidebarItem)
             }
 
@@ -103,7 +106,7 @@ export default {
             }
         },
         handleSidebarItemDoubleClick(sidebarItem) {
-            if(sidebarItem._type === 'request') {
+            if(sidebarItem._type === 'request' || sidebarItem._type === 'socket') {
                 this.newSidebarItemName = sidebarItem.name
                 this.showInputToRenameRequest = true
             }

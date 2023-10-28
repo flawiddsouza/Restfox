@@ -1,9 +1,9 @@
 <template>
     <div v-if="showModalComp">
-        <modal :title="collectionItem._type === 'request_group' ? 'Folder Properties' : 'Request Properties'" v-model="showModalComp">
+        <modal :title="title" v-model="showModalComp">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request'">(also rename by double-clicking in sidebar)</span></div>
-                <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="collectionItem._type === 'request_group' ? 'Folder Name' : 'Request Name'" spellcheck="false" v-focus>
+                <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
+                <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" v-focus>
             </label>
             <div style="padding-bottom: 1rem"></div>
             <template #footer>
@@ -38,6 +38,32 @@ export default {
             },
             set(value) {
                 this.$emit('update:showModal', value)
+            }
+        },
+        title() {
+            if(this.collectionItem._type === 'request_group') {
+                return 'Folder Properties'
+            }
+
+            if(this.collectionItem._type === 'request') {
+                return 'Request Properties'
+            }
+
+            if(this.collectionItem._type === 'socket') {
+                return 'Socket Properties'
+            }
+        },
+        placeholder() {
+            if(this.collectionItem._type === 'request_group') {
+                return 'Folder Name'
+            }
+
+            if(this.collectionItem._type === 'request') {
+                return 'Request Name'
+            }
+
+            if(this.collectionItem._type === 'socket') {
+                return 'Socket Name'
             }
         }
     },

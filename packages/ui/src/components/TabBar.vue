@@ -134,6 +134,15 @@ export default {
                 this.$store.commit('closeAllTabs')
             }
         },
+        getTabMethodName(tab) {
+            if(tab._type === 'request') {
+                return tab.method
+            }
+
+            if(tab._type === 'socket') {
+                return 'SOCK'
+            }
+        }
     },
     mounted() {
         document.addEventListener('dragstart', this.dragStart)
@@ -166,7 +175,7 @@ export default {
             draggable="true"
             @contextmenu.prevent="handleTabContextMenu($event, tab)"
         >
-            <span :class="`request-method--${tab.method}`">{{ tab.method }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
+            <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
             <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close">x</span>
         </div>
     </div>

@@ -227,20 +227,22 @@ const store = createStore({
         addTab(state, tab) {
             const tabCopy = JSON.parse(JSON.stringify(tab))
 
-            if('params' in tab.body) {
-                let params = []
-                for(const param of tab.body.params) {
-                    let paramExtracted = {...param}
-                    if('files' in paramExtracted) {
-                        paramExtracted.files = [...paramExtracted.files]
+            if('body' in tab) {
+                if('params' in tab.body) {
+                    let params = []
+                    for(const param of tab.body.params) {
+                        let paramExtracted = {...param}
+                        if('files' in paramExtracted) {
+                            paramExtracted.files = [...paramExtracted.files]
+                        }
+                        params.push(paramExtracted)
                     }
-                    params.push(paramExtracted)
+                    tabCopy.body.params = params
                 }
-                tabCopy.body.params = params
-            }
 
-            if('fileName' in tab.body) {
-                tabCopy.body.fileName = tab.body.fileName
+                if('fileName' in tab.body) {
+                    tabCopy.body.fileName = tab.body.fileName
+                }
             }
 
             const existingTab = state.tabs.find(tabItem => tabItem._id === tabCopy._id)
@@ -306,7 +308,7 @@ const store = createStore({
             if(state.activeTab) {
                 const activeTabToSave = JSON.parse(JSON.stringify(state.activeTab))
 
-                if('params' in state.activeTab.body) {
+                if('body' in state.activeTab && 'params' in state.activeTab.body) {
                     let params = []
                     for(const param of state.activeTab.body.params) {
                         let paramExtracted = {...param}
@@ -318,7 +320,7 @@ const store = createStore({
                     activeTabToSave.body.params = params
                 }
 
-                if('fileName' in state.activeTab.body) {
+                if('body' in state.activeTab && 'fileName' in state.activeTab.body) {
                     activeTabToSave.body.fileName = state.activeTab.body.fileName
                 }
 
@@ -536,6 +538,16 @@ const store = createStore({
                     body: {
                         mimeType: payload.mimeType
                     },
+                    parentId: payload.parentId,
+                    workspaceId: context.state.activeWorkspace._id
+                }
+            }
+
+            if(payload.type === 'socket') {
+                newCollectionItem = {
+                    _id: nanoid(),
+                    _type: 'socket',
+                    name: payload.name,
                     parentId: payload.parentId,
                     workspaceId: context.state.activeWorkspace._id
                 }

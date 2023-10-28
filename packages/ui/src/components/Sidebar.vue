@@ -22,6 +22,7 @@
     </div>
     <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" :x-offset="20" />
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
+    <AddSocketModal v-model:showModal="addSocketModalShow" :parent-id="addSocketModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
     <PluginManagerModal v-model:showModal="pluginManagerShow" :collection-item="pluginManagerCollectionItem" />
@@ -33,6 +34,7 @@
 import SidebarItem from './SidebarItem.vue'
 import ContextMenu from './ContextMenu.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
+import AddSocketModal from './modals/AddSocketModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import PluginManagerModal from './modals/PluginManagerModal.vue'
@@ -47,6 +49,7 @@ export default {
         SidebarItem,
         ContextMenu,
         AddRequestModal,
+        AddSocketModal,
         AddFolderModal,
         EnvironmentModal,
         PluginManagerModal,
@@ -58,6 +61,8 @@ export default {
             showContextMenu: false,
             addRequestModalShow: false,
             addRequestModalParentId: null,
+            addSocketModalShow: false,
+            addSocketModalParentId: null,
             addFolderModalShow: false,
             addFolderModalParentId: null,
             contextMenuX: null,
@@ -99,6 +104,12 @@ export default {
                     },
                     {
                         'type': 'option',
+                        'label': 'New Socket',
+                        'value': 'New Socket',
+                        'icon': 'fa fa-plus-circle',
+                    },
+                    {
+                        'type': 'option',
                         'label': 'New Folder',
                         'value': 'New Folder',
                         'icon': 'fa fa-folder',
@@ -116,8 +127,8 @@ export default {
                 return []
             }
 
-            if(this.activeSidebarItemForContextMenu._type === 'request') {
-                return [
+            if(this.activeSidebarItemForContextMenu._type === 'request' || this.activeSidebarItemForContextMenu._type === 'socket') {
+                let contextMenuOptions = [
                     {
                         'type': 'option',
                         'label': 'Duplicate',
@@ -158,6 +169,13 @@ export default {
                         'icon': 'fa fa-wrench',
                     }
                 ]
+
+                if(this.activeSidebarItemForContextMenu._type === 'socket') {
+                    // Remove Copy as Curl & Plugins
+                    contextMenuOptions = contextMenuOptions.filter(option => option.value !== 'Copy as Curl' && option.value !== 'Plugins')
+                }
+
+                return contextMenuOptions
             }
 
             if(this.activeSidebarItemForContextMenu._type === 'request_group') {
@@ -166,6 +184,12 @@ export default {
                         'type': 'option',
                         'label': 'New Request',
                         'value': 'New Request',
+                        'icon': 'fa fa-plus-circle',
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'New Socket',
+                        'value': 'New Socket',
                         'icon': 'fa fa-plus-circle',
                     },
                     {
@@ -287,6 +311,11 @@ export default {
             if(clickedSidebarItem === 'New Request') {
                 this.addRequestModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
                 this.addRequestModalShow = true
+            }
+
+            if(clickedSidebarItem === 'New Socket') {
+                this.addSocketModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
+                this.addSocketModalShow = true
             }
 
             if(clickedSidebarItem === 'New Folder') {

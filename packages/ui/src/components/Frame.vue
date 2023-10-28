@@ -4,6 +4,7 @@ import TabBar from '@/components/TabBar.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
+import SocketPanel from '@/components/SocketPanel.vue'
 import ImportModal from '@/components/ImportModal.vue'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useStore } from 'vuex'
@@ -90,7 +91,7 @@ onBeforeUnmount(() => {
             <Sidebar />
         </aside>
 
-        <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="activeTab" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
+        <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="activeTab && activeTab._type === 'request'" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
             <section
                 class="request-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
                     'flexGrow': requestPanelRatio,
@@ -112,6 +113,10 @@ onBeforeUnmount(() => {
             >
                 <ResponsePanel />
             </section>
+        </section>
+
+        <section class="request-response-panels" v-show="activeTab && activeTab._type === 'socket'">
+            <SocketPanel />
         </section>
 
         <ImportModal />
