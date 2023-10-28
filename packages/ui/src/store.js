@@ -518,7 +518,7 @@ const store = createStore({
                 })
             }
 
-            if(newCollectionItem._type === 'request') {
+            if(newCollectionItem._type === 'request' || newCollectionItem._type === 'socket') {
                 context.commit('addTab', newCollectionItem)
             }
 
@@ -584,7 +584,7 @@ const store = createStore({
                 })
             }
 
-            if(payload.type === 'request') {
+            if(payload.type === 'request' || payload.type === 'socket') {
                 context.commit('addTab', newCollectionItem)
             }
 
