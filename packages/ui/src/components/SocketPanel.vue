@@ -251,6 +251,7 @@ const clients: Ref<Client[]> = ref([])
 // Computed
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
+const sockets = store.state.sockets
 
 // Methods
 
@@ -270,7 +271,6 @@ function addClient() {
         currentPayloadId: payloadId,
         message: '',
         messages: [],
-        ws: null,
         visibility: 'shown'
     })
 }
@@ -279,7 +279,7 @@ function removeClient(client: Client) {
     if (!confirm('Are you sure you want to remove this client?')) {
         return
     }
-    client.ws?.close()
+    sockets[activeTab.value._id + '-' + client.id]?.close()
     clients.value = clients.value.filter(
         (clientItem) => clientItem.id !== client.id
     )
@@ -296,7 +296,7 @@ async function connect(client: Client) {
     }
 
     let clientUrlWithEnvironmentVariablesSubtituted = client.url
-    const { environment } = await store.dispatch('getEnvironmentForRequest', activeTab)
+    const { environment } = await store.dispatch('getEnvironmentForRequest', activeTab.value)
     const possibleEnvironmentObjectPaths: string[] = getObjectPaths(environment)
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
@@ -307,9 +307,9 @@ async function connect(client: Client) {
 
     try {
         if (client.type === undefined) {
-            client.ws = new WebSocket(clientUrlWithEnvironmentVariablesSubtituted)
+            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(clientUrlWithEnvironmentVariablesSubtituted)
         } else if (client.type === 'Socket.IO') {
-            client.ws = io(clientUrlWithEnvironmentVariablesSubtituted)
+            sockets[activeTab.value._id + '-' + client.id] = io(clientUrlWithEnvironmentVariablesSubtituted)
         }
     } catch {
         alert(`Invalid WebSocket URL: ${clientUrlWithEnvironmentVariablesSubtituted}`)
@@ -322,8 +322,10 @@ async function connect(client: Client) {
         type: 'INFO'
     })
 
-    if (client.ws instanceof WebSocket) {
-        client.ws.addEventListener('open', async() => {
+    const socket = sockets[activeTab.value._id + '-' + client.id]
+
+    if (socket instanceof WebSocket) {
+        socket.addEventListener('open', async() => {
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
                 message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
@@ -331,13 +333,13 @@ async function connect(client: Client) {
             })
         })
 
-        client.ws.addEventListener('message', async(e) => {
+        socket.addEventListener('message', async(e) => {
             let receivedMessage = e.data
 
             clientMessageHandler(client, receivedMessage)
         })
 
-        client.ws.addEventListener('close', async() => {
+        socket.addEventListener('close', async() => {
             disconnect(client)
 
             addClientMessage(client, {
@@ -348,13 +350,21 @@ async function connect(client: Client) {
         })
     }
 
-    if (client.ws instanceof Socket) {
-        client.ws.onAny(async(event, ...args) => {
+    if (socket instanceof Socket) {
+        socket.on('connect', async() => {
+            addClientMessage(client, {
+                timestamp: new Date().getTime(),
+                message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
+                type: 'INFO'
+            })
+        })
+
+        socket.onAny(async(event, ...args) => {
             const receivedMessage = `[${event}] ${args[0]}`
             clientMessageHandler(client, receivedMessage)
         })
 
-        client.ws.on('disconnect', async() => {
+        socket.on('disconnect', async() => {
             disconnect(client)
 
             addClientMessage(client, {
@@ -402,13 +412,15 @@ async function sendMessage(client: Client) {
         return
     }
 
-    if (client.ws instanceof Socket && (client.event === undefined || client.event === '')) {
+    const socket = sockets[activeTab.value._id + '-' + client.id]
+
+    if (socket instanceof Socket && (client.event === undefined || client.event === '')) {
         return
     }
 
     let messageToSend = client.message
 
-    const { environment } = await store.dispatch('getEnvironmentForRequest', activeTab)
+    const { environment } = await store.dispatch('getEnvironmentForRequest', activeTab.value)
     const possibleEnvironmentObjectPaths: string[] = getObjectPaths(environment)
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
@@ -417,17 +429,17 @@ async function sendMessage(client: Client) {
         messageToSend = messageToSend.replace(`{{${objectPath}}}`, objectPathValue)
     })
 
-    if (client.ws instanceof WebSocket) {
-        client.ws.send(messageToSend)
+    if (socket instanceof WebSocket) {
+        socket.send(messageToSend)
     }
 
-    if (client.ws instanceof Socket && client.event !== undefined) {
-        client.ws.emit(client.event, messageToSend)
+    if (socket instanceof Socket && client.event !== undefined) {
+        socket.emit(client.event, messageToSend)
     }
 
     let clientMessageToSave = messageToSend
 
-    if (client.ws instanceof Socket) {
+    if (socket instanceof Socket) {
         clientMessageToSave = `[${client.event}] ${clientMessageToSave}`
     }
 
@@ -445,8 +457,24 @@ function clearMessages(client: Client) {
 }
 
 function disconnect(client: Client) {
-    client.ws?.close()
-    client.ws = null
+    const socket = sockets[activeTab.value._id + '-' + client.id]
+
+    if(socket instanceof WebSocket) {
+        socket.close()
+    }
+
+    if(socket instanceof Socket) {
+        socket.disconnect()
+
+        // because socket.io doesn't seem to trigger the disconnect event
+        addClientMessage(client, {
+            timestamp: new Date().getTime(),
+            message: `Disconnected from ${client.url}`,
+            type: 'INFO'
+        })
+    }
+
+    sockets[activeTab.value._id + '-' + client.id] = null
 }
 
 function parseAndFormatMessage(message: string) {
@@ -494,7 +522,6 @@ function loadSavedClients() {
             currentPayloadId: firstPayloadId,
             message: '',
             messages: [],
-            ws: null,
             visibility: 'shown'
         }
 
@@ -564,11 +591,13 @@ function getItem(key: string) {
 }
 
 function isClientConnected(client: Client) {
-    if(client.ws instanceof WebSocket) {
+    const socket = sockets[activeTab.value._id + '-' + client.id]
+
+    if(socket instanceof WebSocket) {
         return true
     }
 
-    if(client.ws instanceof Socket) {
+    if(socket instanceof Socket) {
         return true
     }
 

@@ -1,5 +1,3 @@
-import { Socket } from 'socket.io-client'
-
 export interface ClientMessage {
     timestamp: number
     message: string
@@ -22,6 +20,5 @@ export interface Client {
     event?: string
     message: string
     messages: ClientMessage[]
-    ws: WebSocket | Socket | null
     visibility?: 'shown' | 'hidden'
 }

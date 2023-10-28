@@ -208,7 +208,8 @@ const store = createStore({
                 browserExtensionEnabled: false,
                 isBrowser: true
             },
-            openContextMenuElement: null
+            openContextMenuElement: null,
+            sockets: {},
         }
     },
     getters: {
@@ -278,6 +279,11 @@ const store = createStore({
             }
 
             state.tabs.splice(tabIndex, 1)
+
+            // remove socket instances for a tab when a tab is closed
+            Object.keys(state.sockets).filter(key => key.startsWith(collectionItemId)).forEach(key => {
+                delete state.sockets[key]
+            })
         },
         closeAllTabs(state) {
             state.activeTab = null
