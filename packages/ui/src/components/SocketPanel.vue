@@ -618,54 +618,6 @@ onBeforeMount(async() => {
     width: 100%;
 }
 
-.client-sidebar {
-    height: 100%;
-    overflow-y: auto;
-    border: 1px solid var(--default-border-color);
-    width: 10rem;
-    padding: 0.5rem;
-}
-
-.client-sidebar > .client-sidebar-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 0.3rem;
-    padding-bottom: 0.3rem;
-    padding-left: 0.5rem;
-    padding-right: 0.1rem;
-    cursor: pointer;
-}
-
-.client-sidebar > .client-sidebar-item.client-sidebar-item-selected {
-    background-color: cadetblue;
-    color: white;
-}
-
-.client-sidebar > .client-sidebar-item > .client-sidebar-item-menu {
-    visibility: hidden;
-    border-radius: 10px;
-}
-
-.client-sidebar > .client-sidebar-item:hover > .client-sidebar-item-menu,
-.client-sidebar > .client-sidebar-item > .client-sidebar-item-menu.client-sidebar-item-menu-disable-hide {
-    visibility: visible;
-}
-
-.client-sidebar > .client-sidebar-item.client-sidebar-item-selected > .client-sidebar-item-menu svg {
-    fill: white;
-}
-
-.client-sidebar > .client-sidebar-item > .client-sidebar-item-menu:hover,
-.client-sidebar > .client-sidebar-item > .client-sidebar-item-menu.client-sidebar-item-menu-disable-hide {
-    background-color: rgba(240, 248, 255, 0.233);
-}
-
-.client-sidebar > .client-sidebar-item:not(.client-sidebar-item-selected) > .client-sidebar-item-menu:hover,
-.client-sidebar > .client-sidebar-item:not(.client-sidebar-item-selected) > .client-sidebar-item-menu.client-sidebar-item-menu-disable-hide {
-    background-color: rgb(108 194 197 / 20%);
-}
-
 .client-component {
     display: grid;
     height: 100%;
@@ -701,7 +653,7 @@ table tr > td:last-child {
 }
 
 table tr.green-row > td {
-    background-color: #ddffb6;
+    background-color: var(--socket-green-row-background-color);
 }
 
 table svg {
@@ -789,7 +741,7 @@ table svg {
 }
 
 .bc-primary {
-    background-color: #edf2f7;
+    background-color: var(--socket-header-background-color);
 }
 
 .w-100p {
@@ -827,7 +779,7 @@ table td {
 
 button {
     cursor: pointer;
-    background-color: cadetblue;
+    background-color: var(--socket-button-background-color);
     border: 1px solid rgb(64, 107, 109);
     border-radius: 0.25rem;
     padding: 0.3rem 0.6rem;
@@ -852,13 +804,13 @@ button.disabled {
 button.icon {
     background-color: transparent;
     border: 0;
-    color: black;
+    color: var(--text-color);
 }
 
 button.icon:hover {
     background-color: transparent;
     border: 0;
-    color: blue;
+    color: #fd4343;
 }
 
 button.icon > svg {
@@ -873,7 +825,7 @@ select {
     border-radius: 0.25rem;
     padding: 0.5rem;
     font: inherit;
-    background-color: white;
+    background-color: var(--background-color);
 }
 
 textarea {
@@ -881,7 +833,7 @@ textarea {
 }
 
 input:disabled {
-    background-color: #f4f4f4;
+    background-color: var(--socket-input-disabled-background-color);
 }
 
 select {

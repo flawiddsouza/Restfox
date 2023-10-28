@@ -63,6 +63,10 @@ html {
     --method-patch: #fcca25;
     --method-options: #2bc2f0;
     --method-head: #267aba;
+    --socket-header-background-color: #edf2f7;
+    --socket-button-background-color: cadetblue;
+    --socket-input-disabled-background-color: #fafbfd;
+    --socket-green-row-background-color: #ddffb6;
 }
 
 html.theme-dark {
@@ -111,6 +115,10 @@ html.theme-dark {
     --modal-cm-number: #164;
     --drop-target-background-color: #f8889b41;
     --workspace-menu-hover-background-color: #505050;
+    --socket-header-background-color: var(--sidebar-item-active-color);
+    --socket-button-background-color: #2c3f40;
+    --socket-input-disabled-background-color: #2d2d2d;
+    --socket-green-row-background-color: #88ff0017;
 }
 
 * {

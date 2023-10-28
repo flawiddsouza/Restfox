@@ -224,13 +224,12 @@ button.disabled {
 button.icon {
     background-color: transparent;
     border: 0;
-    color: black;
+    color: var(--text-color);
 }
 
 button.icon:hover {
     background-color: transparent;
     border: 0;
-    color: blue;
 }
 
 button.icon > svg {
