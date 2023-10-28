@@ -32,7 +32,7 @@
                             <select
                                 v-model="client.type"
                                 class="h-100p"
-                                :disabled="client.ws ? true : false"
+                                :disabled="isClientConnected(client) ? true : false"
                             >
                                 <option :value="undefined">WS</option>
                                 <option value="Socket.IO">IO</option>
@@ -42,12 +42,12 @@
                                 v-model="client.url"
                                 :placeholder="`${client.type === undefined ? 'WebSocket URL' : 'Socket.IO URL'}`"
                                 class="ml-0_5rem w-100p"
-                                :disabled="client.ws ? true : false"
+                                :disabled="isClientConnected(client)"
                             />
                             <div class="ml-0_5rem">
                                 <button
                                     @click="connect(client)"
-                                    v-if="client.ws === null"
+                                    v-if="!isClientConnected(client)"
                                 >
                                     Connect
                                 </button>
@@ -115,7 +115,7 @@
                                 </button>
                                 <button
                                     @click="sendMessage(client)"
-                                    :disabled="client.ws === null"
+                                    :disabled="!isClientConnected(client)"
                                 >
                                     Send
                                 </button>
@@ -225,7 +225,7 @@
 </template>
 
 <script setup lang="ts">
-import { Ref, ref, watch, nextTick, onBeforeMount, reactive, computed } from 'vue'
+import { Ref, ref, nextTick, onBeforeMount, reactive, computed } from 'vue'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
 import { formatTimestamp, generateId, getObjectPaths } from '@/helpers'
 import getObjectPathValue from 'lodash.get'
@@ -532,25 +532,17 @@ function getItem(key: string) {
     return activeTab.value[key]
 }
 
-function setItem(key: string, value: any) {
-    activeTab.value[key] = value
+function isClientConnected(client: Client) {
+    if(client.ws instanceof WebSocket) {
+        return true
+    }
+
+    if(client.ws instanceof Socket) {
+        return true
+    }
+
+    return false
 }
-
-// Watch
-
-watch(
-    clients,
-    () => {
-        setItem(
-            'clients',
-            clients.value.map((item) => ({
-                ...item,
-                ws: null
-            }))
-        )
-    },
-    { deep: true }
-)
 
 // Lifecycle Events
 

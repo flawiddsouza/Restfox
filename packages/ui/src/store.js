@@ -225,33 +225,38 @@ const store = createStore({
     },
     mutations: {
         addTab(state, tab) {
-            const tabCopy = JSON.parse(JSON.stringify(tab))
+            const id = tab._id
 
-            if('body' in tab) {
-                if('params' in tab.body) {
-                    let params = []
-                    for(const param of tab.body.params) {
-                        let paramExtracted = {...param}
-                        if('files' in paramExtracted) {
-                            paramExtracted.files = [...paramExtracted.files]
-                        }
-                        params.push(paramExtracted)
-                    }
-                    tabCopy.body.params = params
-                }
+            const existingTab = state.tabs.find(tabItem => tabItem._id === id)
 
-                if('fileName' in tab.body) {
-                    tabCopy.body.fileName = tab.body.fileName
-                }
-            }
-
-            const existingTab = state.tabs.find(tabItem => tabItem._id === tabCopy._id)
             if(!existingTab) {
+                const tabCopy = JSON.parse(JSON.stringify(tab))
+
+                if('body' in tab) {
+                    if('params' in tab.body) {
+                        let params = []
+                        for(const param of tab.body.params) {
+                            let paramExtracted = {...param}
+                            if('files' in paramExtracted) {
+                                paramExtracted.files = [...paramExtracted.files]
+                            }
+                            params.push(paramExtracted)
+                        }
+                        tabCopy.body.params = params
+                    }
+
+                    if('fileName' in tab.body) {
+                        tabCopy.body.fileName = tab.body.fileName
+                    }
+                }
                 state.tabs.push(tabCopy)
+                setActiveTab(state, tabCopy)
+            } else {
+                setActiveTab(state, existingTab)
             }
-            setActiveTab(state, tabCopy)
+
             nextTick(() => {
-                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tabCopy._id}"]`)
+                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${id}"]`)
                 activeTabElement.scrollIntoView()
             })
         },
