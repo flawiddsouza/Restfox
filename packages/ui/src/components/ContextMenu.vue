@@ -34,8 +34,14 @@ function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0) {
         menuPostion.x = mousePosition.x
     }
 
+    // If the menu is going to be below the bottom of the screen, move it up
     if(mousePosition.y + menuDimension.y > window.innerHeight + document.body.scrollTop) {
         menuPostion.y = mousePosition.y - menuDimension.y - yOffset
+        // minus, means the menu is going to be above the top of the screen
+        if(menuPostion.y < 0) {
+            menuPostion.maxHeight = menuDimension.y + menuPostion.y
+            menuPostion.y = 0
+        }
     } else {
         menuPostion.y = mousePosition.y
     }
@@ -89,6 +95,7 @@ export default {
                 })
             } else {
                 this.$store.state.openContextMenuElement = null
+                this.contextMenuStyle = {}
             }
         }
     },
@@ -110,7 +117,8 @@ export default {
 
             this.contextMenuStyle = {
                 left: x + 'px',
-                top: y + 'px'
+                top: y + 'px',
+                maxHeight: contextMenuPosition.maxHeight + 'px',
             }
         }
     }
