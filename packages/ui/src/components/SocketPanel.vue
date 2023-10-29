@@ -4,7 +4,7 @@
             <div class="d-f flex-jc-sb mb-0_5rem ml-1rem mr-0_5rem mt-0_5rem">
                 <div>
                     <div style="display: inline-flex">
-                        <div v-for="(client, index) in clients">
+                        <div v-for="(client, index) in activeTab.clients">
                             <button
                                 :style="{ 'margin-left': index !== 0 ? '0.6rem' : '' }"
                                 :class="{
@@ -23,7 +23,7 @@
                 </div>
             </div>
             <div class="clients">
-                <template v-for="client in clients">
+                <template v-for="client in activeTab.clients">
                     <div
                         class="client"
                         v-if="!client.visibility || client.visibility === 'shown'"
@@ -165,7 +165,7 @@
                                             <div
                                                 v-if="message.type === 'INFO'"
                                             >
-                                                <svg  viewBox="0 0 24 24" width="1.2em" height="1.2em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4m0-4h.01"></path></g></svg>
+                                                <svg viewBox="0 0 24 24" width="1.2em" height="1.2em"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4m0-4h.01"></path></g></svg>
                                             </div>
                                             <div
                                                 v-if="message.type === 'SEND'"
@@ -230,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { Ref, ref, nextTick, onBeforeMount, reactive, computed } from 'vue'
+import { nextTick, onBeforeMount, reactive, computed } from 'vue'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
 import { formatTimestamp, generateId, getObjectPaths } from '@/helpers'
 import getObjectPathValue from 'lodash.get'
@@ -246,8 +246,6 @@ function handleMessageContainerRef(ref: any, clientId: string) {
     messageContainerRefs[clientId] = ref
 }
 
-const clients: Ref<Client[]> = ref([])
-
 // Computed
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
@@ -258,7 +256,7 @@ const sockets = store.state.sockets
 function addClient() {
     const payloadId = generateId()
 
-    clients.value.push({
+    activeTab.value.clients.push({
         id: generateId(),
         url: '',
         payloads: [
@@ -280,8 +278,8 @@ function removeClient(client: Client) {
         return
     }
     sockets[activeTab.value._id + '-' + client.id]?.close()
-    clients.value = clients.value.filter(
-        (clientItem) => clientItem.id !== client.id
+    activeTab.value.clients = activeTab.value.clients.filter(
+        (clientItem: Client) => clientItem.id !== client.id
     )
 }
 
@@ -498,10 +496,9 @@ function scrollToBottomClientMessages(clientId: string) {
 }
 
 function loadSavedClients() {
-    const savedClients = getItem('clients')
+    const savedClients = activeTab.value.clients
     if (savedClients) {
-        clients.value = savedClients
-        clients.value.forEach((client) => {
+        activeTab.value.clients.forEach((client) => {
             if (client.visibility !== 'hidden') {
                 scrollToBottomClientMessages(client.id)
             }
@@ -525,7 +522,7 @@ function loadSavedClients() {
             visibility: 'shown'
         }
 
-        clients.value = [initialClient]
+        activeTab.value.clients = [initialClient]
     }
 }
 
@@ -584,10 +581,6 @@ function getCurrentPayloadValue(client: Client, field: 'name' | 'event' | 'paylo
     }
 
     return undefined
-}
-
-function getItem(key: string) {
-    return activeTab.value[key]
 }
 
 function isClientConnected(client: Client) {
