@@ -363,6 +363,9 @@ async function connect(client: Client) {
         })
 
         socket.on('disconnect', async() => {
+            if(socket.disconnected) {
+                return
+            }
             disconnect(client)
 
             addClientMessage(client, {
