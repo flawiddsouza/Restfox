@@ -14,10 +14,10 @@ html {
     --default-border-color: lightgrey;
     --border-color-lighter: #f1f1f1;
     --border-color-lighter-darkened: #f1f1f147;
-    --base-color-success: #0cbb52;
+    --base-color-success: #047857;
     --base-color-info: #097bed;
     --base-color-warning: #ffb400;
-    --base-color-error: #eb2013;
+    --base-color-error: #b91c1c;
     --background-color: white;
     --text-color: black;
     --caret-color: black;
@@ -73,10 +73,10 @@ html.theme-dark {
     --default-border-color: #484848;
     --border-color-lighter: #484848;
     --border-color-lighter-darkened: #48484847;
-    --base-color-success: #0cbb52;
+    --base-color-success: #0bb27e;
     --base-color-info: #097bed;
     --base-color-warning: #ffb400;
-    --base-color-error: #eb2013;
+    --base-color-error: #f06f57;
     --background-color: #292929;
     --text-color: #e0e0e0;
     --caret-color: #e0e0e0;

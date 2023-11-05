@@ -1,8 +1,25 @@
 import { getQuickJS } from 'quickjs-emscripten'
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
+import chai from 'chai'
 
-export function createRequestContextForPlugin(request, environment, setEnvironmentVariable) {
+const test = (testResults) => (description, callback) => {
+    try {
+        callback()
+        testResults.push({
+            description,
+            passed: true
+        })
+    } catch(error) {
+        testResults.push({
+            description,
+            passed: false,
+            error: error.message,
+        })
+    }
+}
+
+export function createRequestContextForPlugin(request, environment, setEnvironmentVariable, testResults) {
     let state = JSON.parse(JSON.stringify(request))
 
     if('params' in request) {
@@ -22,60 +39,74 @@ export function createRequestContextForPlugin(request, environment, setEnvironme
     }
 
     return {
-        request: {
-            getMethod() {
-                return state.method
-            },
-            getBody() {
-                return state.body
-            },
-            getEnvironmentVariable(objectPath) {
-                return getObjectPathValue(environment, objectPath)
-            },
-            setBody(requestBody) {
-                state.body = requestBody
-            },
-            setEnvironmentVariable(objectPath, value) {
-                setEnvironmentVariable(objectPath, value)
-            },
-            getQueryParams() {
-                return state.parameters ?? []
-            },
-            setQueryParams(queryParams) {
-                state.parameters = queryParams
+        context: {
+            request: {
+                getMethod() {
+                    return state.method
+                },
+                getBody() {
+                    return state.body
+                },
+                getEnvironmentVariable(objectPath) {
+                    return getObjectPathValue(environment, objectPath)
+                },
+                setBody(requestBody) {
+                    state.body = requestBody
+                },
+                setEnvironmentVariable(objectPath, value) {
+                    setEnvironmentVariable(objectPath, value)
+                },
+                getQueryParams() {
+                    return state.parameters ?? []
+                },
+                setQueryParams(queryParams) {
+                    state.parameters = queryParams
+                }
             }
+        },
+        expose: {
+            expect: chai.expect,
+            assert: chai.assert,
+            test: test(testResults),
         }
     }
 }
 
-export function createResponseContextForPlugin(response, environment, setEnvironmentVariable) {
+export function createResponseContextForPlugin(response, environment, setEnvironmentVariable, testResults) {
     let bufferCopy = response.buffer.slice(0)
 
     return {
-        response: {
-            getBody() {
-                return bufferCopy
-            },
-            getBodyText() {
-                return (new TextDecoder('utf-8')).decode(bufferCopy)
-            },
-            getEnvironmentVariable(objectPath) {
-                return getObjectPathValue(environment, objectPath)
-            },
-            setBody(buffer) {
-                bufferCopy = buffer
-            },
-            setBodyText(bodyText) {
-                bufferCopy = (new TextEncoder('utf-8')).encode(bodyText)
-            },
-            setEnvironmentVariable(objectPath, value) {
-                setEnvironmentVariable(objectPath, value)
+        context: {
+            response: {
+                getBody() {
+                    return bufferCopy
+                },
+                getBodyText() {
+                    return (new TextDecoder('utf-8')).decode(bufferCopy)
+                },
+                getEnvironmentVariable(objectPath) {
+                    return getObjectPathValue(environment, objectPath)
+                },
+                setBody(buffer) {
+                    bufferCopy = buffer
+                },
+                setBodyText(bodyText) {
+                    bufferCopy = (new TextEncoder('utf-8')).encode(bodyText)
+                },
+                setEnvironmentVariable(objectPath, value) {
+                    setEnvironmentVariable(objectPath, value)
+                }
             }
+        },
+        expose: {
+            expect: chai.expect,
+            assert: chai.assert,
+            test: test(testResults),
         }
     }
 }
 
-export async function usePlugin(context, plugin) {
+export async function usePlugin(context, expose, plugin) {
     const vm = (await getQuickJS()).newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 
@@ -83,7 +114,8 @@ export async function usePlugin(context, plugin) {
         console: {
             log: console.log
         },
-        context
+        context,
+        ...expose,
     })
 
     try {

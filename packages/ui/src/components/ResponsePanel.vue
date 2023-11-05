@@ -32,7 +32,7 @@
         </div>
         <div class="response-panel-tabs">
             <div class="response-panel-tab" :class="{ 'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name }" @click="activeResponsePanelTab = responsePanelTab.name" v-for="responsePanelTab in responsePanelTabs">
-                {{ responsePanelTab.name }}
+                {{ responsePanelTab.label }}
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
@@ -105,6 +105,18 @@
                     <button class="button" @click="restoreCurrentResponseRequest">Restore</button>
                 </div>
             </div>
+            <div class="content-box" v-if="activeResponsePanelTab === 'Tests'">
+                <div v-if="response.testResults.length === 0">
+                    No tests found
+                </div>
+                <div v-else>
+                    <div style="padding-bottom: 0.5rem">Tests: {{ response.testResults.length }}, Passed: {{ passedTestCases }}, Failed: {{ response.testResults.length - passedTestCases }}</div>
+                    <div v-for="testResult in response.testResults" style="padding-bottom: 0.5rem">
+                        <div :style="{ color: testResult.passed ? 'var(--base-color-success)' : 'var(--base-color-error)' }"><span v-if="testResult.passed">✔  </span><span v-else>✘  </span>{{ testResult.description }}</div>
+                        <div v-if="!testResult.passed" style="margin-left: 1rem; margin-top: 0.15rem;">{{ testResult.error }}</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </template>
     <template v-else>
@@ -141,17 +153,33 @@ export default {
         responsePanelTabs() {
             let tabs = [
                 {
-                    name: 'Preview'
+                    name: 'Preview',
+                    label: 'Preview'
                 },
                 {
-                    name: 'Header'
+                    name: 'Header',
+                    label: 'Header'
                 }
             ]
 
             if(this.response && 'request' in this.response) {
                 tabs.push({
-                    name: 'Request'
+                    name: 'Request',
+                    label: 'Request'
                 })
+            }
+
+            if(this.response && 'testResults' in this.response) {
+                const tab = {
+                    name: 'Tests',
+                    label: 'Tests'
+                }
+
+                if(this.response.testResults.length > 0) {
+                    tab.label += ` (${this.response.testResults.filter(item => item.passed).length}/${this.response.testResults.length})`
+                }
+
+                tabs.push(tab)
             }
 
             return tabs
@@ -254,7 +282,14 @@ export default {
             }
 
             return ''
-        }
+        },
+        passedTestCases() {
+            if(this.response && 'testResults' in this.response) {
+                return this.response.testResults.filter(item => item.passed).length
+            }
+
+            return 0
+        },
     },
     watch: {
         response() {
@@ -477,6 +512,7 @@ export default {
     border-bottom: 1px solid var(--default-border-color);
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
+    white-space: nowrap;
 }
 
 .response-panel-tabs .response-panel-tab-active {

@@ -214,11 +214,11 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
 
 export async function createRequestData(state, request, environment, setEnvironmentVariable, plugins) {
     for(const plugin of plugins) {
-        const requestContext = createRequestContextForPlugin(request, environment, setEnvironmentVariable)
+        const { context: requestContext, expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
         state.currentPlugin = plugin.name
 
-        await usePlugin(requestContext, {
+        await usePlugin(requestContext, expose, {
             code: plugin.code
         })
 
@@ -333,7 +333,8 @@ export async function createRequestData(state, request, environment, setEnvironm
 
 export async function handleRequest(request, environment, setEnvironmentVariable, plugins, abortControllerSignal) {
     const state = {
-        currentPlugin: null
+        currentPlugin: null,
+        testResults: [],
     }
 
     try {
@@ -406,7 +407,8 @@ export async function handleRequest(request, environment, setEnvironmentVariable
                     body: originRequestBodyToSave
                 }
             },
-            createdAt: new Date().getTime()
+            createdAt: new Date().getTime(),
+            testResults: [],
         }
 
         if(request.parameters) {
@@ -426,14 +428,16 @@ export async function handleRequest(request, environment, setEnvironmentVariable
         }
 
         for(const plugin of plugins) {
-            const responseContext = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable)
+            const { context: responseContext, expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults)
 
-            await usePlugin(responseContext, {
+            await usePlugin(responseContext, expose, {
                 code: plugin.code
             })
 
             responseToSend = { ...responseToSend, buffer: responseContext.response.getBody() }
         }
+
+        responseToSend.testResults = state.testResults
 
         return responseToSend
     } catch(e) {
