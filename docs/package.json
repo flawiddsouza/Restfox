@@ -5,6 +5,7 @@
         "preview": "vitepress preview . --port 4174"
     },
     "devDependencies": {
+        "medium-zoom": "^1.0.8",
         "vitepress": "^1.0.0-rc.25"
     }
 }

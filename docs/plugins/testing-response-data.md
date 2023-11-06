@@ -26,20 +26,20 @@ if('response' in context) {
 
 1) Right click on a request to access Plugins
 
-![Image](./images/1.png)
+![Image](./images/1.png){data-zoomable}
 
 2) Click on add plugin to create a new plugin
 
-![Image](./images/2.png)
+![Image](./images/2.png){data-zoomable}
 
 3) Write a test script and save it
 
-![Image](./images/3.png)
+![Image](./images/3.png){data-zoomable}
 
-![Image](./images/4.png)
+![Image](./images/4.png){data-zoomable}
 
 4) Send the request & test results will be available in the Tests tab of the response panel
 
-![Image](./images/5.png)
+![Image](./images/5.png){data-zoomable}
 
-![Image](./images/6.png)
+![Image](./images/6.png){data-zoomable}
