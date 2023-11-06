@@ -107,7 +107,8 @@
             </div>
             <div class="content-box" v-if="activeResponsePanelTab === 'Tests'">
                 <div v-if="response.testResults.length === 0">
-                    No tests found
+                    <div style="margin-bottom: 1rem;">No tests found</div>
+                    <div>Please refer <a href="https://docs.restfox.dev/plugins/testing-response-data.html" target="_blank">https://docs.restfox.dev/plugins/testing-response-data.html</a> for more info on how to write tests.</div>
                 </div>
                 <div v-else>
                     <div style="padding-bottom: 0.5rem">Tests: {{ response.testResults.length }}, Passed: {{ passedTestCases }}, Failed: {{ response.testResults.length - passedTestCases }}</div>
