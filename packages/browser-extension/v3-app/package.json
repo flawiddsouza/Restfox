@@ -1,5 +1,6 @@
 {
     "scripts": {
+        "zipa": "cd src && zip -r - . > ../src.zip",
         "zip": "git stash && cd src && zip -r - . > ../src.zip && git stash pop"
     }
 }
