@@ -6,6 +6,7 @@ const pathToElectron = path.join(__dirname, '../packages/electron')
 const pathToElectronPackageJSON = path.join(pathToElectron, 'package.json')
 const pathToElectronPackageLockJSON = path.join(pathToElectron, 'package-lock.json')
 // const pathToChromeAppManifest = path.join(__dirname, '../packages/browser-extension/v3-app/src/manifest.json')
+const pathToChromeAppManifest = ''
 
 const packageJSON = JSON.parse(readFileSync(pathToElectronPackageJSON))
 // const chromeAppManifest = JSON.parse(readFileSync(pathToChromeAppManifest))
