@@ -32,7 +32,7 @@
         "lint-fix": "eslint src/*.ts --fix",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "build-snap": "electron-builder --linux snap",
+        "build-snap": "electron-builder --linux snap --publish never",
         "build-appx": "electron-builder --windows appx"
     },
     "dependencies": {
