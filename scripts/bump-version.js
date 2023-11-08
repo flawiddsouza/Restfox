@@ -11,9 +11,44 @@ const pathToChromeAppManifest = ''
 const packageJSON = JSON.parse(readFileSync(pathToElectronPackageJSON))
 // const chromeAppManifest = JSON.parse(readFileSync(pathToChromeAppManifest))
 
-const [ major, minor, patch ] = packageJSON.version.split('.').map(item => Number(item))
+const args = process.argv.slice(2)
 
-packageJSON.version = `${major}.${minor}.${patch+1}`
+if (args.length === 0) {
+    console.log('Please specify one of these: --major | --minor | --patch | --undo')
+    process.exit(1)
+}
+
+if (args.includes('--undo')) {
+    // check if last commit is "chore: bump version"
+    const lastCommit = execSync('git log -1 --pretty=%B').toString().trim()
+    if (lastCommit !== 'chore: bump version') {
+        console.log('Last commit is not "chore: bump version" so nothing to undo')
+        process.exit(1)
+    }
+    execSync(`git tag -d v${packageJSON.version}`)
+    execSync(`git stash`)
+    execSync(`git reset --hard HEAD~1`)
+    execSync(`git stash pop`)
+    process.exit(0)
+}
+
+let [major, minor, patch] = packageJSON.version.split('.').map(item => Number(item))
+
+if (args.includes('--major')) {
+    major++
+    minor = 0
+    patch = 0
+} else if (args.includes('--minor')) {
+    minor++
+    patch = 0
+} else if (args.includes('--patch')) {
+    patch++
+} else {
+    console.log('Please specify one of these: --major | --minor | --patch | --undo')
+    process.exit(1)
+}
+
+packageJSON.version = `${major}.${minor}.${patch}`
 // chromeAppManifest.version = `${major}.${minor}.${patch+1}`
 
 writeFileSync(pathToElectronPackageJSON, JSON.stringify(packageJSON, null, 4) + '\n')
