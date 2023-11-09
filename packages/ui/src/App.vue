@@ -38,19 +38,50 @@ export default {
         }
     },
     watch: {
-        'activeTab.url'() {
-            // sync query params in url with query params in collection if they are the same
-            if(this.activeTab && 'url' in this.activeTab && this.activeTab.url && 'parameters' in this.activeTab) {
-                let urlParamsSplit = this.activeTab.url.split('?')
-                if(urlParamsSplit.length > 1) {
-                    const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
-                    for(const urlParam of urlSearchParams.entries()) {
-                        this.activeTab.parameters.filter(item => !item.disabled && item.name === urlParam[0]).forEach(matchingParam => {
-                            matchingParam.value = urlParam[1]
-                        })
-                    }
-                }
+        // sync query params in url with query params in request
+        'activeTab.url'(newValue, previousValue) {
+            if (!newValue || !previousValue) {
+                return
             }
+
+            const previousParams = new URLSearchParams(previousValue.split('?')[1] || '')
+            const newParams = new URLSearchParams(newValue.split('?')[1] || '')
+            const paramMap = new Map()
+
+            // Add all parameters from the new URL to paramMap, overriding any existing ones
+            newParams.forEach((value, key) => paramMap.set(key, value))
+
+            // Detect changed parameters by comparing previous and new values
+            const changedParams = []
+            previousParams.forEach((value, key) => {
+                if (!newParams.has(key)) { // Parameter is removed
+                    changedParams.push(key)
+                }
+            })
+
+            this.activeTab.parameters = this.activeTab.parameters.filter(param => {
+                // Keep all parameters except the ones that have been explicitly changed
+                return !changedParams.includes(param.name) || paramMap.has(param.name)
+            })
+
+            // Map existing parameters to keep track of which ones have been handled
+            const existingParameters = new Map()
+            this.activeTab.parameters.forEach(param => existingParameters.set(param.name, param))
+
+            // Update the values of parameters or create new ones based on the new URL
+            paramMap.forEach((value, key) => {
+                if (existingParameters.has(key)) {
+                    // Update existing parameter's value
+                    existingParameters.get(key).value = value
+                } else {
+                    // Add new parameter
+                    this.activeTab.parameters.push({
+                        name: key,
+                        value: value,
+                        disabled: false
+                    })
+                }
+            })
         },
         'activeTab.parameters': {
             handler() {
