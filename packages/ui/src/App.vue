@@ -46,6 +46,12 @@ export default {
 
             const previousParams = new URLSearchParams(previousValue.split('?')[1] || '')
             const newParams = new URLSearchParams(newValue.split('?')[1] || '')
+
+            // no change in url query params
+            if(previousParams.toString() === newParams.toString()) {
+                return
+            }
+
             const paramMap = new Map()
 
             // Add all parameters from the new URL to paramMap, overriding any existing ones
@@ -58,6 +64,10 @@ export default {
                     changedParams.push(key)
                 }
             })
+
+            if(this.activeTab.parameters === undefined) {
+                this.activeTab.parameters = []
+            }
 
             this.activeTab.parameters = this.activeTab.parameters.filter(param => {
                 // Keep all parameters except the ones that have been explicitly changed
