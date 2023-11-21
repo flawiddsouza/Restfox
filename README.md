@@ -140,7 +140,7 @@ npm run build
 ## Using web-standalone
 ```
 git clone https://github.com/flawiddsouza/Restfox
-cd packages/ui
+cd Restfox/packages/ui
 npm i
 npm run build-web-standalone
 cd ../web-standalone
