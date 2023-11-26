@@ -209,7 +209,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
             }
         }
 
-        return new Promise(async(resolve, reject) => {
+        return new Promise((resolve, reject) => {
             const requestId = nanoid()
 
             abortControllerSignal.onabort = () => {
@@ -217,23 +217,25 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 reject(new DOMException('The user aborted a request.', 'AbortError'))
             }
 
-            const data = await window.electronIPC.sendRequest({
+            window.electronIPC.sendRequest({
                 requestId,
                 url: url.toString(),
                 method,
                 headers,
                 body,
                 bodyHint
+            }).then(data => {
+                if(data.event === 'response') {
+                    data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
+                    resolve(data.eventData)
+                }
+
+                if(data.event === 'responseError') {
+                    reject(new Error(data.eventData))
+                }
+            }).catch(error => {
+                reject(error)
             })
-
-            if(data.event === 'response') {
-                data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
-                resolve(data.eventData)
-            }
-
-            if(data.event === 'responseError') {
-                reject(new Error(data.eventData))
-            }
         })
     }
 
