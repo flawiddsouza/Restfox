@@ -324,7 +324,7 @@ const store = createStore({
                     for(const param of state.activeTab.body.params) {
                         let paramExtracted = {...param}
                         if('files' in paramExtracted) {
-                            paramExtracted.files = [...paramExtracted.files]
+                            paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
                         }
                         params.push(paramExtracted)
                     }
