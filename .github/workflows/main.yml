@@ -14,15 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
+      - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Build UI
         working-directory: ./packages/ui
         run: |
           npm ci
-          npm run build-desktop
+          npm run build-desktop-electron
       - name: Install flatpak dependencies
         run: |
           sudo apt-get install -y flatpak-builder
@@ -37,15 +37,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
+      - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Build UI
         working-directory: ./packages/ui
         run: |
           npm ci
-          npm run build-desktop
+          npm run build-desktop-electron
       - name: Build windows installer
         working-directory: ./packages/electron
         run: |
@@ -55,15 +55,15 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
+      - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Build UI
         working-directory: ./packages/ui
         run: |
           npm ci
-          npm run build-desktop
+          npm run build-desktop-electron
       - name: Add macOS certs
         run: chmod +x scripts/add-osx-cert.sh && ./scripts/add-osx-cert.sh
         env:
@@ -83,15 +83,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
+      - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Build UI
         working-directory: ./packages/ui
         run: |
           npm ci
-          npm run build-desktop
+          npm run build-desktop-electron
       - name: Build snap package
         working-directory: ./packages/electron
         run: |
@@ -134,10 +134,10 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Fetch all history
-      - name: Setup Node 16
+      - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 20
       - name: Generate & Update Release Notes
         run: |
           node scripts/update-release-notes.js

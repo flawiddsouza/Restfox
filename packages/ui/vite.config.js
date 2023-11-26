@@ -76,6 +76,17 @@ export default defineConfig(({ mode }) => {
         )
     }
 
+    if(mode === 'desktop-electron') {
+        config.plugins.push(
+            copy({
+                targets: [
+                    { src: 'dist/*', dest: '../electron/ui' },
+                ],
+                hook: 'writeBundle'
+            })
+        )
+    }
+
     if(mode === 'web-standalone') {
         config.plugins.push(
             copy({

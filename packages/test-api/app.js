@@ -81,4 +81,12 @@ app.get('/protected', verifyAccessToken, (req, res) => {
     res.send('Protected Page')
 })
 
+app.get('/user-agent', (req, res) => {
+    res.send(req.headers['user-agent'])
+})
+
+app.get('/cookie', (req, res) => {
+    res.send(req.headers['cookie'])
+})
+
 app.listen(5605, () => console.log('Running at http://localhost:5605'))

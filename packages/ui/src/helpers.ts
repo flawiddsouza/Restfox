@@ -181,6 +181,62 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
         })
     }
 
+    if (import.meta.env.MODE === 'desktop-electron') {
+        let bodyHint: any = null
+
+        if(body instanceof FormData) {
+            bodyHint = 'FormData'
+            body = Array.from(body.entries())
+            let i = 0
+            for(const item of body) {
+                if(item[1] instanceof File) {
+                    body[i][1] = {
+                        name: item[1].name,
+                        type: item[1].type,
+                        buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
+                    }
+                }
+                i++
+            }
+        }
+
+        if(body instanceof File) {
+            bodyHint = 'File'
+            body = {
+                name: body.name,
+                type: body.type,
+                buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
+            }
+        }
+
+        return new Promise(async(resolve, reject) => {
+            const requestId = nanoid()
+
+            abortControllerSignal.onabort = () => {
+                window.electronIPC.cancelRequest(requestId)
+                reject(new DOMException('The user aborted a request.', 'AbortError'))
+            }
+
+            const data = await window.electronIPC.sendRequest({
+                requestId,
+                url: url.toString(),
+                method,
+                headers,
+                body,
+                bodyHint
+            })
+
+            if(data.event === 'response') {
+                data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
+                resolve(data.eventData)
+            }
+
+            if(data.event === 'responseError') {
+                reject(new Error(data.eventData))
+            }
+        })
+    }
+
     const startTime = new Date()
 
     const response = await fetch(url, {

@@ -5,6 +5,7 @@
         "dev": "vite",
         "build": "vite build",
         "build-desktop": "vite build --mode desktop",
+        "build-desktop-electron": "vite build --mode desktop-electron",
         "build-web-standalone": "vite build --mode web-standalone",
         "serve": "vite preview",
         "test": "vitest",

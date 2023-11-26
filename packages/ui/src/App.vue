@@ -264,7 +264,7 @@ export default {
         this.$store.dispatch('loadPlugins')
         await this.$store.dispatch('loadWorkspaces')
 
-        if(import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'web-standalone') {
+        if(import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'desktop-electron' || import.meta.env.MODE === 'web-standalone') {
             this.$store.state.flags.isBrowser = false
         }
     },
