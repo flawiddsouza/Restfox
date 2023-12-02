@@ -9,15 +9,16 @@
                     <option>Postman URL</option>
                     <option>Insomnia</option>
                     <option>OpenAPI</option>
+                    <option>OpenAPI URL</option>
                 </select>
             </label>
 
             <div style="margin-top: 1rem">
-                <template v-if="importFrom !== 'Postman URL'">
+                <template v-if="importFrom.endsWith(' URL') === false">
                     <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip, .yml, .yaml" multiple required>
                 </template>
                 <template v-else>
-                    <input type="url" v-model="urlToImport" required placeholder="https://postman.com/collections/{collectionId}" class="full-width-input">
+                    <input type="url" v-model="urlToImport" required :placeholder="importUrlPlaceholder" class="full-width-input">
                 </template>
             </div>
 
@@ -96,6 +97,17 @@ export default {
         },
         collectionTree() {
             return this.$store.state.collectionTree
+        },
+        importUrlPlaceholder() {
+            if(this.importFrom === 'Postman URL') {
+                return 'https://postman.com/collections/{collectionId}'
+            }
+
+            if(this.importFrom === 'OpenAPI URL') {
+                return 'https://openapi.spec/v3.yaml or https://openapi.spec/v3.json'
+            }
+
+            return ''
         }
     },
     watch: {
@@ -128,6 +140,11 @@ export default {
                     json = await response.json()
 
                     collectionTree = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
+                } else if(this.importFrom === 'OpenAPI URL') {
+                    const response = await fetch(this.urlToImport)
+                    json = await response.text()
+
+                    collectionTree = await convertOpenAPIExportToRestfoxCollection(json, this.activeWorkspace._id)
                 } else {
                     for(const fileToImport of this.filesToImport) {
                         fileBeingImported = fileToImport.name
@@ -173,7 +190,7 @@ export default {
                 this.filesToImport = []
                 this.showImportModal = false
 
-                if(this.importFrom === 'Postman URL') {
+                if(this.importFrom.endsWith(' URL')) {
                     alert('URL imported successfully')
                 } else {
                     if(importedFileCount === 1) {
