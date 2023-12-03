@@ -206,7 +206,9 @@ const store = createStore({
             flags: {
                 hideBrowserRelatedResponsePanelErrors: false,
                 browserExtensionEnabled: false,
-                isBrowser: true
+                isBrowser: true,
+                isElectron: false,
+                disableSSLVerification: false,
             },
             openContextMenuElement: null,
             sockets: {},
@@ -718,7 +720,7 @@ const store = createStore({
             ]
 
             context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, setEnvironmentVariable, enabledPlugins, context.state.requestAbortController[activeTab._id].signal)
+            const response = await handleRequest(activeTab, environment, setEnvironmentVariable, enabledPlugins, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'

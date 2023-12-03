@@ -84,7 +84,7 @@ export function generateBasicAuthString(username, password) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-export async function fetchWrapper(url, method, headers, body, abortControllerSignal) {
+export async function fetchWrapper(url, method, headers, body, abortControllerSignal, disableSSLVerification) {
     if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
         let bodyHint: any = null
 
@@ -223,7 +223,8 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 method,
                 headers,
                 body,
-                bodyHint
+                bodyHint,
+                disableSSLVerification,
             }).then(data => {
                 if(data.event === 'response') {
                     data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
@@ -389,7 +390,7 @@ export async function createRequestData(state, request, environment, setEnvironm
     }
 }
 
-export async function handleRequest(request, environment, setEnvironmentVariable, plugins, abortControllerSignal) {
+export async function handleRequest(request, environment, setEnvironmentVariable, plugins, abortControllerSignal, flags) {
     const state = {
         currentPlugin: null,
         testResults: [],
@@ -398,7 +399,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins)
 
-        const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal)
+        const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal, flags.disableSSLVerification)
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
 

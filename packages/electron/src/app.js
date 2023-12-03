@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { resolve } = require('path')
 const { File } = require('node:buffer')
+const { Agent } = require('undici')
 require('update-electron-app')()
 
 if(require('electron-squirrel-startup')) return app.quit()
@@ -25,7 +26,7 @@ let abortController = {}
 
 async function handleSendRequest(_event, data) {
     try {
-        const { requestId, url, method, headers, bodyHint } = data
+        const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
         let { body } = data
 
         abortController[requestId] = new AbortController()
@@ -49,7 +50,12 @@ async function handleSendRequest(_event, data) {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
-            signal: abortController.signal
+            signal: abortController.signal,
+            dispatcher: new Agent({
+                connect: {
+                    rejectUnauthorized: disableSSLVerification ? false : true,
+                },
+            }),
         })
 
         const endTime = new Date()

@@ -8,6 +8,7 @@ export default {
         THEME: 'Restfox-Theme',
         GITHUB_STAR_COUNT: 'Restfox-GithubStarCount',
         DISABLE_PAGE_VIEW_ANALYTICS_TRACKING: 'Restfox-DisablePageViewAnalyticsTracking',
+        DISABLE_SSL_VERIFICATION: 'Restfox-DisableSSLVerification',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

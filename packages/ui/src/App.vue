@@ -267,6 +267,10 @@ export default {
         if(import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'desktop-electron' || import.meta.env.MODE === 'web-standalone') {
             this.$store.state.flags.isBrowser = false
         }
+
+        if(import.meta.env.MODE === 'desktop-electron') {
+            this.$store.state.flags.isElectron = true
+        }
     },
     mounted() {
         const messageHandler = message => {
@@ -296,6 +300,7 @@ export default {
         const savedTheme = localStorage.getItem(constants.LOCAL_STORAGE_KEY.THEME)
         const savedGithubStarCount = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT)
         let savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
+        const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -329,6 +334,14 @@ export default {
             script.dataset.websiteId = 'ed9e95fd-48af-4aac-a929-2a9f04ce9883'
             script.src = 'https://umami.artelin.dev/umami-analytics.js'
             document.body.appendChild(script)
+        }
+
+        if(savedDisableSSLVerification) {
+            try {
+                this.$store.state.flags.disableSSLVerification = JSON.parse(savedDisableSSLVerification)
+            } catch(e) {
+                this.$store.state.flags.disableSSLVerification = false
+            }
         }
     },
     beforeUnmount() {

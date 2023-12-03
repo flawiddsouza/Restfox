@@ -37,6 +37,7 @@
     },
     "dependencies": {
         "electron-squirrel-startup": "^1.0.0",
+        "undici": "^5.28.2",
         "update-electron-app": "^2.0.1"
     },
     "config": {

@@ -21,8 +21,18 @@
                 <label style="display: flex;">
                     <input type="checkbox" v-model="disablePageViewAnalyticsTracking"> <div style="margin-left: 0.5rem;">Disable Page View Analytics Tracking</div> <div style="margin-left: 0.5rem;"></div>
                 </label>
-                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Disabling this will prevent the application from sending page view event to the <a href="https://umami.is" target="_blank">analytics server</a> when the application is opened. Please note that we do not track any other actions or the requests you make in the application. Click <a href="https://umami.is/docs/tracker-functions#:~:text=Pageviews,Website%20ID%20(required)" target="_blank">here</a> to see what data gets collected.</div>
+                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will prevent the application from sending page view event to the <a href="https://umami.is" target="_blank">analytics server</a> when the application is opened. Please note that we do not track any other actions or the requests you make in the application. Click <a href="https://umami.is/docs/tracker-functions#:~:text=Pageviews,Website%20ID%20(required)" target="_blank">here</a> to see what data gets collected.</div>
             </div>
+            <template v-if="flags.isElectron">
+                <div style="padding-top: 1rem"></div>
+                <div style="padding-top: 1rem"></div>
+                <div>
+                    <label style="display: flex;">
+                        <input type="checkbox" v-model="disableSSLVerification"> <div style="margin-left: 0.5rem;">Disable SSL Verification</div> <div style="margin-left: 0.5rem;"></div>
+                    </label>
+                    <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will disable SSL verification for all requests made from the application. This is useful when you are working with self signed certificates.</div>
+                </div>
+            </template>
             <div style="padding-top: 1rem"></div>
             <div style="padding-top: 1rem"></div>
             <div style="font-style: italic; text-align: center;">Changes you make here will be auto saved</div>
@@ -52,6 +62,7 @@ export default {
             requestPanelRatio: null,
             responsePanelRatio: null,
             disablePageViewAnalyticsTracking: false,
+            disableSSLVerification: false,
         }
     },
     computed: {
@@ -62,7 +73,10 @@ export default {
             set(value) {
                 this.$emit('update:showModal', value)
             }
-        }
+        },
+        flags() {
+            return this.$store.state.flags
+        },
     },
     watch: {
         showModal() {
@@ -70,7 +84,11 @@ export default {
         },
         disablePageViewAnalyticsTracking() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING, this.disablePageViewAnalyticsTracking)
-        }
+        },
+        disableSSLVerification() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION, this.disableSSLVerification)
+            this.$store.state.flags.disableSSLVerification = this.disableSSLVerification
+        },
     },
     methods: {
         resetWidths() {
@@ -84,6 +102,9 @@ export default {
         resetDisablePageViewAnalyticsTracking() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
         },
+        resetDisableSSLVerification() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -96,6 +117,7 @@ export default {
             this.resetWidths()
             this.resetLayout()
             this.resetDisablePageViewAnalyticsTracking()
+            this.resetDisableSSLVerification()
             document.location.reload()
         },
         fetchSavedSettings() {
@@ -103,6 +125,7 @@ export default {
             const savedRequestPanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
             const savedResponsePanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO)
             const savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
+            const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -121,6 +144,14 @@ export default {
                     this.disablePageViewAnalyticsTracking = JSON.parse(savedDisablePageViewAnalyticsTracking)
                 } catch (e) {
                     this.disablePageViewAnalyticsTracking = false
+                }
+            }
+
+            if(savedDisableSSLVerification) {
+                try {
+                    this.disableSSLVerification = JSON.parse(savedDisableSSLVerification)
+                } catch (e) {
+                    this.disableSSLVerification = false
                 }
             }
         }
