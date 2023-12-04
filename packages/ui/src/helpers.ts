@@ -373,10 +373,14 @@ export async function createRequestData(state, request, environment, setEnvironm
         for(const header of enabledHeaders) {
             const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
             const headerValue = substituteEnvironmentVariables(environment, header.value)
+
             if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
                 continue
             }
-            headers[headerName] = headerValue
+
+            if(headerName !== '') {
+                headers[headerName] = headerValue
+            }
         }
     }
 
