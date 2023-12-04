@@ -7,9 +7,11 @@ const pathToElectronPackageJSON = path.join(pathToElectron, 'package.json')
 const pathToElectronPackageLockJSON = path.join(pathToElectron, 'package-lock.json')
 // const pathToChromeAppManifest = path.join(__dirname, '../packages/browser-extension/v3-app/src/manifest.json')
 const pathToChromeAppManifest = ''
+const pathToREADME = path.join(__dirname, '../README.md')
 
 const packageJSON = JSON.parse(readFileSync(pathToElectronPackageJSON))
 // const chromeAppManifest = JSON.parse(readFileSync(pathToChromeAppManifest))
+const README = readFileSync(pathToREADME).toString()
 
 const args = process.argv.slice(2)
 
@@ -53,11 +55,12 @@ packageJSON.version = `${major}.${minor}.${patch}`
 
 writeFileSync(pathToElectronPackageJSON, JSON.stringify(packageJSON, null, 4) + '\n')
 // writeFileSync(pathToChromeAppManifest, JSON.stringify(chromeAppManifest, null, 4) + '\n')
+writeFileSync(pathToREADME, README.replace(/\d+\.\d+\.\d+/g, packageJSON.version))
 
 execSync('npm i', {
     cwd: pathToElectron
 })
 
-execSync(`git add ${pathToElectronPackageJSON} ${pathToElectronPackageLockJSON} ${pathToChromeAppManifest}`)
+execSync(`git add ${pathToElectronPackageJSON} ${pathToElectronPackageLockJSON} ${pathToChromeAppManifest} ${pathToREADME}`)
 execSync(`git commit -m "chore: bump version"`)
 execSync(`git tag v${packageJSON.version} --force`)
