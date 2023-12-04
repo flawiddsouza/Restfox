@@ -339,11 +339,23 @@ export async function createRequestData(state, request, environment, setEnvironm
 
     const url = new URL(urlWithEnvironmentVariablesSubstituted)
 
+    const urlCopy = new URL(urlWithEnvironmentVariablesSubstituted)
+
     if('parameters' in request && request.parameters) {
         request.parameters.filter(item => !item.disabled).forEach(param => {
+            const paramName = substituteEnvironmentVariables(environment, param.name)
+            const paramValue = substituteEnvironmentVariables(environment, param.value)
+
+            // if the parameter with the same name & value is already in the url, then we remove it, to prevent duplicate parameters
+            if(urlCopy.searchParams.has(paramName, paramValue) && urlCopy.searchParams.getAll(paramName).some(value => value === paramValue)) {
+                // console.log('Removing duplicate parameter', paramName, paramValue)
+                url.searchParams.delete(paramName, paramValue)
+            }
+
+            // console.log('Adding parameter', paramName, paramValue)
             url.searchParams.append(
-                substituteEnvironmentVariables(environment, param.name),
-                substituteEnvironmentVariables(environment, param.value)
+                paramName,
+                paramValue
             )
         })
     }
