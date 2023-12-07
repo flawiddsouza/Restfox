@@ -33,7 +33,13 @@ module.exports = {
         },
         {
             name: '@electron-forge/maker-deb',
-            config: {}
+            config: {
+                options: {
+                    // From https://github.com/electron/forge/issues/3235#issuecomment-1710830667
+                    // fixes https://github.com/flawiddsouza/Restfox/issues/85
+                    compression: 'gzip'
+                }
+            }
         },
         {
             name: '@electron-forge/maker-rpm',
