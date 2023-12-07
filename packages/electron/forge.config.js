@@ -37,7 +37,8 @@ module.exports = {
                 options: {
                     // From https://github.com/electron/forge/issues/3235#issuecomment-1710830667
                     // fixes https://github.com/flawiddsouza/Restfox/issues/85
-                    compression: 'gzip'
+                    compression: 'gzip',
+                    icon: 'ui/favicon.png',
                 }
             }
         },

@@ -14,7 +14,8 @@ function createWindow() {
             preload: resolve(__dirname, './preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
-        }
+        },
+        icon: resolve(__dirname, '../ui/favicon.png'),
     })
     win.on('show', () => { win.focus() })
     win.maximize()
