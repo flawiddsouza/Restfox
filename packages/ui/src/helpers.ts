@@ -84,7 +84,7 @@ export function generateBasicAuthString(username, password) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-export async function fetchWrapper(url, method, headers, body, abortControllerSignal, disableSSLVerification) {
+export async function fetchWrapper(url, method, headers, body, abortControllerSignal, flags) {
     if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
         let bodyHint: any = null
 
@@ -181,7 +181,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
         })
     }
 
-    if (import.meta.env.MODE === 'desktop-electron') {
+    if (import.meta.env.MODE === 'desktop-electron' && !flags.electronSwitchToChromiumFetch) {
         let bodyHint: any = null
 
         if(body instanceof FormData) {
@@ -224,7 +224,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 headers,
                 body,
                 bodyHint,
-                disableSSLVerification,
+                disableSSLVerification: flags.disableSSLVerification,
             }).then(data => {
                 if(data.event === 'response') {
                     data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
@@ -415,7 +415,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins)
 
-        const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal, flags.disableSSLVerification)
+        const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal, flags)
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
 

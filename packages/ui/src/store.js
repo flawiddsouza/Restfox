@@ -209,6 +209,7 @@ const store = createStore({
                 isBrowser: true,
                 isElectron: false,
                 disableSSLVerification: false,
+                electronSwitchToChromiumFetch: false,
             },
             openContextMenuElement: null,
             sockets: {},

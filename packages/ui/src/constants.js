@@ -9,6 +9,7 @@ export default {
         GITHUB_STAR_COUNT: 'Restfox-GithubStarCount',
         DISABLE_PAGE_VIEW_ANALYTICS_TRACKING: 'Restfox-DisablePageViewAnalyticsTracking',
         DISABLE_SSL_VERIFICATION: 'Restfox-DisableSSLVerification',
+        ELECTRON_SWITCH_TO_CHROMIUM_FETCH: 'Restfox-ElectronSwitchToChromiumFetch',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

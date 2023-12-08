@@ -301,6 +301,7 @@ export default {
         const savedGithubStarCount = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT)
         let savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
         const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
+        const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -341,6 +342,14 @@ export default {
                 this.$store.state.flags.disableSSLVerification = JSON.parse(savedDisableSSLVerification)
             } catch(e) {
                 this.$store.state.flags.disableSSLVerification = false
+            }
+        }
+
+        if(savedElectronSwitchToChromiumFetch) {
+            try {
+                this.$store.state.flags.electronSwitchToChromiumFetch = JSON.parse(savedElectronSwitchToChromiumFetch)
+            } catch(e) {
+                this.$store.state.flags.electronSwitchToChromiumFetch = false
             }
         }
     },

@@ -25,12 +25,18 @@
             </div>
             <template v-if="flags.isElectron">
                 <div style="padding-top: 1rem"></div>
-                <div style="padding-top: 1rem"></div>
                 <div>
                     <label style="display: flex;">
                         <input type="checkbox" v-model="disableSSLVerification"> <div style="margin-left: 0.5rem;">Disable SSL Verification</div> <div style="margin-left: 0.5rem;"></div>
                     </label>
                     <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will disable SSL verification for all requests made from the application. This is useful when you are working with self signed certificates.</div>
+                </div>
+                <div style="padding-top: 1rem"></div>
+                <div>
+                    <label style="display: flex;">
+                        <input type="checkbox" v-model="electronSwitchToChromiumFetch"> <div style="margin-left: 0.5rem;">Switch to Chromium Fetch</div> <div style="margin-left: 0.5rem;"></div>
+                    </label>
+                    <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Tick this if you're not able to make any requests despite the server being reachable. This is not recommended for most people and is only provided to temporarily alleviate issues with firewalls and vpns. See <a href="https://github.com/flawiddsouza/Restfox/issues/86" target="_blank">this link</a> for more info.</div>
                 </div>
             </template>
             <div style="padding-top: 1rem"></div>
@@ -63,6 +69,7 @@ export default {
             responsePanelRatio: null,
             disablePageViewAnalyticsTracking: false,
             disableSSLVerification: false,
+            electronSwitchToChromiumFetch: false,
         }
     },
     computed: {
@@ -89,6 +96,10 @@ export default {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION, this.disableSSLVerification)
             this.$store.state.flags.disableSSLVerification = this.disableSSLVerification
         },
+        electronSwitchToChromiumFetch() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH, this.electronSwitchToChromiumFetch)
+            this.$store.state.flags.electronSwitchToChromiumFetch = this.electronSwitchToChromiumFetch
+        }
     },
     methods: {
         resetWidths() {
@@ -105,6 +116,9 @@ export default {
         resetDisableSSLVerification() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
         },
+        resetElectronSwitchToChromiumFetch() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -118,6 +132,7 @@ export default {
             this.resetLayout()
             this.resetDisablePageViewAnalyticsTracking()
             this.resetDisableSSLVerification()
+            this.resetElectronSwitchToChromiumFetch()
             document.location.reload()
         },
         fetchSavedSettings() {
@@ -126,6 +141,7 @@ export default {
             const savedResponsePanelRatio = localStorage.getItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO)
             const savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
             const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
+            const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -152,6 +168,14 @@ export default {
                     this.disableSSLVerification = JSON.parse(savedDisableSSLVerification)
                 } catch (e) {
                     this.disableSSLVerification = false
+                }
+            }
+
+            if(savedElectronSwitchToChromiumFetch) {
+                try {
+                    this.electronSwitchToChromiumFetch = JSON.parse(savedElectronSwitchToChromiumFetch)
+                } catch (e) {
+                    this.electronSwitchToChromiumFetch = false
                 }
             }
         }
