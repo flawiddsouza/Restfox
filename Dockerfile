@@ -1,6 +1,8 @@
 # Stage 1: Build the UI and web-standalone
 FROM node:19.8.1-alpine3.17 AS build
+RUN apk add --no-cache git
 RUN mkdir /app
+ADD .git /app/.git
 ADD ./packages/ui /app/ui/
 ADD ./packages/web-standalone /app/web-standalone/
 WORKDIR /app/ui
