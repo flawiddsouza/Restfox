@@ -3,11 +3,13 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 import copy from 'rollup-plugin-copy'
 import { VitePWA } from 'vite-plugin-pwa'
+import { ViteRevisionPlugin } from './vite-plugin-revision'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
     const config = {
         plugins: [
+            ViteRevisionPlugin(),
             vue({
                 template: {
                     compilerOptions: {

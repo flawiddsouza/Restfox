@@ -1,6 +1,8 @@
 <template>
     <div v-if="showModalComp">
         <modal title="Settings" v-model="showModalComp" width="600px">
+            <div>Running: {{ gitTag }} ({{ gitCommitHash }})</div>
+            <div style="padding-top: 1rem"></div>
             <div>
                 Sidebar Width<br>
                 <input type="text" :value="sidebarWidth" class="full-width-input" placeholder="Default" disabled>
@@ -83,6 +85,12 @@ export default {
         },
         flags() {
             return this.$store.state.flags
+        },
+        gitTag() {
+            return import.meta.env.VITE_GIT_TAG
+        },
+        gitCommitHash() {
+            return import.meta.env.VITE_GIT_COMMIT_HASH
         },
     },
     watch: {
