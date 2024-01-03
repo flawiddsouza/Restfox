@@ -889,6 +889,8 @@ function importRestfoxV1(collections, workspaceId) {
                 _type: 'request_group',
                 name: item.name,
                 environment: item.environment,
+                environments: item.environments,
+                currentEnvironment: item.currentEnvironment,
                 parentId: item.parentId,
                 workspaceId,
                 sortOrder: item.sortOrder
