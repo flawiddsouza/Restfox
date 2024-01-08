@@ -1223,10 +1223,11 @@ export function getObjectPaths(object: object): string[] {
     return paths
 }
 
-export function exportRestfoxCollection(collection) {
+export function exportRestfoxCollection(collection, environments = undefined) {
     downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
         exportedFrom: 'Restfox-1.0.0',
-        collection
+        collection,
+        environments,
     })
 }
 

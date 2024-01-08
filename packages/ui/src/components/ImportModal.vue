@@ -53,6 +53,7 @@ import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
 import { flattenTree, sortTree, toTree } from '../helpers'
+import { mergeArraysByProperty } from '@/utils/array'
 
 function prependParentTitleToChildTitle(array, prepend = '') {
     array.forEach(item => {
@@ -165,6 +166,18 @@ export default {
 
                         if(this.importFrom === 'Restfox') {
                             collectionTree = collectionTree.concat(convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id))
+                            if(json.environments) {
+                                this.activeWorkspace.environments = mergeArraysByProperty(this.activeWorkspace.environments ?? [], json.environments, 'name')
+                                this.$store.commit('updateWorkspaceEnvironments', {
+                                    workspaceId: this.activeWorkspace._id,
+                                    environments: this.activeWorkspace.environments
+                                })
+                                this.activeWorkspace.environment = this.activeWorkspace.environments.find(environment => environment.name === (this.activeWorkspace.currentEnvironment ?? 'Default')).environment
+                                this.$store.commit('updateWorkspaceEnvironment', {
+                                    workspaceId: this.activeWorkspace._id,
+                                    environment: this.activeWorkspace.environment,
+                                })
+                            }
                         }
 
                         if(this.importFrom === 'OpenAPI') {

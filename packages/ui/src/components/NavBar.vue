@@ -137,7 +137,7 @@ export default {
     methods: {
         async exportCollection() {
             const collection = await getCollectionForWorkspace(this.activeWorkspace._id)
-            exportRestfoxCollection(collection)
+            exportRestfoxCollection(collection, this.activeWorkspace.environments)
         },
         async clearCollection() {
             if(await window.createPrompt('Are you sure? Type "clear everything in workspace" to confirm') === 'clear everything in workspace') {

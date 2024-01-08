@@ -180,7 +180,7 @@ describe('curl', () => {
                 --compressed
         `.trim()
         const result = convert(chromeCurlBash)
-        console.log(result[0])
+        // console.log(result[0])
         expect(result).toMatchObject([{
             _id: '__REQ_1__',
             _type: 'request',
@@ -243,7 +243,7 @@ describe('curl', () => {
                 --compressed
         `.trim()
         const result = convert(chromeCurlCmd)
-        console.log(result[0])
+        // console.log(result[0])
         expect(result).toMatchObject([{
             _id: '__REQ_1__',
             _type: 'request',
