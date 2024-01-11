@@ -9,7 +9,7 @@ import { ViteRevisionPlugin } from './vite-plugin-revision'
 export default defineConfig(({ mode }) => {
     const config = {
         plugins: [
-            ViteRevisionPlugin(),
+            process.env.VITEST ? null : ViteRevisionPlugin(),
             vue({
                 template: {
                     compilerOptions: {
