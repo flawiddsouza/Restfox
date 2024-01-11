@@ -18,6 +18,8 @@ jobs:
           working-directory: ./packages/ui
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-tags: true
     - name: Use Node.js 19
       uses: actions/setup-node@v3
       with:
