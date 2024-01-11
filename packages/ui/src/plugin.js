@@ -127,7 +127,7 @@ export function createResponseContextForPlugin(response, environment, setEnviron
                 },
                 getHeader(headerName) {
                     var header = headers.find((header) => header[0].toLowerCase() == headerName.toLowerCase())
-                    return header ? substituteEnvironmentVariables(environment, header[1]) : undefined
+                    return header ? header[1] : undefined
                 }
             }
         },
