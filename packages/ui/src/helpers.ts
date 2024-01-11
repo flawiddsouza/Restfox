@@ -281,7 +281,7 @@ export async function createRequestData(state, request, environment, setEnvironm
             code: plugin.code
         })
 
-        request = { ...request, body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
+        request = { ...request, headers: requestContext.request.getHeaders(), body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
     }
 
     let body: any = null
