@@ -2,6 +2,7 @@ import { getQuickJS } from 'quickjs-emscripten'
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
+import { substituteEnvironmentVariables } from './helpers'
 
 const test = (testResults) => (description, callback) => {
     try {
@@ -61,6 +62,27 @@ export function createRequestContextForPlugin(request, environment, setEnvironme
                 },
                 setQueryParams(queryParams) {
                     state.parameters = queryParams
+                },
+                getURL() {
+                    return substituteEnvironmentVariables(environment, state.url)
+                },
+                getHeaders() {
+                    return state.headers
+                },
+                setHeaders(requestHeaders) {
+                    state.headers = requestHeaders
+                },
+                getHeader(headerName) {
+                    var header = state.headers.find((header) => header.name.toLowerCase() == headerName.toLowerCase())
+                    return header ? substituteEnvironmentVariables(environment, header.value) : undefined
+                },
+                setHeader(headerName, value) {
+                    var headerIndex = state.headers.findIndex((header) => header.name.toLowerCase() == headerName.toLowerCase())
+                    if(headerIndex >= 0) {
+                        state.headers[headerIndex].value = value
+                    } else {
+                        state.headers.push({ name: headerName, value: value })
+                    }
                 }
             }
         },
@@ -74,6 +96,7 @@ export function createRequestContextForPlugin(request, environment, setEnvironme
 
 export function createResponseContextForPlugin(response, environment, setEnvironmentVariable, testResults) {
     let bufferCopy = response.buffer.slice(0)
+    let headers = response.headers
 
     return {
         context: {
@@ -95,6 +118,16 @@ export function createResponseContextForPlugin(response, environment, setEnviron
                 },
                 setEnvironmentVariable(objectPath, value) {
                     setEnvironmentVariable(objectPath, value)
+                },
+                getURL() {
+                    return response.url
+                },
+                getHeaders() {
+                    return headers
+                },
+                getHeader(headerName) {
+                    var header = headers.find((header) => header[0].toLowerCase() == headerName.toLowerCase())
+                    return header ? header[1] : undefined
                 }
             }
         },
