@@ -14,7 +14,7 @@ import {
     isFirstIdIndirectOrDirectParentOfSecondIdInTree,
     generateNewIdsForTree,
     substituteEnvironmentVariables,
-    setObjectPathValue
+    setEnvironmentVariable
 } from './helpers'
 import {
     getResponsesByCollectionId,
@@ -663,31 +663,8 @@ const store = createStore({
 
             const { environment, requestParentArray } = await context.dispatch('getEnvironmentForRequest', activeTab)
 
-            const setEnvironmentVariable = (objectPath, value) => {
-                try {
-                    const environmentToModify = context.state.activeWorkspace.environment ?? {}
-                    const environmentsToModify = context.state.activeWorkspace.environments ?? [
-                        {
-                            name: 'Default',
-                            environment: {}
-                        }
-                    ]
-                    setObjectPathValue(environmentToModify, objectPath, value)
-                    context.state.activeWorkspace.environment = environmentToModify
-                    context.commit('updateWorkspaceEnvironment',  {
-                        workspaceId: context.state.activeWorkspace._id,
-                        environment: environmentToModify
-                    })
-                    const currentEnvironment = environmentsToModify.find(environmentItem => environmentItem.name === (context.state.activeWorkspace.currentEnvironment ?? 'Default'))
-                    currentEnvironment.environment = environmentToModify
-                    context.commit('updateWorkspaceEnvironments',  {
-                        workspaceId: context.state.activeWorkspace._id,
-                        environments: environmentsToModify
-                    })
-                } catch(e) {
-                    console.log('Failed to set environment variable:')
-                    console.log(e)
-                }
+            const setEnvironmentVariableWrapper = (objectPath, value) => {
+                setEnvironmentVariable(context, objectPath, value)
             }
 
             const globalPlugins = []
@@ -721,7 +698,7 @@ const store = createStore({
             ]
 
             context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, setEnvironmentVariable, enabledPlugins, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
+            const response = await handleRequest(activeTab, environment, setEnvironmentVariableWrapper, enabledPlugins, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'

@@ -5,7 +5,7 @@ class AlertConfirmPrompt extends HTMLElement {
         this.attachShadow({ mode: 'open' })
     }
 
-    createPrompt = (title, defaultValue = '') => {
+    createPrompt = (title, defaultValue = '', selectList = []) => {
         const div = document.createElement('div')
 
         div.innerHTML  = `
@@ -13,7 +13,10 @@ class AlertConfirmPrompt extends HTMLElement {
                 <div class="dialog">
                     <div>${title}</div>
                     <div style="margin-top: 0.5rem;">
-                        <input type="text" value="${defaultValue ?? ''}" class="dialog-input" id="p-input" spellcheck="false">
+                        <input type="text" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="p-input" spellcheck="false">
+                        <datalist id="selectList">
+                            ${selectList.map(item => `<option value="${item}"></option>`)}
+                        </datalist>
                     </div>
                     <div style="margin-top: 1rem; text-align: right; user-select: none;">
                         <button class="dialog-primary-button" id="p-confirm">OK</button>

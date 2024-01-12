@@ -1379,3 +1379,30 @@ export function formatTimestamp(epoch: number) {
 export function generateId() {
     return nanoid()
 }
+
+export function setEnvironmentVariable(store, objectPath, value) {
+    try {
+        const environmentToModify = store.state.activeWorkspace.environment ?? {}
+        const environmentsToModify = store.state.activeWorkspace.environments ?? [
+            {
+                name: 'Default',
+                environment: {}
+            }
+        ]
+        setObjectPathValue(environmentToModify, objectPath, value)
+        store.state.activeWorkspace.environment = environmentToModify
+        store.commit('updateWorkspaceEnvironment',  {
+            workspaceId: store.state.activeWorkspace._id,
+            environment: environmentToModify
+        })
+        const currentEnvironment = environmentsToModify.find(environmentItem => environmentItem.name === (store.state.activeWorkspace.currentEnvironment ?? 'Default'))
+        currentEnvironment.environment = environmentToModify
+        store.commit('updateWorkspaceEnvironments',  {
+            workspaceId: store.state.activeWorkspace._id,
+            environments: environmentsToModify
+        })
+    } catch(e) {
+        console.log('Failed to set environment variable:')
+        console.log(e)
+    }
+}

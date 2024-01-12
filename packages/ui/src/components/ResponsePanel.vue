@@ -36,6 +36,7 @@
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
+                <i class="fas fa-code" @click="setSelectedTextAsEnvironmentVariable" title="Set selected text as environment variable"></i>
                 <i class="fas fa-download" @click="downloadResponse" title="Download response as a file"></i>
                 <i class="fas fa-paste" @click="copyResponseToClipboard" title="Copy response to clipboard"></i>
             </div>
@@ -53,7 +54,7 @@
                         <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
                     </div>
                     <template v-else>
-                        <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" />
+                        <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
                     </template>
                 </template>
                 <div class="content-box" v-else>
@@ -134,7 +135,13 @@ import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
-import { dateFormat, humanFriendlyTime, humanFriendlySize, parseContentDispositionHeaderAndGetFileName } from '@/helpers'
+import {
+    dateFormat,
+    humanFriendlyTime,
+    humanFriendlySize,
+    parseContentDispositionHeaderAndGetFileName,
+    setEnvironmentVariable,
+} from '@/helpers'
 import { emitter } from '@/event-bus'
 
 export default {
@@ -148,7 +155,8 @@ export default {
         return {
             activeResponsePanelTab: 'Preview',
             responseHistoryContextMenuElement: null,
-            showResponseHistoryContextMenu: false
+            showResponseHistoryContextMenu: false,
+            currentlySelectedText: '',
         }
     },
     computed: {
@@ -188,6 +196,9 @@ export default {
         },
         activeTab() {
             return this.$store.state.activeTab
+        },
+        activeWorkspace() {
+            return this.$store.state.activeWorkspace
         },
         status() {
             if(this.activeTab && this.activeTab._id in this.$store.state.requestResponseStatus) {
@@ -405,6 +416,27 @@ export default {
             }
 
             emitter.emit('response_panel', 'request restored')
+        },
+        codeMirrorSelectionChanged(selectedText) {
+            this.currentlySelectedText = selectedText
+        },
+        async setSelectedTextAsEnvironmentVariable() {
+            if(this.currentlySelectedText === '') {
+                return
+            }
+
+            const environment = this.activeWorkspace.environment ?? {}
+            const currentlyDefinedEnvironmentVariables = Object.keys(environment)
+
+            const environmentVariableName = await window.createPrompt('Select / Enter environment variable name', '', currentlyDefinedEnvironmentVariables)
+
+            if(environmentVariableName === null || environmentVariableName === '') {
+                return
+            }
+
+            setEnvironmentVariable(this.$store, environmentVariableName, this.currentlySelectedText)
+
+            this.$toast.success(`Environment variable set: ${environmentVariableName}`)
         }
     }
 }

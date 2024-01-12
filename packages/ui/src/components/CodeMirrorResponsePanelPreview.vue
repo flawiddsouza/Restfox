@@ -16,22 +16,29 @@ const styleOverrides = EditorView.theme({
     }
 })
 
-const extensions = [
-    json(),
-    syntaxHighlighting(codeMirrorSyntaxHighlighting(), { fallback: true }),
-    lineNumbers(),
-    foldGutter({ openText: '▾', closedText: '▸' }),
-    highlightSelectionMatches(),
-    EditorView.lineWrapping,
-    EditorView.editable.of(true),
-    EditorState.readOnly.of(true),
-    styleOverrides,
-    keymap.of([
-        ...searchKeymap,
-    ])
-]
+function createState(documentText, vueInstance) {
+    const extensions = [
+        json(),
+        syntaxHighlighting(codeMirrorSyntaxHighlighting(), { fallback: true }),
+        lineNumbers(),
+        foldGutter({ openText: '▾', closedText: '▸' }),
+        highlightSelectionMatches(),
+        EditorView.lineWrapping,
+        EditorView.editable.of(true),
+        EditorState.readOnly.of(true),
+        styleOverrides,
+        keymap.of([
+            ...searchKeymap,
+        ]),
+        EditorView.updateListener.of(v => {
+            if(v.selectionSet) {
+                const { main } = v.state.selection
+                const selectedText = main.empty ? '' : v.state.doc.sliceString(main.from, main.to)
+                vueInstance.$emit('selection-changed', selectedText)
+            }
+        }),
+    ]
 
-function createState(documentText) {
     return EditorState.create({
         doc: documentText,
         extensions: extensions
@@ -59,7 +66,7 @@ export default {
     },
     mounted() {
         this.editor = new EditorView({
-            state: createState(this.modelValue),
+            state: createState(this.modelValue, this),
             parent: this.$el
         })
     }
