@@ -1,9 +1,15 @@
 <template>
     <form @submit.prevent="done" v-if="showModalComp">
         <modal :title="`Environment (JSON Format) — ${collectionItem ? collectionItem.name : workspace.name}`" v-model="showModalComp" height="70vh" width="55rem">
+            <template #after-title>
+                <button type="button" class="button" @click="importEnvironment">
+                    <i class="fa fa-upload" style="cursor: pointer;"></i> Import
+                </button>
+            </template>
+
             <div style="display: grid; grid-template-columns: auto 1fr; height: 100%; overflow: auto;">
                 <div style="display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: auto; margin-right: 1rem; border-right: 1px solid var(--modal-border-color)">
-                    <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment">Add Environment</button>
+                    <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment()">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
                         <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
                             <div>{{ environment.name }}</div>
@@ -158,11 +164,13 @@ export default {
         async done() {
             this.showModalComp = false
         },
-        async addEnvironment() {
-            const newEnvironmentName = await window.createPrompt('Enter new environment name')
+        async addEnvironment(newEnvironmentName = undefined, environmentObject = undefined) {
+            if(newEnvironmentName === undefined) {
+                newEnvironmentName = await window.createPrompt('Enter new environment name')
 
-            if(!newEnvironmentName || newEnvironmentName.trim() === '') {
-                return
+                if(!newEnvironmentName || newEnvironmentName.trim() === '') {
+                    return
+                }
             }
 
             if(this.environments.some(environment => environment.name === newEnvironmentName)) {
@@ -171,6 +179,10 @@ export default {
             }
 
             const environment = { name: newEnvironmentName, environment: {} }
+
+            if(environmentObject !== undefined) {
+                environment.environment = environmentObject
+            }
 
             if(this.collectionItem) {
                 if('environments' in this.collectionItem === false) {
@@ -357,7 +369,40 @@ export default {
             }
 
             this.hideEnvironmentContextMenu()
-        }
+        },
+        importEnvironment() {
+            const fileInput = document.createElement('input')
+            fileInput.type = 'file'
+            fileInput.accept = '.json'
+            fileInput.style.display = 'none'
+            fileInput.addEventListener('change', async() => {
+                const file = fileInput.files[0]
+                if(!file) {
+                    return
+                }
+                const fileContents = await file.text()
+                try {
+                    const parsedJSON = JSON.parse(fileContents)
+                    const environment = {}
+
+                    if('_postman_variable_scope' in parsedJSON && parsedJSON._postman_variable_scope === 'environment') {
+                        parsedJSON.values.forEach(variable => {
+                            if(variable.enabled) {
+                                environment[variable.key] = variable.value
+                            }
+                        })
+                    }
+
+                    this.addEnvironment(parsedJSON.name, environment)
+                } catch(e) {
+                    alert('Invalid JSON file')
+                } finally {
+                    document.body.removeChild(fileInput)
+                }
+            })
+            document.body.appendChild(fileInput)
+            fileInput.click()
+        },
     }
 }
 </script>

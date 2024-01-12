@@ -3,7 +3,12 @@
         <div class="modal__container" :style="{ width: width }">
             <div class="modal__content" :style="{ height: fullHeight ? '90vh': undefined }">
                 <header>
-                    <h3>{{ title }}</h3>
+                    <div style="display: flex; justify-content: space-between;">
+                        <h3>{{ title }}</h3>
+                        <div style="margin-right: 1rem;">
+                            <slot name="after-title"></slot>
+                        </div>
+                    </div>
                     <span @click="$emit('update:modelValue', false)"><i class="fa fa-times"></i></span>
                 </header>
                 <div class="modal-main" :style="{ flexBasis: height }">
