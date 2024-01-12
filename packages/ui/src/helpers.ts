@@ -368,7 +368,7 @@ export async function createRequestData(state, request, environment, setEnvironm
         })
     }
 
-    if('headers' in request) {
+    if('headers' in request && request.headers !== undefined) {
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
             const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
