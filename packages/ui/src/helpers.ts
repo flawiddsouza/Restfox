@@ -787,6 +787,13 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
                     mimeType = 'application/json'
                 }
 
+                if(mimeType === 'text/plain') {
+                    try {
+                        JSON.parse(request.request.body.raw)
+                        mimeType = 'application/json'
+                    } catch {}
+                }
+
                 body = {
                     mimeType: mimeType,
                     text: request.request.body.raw
