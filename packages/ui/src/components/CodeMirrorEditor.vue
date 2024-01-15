@@ -104,10 +104,10 @@ export default {
     },
     data() {
         return {
-            editor: null,
             emitted: false
         }
     },
+    editor: null,
     watch: {
         modelValue() {
             if(!this.emitted) {
