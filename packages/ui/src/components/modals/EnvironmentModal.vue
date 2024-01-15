@@ -3,7 +3,10 @@
         <modal :title="`Environment (JSON Format) — ${collectionItem ? collectionItem.name : workspace.name}`" v-model="showModalComp" height="70vh" width="55rem">
             <template #after-title>
                 <button type="button" class="button" @click="importEnvironment">
-                    <i class="fa fa-upload" style="cursor: pointer;"></i> Import
+                    <i class="fa fa-upload"></i> Import
+                </button>
+                <button type="button" class="button ml-1rem" @click="exportEnvironment">
+                    <i class="fa fa-download"></i> Export
                 </button>
             </template>
 
@@ -165,6 +168,9 @@ export default {
             this.showModalComp = false
         },
         async addEnvironment(newEnvironmentName = undefined, environmentObject = undefined) {
+            const isImport = environmentObject !== undefined
+            let isMerge = false
+
             if(newEnvironmentName === undefined) {
                 newEnvironmentName = await window.createPrompt('Enter new environment name')
 
@@ -174,38 +180,52 @@ export default {
             }
 
             if(this.environments.some(environment => environment.name === newEnvironmentName)) {
-                alert('Given environment name already exists')
-                return
-            }
+                if(!isImport) {
+                    alert(`Given environment name already exists: ${newEnvironmentName}`)
+                    return
+                } else {
+                    if(!confirm(`Given environment name already exists: ${newEnvironmentName}\nDo you want to merge with the existing one?`)) {
+                        return
+                    }
 
-            const environment = { name: newEnvironmentName, environment: {} }
-
-            if(environmentObject !== undefined) {
-                environment.environment = environmentObject
-            }
-
-            if(this.collectionItem) {
-                if('environments' in this.collectionItem === false) {
-                    this.collectionItem.environments = [
-                        {
-                            name: 'Default',
-                            environment: this.environmentToSave
-                        }
-                    ]
+                    isMerge = true
                 }
-                this.collectionItem.environments.push(environment)
             }
 
-            if(this.workspace) {
-                if('environments' in this.workspace === false) {
-                    this.workspace.environments = [
-                        {
-                            name: 'Default',
-                            environment: this.environmentToSave
-                        }
-                    ]
+            let environment = { name: newEnvironmentName, environment: {} }
+
+            if(!isMerge) {
+                if(environmentObject !== undefined) {
+                    environment.environment = environmentObject
                 }
-                this.workspace.environments.push(environment)
+
+                if(this.collectionItem) {
+                    if('environments' in this.collectionItem === false) {
+                        this.collectionItem.environments = [
+                            {
+                                name: 'Default',
+                                environment: this.environmentToSave
+                            }
+                        ]
+                    }
+                    this.collectionItem.environments.push(environment)
+                }
+
+                if(this.workspace) {
+                    if('environments' in this.workspace === false) {
+                        this.workspace.environments = [
+                            {
+                                name: 'Default',
+                                environment: this.environmentToSave
+                            }
+                        ]
+                    }
+                    this.workspace.environments.push(environment)
+                }
+            } else {
+                const existingEnvironment = this.environments.find(environment => environment.name === newEnvironmentName)
+                existingEnvironment.environment = { ...existingEnvironment.environment, ...environmentObject }
+                environment = existingEnvironment
             }
 
             this.changeEnvironment(environment)
@@ -383,7 +403,7 @@ export default {
                 const fileContents = await file.text()
                 try {
                     const parsedJSON = JSON.parse(fileContents)
-                    const environment = {}
+                    let environment = {}
 
                     if('_postman_variable_scope' in parsedJSON && parsedJSON._postman_variable_scope === 'environment') {
                         parsedJSON.values.forEach(variable => {
@@ -391,6 +411,8 @@ export default {
                                 environment[variable.key] = variable.value
                             }
                         })
+                    } else {
+                        environment = parsedJSON.environment
                     }
 
                     this.addEnvironment(parsedJSON.name, environment)
@@ -402,6 +424,15 @@ export default {
             })
             document.body.appendChild(fileInput)
             fileInput.click()
+        },
+        exportEnvironment() {
+            const environment = this.environments.find(environment => environment.name === this.currentEnvironment)
+            const blob = new Blob([JSON.stringify(environment, null, 4)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `${environment.name}.restfox_environment.json`
+            link.click()
         },
     }
 }
@@ -487,5 +518,9 @@ export default {
 .context-menu > div:hover {
     background-color: slateblue;
     color: white;
+}
+
+.ml-1rem {
+    margin-left: 1rem;
 }
 </style>
