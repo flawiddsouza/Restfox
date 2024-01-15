@@ -2,9 +2,13 @@
 
 # Restfox
 
-[**Website**](https://restfox.dev) **|** [**Install**](#installation) **|** [**Releases/Downloads**](https://github.com/flawiddsouza/Restfox/releases) **|** [**Screenshots**](#screenshots) **|** [**Compiling**](#compiling) **|** [**Compiling Web Standalone**](#using-web-standalone)
+[**Web App**](https://restfox.dev) **|** [**Install**](#installation) **|** [**Releases/Downloads**](https://github.com/flawiddsouza/Restfox/releases) **|** [**Screenshots**](#screenshots) **|** [**Docs**](https://docs.restfox.dev) **|** [**Compiling**](#compiling) **|** [**Compiling Web Standalone**](#using-web-standalone)
 
-Offline-first web HTTP client
+Offline-First Minimalistic HTTP & Socket Testing Client for the Web & Desktop
+
+Watch video to see plugins in action:<br>
+[<img src="https://img.youtube.com/vi/3cOQPm43Wus/hqdefault.jpg" width="600" height="300" width="100%"
+/>](https://www.youtube.com/watch?v=3cOQPm43Wus)
 
 ## Installation
 
@@ -96,37 +100,6 @@ or
 npm run publish
 ```
 
-## tauri(optional)
-
-### fetch polyfill for tauri
-
-After ui is built, go to the ui/assets/index.[hash].js file and add this code at the top of the file:
-```js
-export async function fetch(input, init) {
-    const fetch = window.__TAURI__.http.fetch
-
-    const params = {
-        ...init,
-        body: {
-            type: 'Text',
-            payload: init.body
-        }
-    };
-
-    if(params.body.payload instanceof URLSearchParams) {
-        params.body.payload = params.body.payload.toString()
-    }
-
-    if(init.method === 'GET' || 'body' in init === false || init.body === null) {
-        delete params.body
-    }
-
-    const res = await fetch(input.toString(), params)
-
-    return new Response(JSON.stringify(res.data), res)
-}
-```
-
 ### Development
 ```
 npm run dev
@@ -150,7 +123,7 @@ npm start
 
 By default npm start will run Restfox at port 4004. You can override the port by passing port like so `PORT=5040 npm start`.
 
-## Built and used by Docker
+## Docker Build Instructions
 
 First refer to [**Compiling Web Standalone**](#using-web-standalone) to build successfully locally and use it normally.
 Then in the project root directory (directory with Dockerfile), execute:
