@@ -1,4 +1,7 @@
 import express from 'express'
+import { createServer } from 'http'
+import { Server as SocketIOv3Server } from 'socket.io-v3'
+import { Server as SocketIOv4Server } from 'socket.io-v4'
 import { readFileSync, writeFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
 
@@ -89,4 +92,44 @@ app.get('/cookie', (req, res) => {
     res.send(req.headers['cookie'])
 })
 
-app.listen(5605, () => console.log('Running at http://localhost:5605'))
+const server = createServer(app)
+
+const ioV3 = new SocketIOv3Server(server, {
+    path: '/socket.io-v3',
+    cors: {
+        origin: '*',
+    }
+})
+
+ioV3.on('connection', (socket) => {
+    console.log('Socket.IO v3 client connected')
+
+    socket.onAny((event, ...args) => {
+        socket.emit(event, ...args)
+    })
+
+    socket.on('disconnect', () => {
+        console.log('Socket.IO v3 client disconnected')
+    })
+})
+
+const ioV4 = new SocketIOv4Server(server, {
+    path: '/socket.io-v4',
+    cors: {
+        origin: '*',
+    }
+})
+
+ioV4.on('connection', (socket) => {
+    console.log('Socket.IO v4 client connected')
+
+    socket.onAny((event, ...args) => {
+        socket.emit(event, ...args)
+    })
+
+    socket.on('disconnect', () => {
+        console.log('Socket.IO v4 client disconnected')
+    })
+})
+
+server.listen(5605, () => console.log('Running at http://localhost:5605'))

@@ -13,7 +13,7 @@ export interface ClientPayload {
 
 export interface Client {
     id: string
-    type?: 'Socket.IO'
+    type?: 'Socket.IO-v2' | 'Socket.IO-v3' | 'Socket.IO'
     url: string
     payloads: ClientPayload[],
     currentPayloadId: string,

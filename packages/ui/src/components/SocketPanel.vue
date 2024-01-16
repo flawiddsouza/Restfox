@@ -35,7 +35,9 @@
                                 :disabled="isClientConnected(client) ? true : false"
                             >
                                 <option :value="undefined">WS</option>
-                                <option value="Socket.IO">IO</option>
+                                <option value="Socket.IO">IO v4</option>
+                                <option value="Socket.IO-v3">IO v3</option>
+                                <option value="Socket.IO-v2">IO v2</option>
                             </select>
                             <input
                                 type="text"
@@ -97,7 +99,7 @@
                                     class="w-100p ml-0_5rem"
                                     :value="getCurrentPayloadValue(client, 'event')"
                                     @input="updateCurrentPayload(client, 'event', ($event as any).target.value)"
-                                    v-if="client.type === 'Socket.IO'"
+                                    v-if="client.type && client.type.startsWith('Socket.IO')"
                                 />
                             </div>
                             <textarea
@@ -235,7 +237,9 @@ import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
 import { formatTimestamp, generateId, getObjectPaths } from '@/helpers'
 import getObjectPathValue from 'lodash.get'
 import Tabs from './Tabs.vue'
-import { Socket, io } from 'socket.io-client'
+import ioV2 from 'socket.io-client-v2'
+import { io as ioV3 } from 'socket.io-client-v3'
+import { io as ioV4 } from 'socket.io-client-v4'
 import { useStore } from 'vuex'
 
 // Data Variables
@@ -306,10 +310,31 @@ async function connect(client: Client) {
     try {
         if (client.type === undefined) {
             sockets[activeTab.value._id + '-' + client.id] = new WebSocket(clientUrlWithEnvironmentVariablesSubtituted)
-        } else if (client.type === 'Socket.IO') {
-            sockets[activeTab.value._id + '-' + client.id] = io(clientUrlWithEnvironmentVariablesSubtituted)
+        } else if (client.type.startsWith('Socket.IO')) {
+            const parsedUrl = new URL(clientUrlWithEnvironmentVariablesSubtituted)
+
+            if (client.type === 'Socket.IO-v2') {
+                sockets[activeTab.value._id + '-' + client.id] = ioV2(parsedUrl.origin, {
+                    path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
+                })
+            }
+
+            if (client.type === 'Socket.IO-v3') {
+                sockets[activeTab.value._id + '-' + client.id] = ioV3(parsedUrl.origin, {
+                    path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
+                    reconnection: false,
+                })
+            }
+
+            if (client.type === 'Socket.IO') {
+                sockets[activeTab.value._id + '-' + client.id] = ioV4(parsedUrl.origin, {
+                    path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
+                    reconnection: false,
+                })
+            }
         }
-    } catch {
+    } catch(e) {
+        console.log(e)
         alert(`Invalid WebSocket URL: ${clientUrlWithEnvironmentVariablesSubtituted}`)
         return
     }
@@ -348,7 +373,7 @@ async function connect(client: Client) {
         })
     }
 
-    if (socket instanceof Socket) {
+    if (socket.constructor.name.startsWith('Socket')) {
         socket.on('connect', async() => {
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
@@ -357,10 +382,24 @@ async function connect(client: Client) {
             })
         })
 
-        socket.onAny(async(event, ...args) => {
-            const receivedMessage = `[${event}] ${args[0]}`
-            clientMessageHandler(client, receivedMessage)
-        })
+        if (client.type === 'Socket.IO-v2') {
+            const originalOnevent = socket.onevent
+
+            socket.onevent = function(packet) {
+                const event = packet.data[0]
+                const args = packet.data.slice(1)
+                const receivedMessage = `[${event}] ${typeof args[0] === 'object' ? JSON.stringify(args[0], null, 4) : args[0]}`
+                clientMessageHandler(client, receivedMessage)
+                originalOnevent.call(this, packet)
+            }
+        }
+
+        if (client.type === 'Socket.IO-v3' || client.type === 'Socket.IO') {
+            socket.onAny(async(event, ...args) => {
+                const receivedMessage = `[${event}] ${args[0]}`
+                clientMessageHandler(client, receivedMessage)
+            })
+        }
 
         socket.on('disconnect', async() => {
             if(socket.disconnected) {
@@ -415,7 +454,7 @@ async function sendMessage(client: Client) {
 
     const socket = sockets[activeTab.value._id + '-' + client.id]
 
-    if (socket instanceof Socket && (client.event === undefined || client.event === '')) {
+    if (socket.constructor.name.startsWith('Socket') && (client.event === undefined || client.event === '')) {
         return
     }
 
@@ -434,13 +473,13 @@ async function sendMessage(client: Client) {
         socket.send(messageToSend)
     }
 
-    if (socket instanceof Socket && client.event !== undefined) {
+    if (socket.constructor.name.startsWith('Socket') && client.event !== undefined) {
         socket.emit(client.event, messageToSend)
     }
 
     let clientMessageToSave = messageToSend
 
-    if (socket instanceof Socket) {
+    if (socket.constructor.name.startsWith('Socket')) {
         clientMessageToSave = `[${client.event}] ${clientMessageToSave}`
     }
 
@@ -464,7 +503,7 @@ function disconnect(client: Client) {
         socket.close()
     }
 
-    if(socket instanceof Socket) {
+    if(socket.constructor.name.startsWith('Socket')) {
         socket.disconnect()
 
         // because socket.io doesn't seem to trigger the disconnect event
@@ -589,11 +628,15 @@ function getCurrentPayloadValue(client: Client, field: 'name' | 'event' | 'paylo
 function isClientConnected(client: Client) {
     const socket = sockets[activeTab.value._id + '-' + client.id]
 
+    if(socket === undefined || socket === null) {
+        return false
+    }
+
     if(socket instanceof WebSocket) {
         return true
     }
 
-    if(socket instanceof Socket) {
+    if(socket.constructor.name.startsWith('Socket')) {
         return true
     }
 
