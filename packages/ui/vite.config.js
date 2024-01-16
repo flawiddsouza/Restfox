@@ -62,7 +62,10 @@ export default defineConfig(({ mode }) => {
         base: '',
         test: {
             reporters: 'verbose'
-        }
+        },
+        esbuild: {
+            minifyIdentifiers: false,
+        },
     }
 
     if(mode === 'desktop') {
