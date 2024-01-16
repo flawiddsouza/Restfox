@@ -904,7 +904,10 @@ function importRestfoxV1(collections, workspaceId) {
             })
         } else {
             if(item._type === 'socket') {
-                collection.push(item)
+                collection.push({
+                    ...item,
+                    workspaceId,
+                })
             } else {
                 collection.push({
                     _id: item._id,
