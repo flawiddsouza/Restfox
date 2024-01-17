@@ -56,6 +56,7 @@ function createState(language, documentText, vueInstance) {
         languageFunc = graphqlLanguage
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
+
     return EditorState.create({
         doc: documentText,
         extensions: [
@@ -86,7 +87,8 @@ function createState(language, documentText, vueInstance) {
                 indentWithTab,
                 ...searchKeymap,
                 selectLineKeyMap
-            ])
+            ]),
+            vueInstance.readonly ? EditorState.readOnly.of(true) : EditorState.readOnly.of(false),
         ]
     })
 }
@@ -100,7 +102,11 @@ export default {
         lang: {
             type: String,
             required: true
-        }
+        },
+        readonly: {
+            type: Boolean,
+            default: false
+        },
     },
     data() {
         return {

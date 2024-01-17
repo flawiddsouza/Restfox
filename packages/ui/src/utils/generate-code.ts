@@ -1,5 +1,9 @@
 import { createRequestData, substituteEnvironmentVariables } from '@/helpers'
-import { HTTPSnippet } from 'httpsnippet-browser'
+import { HTTPSnippet, availableTargets } from 'httpsnippet-browser'
+
+export function getAvailableTargets() {
+    return availableTargets()
+}
 
 export async function generateCode(request, environment, target: 'shell', clientId: 'curl') {
     const state = {

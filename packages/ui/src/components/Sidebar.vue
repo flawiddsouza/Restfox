@@ -28,6 +28,7 @@
     <PluginManagerModal v-model:showModal="pluginManagerShow" :collection-item="pluginManagerCollectionItem" />
     <SettingsModal v-model:showModal="settingsModalShow" :collection-item="settingsModalCollectionItem" />
     <DuplicateCollectionItemModal v-model:showModal="showDuplicateCollectionItemModal" :collection-item-to-duplicate="collectionItemToDuplicate" />
+    <GenerateCodeModal v-model:showModal="generateCodeModalShow" :collection-item="generateCodeModalCollectionItem" />
 </template>
 
 <script>
@@ -40,6 +41,7 @@ import EnvironmentModal from './modals/EnvironmentModal.vue'
 import PluginManagerModal from './modals/PluginManagerModal.vue'
 import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
+import GenerateCodeModal from './modals/GenerateCodeModal.vue'
 import { mapState } from 'vuex'
 import { flattenTree, exportRestfoxCollection } from '@/helpers'
 import { generateCode } from '@/utils/generate-code'
@@ -54,7 +56,8 @@ export default {
         EnvironmentModal,
         PluginManagerModal,
         SettingsModal,
-        DuplicateCollectionItemModal
+        DuplicateCollectionItemModal,
+        GenerateCodeModal,
     },
     data() {
         return {
@@ -78,6 +81,8 @@ export default {
             collectionItemToDuplicate: null,
             pluginManagerCollectionItem: null,
             pluginManagerShow: false,
+            generateCodeModalCollectionItem: null,
+            generateCodeModalShow: false,
         }
     },
     computed: {
@@ -149,6 +154,12 @@ export default {
                     },
                     {
                         'type': 'option',
+                        'label': 'Generate Code',
+                        'value': 'Generate Code',
+                        'icon': 'fa fa-code'
+                    },
+                    {
+                        'type': 'option',
                         'label': 'Plugins',
                         'value': 'Plugins',
                         'icon': 'fa fa-plug',
@@ -171,8 +182,12 @@ export default {
                 ]
 
                 if(this.activeSidebarItemForContextMenu._type === 'socket') {
-                    // Remove Copy as Curl & Plugins
-                    contextMenuOptions = contextMenuOptions.filter(option => option.value !== 'Copy as Curl' && option.value !== 'Plugins')
+                    const optionsToRemove = [
+                        'Copy as Curl',
+                        'Generate Code',
+                        'Plugins'
+                    ]
+                    contextMenuOptions = contextMenuOptions.filter(option => !optionsToRemove.includes(option.value))
                 }
 
                 return contextMenuOptions
@@ -306,6 +321,11 @@ export default {
                     }
                     this.$toast.error('Failed to copy to clipboard' + errorAdditional)
                 }
+            }
+
+            if(clickedSidebarItem === 'Generate Code') {
+                this.generateCodeModalCollectionItem = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.generateCodeModalShow = true
             }
 
             if(clickedSidebarItem === 'New Request') {
