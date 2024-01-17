@@ -14,21 +14,29 @@ Watch video to see plugins in action:<br>
 
 ### macOS
 Package available in homebrew by using:
-`brew install restfox`
+```
+brew install restfox
+```
 
 ### Ubuntu and other distributions supporting snap
 Package available through snap can be installed using:
-`sudo snap install restfox`
+```
+sudo snap install restfox
+```
 
 ### RPM, DEB and NuPKG
 There are precompiled binaries in the [releases](https://github.com/flawiddsouza/Restfox/releases) page.
 
 ### Windows
-There are precompiled binaries in the [releases](https://github.com/flawiddsouza/Restfox/releases) page.
+```
+scoop bucket add extras
+scoop install restfox
+```
+There are also precompiled binaries in the [releases](https://github.com/flawiddsouza/Restfox/releases) page.
 
 ### [Docker](https://hub.docker.com/r/flawiddsouza/restfox)
 ```
-docker run --name Restfox -d -p 4004:4004 flawiddsouza/restfox:0.3.2
+docker run --name Restfox -d -p 4004:4004 flawiddsouza/restfox:0.4.0
 ```
 
 ## Screenshots

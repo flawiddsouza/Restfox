@@ -48,6 +48,12 @@ For **macOS**, the app can be installed using homebrew:
 brew install restfox
 \`\`\`
 
+For **Windows**, the app can be installed using:
+\`\`\`
+scoop bucket add extras
+scoop install restfox
+\`\`\`
+
 **NOTE:** Not all the builds have been tested properly, so please create an issue if you encounter any problems.
 `)
 console.log(`\n**Full Changelog**: https://github.com/flawiddsouza/Restfox/compare/${fromTag}...${toTag}`)
