@@ -289,6 +289,8 @@ export default {
             if(this.workspace) {
                 this.$store.commit('updateWorkspaceEnvironments',  { workspaceId: this.workspace._id, environments: this.environments })
             }
+
+            this.$store.dispatch('updateActiveTabEnvironmentResolved')
         },
         saveCurrentEnvironment() {
             if(this.collectionItem) {

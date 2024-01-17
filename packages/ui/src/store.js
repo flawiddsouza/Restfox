@@ -213,6 +213,7 @@ const store = createStore({
             },
             openContextMenuElement: null,
             sockets: {},
+            activeTabEnvironmentResolved: {},
         }
     },
     getters: {
@@ -798,6 +799,10 @@ const store = createStore({
             const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
             await createCollections(flattenedCollectionTree)
             context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))
+        },
+        async updateActiveTabEnvironmentResolved(context) {
+            const { environment } = await context.dispatch('getEnvironmentForRequest', context.state.activeTab)
+            context.state.activeTabEnvironmentResolved = environment
         }
     }
 })

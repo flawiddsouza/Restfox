@@ -133,6 +133,8 @@ export default {
                         Object.assign(tab, this.activeTab)
                     }
                 }
+
+                this.$store.dispatch('updateActiveTabEnvironmentResolved')
             },
             deep: true
         },

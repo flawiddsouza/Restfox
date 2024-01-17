@@ -12,7 +12,7 @@
                 <label v-if="selectedLanguage" style="margin-top: 1rem;">
                     <div style="font-weight: 500; margin-bottom: 0.25rem;">Select Client</div>
                     <select v-model="selectedClient" @change="selectedClientChanged" class="full-width-input">
-                        <option value="" disabled >Select client</option>
+                        <option value="" disabled>Select client</option>
                         <option v-for="client in selectedLanguageClients" :value="client.key">{{ client.title }}</option>
                     </select>
                 </label>

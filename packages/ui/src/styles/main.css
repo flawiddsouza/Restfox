@@ -67,6 +67,10 @@ html {
     --socket-button-background-color: cadetblue;
     --socket-input-disabled-background-color: #fafbfd;
     --socket-green-row-background-color: #ddffb6;
+    --valid-env-highlight-color: #2e7d32;
+    --valid-env-highlight-background-color: #e8f5e9;
+    --invalid-env-highlight-color: #d32f2f;
+    --invalid-env-highlight-background-color: #ffebee;
 }
 
 html.theme-dark {
@@ -119,6 +123,10 @@ html.theme-dark {
     --socket-button-background-color: #2c3f40;
     --socket-input-disabled-background-color: #2d2d2d;
     --socket-green-row-background-color: #88ff0017;
+    --valid-env-highlight-color: #a5d6a7;
+    --valid-env-highlight-background-color: #1b5e20;
+    --invalid-env-highlight-color: #ffcccb;
+    --invalid-env-highlight-background-color: #7c0404;
 }
 
 * {

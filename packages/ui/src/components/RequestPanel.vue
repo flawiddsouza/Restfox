@@ -5,7 +5,7 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <div class="code-mirror-input-container">
-                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" @paste="handleAdressBarPaste" />
+                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" @paste="handleAdressBarPaste" :env-variables="activeTabEnvironmentResolved" />
             </div>
             <button @click="sendRequest">Send</button>
         </div>
@@ -333,6 +333,9 @@ export default {
         },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
+        },
+        activeTabEnvironmentResolved() {
+            return this.$store.state.activeTabEnvironmentResolved
         },
     },
     watch: {
