@@ -247,6 +247,10 @@ import { useStore } from 'vuex'
 const messageContainerRefs: any = reactive({})
 
 function handleMessageContainerRef(ref: any, clientId: string) {
+    // ref can suddenly become null when tab is switched to a request tab and switched back to a socket tab
+    if(ref === null) {
+        return
+    }
     messageContainerRefs[clientId] = ref
 }
 
