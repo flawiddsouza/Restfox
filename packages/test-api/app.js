@@ -2,6 +2,7 @@ import express from 'express'
 import { createServer } from 'http'
 import { Server as SocketIOv3Server } from 'socket.io-v3'
 import { Server as SocketIOv4Server } from 'socket.io-v4'
+import { WebSocketServer } from 'ws'
 import { readFileSync, writeFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
 
@@ -132,4 +133,24 @@ ioV4.on('connection', (socket) => {
     })
 })
 
-server.listen(5605, () => console.log('Running at http://localhost:5605'))
+const webSocketServer = new WebSocketServer({ server, path: '/websocket' })
+
+webSocketServer.on('connection', (ws) => {
+    console.log('WebSocket client connected')
+
+    ws.on('message', (message) => {
+        console.log(`Received message: ${message}`)
+        ws.send(message.toString())
+    })
+
+    ws.on('close', () => {
+        console.log('WebSocket client disconnected')
+    })
+})
+
+server.listen(5605, () => console.log(`
+HTTP at http://localhost:5605
+Socket.IO v3 at http://localhost:5605/socket.io-v3
+Socket.IO v4 at http://localhost:5605/socket.io-v4
+WebSocket at ws://localhost:5605/websocket
+`))
