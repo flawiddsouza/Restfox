@@ -503,6 +503,10 @@ function clearMessages(client: Client) {
 function disconnect(client: Client) {
     const socket = sockets[activeTab.value._id + '-' + client.id]
 
+    if(socket === undefined || socket === null) {
+        return false
+    }
+
     if(socket instanceof WebSocket) {
         socket.close()
     }
@@ -637,11 +641,11 @@ function isClientConnected(client: Client) {
     }
 
     if(socket instanceof WebSocket) {
-        return true
+        return socket.readyState === WebSocket.OPEN
     }
 
     if(socket.constructor.name.startsWith('Socket')) {
-        return true
+        return socket.connected
     }
 
     return false
