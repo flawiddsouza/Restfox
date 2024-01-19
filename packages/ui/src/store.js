@@ -801,6 +801,10 @@ const store = createStore({
             context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))
         },
         async updateActiveTabEnvironmentResolved(context) {
+            if(!context.state.activeTab) {
+                // console.warn('updateActiveTabEnvironmentResolved called without an active tab')
+                return
+            }
             const { environment } = await context.dispatch('getEnvironmentForRequest', context.state.activeTab)
             context.state.activeTabEnvironmentResolved = environment
         }
