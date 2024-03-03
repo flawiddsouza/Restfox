@@ -137,6 +137,9 @@ export default {
     methods: {
         async exportCollection() {
             const collection = await getCollectionForWorkspace(this.activeWorkspace._id)
+            for(const item of collection) {
+                item.plugins = this.$store.state.plugins.filter(plugin => plugin.collectionId === item._id)
+            }
             exportRestfoxCollection(collection, this.activeWorkspace.environments)
         },
         async clearCollection() {

@@ -135,6 +135,7 @@ export default {
                 let json = null
 
                 let collectionTree = []
+                let plugins = []
 
                 if(this.importFrom === 'Postman URL') {
                     const response = await fetch(this.urlToImport)
@@ -165,7 +166,10 @@ export default {
                         }
 
                         if(this.importFrom === 'Restfox') {
-                            collectionTree = collectionTree.concat(convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id))
+                            const { newCollectionTree, newPlugins } = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
+
+                            collectionTree = collectionTree.concat(newCollectionTree)
+
                             if(json.environments) {
                                 this.activeWorkspace.environments = mergeArraysByProperty(this.activeWorkspace.environments ?? [], json.environments, 'name')
                                 this.$store.commit('updateWorkspaceEnvironments', {
@@ -177,6 +181,10 @@ export default {
                                     workspaceId: this.activeWorkspace._id,
                                     environment: this.activeWorkspace.environment,
                                 })
+                            }
+
+                            if(newPlugins.length > 0) {
+                                plugins = plugins.concat(newPlugins)
                             }
                         }
 
@@ -193,9 +201,15 @@ export default {
                     })
                 }
 
-                generateNewIdsForTree(collectionTree)
+                const oldIdNewIdMapping = generateNewIdsForTree(collectionTree)
 
-                this.$store.dispatch('setCollectionTree', { collectionTree, parentId: this.selectedRequestGroupId })
+                plugins.forEach(plugin => {
+                    if(plugin.collectionId) {
+                        plugin.collectionId = oldIdNewIdMapping[plugin.collectionId]
+                    }
+                })
+
+                this.$store.dispatch('setCollectionTree', { collectionTree, parentId: this.selectedRequestGroupId, plugins })
 
                 const importedFileCount = this.filesToImport.length
 

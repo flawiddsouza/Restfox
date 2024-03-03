@@ -141,3 +141,8 @@ export async function deletePluginsByWorkspace(workspaceId) {
 export async function deletePluginsByCollectionIds(collectionIds) {
     await db.plugins.where('collectionId').anyOf(collectionIds).delete()
 }
+
+// used for import
+export async function createPlugins(plugin) {
+    await db.plugins.bulkPut(plugin)
+}

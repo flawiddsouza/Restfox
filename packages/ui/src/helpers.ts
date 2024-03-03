@@ -888,6 +888,7 @@ function importPostmanV2(collections, workspaceId) {
 
 function importRestfoxV1(collections, workspaceId) {
     const collection = []
+    const plugins = []
 
     collections.forEach(item => {
         if(item._type === 'request_group') {
@@ -935,12 +936,19 @@ function importRestfoxV1(collections, workspaceId) {
                 })
             }
         }
+
+        if(item.plugins) {
+            plugins.push(...item.plugins)
+        }
     })
 
     const collectionTree = toTree(collection)
     sortTree(collectionTree)
 
-    return collectionTree
+    return {
+        newCollectionTree: collectionTree,
+        newPlugins: plugins
+    }
 }
 
 export function convertRestfoxExportToRestfoxCollection(json, workspaceId) {
@@ -1086,30 +1094,40 @@ export function findItemInTreeById(array, id) {
     return result
 }
 
-export function generateNewIdsForTreeItemChildren(treeItem) {
+export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping) {
     const parentId = treeItem._id
     treeItem.children.forEach(item => {
-        item._id = nanoid()
+        const newId = nanoid()
+        oldIdNewIdMapping[item._id] = newId
+        item._id = newId
         item.parentId = parentId
         if('children' in item) {
-            generateNewIdsForTreeItemChildren(item)
+            generateNewIdsForTreeItemChildren(item, oldIdNewIdMapping)
         }
     })
 }
 
 export function generateNewIdsForTree(array) {
+    const oldIdNewIdMapping = {}
+
     array.forEach(treeItem => {
-        treeItem._id = nanoid()
+        const newId = nanoid()
+        oldIdNewIdMapping[treeItem._id] = newId
+        treeItem._id = newId
         if('children' in treeItem) {
             treeItem.children.forEach(item => {
-                item._id = nanoid()
+                const newId = nanoid()
+                oldIdNewIdMapping[item._id] = newId
+                item._id = newId
                 item.parentId = treeItem._id
                 if('children' in item) {
-                    generateNewIdsForTreeItemChildren(item)
+                    generateNewIdsForTreeItemChildren(item, oldIdNewIdMapping)
                 }
             })
         }
     })
+
+    return oldIdNewIdMapping
 }
 
 // From: https://stackoverflow.com/a/6470794/4932305

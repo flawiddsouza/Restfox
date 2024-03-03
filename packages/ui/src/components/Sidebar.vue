@@ -301,7 +301,11 @@ export default {
             if(clickedSidebarItem === 'Export') {
                 const collectionItemToExport = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
                 collectionItemToExport.parentId = null
-                exportRestfoxCollection(flattenTree([collectionItemToExport]))
+                const collection = flattenTree([collectionItemToExport])
+                for(const item of collection) {
+                    item.plugins = this.$store.state.plugins.filter(plugin => plugin.collectionId === item._id)
+                }
+                exportRestfoxCollection(collection)
             }
 
             if(clickedSidebarItem === 'Copy as Curl') {

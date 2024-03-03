@@ -43,6 +43,7 @@ import {
     createPlugin,
     updatePlugin,
     deletePlugin,
+    createPlugins,
 } from './db'
 import { nextTick } from 'vue'
 import constants from './constants'
@@ -788,16 +789,33 @@ const store = createStore({
             generateNewIdsForTree(collectionTree)
             await createCollections(flattenTree(collectionTree))
         },
-        async setCollectionTree(context, { collectionTree, parentId = null }) {
+        async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }) {
             if(parentId) {
                 const parentCollection = findItemInTreeById(context.state.collectionTree, parentId)
                 collectionTree = parentCollection.children.concat(collectionTree)
             } else {
                 collectionTree = context.state.collectionTree.concat(collectionTree)
             }
+
             addSortOrderToTree(collectionTree)
+
             const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
             await createCollections(flattenedCollectionTree)
+
+            if (plugins.length > 0) {
+                // assign new ids to the imported / duplicated plugins
+                // else the original request & request folders where the
+                // plugins were exported from will lose their plugins
+                // also update timestamps
+                plugins.forEach(plugin => {
+                    plugin._id = nanoid()
+                    plugin.createdAt = new Date().getTime()
+                    plugin.updatedAt = new Date().getTime()
+                })
+                await createPlugins(plugins)
+                context.state.plugins.push(...plugins)
+            }
+
             context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))
         },
         async updateActiveTabEnvironmentResolved(context) {
