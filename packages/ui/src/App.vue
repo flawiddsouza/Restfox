@@ -134,7 +134,9 @@ export default {
                     }
                 }
 
-                this.$store.dispatch('updateActiveTabEnvironmentResolved')
+                if(newValue !== null) {
+                    this.$store.dispatch('updateActiveTabEnvironmentResolved')
+                }
             },
             deep: true
         },
