@@ -471,6 +471,7 @@ export default {
                     delete result[0]._id
                     delete result[0]._type
                     delete result[0].workspaceId
+                    delete result[0].parentId
                     Object.assign(this.activeTab, result[0])
                 }
             }
