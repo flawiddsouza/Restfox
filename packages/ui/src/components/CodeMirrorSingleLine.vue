@@ -1,5 +1,5 @@
 <template>
-    <div class="code-mirror-single-line"></div>
+    <div class="code-mirror-single-line" :class="{ disabled }"></div>
 </template>
 
 <script>
@@ -9,7 +9,7 @@ import { history, historyKeymap } from '@codemirror/commands'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 function getExtensions(vueInstance) {
-    return [
+    const extensions = [
         history(),
         EditorView.updateListener.of(v => {
             if(v.docChanged) {
@@ -38,6 +38,12 @@ function getExtensions(vueInstance) {
         placeholder(vueInstance.placeholder),
         envVarDecoration(vueInstance.envVariables),
     ]
+
+    if(vueInstance.disabled) {
+        extensions.push(EditorView.editable.of(false))
+    }
+
+    return extensions
 }
 
 function createState(vueInstance) {
@@ -60,6 +66,14 @@ export default {
         envVariables: {
             type: Object,
             default: () => ({})
+        },
+        inputTextCompatible: {
+            type: Boolean,
+            default: false
+        },
+        disabled: {
+            type: Boolean,
+            default: false
         },
     },
     data() {
@@ -86,6 +100,13 @@ export default {
                 }
             }
         },
+        disabled() {
+            if (this.editor) {
+                this.editor.dispatch({
+                    effects: StateEffect.reconfigure.of(getExtensions(this))
+                })
+            }
+        },
     },
     mounted() {
         this.editor = new EditorView({
@@ -103,9 +124,14 @@ export default {
 
 .code-mirror-single-line .cm-scroller {
     font-family: inherit !important;
-    margin-left: 0.2rem;
-    margin-right: 0.5rem;
-    overflow-x: hidden !important;
+    margin-left: v-bind('inputTextCompatible ? "2px" : "0.2rem"');
+    margin-right: v-bind('inputTextCompatible ? "2px" : "0.5rem"');
+    overflow: hidden;
+    line-height: v-bind('inputTextCompatible ? "1.3" : "1.4"');
+}
+
+.code-mirror-single-line .cm-content {
+    padding: v-bind('inputTextCompatible ? "0" : "4px 0"');
 }
 
 .code-mirror-single-line .valid-env-var {
@@ -120,5 +146,14 @@ export default {
     border-radius: 3px;
     padding: 2px 0;
     color: var(--invalid-env-highlight-color);
+}
+
+.code-mirror-single-line .cm-line {
+    padding: v-bind('inputTextCompatible ? "0" : "0 2px 0 4px"');
+}
+
+.code-mirror-single-line .cm-content[contenteditable="false"] {
+    background-color: var(--input-disabled-background-color);
+    color: var(--input-disabled-color);
 }
 </style>

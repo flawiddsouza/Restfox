@@ -36,13 +36,27 @@
                     <option value="application/octet-stream">Binary File</option>
                 </select>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
-                    <table>
+                    <table style="table-layout: fixed;">
                         <tr v-for="(param, index) in activeTab.body.params">
                             <td>
-                                <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                                <CodeMirrorSingleLine
+                                    v-model="param.name"
+                                    placeholder="name"
+                                    :env-variables="activeTabEnvironmentResolved"
+                                    :input-text-compatible="true"
+                                    :disabled="param.disabled"
+                                    :key="'body-param-name-' + index"
+                                />
                             </td>
                             <td>
-                                <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                                <CodeMirrorSingleLine
+                                    v-model="param.value"
+                                    placeholder="value"
+                                    :env-variables="activeTabEnvironmentResolved"
+                                    :input-text-compatible="true"
+                                    :disabled="param.disabled"
+                                    :key="'body-param-value-' + index"
+                                />
                             </td>
                             <td>
                                 <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
@@ -59,15 +73,30 @@
                     </table>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'multipart/form-data'">
-                    <table>
+                    <table style="table-layout: fixed;">
                         <tr v-for="(param, index) in activeTab.body.params">
                             <td>
-                                <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                                <CodeMirrorSingleLine
+                                    v-model="param.name"
+                                    placeholder="name"
+                                    :env-variables="activeTabEnvironmentResolved"
+                                    :input-text-compatible="true"
+                                    :disabled="param.disabled"
+                                    :key="'body-param-name-' + index"
+                                />
                             </td>
                             <td>
                                 <div style="display: flex">
                                     <template v-if="param.type === 'text'">
-                                        <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                                        <CodeMirrorSingleLine
+                                            v-model="param.value"
+                                            placeholder="value"
+                                            :env-variables="activeTabEnvironmentResolved"
+                                            :input-text-compatible="true"
+                                            :disabled="param.disabled"
+                                            :key="'body-param-value-' + index"
+                                            style="flex: 1; overflow: auto;"
+                                        />
                                     </template>
                                     <template v-else>
                                         <label style="width: 100%; display: flex; align-items: center;">
@@ -165,13 +194,27 @@
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
-                <table>
+                <table style="table-layout: fixed;">
                     <tr v-for="(param, index) in activeTab.parameters">
                         <td>
-                            <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                            <CodeMirrorSingleLine
+                                v-model="param.name"
+                                placeholder="name"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="param.disabled"
+                                :key="'query-param-name-' + index"
+                            />
                         </td>
                         <td>
-                            <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                            <CodeMirrorSingleLine
+                                v-model="param.value"
+                                placeholder="value"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="param.disabled"
+                                :key="'query-param-value-' + index"
+                            />
                         </td>
                         <td>
                             <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
@@ -192,13 +235,27 @@
                         <span> ({{ activeTab.pathParameters.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
                     </template>
                 </div>
-                <table>
+                <table style="table-layout: fixed;">
                     <tr v-for="(param, index) in activeTab.pathParameters">
                         <td>
-                            <input type="text" v-model="param.name" spellcheck="false" placeholder="name" :disabled="param.disabled">
+                            <CodeMirrorSingleLine
+                                v-model="param.name"
+                                placeholder="name"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="param.disabled"
+                                :key="'path-param-name-' + index"
+                            />
                         </td>
                         <td>
-                            <input type="text" v-model="param.value" spellcheck="false" placeholder="value" :disabled="param.disabled">
+                            <CodeMirrorSingleLine
+                                v-model="param.value"
+                                placeholder="value"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="param.disabled"
+                                :key="'path-param-value-' + index"
+                            />
                         </td>
                         <td>
                             <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
@@ -215,13 +272,27 @@
                 </table>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
-                <table>
+                <table style="table-layout: fixed;">
                     <tr v-for="(header, index) in activeTab.headers">
                         <td>
-                            <input type="text" v-model="header.name" spellcheck="false" placeholder="name" :disabled="header.disabled">
+                            <CodeMirrorSingleLine
+                                v-model="header.name"
+                                placeholder="name"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="header.disabled"
+                                :key="'header-name-' + index"
+                            />
                         </td>
                         <td>
-                            <input type="text" v-model="header.value" spellcheck="false" placeholder="value" :disabled="header.disabled">
+                            <CodeMirrorSingleLine
+                                v-model="header.value"
+                                placeholder="value"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="header.disabled"
+                                :key="'header-value-' + index"
+                            />
                         </td>
                         <td>
                             <input type="checkbox" :checked="header.disabled === undefined || header.disabled === false" @change="header.disabled = $event.target.checked ? false : true">
@@ -244,7 +315,7 @@
                     <option value="bearer">Bearer Token</option>
                 </select>
                 <div v-if="activeTab.authentication && activeTab.authentication.type !== 'No Auth'">
-                    <table>
+                    <table class="auth" style="table-layout: fixed;">
                         <tr>
                             <td style="min-width: 6rem; user-select: none;">
                                 <label for="basic-auth-enabled">Enabled</label>
@@ -259,7 +330,13 @@
                                     <label for="basic-auth-username" :class="{ disabled: activeTab.authentication.disabled }">Username</label>
                                 </td>
                                 <td style="width: 100%">
-                                    <input type="text" v-model="activeTab.authentication.username" id="basic-auth-username" :disabled="activeTab.authentication.disabled">
+                                    <CodeMirrorSingleLine
+                                        v-model="activeTab.authentication.username"
+                                        :env-variables="activeTabEnvironmentResolved"
+                                        :input-text-compatible="true"
+                                        :disabled="activeTab.authentication.disabled"
+                                        :key="'basic-auth-username'"
+                                    />
                                 </td>
                             </tr>
                             <tr>
@@ -267,17 +344,29 @@
                                     <label for="basic-auth-password" :class="{ disabled: activeTab.authentication.disabled }">Password</label>
                                 </td>
                                 <td style="width: 100%">
-                                    <input type="text" v-model="activeTab.authentication.password" id="basic-auth-password" :disabled="activeTab.authentication.disabled">
+                                    <CodeMirrorSingleLine
+                                        v-model="activeTab.authentication.password"
+                                        :env-variables="activeTabEnvironmentResolved"
+                                        :input-text-compatible="true"
+                                        :disabled="activeTab.authentication.disabled"
+                                        :key="'basic-auth-password'"
+                                    />
                                 </td>
                             </tr>
                         </template>
                         <template v-if="activeTab.authentication.type === 'bearer'">
                             <tr>
                                 <td style="user-select: none;">
-                                    <label for="basic-auth-token" :class="{ disabled: activeTab.authentication.disabled }">Token</label>
+                                    <label for="bearer-auth-token" :class="{ disabled: activeTab.authentication.disabled }">Token</label>
                                 </td>
                                 <td style="width: 100%">
-                                    <input type="text" v-model="activeTab.authentication.token" id="basic-auth-token" :disabled="activeTab.authentication.disabled">
+                                    <CodeMirrorSingleLine
+                                        v-model="activeTab.authentication.token"
+                                        :env-variables="activeTabEnvironmentResolved"
+                                        :input-text-compatible="true"
+                                        :disabled="activeTab.authentication.disabled"
+                                        :key="'bearer-auth-token'"
+                                    />
                                 </td>
                             </tr>
                             <tr>
@@ -285,7 +374,13 @@
                                     <label for="basic-auth-prefix" :class="{ disabled: activeTab.authentication.disabled }">Prefix</label>
                                 </td>
                                 <td style="width: 100%">
-                                    <input type="text" v-model="activeTab.authentication.prefix" id="basic-auth-prefix" :disabled="activeTab.authentication.disabled">
+                                    <CodeMirrorSingleLine
+                                        v-model="activeTab.authentication.prefix"
+                                        :env-variables="activeTabEnvironmentResolved"
+                                        :input-text-compatible="true"
+                                        :disabled="activeTab.authentication.disabled"
+                                        :key="'bearer-auth-prefix'"
+                                    />
                                 </td>
                             </tr>
                         </template>
@@ -658,8 +753,12 @@ export default {
     padding: 0.5rem;
 }
 
-.request-panel-tabs-context table td:nth-last-child(-n+2) {
-    width: 1px;
+.request-panel-tabs-context table:not(.auth) td:nth-last-child(-n+2) {
+    width: 29px;
+}
+
+.request-panel-tabs-context table.auth td:nth-last-child(-n+2) {
+    width: 96px;
 }
 
 .request-panel-tabs-context table input {
