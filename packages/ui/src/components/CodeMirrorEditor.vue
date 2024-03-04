@@ -4,7 +4,7 @@
 
 <script>
 import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, StateEffect } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript } from '@codemirror/lang-javascript'
 import { graphqlLanguage } from 'altair-codemirror-graphql'
@@ -13,6 +13,7 @@ import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlight
 import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selectLineBoundaryForward } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
+import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 const styleOverrides = EditorView.theme({
     '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
@@ -39,7 +40,7 @@ document.onkeydown = function(evt) {
     }
 }
 
-function createState(language, documentText, vueInstance) {
+function getLanguageFuncAndHighlightStyle(language) {
     let languageFunc = null
     let highlightStyle = defaultHighlightStyle
 
@@ -57,39 +58,56 @@ function createState(language, documentText, vueInstance) {
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
+    return { languageFunc, highlightStyle }
+}
+
+function getExtensions(vueInstance, language) {
+    const { languageFunc, highlightStyle } = getLanguageFuncAndHighlightStyle(language)
+
+    // languageFunc will be null for plain text & unsupported languages,
+    // so we filter it out, to prevent errors
+    const languageArray = [
+        languageFunc
+    ].filter(Boolean)
+
+    return [
+        ...languageArray,
+        syntaxHighlighting(highlightStyle, { fallback: true }),
+        lineNumbers(),
+        highlightActiveLineGutter(),
+        foldGutter({ openText: '▾', closedText: '▸' }),
+        closeBrackets(),
+        bracketMatching(),
+        indentOnInput(),
+        highlightActiveLine(),
+        history(),
+        highlightSpecialChars(),
+        highlightSelectionMatches(),
+        indentUnit.of('    '), // 4 spaces
+        EditorView.lineWrapping,
+        EditorView.updateListener.of(v => {
+            if(v.docChanged) {
+                vueInstance.emitted = true
+                vueInstance.$emit('update:modelValue', v.state.doc.toString())
+            }
+        }),
+        styleOverrides,
+        keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            indentWithTab,
+            ...searchKeymap,
+            selectLineKeyMap
+        ]),
+        vueInstance.readonly ? EditorState.readOnly.of(true) : EditorState.readOnly.of(false),
+        envVarDecoration(vueInstance.envVariables),
+    ]
+}
+
+function createState(language, documentText, vueInstance) {
     return EditorState.create({
         doc: documentText,
-        extensions: [
-            languageFunc,
-            syntaxHighlighting(highlightStyle, { fallback: true }),
-            lineNumbers(),
-            highlightActiveLineGutter(),
-            foldGutter({ openText: '▾', closedText: '▸' }),
-            closeBrackets(),
-            bracketMatching(),
-            indentOnInput(),
-            highlightActiveLine(),
-            history(),
-            highlightSpecialChars(),
-            highlightSelectionMatches(),
-            indentUnit.of('    '), // 4 spaces
-            EditorView.lineWrapping,
-            EditorView.updateListener.of(v => {
-                if(v.docChanged) {
-                    vueInstance.emitted = true
-                    vueInstance.$emit('update:modelValue', v.state.doc.toString())
-                }
-            }),
-            styleOverrides,
-            keymap.of([
-                ...defaultKeymap,
-                ...historyKeymap,
-                indentWithTab,
-                ...searchKeymap,
-                selectLineKeyMap
-            ]),
-            vueInstance.readonly ? EditorState.readOnly.of(true) : EditorState.readOnly.of(false),
-        ]
+        extensions: getExtensions(vueInstance, language)
     })
 }
 
@@ -107,6 +125,10 @@ export default {
             type: Boolean,
             default: false
         },
+        envVariables: {
+            type: Object,
+            default: () => ({})
+        },
     },
     data() {
         return {
@@ -121,7 +143,17 @@ export default {
             } else {
                 this.emitted = false
             }
-        }
+        },
+        envVariables: {
+            deep: true,
+            handler() {
+                if (this.editor) {
+                    this.editor.dispatch({
+                        effects: StateEffect.reconfigure.of(getExtensions(this, this.lang))
+                    })
+                }
+            }
+        },
     },
     methods: {
         setValue(value) {
@@ -171,5 +203,27 @@ export default {
 
 .code-mirror-editor .cm-editor {
     height: 100%;
+}
+
+.code-mirror-editor .valid-env-var {
+    background-color: var(--valid-env-highlight-background-color);
+    border-radius: 3px;
+    padding: 2px 0;
+    color: var(--valid-env-highlight-color);
+}
+
+.code-mirror-editor .valid-env-var * {
+    color: var(--valid-env-highlight-color) !important;
+}
+
+.code-mirror-editor .invalid-env-var {
+    background-color: var(--invalid-env-highlight-background-color);
+    border-radius: 3px;
+    padding: 2px 0;
+    color: var(--invalid-env-highlight-color);
+}
+
+.code-mirror-editor .invalid-env-var * {
+    color: var(--invalid-env-highlight-color) !important;
 }
 </style>

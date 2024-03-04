@@ -101,23 +101,50 @@
                         </tr>
                     </table>
                 </div>
-                <div v-if="activeTab.body.mimeType === 'text/plain'">
-                    <textarea v-model="activeTab.body.text" style="width: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
+                <div v-if="activeTab.body.mimeType === 'text/plain'" class="oy-a">
+                    <CodeMirrorEditor
+                        v-model="activeTab.body.text"
+                        lang="text"
+                        :env-variables="activeTabEnvironmentResolved"
+                        class="code-editor"
+                        :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
+                    ></CodeMirrorEditor>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/json'" class="oy-a">
-                    <CodeMirrorEditor v-model="activeTab.body.text" lang="json" class="code-editor" :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="jsonEditor"></CodeMirrorEditor>
+                    <CodeMirrorEditor
+                        v-model="activeTab.body.text"
+                        lang="json"
+                        :env-variables="activeTabEnvironmentResolved"
+                        class="code-editor"
+                        :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
+                        ref="jsonEditor"
+                    ></CodeMirrorEditor>
                 </div>
                 <div class="request-panel-body-footer" v-if="activeTab.body.mimeType === 'application/json'">
                     <button class="button" @click="beautifyJSON">Beautify JSON</button>
                 </div>
                 <div style="display: grid; grid-template-rows: 1fr 130px auto; height: 100%; overflow: auto;" v-if="activeTab.body.mimeType === 'application/graphql'">
                     <div class="oy-a" style="min-height: 130px;">
-                        <CodeMirrorEditor v-model="graphql.query" lang="graphql" class="code-editor" :key="'code-mirror-editor1-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="graphqlEditor"></CodeMirrorEditor>
+                        <CodeMirrorEditor
+                            v-model="graphql.query"
+                            lang="graphql"
+                            :env-variables="activeTabEnvironmentResolved"
+                            class="code-editor"
+                            :key="'code-mirror-editor1-' + activeTab._id + '-' + refreshCodeMirrorEditors"
+                            ref="graphqlEditor"
+                        ></CodeMirrorEditor>
                     </div>
                     <div style="margin-top: 0.5rem;display: grid; grid-template-rows: auto 1fr;">
                         <div style="margin-bottom: 0.3rem; user-select: none;">Query Variables</div>
                         <div class="oy-a">
-                            <CodeMirrorEditor v-model="graphql.variables" lang="json" class="code-editor" :key="'code-mirror-editor2-' + activeTab._id + '-' + refreshCodeMirrorEditors" ref="jsonEditor"></CodeMirrorEditor>
+                            <CodeMirrorEditor
+                                v-model="graphql.variables"
+                                lang="json"
+                                :env-variables="activeTabEnvironmentResolved"
+                                class="code-editor"
+                                :key="'code-mirror-editor2-' + activeTab._id + '-' + refreshCodeMirrorEditors"
+                                ref="jsonEditor"
+                            ></CodeMirrorEditor>
                         </div>
                     </div>
                     <div class="request-panel-body-footer">
