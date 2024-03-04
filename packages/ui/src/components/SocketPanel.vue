@@ -39,12 +39,13 @@
                                 <option value="Socket.IO-v3">IO v3</option>
                                 <option value="Socket.IO-v2">IO v2</option>
                             </select>
-                            <input
-                                type="text"
+                            <CodeMirrorSingleLine
                                 v-model="client.url"
                                 :placeholder="`${client.type === undefined ? 'WebSocket URL' : 'Socket.IO URL'}`"
-                                class="ml-0_5rem w-100p"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
                                 :disabled="isClientConnected(client)"
+                                class="input ml-0_5rem w-100p"
                             />
                             <div class="ml-0_5rem">
                                 <button
@@ -241,6 +242,7 @@ import ioV2 from 'socket.io-client-v2'
 import { io as ioV3 } from 'socket.io-client-v3'
 import { io as ioV4 } from 'socket.io-client-v4'
 import { useStore } from 'vuex'
+import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 
 // Data Variables
 
@@ -257,6 +259,7 @@ function handleMessageContainerRef(ref: any, clientId: string) {
 // Computed
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
+const activeTabEnvironmentResolved = computed(() => store.state.activeTabEnvironmentResolved)
 const sockets = store.state.sockets
 
 // Methods
@@ -866,7 +869,8 @@ button.icon > svg {
 
 textarea,
 input,
-select {
+select,
+.input {
     outline: 0;
     border: 1px solid var(--default-border-color);
     border-radius: 0.25rem;
@@ -879,7 +883,7 @@ textarea {
     resize: vertical;
 }
 
-input:disabled {
+input:disabled, .input.disabled {
     background-color: var(--socket-input-disabled-background-color);
 }
 

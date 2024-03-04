@@ -156,4 +156,13 @@ export default {
     background-color: var(--input-disabled-background-color);
     color: var(--input-disabled-color);
 }
+
+/* when editor transitions from empty to filled when you type something, the editor messes */
+/* with the size of the div container, causing a small layout shift - this fixes that */
+/* img.cm-widgetBuffers seems appear inside editor only when the editor is empty */
+/* without this fix, the ui jump can be seen in the socket panel address bar & the */
+/* request panel inputs of the auth tab, when moving from empty to filled */
+.code-mirror-single-line .cm-widgetBuffer {
+    vertical-align: inherit;
+}
 </style>
