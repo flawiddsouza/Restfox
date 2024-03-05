@@ -9,6 +9,28 @@ import { history, historyKeymap } from '@codemirror/commands'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 function getExtensions(vueInstance) {
+    const singleLineEnforcers = []
+
+    if(!vueInstance.allowMultipleLines) {
+        // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
+        [
+            EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
+            EditorView.domEventHandlers({
+                paste: (event, view) => {
+                    const content = event.clipboardData.getData('text/plain')
+
+                    if(content.includes('\n')) {
+                        event.preventDefault()
+                        const contentWithoutNewLines = content.replace(/[\n\r]/g, '')
+                        const transaction = view.state.replaceSelection(contentWithoutNewLines)
+                        const update = view.state.update(transaction)
+                        view.update([update])
+                    }
+                }
+            })
+        ].forEach(enforcer => singleLineEnforcers.push(enforcer))
+    }
+
     const extensions = [
         history(),
         EditorView.updateListener.of(v => {
@@ -17,21 +39,7 @@ function getExtensions(vueInstance) {
                 vueInstance.$emit('update:modelValue', v.state.doc.toString())
             }
         }),
-        // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
-        EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
-        EditorView.domEventHandlers({
-            paste: (event, view) => {
-                const content = event.clipboardData.getData('text/plain')
-
-                if(content.includes('\n')) {
-                    event.preventDefault()
-                    const contentWithoutNewLines = content.replace(/[\n\r]/g, '')
-                    const transaction = view.state.replaceSelection(contentWithoutNewLines)
-                    const update = view.state.update(transaction)
-                    view.update([update])
-                }
-            }
-        }),
+        ...singleLineEnforcers,
         keymap.of([
             ...historyKeymap
         ]),
@@ -48,7 +56,7 @@ function getExtensions(vueInstance) {
 
 function createState(vueInstance) {
     return EditorState.create({
-        doc: vueInstance.modelValue,
+        doc: typeof vueInstance.modelValue === 'string' ? vueInstance.modelValue : '',
         extensions: getExtensions(vueInstance)
     })
 }
@@ -68,6 +76,10 @@ export default {
             default: () => ({})
         },
         inputTextCompatible: {
+            type: Boolean,
+            default: false
+        },
+        allowMultipleLines: {
             type: Boolean,
             default: false
         },
@@ -118,6 +130,10 @@ export default {
 </script>
 
 <style>
+.code-mirror-single-line .cm-editor {
+    height: 100%;
+}
+
 .code-mirror-single-line .cm-editor.cm-focused {
     outline: 0 !important;
 }

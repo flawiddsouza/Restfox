@@ -103,13 +103,16 @@
                                     v-if="client.type && client.type.startsWith('Socket.IO')"
                                 />
                             </div>
-                            <textarea
-                                class="w-100p mt-0_5rem"
-                                rows="5"
-                                placeholder="Payload"
+                            <CodeMirrorSingleLine
                                 v-model="client.message"
-                                @input="updateCurrentPayload(client, 'payload', ($event as any).target.value)"
-                            ></textarea>
+                                @update:modelValue="updateCurrentPayload(client, 'payload', $event)"
+                                :placeholder="`Payload`"
+                                :env-variables="activeTabEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :allow-multiple-lines="true"
+                                class="w-100p mt-0_5rem input o-a"
+                                style="height: 5.8rem; resize: vertical; margin-bottom: 0.2rem;"
+                            />
                             <div class="d-f flex-jc-sb">
                                 <button
                                     @click="beautifyJSON(client)"
