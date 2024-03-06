@@ -28,7 +28,7 @@
                         class="client"
                         v-if="!client.visibility || client.visibility === 'shown'"
                     >
-                        <div class="d-f flex-ai-c p-0_5rem bc-primary">
+                        <div class="d-f flex-ai-c p-0_5rem bc-primary" style="min-width: 0;">
                             <select
                                 v-model="client.type"
                                 class="h-100p"
@@ -45,7 +45,7 @@
                                 :env-variables="activeTabEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :disabled="isClientConnected(client)"
-                                class="input ml-0_5rem w-100p"
+                                class="input ml-0_5rem w-100p o-a"
                             />
                             <div class="ml-0_5rem">
                                 <button
@@ -377,7 +377,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Disconnected from ${client.url}`,
+                message: `Disconnected from ${clientUrlWithEnvironmentVariablesSubtituted}`,
                 type: 'INFO'
             })
         })
@@ -419,7 +419,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Disconnected from ${client.url}`,
+                message: `Disconnected from ${clientUrlWithEnvironmentVariablesSubtituted}`,
                 type: 'INFO'
             })
         })
