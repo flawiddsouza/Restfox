@@ -27,7 +27,13 @@
                     </div>
                 </div>
                 <div style="display: grid; grid-template-rows: 1fr auto; overflow: auto;">
-                    <CodeMirrorEditor v-model="environment" lang="json" style="overflow: auto;" :key="currentEnvironment"></CodeMirrorEditor>
+                    <CodeMirrorEditor
+                        v-model="environment"
+                        lang="json"
+                        :env-variables="envVariables"
+                        style="overflow: auto;"
+                        :key="currentEnvironment"
+                    ></CodeMirrorEditor>
                     <div style="margin-top: 1rem">
                         <div v-if="parseError" class="box">{{ parseError }}</div>
                         <div class="box box-hidden" v-else>
@@ -81,7 +87,8 @@ export default {
             showEnvironmentContextMenuPopupCoords: {
                 x: '',
                 y: ''
-            }
+            },
+            envVariables: {},
         }
     },
     computed: {
@@ -160,6 +167,7 @@ export default {
                         inline: 'center'
                     })
                 })
+                this.loadEnvVariables()
             }
         }
     },
@@ -436,6 +444,11 @@ export default {
             link.download = `${environment.name}.restfox_environment.json`
             link.click()
         },
+        async loadEnvVariables() {
+            const request = JSON.parse(JSON.stringify(this.collectionItem))
+            const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
+            this.envVariables = environment
+        }
     }
 }
 </script>
