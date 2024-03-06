@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const { resolve } = require('path')
 const { File } = require('node:buffer')
 const { Agent } = require('undici')
+const { Socket } = require('net')
+const dnsPromises = require('dns').promises
 require('update-electron-app')()
 
 if(require('electron-squirrel-startup')) return app.quit()
@@ -25,6 +27,23 @@ function createWindow() {
 
 let abortController = {}
 
+async function checkReachability(host, port) {
+    return new Promise((resolve) => {
+        const socket = new Socket()
+
+        socket.once('connect', () => {
+            socket.end()
+            resolve(true)
+        })
+
+        socket.once('error', () => {
+            resolve(false)
+        })
+
+        socket.connect(port, host)
+    })
+}
+
 async function handleSendRequest(_event, data) {
     try {
         const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
@@ -47,6 +66,8 @@ async function handleSendRequest(_event, data) {
 
         const startTime = new Date()
 
+        const urlParsed = new URL(url)
+
         const response = await fetch(url, {
             method,
             headers,
@@ -55,6 +76,43 @@ async function handleSendRequest(_event, data) {
             dispatcher: new Agent({
                 connect: {
                     rejectUnauthorized: disableSSLVerification ? false : true,
+                    lookup: async(hostname, _opts, callback) => {
+                        try {
+                            console.log('lookup', hostname)
+                            const addresses = await dnsPromises.lookup(hostname, { all: true })
+
+                            let address = null
+
+                            if (addresses.length > 1) {
+                                console.log('addresses found', addresses)
+
+                                while(addresses.length > 0) {
+                                    address = addresses.shift()
+                                    let isReachable = true
+                                    const urlPort = urlParsed.port !== '' ? urlParsed.port : (urlParsed.protocol === 'https:' ? 443 : 80)
+                                    if (hostname === 'localhost') {
+                                        isReachable = await checkReachability(address.address, urlPort)
+                                        console.log(`address ${address.address} is ${isReachable ? 'reachable' : 'not reachable'} on port ${urlPort}`)
+                                    } else {
+                                        console.log(`reachability test skipped for non-localhost address ${address.address} and picked as the address to use for the request`)
+                                    }
+                                    if(isReachable) {
+                                        break
+                                    }
+                                }
+                            } else {
+                                address = addresses[0]
+                            }
+
+                            if(!address) {
+                                throw new Error('No reachable address found')
+                            }
+
+                            callback(null, address.address, address.family)
+                        } catch(err) {
+                            callback(err)
+                        }
+                    }
                 },
             }),
         })
@@ -84,6 +142,7 @@ async function handleSendRequest(_event, data) {
             eventData: responseToSend
         }
     } catch(e) {
+        console.error('request failed', e)
         return {
             event: 'responseError',
             eventData: e.message
