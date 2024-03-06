@@ -204,26 +204,4 @@ export default {
 .code-mirror-editor .cm-editor {
     height: 100%;
 }
-
-.code-mirror-editor .valid-env-var {
-    background-color: var(--valid-env-highlight-background-color);
-    border-radius: 3px;
-    padding: 2px 0;
-    color: var(--valid-env-highlight-color);
-}
-
-.code-mirror-editor .valid-env-var * {
-    color: var(--valid-env-highlight-color) !important;
-}
-
-.code-mirror-editor .invalid-env-var {
-    background-color: var(--invalid-env-highlight-background-color);
-    border-radius: 3px;
-    padding: 2px 0;
-    color: var(--invalid-env-highlight-color);
-}
-
-.code-mirror-editor .invalid-env-var * {
-    color: var(--invalid-env-highlight-color) !important;
-}
 </style>

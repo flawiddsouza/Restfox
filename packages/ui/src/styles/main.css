@@ -71,6 +71,10 @@ html {
     --valid-env-highlight-background-color: #e8f5e9;
     --invalid-env-highlight-color: #d32f2f;
     --invalid-env-highlight-background-color: #ffebee;
+    --modal-valid-env-highlight-color: #2e7d32;
+    --modal-valid-env-highlight-background-color: #e8f5e9;
+    --modal-invalid-env-highlight-color: #d32f2f;
+    --modal-invalid-env-highlight-background-color: #ffebee;
 }
 
 html.theme-dark {
@@ -127,6 +131,10 @@ html.theme-dark {
     --valid-env-highlight-background-color: #1b5e20;
     --invalid-env-highlight-color: #ffcccb;
     --invalid-env-highlight-background-color: #7c0404;
+    --modal-valid-env-highlight-color: #2e7d32;
+    --modal-valid-env-highlight-background-color: #e8f5e9;
+    --modal-invalid-env-highlight-color: #d32f2f;
+    --modal-invalid-env-highlight-background-color: #ffebee;
 }
 
 * {
@@ -288,6 +296,46 @@ button.button:hover {
 
 .modal .cm-editor .cm-number {
     color: var(--modal-cm-number);
+}
+
+.cm-editor .valid-env-var {
+    background-color: var(--valid-env-highlight-background-color);
+    border-radius: 3px;
+    padding: 2px 0;
+    color: var(--valid-env-highlight-color);
+}
+
+.cm-editor .valid-env-var * {
+    color: var(--valid-env-highlight-color) !important;
+}
+
+.cm-editor .invalid-env-var {
+    background-color: var(--invalid-env-highlight-background-color);
+    border-radius: 3px;
+    padding: 2px 0;
+    color: var(--invalid-env-highlight-color);
+}
+
+.cm-editor .invalid-env-var * {
+    color: var(--invalid-env-highlight-color) !important;
+}
+
+.modal .cm-editor .valid-env-var {
+    background-color: var(--modal-valid-env-highlight-background-color);
+    color: var(--modal-valid-env-highlight-color);
+}
+
+.modal .cm-editor .valid-env-var * {
+    color: var(--modal-valid-env-highlight-color) !important;
+}
+
+.modal .cm-editor .invalid-env-var {
+    background-color: var(--modal-invalid-env-highlight-background-color);
+    color: var(--modal-invalid-env-highlight-color);
+}
+
+.modal .cm-editor .invalid-env-var * {
+    color: var(--modal-invalid-env-highlight-color) !important;
 }
 
 a {

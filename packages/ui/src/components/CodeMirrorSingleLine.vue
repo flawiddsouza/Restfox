@@ -156,20 +156,6 @@ export default {
     padding: v-bind('inputTextCompatible ? "0" : "4px 0"');
 }
 
-.code-mirror-single-line .valid-env-var {
-    background-color: var(--valid-env-highlight-background-color);
-    border-radius: 3px;
-    padding: 2px 0;
-    color: var(--valid-env-highlight-color);
-}
-
-.code-mirror-single-line .invalid-env-var {
-    background-color: var(--invalid-env-highlight-background-color);
-    border-radius: 3px;
-    padding: 2px 0;
-    color: var(--invalid-env-highlight-color);
-}
-
 .code-mirror-single-line .cm-line {
     padding: v-bind('inputTextCompatible ? "0" : "0 2px 0 4px"');
 }
