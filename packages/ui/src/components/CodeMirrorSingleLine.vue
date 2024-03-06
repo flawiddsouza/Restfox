@@ -10,6 +10,7 @@ import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 function getExtensions(vueInstance) {
     const singleLineEnforcers = []
+    const multiLineEnforcers = []
 
     if(!vueInstance.allowMultipleLines) {
         // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
@@ -27,8 +28,12 @@ function getExtensions(vueInstance) {
                         view.update([update])
                     }
                 }
-            })
+            }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
+    } else {
+        [
+            EditorView.lineWrapping,
+        ].forEach(enforcer => multiLineEnforcers.push(enforcer))
     }
 
     const extensions = [
@@ -40,6 +45,7 @@ function getExtensions(vueInstance) {
             }
         }),
         ...singleLineEnforcers,
+        ...multiLineEnforcers,
         keymap.of([
             ...historyKeymap
         ]),
@@ -142,7 +148,7 @@ export default {
     font-family: inherit !important;
     margin-left: v-bind('inputTextCompatible ? "2px" : "0.2rem"');
     margin-right: v-bind('inputTextCompatible ? "2px" : "0.5rem"');
-    overflow: hidden;
+    overflow: v-bind('allowMultipleLines ? "visible" : "hidden"');
     line-height: v-bind('inputTextCompatible ? "1.3" : "1.4"');
 }
 
