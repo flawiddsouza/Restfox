@@ -20,18 +20,14 @@ class AlertConfirmPrompt extends HTMLElement {
             `
         }
 
-        if (type === 'confirm') {
-            inputHtml = '<div style="width: 20rem;"></div>'
-        }
-
         div.innerHTML = `
         <div class="dialog-container">
-            <div class="dialog">
+            <div class="dialog dialog-${type}">
                 <div>${title}</div>
                 ${inputHtml}
                 <div style="margin-top: 1rem; text-align: right; user-select: none;">
                     <button class="dialog-primary-button" id="dialog-confirm">OK</button>
-                    <button class="dialog-secondary-button" id="dialog-cancel">Cancel</button>
+                    ${type !== 'alert' ? '<button class="dialog-secondary-button" id="dialog-cancel">Cancel</button>' : ''}
                 </div>
             </div>
         </div>
@@ -131,6 +127,10 @@ class AlertConfirmPrompt extends HTMLElement {
         return this.createDialog('confirm', title)
     }
 
+    createAlert = (message) => {
+        return this.createDialog('alert', message)
+    }
+
     connectedCallback() {
         this.shadowRoot.innerHTML = /* html */ `
         <div id="root"></div>
@@ -155,6 +155,11 @@ class AlertConfirmPrompt extends HTMLElement {
             box-shadow: 1px 1px 42px -16px black;
             border-radius: 4px;
             border: 1px solid #c6c6c6;
+        }
+
+        .dialog-confirm, .dialog-alert {
+            width: 20rem;
+            padding: 1.5rem;
         }
 
         .dialog *::selection {
@@ -205,6 +210,7 @@ class AlertConfirmPrompt extends HTMLElement {
 
         window.createPrompt = this.createPrompt
         window.createConfirm = this.createConfirm
+        window.createAlert = this.createAlert
     }
 }
 

@@ -218,20 +218,20 @@ export default {
                 this.showImportModal = false
 
                 if(this.importFrom.endsWith(' URL')) {
-                    alert('URL imported successfully')
+                    this.$toast.success('URL imported successfully')
                 } else {
                     if(importedFileCount === 1) {
-                        alert('File imported successfully')
+                        this.$toast.success('File imported successfully')
                     } else {
-                        alert(`${importedFileCount} files imported successfully`)
+                        this.$toast.success(`${importedFileCount} files imported successfully`)
                     }
                 }
             } catch(e) {
                 console.log(e)
                 if(this.importFrom === 'Postman URL') {
-                    alert(`Invalid import url given: ${this.urlToImport}`)
+                    this.$toast.error(`Invalid import url given: ${this.urlToImport}`)
                 } else {
-                    alert(`Invalid import file given: ${fileBeingImported}`)
+                    this.$toast.error(`Invalid import file given: ${fileBeingImported}`)
                 }
             }
         }

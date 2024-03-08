@@ -63,10 +63,10 @@ export default {
 
             try {
                 await importDB(this.fileToRestore)
-                alert('Backup restored successfully')
+                this.$toast.success('Backup restored successfully')
             } catch(e) {
                 console.log(e)
-                alert('Invalid backup file given')
+                this.$toast.error('Invalid backup file given')
             }
         }
     }

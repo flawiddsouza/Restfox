@@ -268,7 +268,7 @@ const activeWorkspace = computed(() => store.state.activeWorkspace)
 const activeTab = computed(() => store.state.activeTab)
 const activeTabEnvironmentResolved = computed(() => store.state.activeTabEnvironmentResolved)
 const sockets = store.state.sockets
-const $toast: { success: (message: string) => void } = inject('$toast')
+const $toast: { success: (message: string) => void, error: (message: string) => void } = inject('$toast')
 
 // Methods
 
@@ -350,7 +350,7 @@ async function connect(client: Client) {
         }
     } catch(e) {
         console.log(e)
-        alert(`Invalid WebSocket URL: ${clientUrlWithEnvironmentVariablesSubtituted}`)
+        $toast.error(`Invalid WebSocket URL: ${clientUrlWithEnvironmentVariablesSubtituted}`)
         return
     }
 
@@ -458,7 +458,7 @@ function beautifyJSON(client: Client) {
         client.message = JSON.stringify(parsedMessage, null, 4)
         client.payloads.find(payload => payload.id === client.currentPayloadId)!.payload = client.message
     } catch {
-        alert('Invalid JSON')
+        $toast.error('Invalid JSON')
     }
 }
 
@@ -618,7 +618,7 @@ function changePayloadTab(client: Client, tab: ClientPayload) {
 
 async function closePayloadTab(client: Client, event: { tabToClose: ClientPayload, tabToOpen: ClientPayload }) {
     if(client.payloads.length === 1) {
-        alert('Cannot delete payload as there\'s only one payload left')
+        $toast.error('Cannot delete payload as there\'s only one payload left')
         return
     }
 

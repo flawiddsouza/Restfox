@@ -353,7 +353,7 @@ export default {
         },
         async copyResponseToClipboard() {
             if(!window.isSecureContext) {
-                alert('Copy to clipboard needs Restfox running under a https url')
+                this.$toast.error('Copy to clipboard needs Restfox running under a https url')
                 return
             }
             await navigator.clipboard.writeText(this.bufferToJSONString(this.response.buffer))

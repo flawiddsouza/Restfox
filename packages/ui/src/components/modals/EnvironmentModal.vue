@@ -189,7 +189,7 @@ export default {
 
             if(this.environments.some(environment => environment.name === newEnvironmentName)) {
                 if(!isImport) {
-                    alert(`Given environment name already exists: ${newEnvironmentName}`)
+                    this.$toast.error(`Given environment name already exists: ${newEnvironmentName}`)
                     return
                 } else {
                     if(!await window.createConfirm(`Given environment name already exists: ${newEnvironmentName}\nDo you want to merge with the existing one?`)) {
@@ -341,7 +341,7 @@ export default {
             }
 
             if(this.clickedContextMenuEnvironment.name !== newEnvironmentName && this.environments.some(environment => environment.name === newEnvironmentName)) {
-                alert('Given environment name already exists')
+                this.$toast.error('Given environment name already exists')
                 this.hideEnvironmentContextMenu()
                 return
             }
@@ -374,7 +374,7 @@ export default {
         },
         async deleteEnvironment() {
             if(this.environments.length === 1) {
-                alert('Cannot delete environment as there\'s only one environment left')
+                this.$toast.error('Cannot delete environment as there\'s only one environment left')
                 this.hideEnvironmentContextMenu()
                 return
             }
@@ -427,7 +427,7 @@ export default {
 
                     this.addEnvironment(parsedJSON.name, environment)
                 } catch(e) {
-                    alert('Invalid JSON file')
+                    this.$toast.error('Invalid JSON file')
                 } finally {
                     document.body.removeChild(fileInput)
                 }
