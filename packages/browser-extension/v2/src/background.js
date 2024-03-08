@@ -109,13 +109,16 @@ async function handleAction() {
 
 browser.pageAction.onClicked.addListener(handleAction)
 
-let abortController = null
+let abortController = new Map()
 
 async function handleSendRequest(message, sendResponse) {
-    abortController = new AbortController()
+    const { eventId } = message
+
     try {
         const { url, method, headers, bodyHint } = message.eventData
         let { body } = message.eventData
+
+        abortController.set(eventId, new AbortController())
 
         if(bodyHint === 'FormData') {
             const formData = new FormData()
@@ -136,7 +139,7 @@ async function handleSendRequest(message, sendResponse) {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
-            signal: abortController.signal
+            signal: abortController.get(eventId).signal
         })
 
         const endTime = new Date()
@@ -162,11 +165,13 @@ async function handleSendRequest(message, sendResponse) {
 
         sendResponse({
             event: 'response',
+            eventId,
             eventData: responseToSend
         })
     } catch(e) {
         sendResponse({
             event: 'responseError',
+            eventId,
             eventData: e.message
         })
     }
@@ -178,7 +183,7 @@ function messageHandler(message, _sender, sendResponse) {
     }
 
     if(message.event === 'cancelRequest') {
-        abortController.abort()
+        abortController.get(message.eventId).abort()
     }
 
     return true
