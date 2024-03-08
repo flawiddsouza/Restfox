@@ -114,8 +114,11 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
         }
 
         return new Promise((resolve, reject) => {
+            const eventId = generateId()
+
             window.postMessage({
                 event: 'sendRequest',
+                eventId,
                 eventData: {
                     url: url.toString(),
                     method,
@@ -126,6 +129,10 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
             })
 
             const messageHandler = message => {
+                if (message.data.eventId !== undefined && message.data.eventId !== eventId) {
+                    return
+                }
+
                 if(message.data.event === 'response') {
                     resolve(message.data.eventData)
                     window.removeEventListener('message',  messageHandler)
@@ -141,7 +148,8 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
 
             abortControllerSignal.onabort = () => {
                 window.postMessage({
-                    event: 'cancelRequest'
+                    event: 'cancelRequest',
+                    eventId,
                 })
                 reject(new DOMException('The user aborted a request.', 'AbortError'))
                 window.removeEventListener('message',  messageHandler)
