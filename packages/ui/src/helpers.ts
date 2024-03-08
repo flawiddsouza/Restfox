@@ -556,7 +556,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
 
     const workspace = json.resources.find(item => item._type === 'workspace')
 
-    json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment', 'proto_file'].includes(item._type) == false).forEach(item => {
+    json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment', 'proto_file', 'unit_test_suite'].includes(item._type) == false).forEach(item => {
         if(item._type === 'workspace' || item._type === 'request_group') {
             let parentId = item.parentId
 

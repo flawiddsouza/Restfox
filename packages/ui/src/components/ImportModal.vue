@@ -7,7 +7,7 @@
                     <option>Restfox</option>
                     <option>Postman</option>
                     <option>Postman URL</option>
-                    <option>Insomnia</option>
+                    <option value="Insomnia">Insomnia / Insomnium</option>
                     <option>OpenAPI</option>
                     <option>OpenAPI URL</option>
                 </select>
