@@ -73,6 +73,18 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActi
     state.activeTab = tab
     loadResponses(state, tab._id)
     if(scrollSidebarItemIntoView) {
+        if(tab.parentId) {
+            let currentParentId = tab.parentId
+            while (currentParentId) {
+                const parentFolder = findItemInTreeById(state.collectionTree, currentParentId)
+                if(parentFolder && parentFolder.collapsed) {
+                    parentFolder.collapsed = false
+                    store.dispatch('saveCollectionItemCollapsedState', { _id: parentFolder._id, collapsed: parentFolder.collapsed })
+                    console.log(`parent folder ${parentFolder.name} was collapsed and has been auto expanded`)
+                }
+                currentParentId = parentFolder.parentId
+            }
+        }
         nextTick(() => {
             const activeSidebarElement = document.querySelector(`.sidebar-list-container div[data-id="${tab._id}"]`)
             if(activeSidebarElement) {
