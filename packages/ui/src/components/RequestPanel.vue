@@ -584,7 +584,7 @@ export default {
             e.stopPropagation()
             const content = e.clipboardData.getData('text/plain').trim()
             if (content.startsWith('curl')) {
-                if(!confirm(`We've detected that you've pasted a curl command. Do you want to import the curl command into the current request?`)) {
+                if(!await window.createConfirm(`We've detected that you've pasted a curl command. Do you want to import the curl command into the current request?`)) {
                     return
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)

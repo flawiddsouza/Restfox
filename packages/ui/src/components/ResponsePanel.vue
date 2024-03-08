@@ -372,8 +372,8 @@ export default {
             a.click()
             URL.revokeObjectURL(url)
         },
-        restoreCurrentResponseRequest() {
-            if(!confirm('Are you sure? Restoring a request will reset your existing request and make it the same as the saved response\'s request.')) {
+        async restoreCurrentResponseRequest() {
+            if(!await window.createConfirm('Are you sure? Restoring a request will reset your existing request and make it the same as the saved response\'s request.')) {
                 return
             }
 

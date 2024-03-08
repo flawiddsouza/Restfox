@@ -57,7 +57,7 @@ export default {
             downloadBlob(`Restfox_Backup_${todayISODate()}.json`, blob)
         },
         async restoreBackup() {
-            if(!confirm('Are you sure?')) {
+            if(!await window.createConfirm('Are you sure?')) {
                 return
             }
 

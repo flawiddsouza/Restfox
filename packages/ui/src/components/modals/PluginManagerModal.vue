@@ -192,8 +192,8 @@ export default {
         updatePluginStatus(pluginId, enabled) {
             this.$store.commit('updatePluginStatus', { _id: pluginId, enabled: enabled === '1' ? true : false })
         },
-        deletePlugin(pluginId) {
-            if(confirm('Are you sure?')) {
+        async deletePlugin(pluginId) {
+            if(await window.createConfirm('Are you sure?')) {
                 this.$store.commit('deletePlugin', pluginId)
             }
         },

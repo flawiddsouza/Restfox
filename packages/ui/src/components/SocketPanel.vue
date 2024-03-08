@@ -292,8 +292,8 @@ function addClient() {
     })
 }
 
-function removeClient(client: Client) {
-    if (!confirm('Are you sure you want to remove this client?')) {
+async function removeClient(client: Client) {
+    if (!await (window as any).createConfirm('Are you sure you want to remove this client?')) {
         return
     }
     sockets[activeTab.value._id + '-' + client.id]?.close()
@@ -616,13 +616,13 @@ function changePayloadTab(client: Client, tab: ClientPayload) {
     client.event = tab.event
 }
 
-function closePayloadTab(client: Client, event: { tabToClose: ClientPayload, tabToOpen: ClientPayload }) {
+async function closePayloadTab(client: Client, event: { tabToClose: ClientPayload, tabToOpen: ClientPayload }) {
     if(client.payloads.length === 1) {
         alert('Cannot delete payload as there\'s only one payload left')
         return
     }
 
-    if(!confirm(`Are you sure you want to remove "${event.tabToClose.name}?"`)) {
+    if(!await (window as any).createConfirm(`Are you sure you want to remove "${event.tabToClose.name}?"`)) {
         return
     }
 

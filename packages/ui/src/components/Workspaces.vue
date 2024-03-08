@@ -75,7 +75,7 @@ export default {
             this.contextMenuWorkspace = workspace
             this.showContextMenu = true
         },
-        handleContextMenuClick(clickedContextMenuItem) {
+        async handleContextMenuClick(clickedContextMenuItem) {
             if(clickedContextMenuItem === 'Duplicate') {
                 this.workspaceToDuplicate = JSON.parse(JSON.stringify(this.contextMenuWorkspace))
                 this.showDuplicateWorkspaceModal = true
@@ -86,7 +86,7 @@ export default {
             }
 
             if(clickedContextMenuItem === 'Delete') {
-                if(confirm('Are you sure?')) {
+                if(await window.createConfirm('Are you sure?')) {
                     this.$store.dispatch('deleteWorkspace', this.contextMenuWorkspace._id)
                 }
             }

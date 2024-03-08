@@ -5,37 +5,48 @@ class AlertConfirmPrompt extends HTMLElement {
         this.attachShadow({ mode: 'open' })
     }
 
-    createPrompt = (title, defaultValue = '', selectList = []) => {
+    createDialog = (type, title, defaultValue = '', selectList = []) => {
         const div = document.createElement('div')
 
-        div.innerHTML  = `
-            <div class="dialog-container">
-                <div class="dialog">
-                    <div>${title}</div>
-                    <div style="margin-top: 0.5rem;">
-                        <input type="text" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="p-input" spellcheck="false">
-                        <datalist id="selectList">
-                            ${selectList.map(item => `<option value="${item}"></option>`)}
-                        </datalist>
-                    </div>
-                    <div style="margin-top: 1rem; text-align: right; user-select: none;">
-                        <button class="dialog-primary-button" id="p-confirm">OK</button>
-                        <button class="dialog-secondary-button" id="p-cancel">Cancel</button>
-                    </div>
+        let inputHtml = ''
+        if (type === 'prompt') {
+            inputHtml = `
+            <div style="margin-top: 0.5rem;">
+                <input type="text" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
+                <datalist id="selectList">
+                    ${selectList.map(item => `<option value="${item}"></option>`).join('')}
+                </datalist>
+            </div>
+            `
+        }
+
+        if (type === 'confirm') {
+            inputHtml = '<div style="width: 20rem;"></div>'
+        }
+
+        div.innerHTML = `
+        <div class="dialog-container">
+            <div class="dialog">
+                <div>${title}</div>
+                ${inputHtml}
+                <div style="margin-top: 1rem; text-align: right; user-select: none;">
+                    <button class="dialog-primary-button" id="dialog-confirm">OK</button>
+                    <button class="dialog-secondary-button" id="dialog-cancel">Cancel</button>
                 </div>
             </div>
+        </div>
         `
 
         this.shadowRoot.querySelector('#root').appendChild(div)
 
-        this.shadowRoot.getElementById('p-input').focus()
-        this.shadowRoot.getElementById('p-input').select()
+        if (type === 'prompt') {
+            this.shadowRoot.getElementById('dialog-input').focus()
+            this.shadowRoot.getElementById('dialog-input').select()
+        } else {
+            this.shadowRoot.getElementById('dialog-confirm').focus()
+        }
 
         return new Promise((resolve) => {
-            const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled)')
-            const firstFocusableEl = focusableEls[0]
-            const lastFocusableEl = focusableEls[focusableEls.length - 1]
-
             const closeModal = () => {
                 document.removeEventListener('click', eventHandler)
                 document.removeEventListener('keyup', eventHandler)
@@ -44,58 +55,64 @@ class AlertConfirmPrompt extends HTMLElement {
             }
 
             const confirm = () => {
-                resolve(this.shadowRoot.getElementById('p-input').value)
+                if (type === 'prompt') {
+                    resolve(this.shadowRoot.getElementById('dialog-input').value)
+                } else {
+                    resolve(true)
+                }
                 closeModal()
             }
 
             const cancel = () => {
-                resolve(null)
+                resolve(type === 'prompt' ? null : false)
                 closeModal()
             }
 
             const eventHandler = e => {
-                if(e.type === 'keyup') {
-                    if(e.key === 'Enter') {
+                if (e.type === 'keyup') {
+                    if (e.key === 'Enter') {
                         confirm()
                     }
 
-                    if(e.key === 'Escape') {
+                    if (e.key === 'Escape') {
                         cancel()
                     }
 
                     return
                 }
 
-                // trap focus inside dialog
-                if(e.type === 'keydown') {
-                    const isTabPressed = e.key === 'Tab'
+                // Trap focus inside dialog
+                if (e.type === 'keydown') {
+                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled)')
+                    const firstFocusableEl = focusableEls[0]
+                    const lastFocusableEl = focusableEls[focusableEls.length - 1]
 
-                    if(!isTabPressed) {
+                    const isTabPressed = e.key === 'Tab'
+                    if (!isTabPressed) {
                         return
                     }
 
-                    if(e.shiftKey) {
-                        if(this.shadowRoot.activeElement === firstFocusableEl) {
+                    if (e.shiftKey) {
+                        if (this.shadowRoot.activeElement === firstFocusableEl) {
                             lastFocusableEl.focus()
                             e.preventDefault()
                         }
                     } else {
-                        if(this.shadowRoot.activeElement === lastFocusableEl) {
+                        if (this.shadowRoot.activeElement === lastFocusableEl) {
                             firstFocusableEl.focus()
                             e.preventDefault()
                         }
                     }
-
                     return
                 }
 
                 const target = e.composedPath()[0]
 
-                if(target.id === 'p-confirm') {
+                if (target.id === 'dialog-confirm') {
                     confirm()
                 }
 
-                if(target.id === 'p-cancel') {
+                if (target.id === 'dialog-cancel') {
                     cancel()
                 }
             }
@@ -106,84 +123,88 @@ class AlertConfirmPrompt extends HTMLElement {
         })
     }
 
+    createPrompt = (title, defaultValue = '', selectList = []) => {
+        return this.createDialog('prompt', title, defaultValue, selectList)
+    }
+
+    createConfirm = (title) => {
+        return this.createDialog('confirm', title)
+    }
 
     connectedCallback() {
         this.shadowRoot.innerHTML = /* html */ `
-            <div id="root"></div>
-            <style>
-            .dialog-container {
-                position: fixed;
-                height: 100vh;
-                width: 100vw;
-                display: grid;
-                place-items: start center;
-                top: 0;
-                left: 0;
-                z-index: 9999;
-                --border-radius: 3px;
-                --primary-color: #1a73e8;
-            }
+        <div id="root"></div>
+        <style>
+        .dialog-container {
+            position: fixed;
+            height: 100vh;
+            width: 100vw;
+            display: grid;
+            place-items: center;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            --border-radius: 3px;
+            --primary-color: #1a73e8;
+        }
 
-            .dialog {
-                background-color: var(--modal-background-color);
-                color: var(--modal-text-color);
-                padding: 1rem;
-                /* box-shadow: 1px 1px 3px 1px lightgrey; */
-                box-shadow: 1px 1px 42px -16px black;
-                border-radius: 4px;
-                border: 1px solid #c6c6c6;
-            }
+        .dialog {
+            background-color: var(--modal-background-color);
+            color: var(--modal-text-color);
+            padding: 1rem;
+            box-shadow: 1px 1px 42px -16px black;
+            border-radius: 4px;
+            border: 1px solid #c6c6c6;
+        }
 
-            .dialog *::selection {
-                background: #9cc3f5;
-            }
+        .dialog *::selection {
+            background: #9cc3f5;
+        }
 
-            .dialog-primary-button {
-                background: var(--primary-color);
-                border: 1px solid var(--primary-color);
-                padding: 8px 16px;
-                color: white;
-                border-radius: var(--border-radius);
-                width: 75px;
-            }
+        .dialog-primary-button, .dialog-secondary-button {
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            border: 1px solid lightgrey;
+        }
 
-            .dialog-primary-button:hover {
-                background: #2f7de3;
-            }
+        .dialog-primary-button {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+            width: 75px;
+        }
 
-            .dialog-secondary-button {
-                margin-left: 0.5rem;
-                border: 0;
-                padding: 8px 16px;
-                color: var(--primary-color);
-                border-radius: var(--border-radius);
-                border: 1px solid lightgrey;
-                background: white;
-            }
+        .dialog-primary-button:hover {
+            background: #2f7de3;
+        }
 
-            .dialog-secondary-button:hover {
-                background: #ebf3fd;
-            }
+        .dialog-secondary-button {
+            margin-left: 0.5rem;
+            color: var(--primary-color);
+            background: white;
+        }
 
-            .dialog-input {
-                padding: 7px;
-                width: 25rem;
-                border-radius: var(--border-radius);
-                border: 1px solid lightgrey;
-                caret-color: var(--modal-caret-color);
-            }
+        .dialog-secondary-button:hover {
+            background: #ebf3fd;
+        }
 
-            .dialog-input:focus, .dialog-primary-button:focus, .dialog-secondary-button:focus {
-                outline: 2px solid var(--primary-color);
-            }
+        .dialog-input {
+            padding: 7px;
+            width: 25rem;
+            border-radius: var(--border-radius);
+            border: 1px solid lightgrey;
+            caret-color: var(--modal-caret-color);
+        }
 
-            .dialog-input:focus, .dialog-primary-button:focus, .dialog-secondary-button:focus {
-                border-color: white;
-            }
-            </style>
+        .dialog-input:focus, .dialog-primary-button:focus, .dialog-secondary-button:focus {
+            outline: 2px solid var(--primary-color);
+            border-color: white;
+        }
+        </style>
         `
 
         window.createPrompt = this.createPrompt
+        window.createConfirm = this.createConfirm
     }
 }
 

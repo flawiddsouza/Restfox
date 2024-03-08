@@ -192,7 +192,7 @@ export default {
                     alert(`Given environment name already exists: ${newEnvironmentName}`)
                     return
                 } else {
-                    if(!confirm(`Given environment name already exists: ${newEnvironmentName}\nDo you want to merge with the existing one?`)) {
+                    if(!await window.createConfirm(`Given environment name already exists: ${newEnvironmentName}\nDo you want to merge with the existing one?`)) {
                         return
                     }
 
@@ -372,14 +372,14 @@ export default {
 
             this.hideEnvironmentContextMenu()
         },
-        deleteEnvironment() {
+        async deleteEnvironment() {
             if(this.environments.length === 1) {
                 alert('Cannot delete environment as there\'s only one environment left')
                 this.hideEnvironmentContextMenu()
                 return
             }
 
-            if(!confirm('Are you sure you want to delete this environment?')) {
+            if(!await window.createConfirm('Are you sure you want to delete this environment?')) {
                 this.hideEnvironmentContextMenu()
                 return
             }
