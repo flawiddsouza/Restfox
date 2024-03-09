@@ -22,7 +22,6 @@
                 </div>
                 <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
                 <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
-                <a href="#" @click.prevent="clearCollection" class="bl">Clear Collection</a>
             </div>
             <template v-if="nav === 'workspaces'">
                 <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
@@ -141,11 +140,6 @@ export default {
                 item.plugins = this.$store.state.plugins.filter(plugin => plugin.collectionId === item._id)
             }
             exportRestfoxCollection(collection, this.activeWorkspace.environments)
-        },
-        async clearCollection() {
-            if(await window.createPrompt('Are you sure? Type "clear everything in workspace" to confirm') === 'clear everything in workspace') {
-                this.$store.commit('clearCollection')
-            }
         },
         setActiveWorkspace(workspace) {
             this.$store.commit('setActiveWorkspace', workspace)

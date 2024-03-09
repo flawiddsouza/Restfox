@@ -322,13 +322,6 @@ const store = createStore({
             sortTree(collectionTree)
             state.collectionTree = collectionTree
         },
-        clearCollection(state) {
-            state.collection = []
-            deleteCollectionsByWorkspaceId(state.activeWorkspace._id)
-            state.collectionTree = []
-            state.activeTab = null
-            state.tabs = []
-        },
         setCollectionFilter(state, filter) {
             state.collectionFilter = filter
         },
