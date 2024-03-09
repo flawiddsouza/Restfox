@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, shell } = require('electron')
 const { resolve } = require('path')
 const { File } = require('node:buffer')
 const { Agent } = require('undici')
@@ -23,6 +23,12 @@ function createWindow() {
     win.maximize()
     win.show()
     win.loadURL(`file://${resolve(__dirname, '../ui/index.html')}`)
+
+    // open links with target="_blank" in an external browser instead of in the app
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        shell.openExternal(url)
+        return { action: 'deny' }
+    })
 }
 
 let abortController = {}
