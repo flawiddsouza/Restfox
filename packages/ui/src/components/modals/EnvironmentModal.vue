@@ -167,7 +167,9 @@ export default {
                         inline: 'center'
                     })
                 })
-                this.loadEnvVariables()
+                if(this.collectionItem) {
+                    this.loadEnvVariables()
+                }
             }
         }
     },
