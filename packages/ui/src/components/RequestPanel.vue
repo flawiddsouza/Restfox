@@ -5,7 +5,7 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <div class="code-mirror-input-container">
-                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" @paste="handleAdressBarPaste" :env-variables="activeTabEnvironmentResolved" />
+                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" :paste-handler="handleAddressBarPaste" :env-variables="activeTabEnvironmentResolved" />
             </div>
             <button @click="sendRequest">Send</button>
         </div>
@@ -579,13 +579,10 @@ export default {
                 this.sendRequest()
             }
         },
-        async handleAdressBarPaste(e) {
-            e.preventDefault()
-            e.stopPropagation()
-            const content = e.clipboardData.getData('text/plain').trim()
+        async handleAddressBarPaste(content) {
             if (content.startsWith('curl')) {
                 if(!await window.createConfirm(`We've detected that you've pasted a curl command. Do you want to import the curl command into the current request?`)) {
-                    return
+                    return false
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
                 if(result.length) {
@@ -596,7 +593,11 @@ export default {
                     delete result[0].parentId
                     Object.assign(this.activeTab, result[0])
                 }
+
+                return true
             }
+
+            return false
         },
         loadGraphql() {
             if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {

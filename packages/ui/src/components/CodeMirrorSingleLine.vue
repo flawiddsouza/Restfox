@@ -17,16 +17,29 @@ function getExtensions(vueInstance) {
         [
             EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
             EditorView.domEventHandlers({
-                paste: (event, view) => {
+                paste: async(event, view) => {
                     const content = event.clipboardData.getData('text/plain')
 
+                    // if pasteHandler exists & pasteHandler returns true, it means it handled the paste event
+                    if(vueInstance.pasteHandler && await vueInstance.pasteHandler(content)) {
+                        console.log('pasteHandler returned true, so not handling paste event')
+                        return
+                    }
+
+                    console.log('pasteHandler not defined or returned false, so handling paste event')
+
                     if(content.includes('\n')) {
-                        event.preventDefault()
                         const contentWithoutNewLines = content.replace(/[\n\r]/g, '')
                         const transaction = view.state.replaceSelection(contentWithoutNewLines)
                         const update = view.state.update(transaction)
                         view.update([update])
+                    } else {
+                        const transaction = view.state.replaceSelection(content)
+                        const update = view.state.update(transaction)
+                        view.update([update])
                     }
+
+                    return true
                 }
             }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
@@ -88,6 +101,10 @@ export default {
         allowMultipleLines: {
             type: Boolean,
             default: false
+        },
+        pasteHandler: {
+            type: Function,
+            default: null
         },
         disabled: {
             type: Boolean,
