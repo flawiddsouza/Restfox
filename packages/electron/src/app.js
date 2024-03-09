@@ -12,6 +12,12 @@ if(require('electron-squirrel-startup')) return app.quit()
 // add a right-click context menu to the app, includes options to copy, paste, select all etc.
 contextMenu()
 
+// fix blacked out select dropdowns + freezes, mostly when running the snap on ubuntu
+// no downsides to doing this, it renders the app just fine
+if (process.platform === 'linux') {
+    app.disableHardwareAcceleration()
+}
+
 function createWindow() {
     const win = new BrowserWindow({
         show: false,
