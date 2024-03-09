@@ -36,6 +36,7 @@
         "build-appx": "electron-builder --windows appx"
     },
     "dependencies": {
+        "electron-context-menu": "^3.6.1",
         "electron-squirrel-startup": "^1.0.0",
         "undici": "^5.28.2",
         "update-electron-app": "^2.0.1"

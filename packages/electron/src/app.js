@@ -4,9 +4,13 @@ const { File } = require('node:buffer')
 const { Agent } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
+const contextMenu = require('electron-context-menu')
 require('update-electron-app')()
 
 if(require('electron-squirrel-startup')) return app.quit()
+
+// add a right-click context menu to the app, includes options to copy, paste, select all etc.
+contextMenu()
 
 function createWindow() {
     const win = new BrowserWindow({
