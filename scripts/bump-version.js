@@ -5,12 +5,11 @@ const { execSync } = require('child_process')
 const pathToElectron = path.join(__dirname, '../packages/electron')
 const pathToElectronPackageJSON = path.join(pathToElectron, 'package.json')
 const pathToElectronPackageLockJSON = path.join(pathToElectron, 'package-lock.json')
-// const pathToChromeAppManifest = path.join(__dirname, '../packages/browser-extension/v3-app/src/manifest.json')
-const pathToChromeAppManifest = ''
+const pathToChromeAppManifest = path.join(__dirname, '../packages/browser-extension/v3-app/src/manifest.json')
 const pathToREADME = path.join(__dirname, '../README.md')
 
 const packageJSON = JSON.parse(readFileSync(pathToElectronPackageJSON))
-// const chromeAppManifest = JSON.parse(readFileSync(pathToChromeAppManifest))
+const chromeAppManifest = JSON.parse(readFileSync(pathToChromeAppManifest))
 const README = readFileSync(pathToREADME).toString()
 
 const args = process.argv.slice(2)
@@ -51,10 +50,15 @@ if (args.includes('--major')) {
 }
 
 packageJSON.version = `${major}.${minor}.${patch}`
-// chromeAppManifest.version = `${major}.${minor}.${patch+1}`
+
+const chromeAppManifestVersion = chromeAppManifest.version.split('.')
+const chromeAppManifestMajor = Number(chromeAppManifestVersion[0])
+const chromeAppManifestMinor = Number(chromeAppManifestVersion[1])
+const chromeAppManifestPatch = Number(chromeAppManifestVersion[2])
+chromeAppManifest.version = `${chromeAppManifestMajor}.${chromeAppManifestMinor}.${chromeAppManifestPatch+1}`
 
 writeFileSync(pathToElectronPackageJSON, JSON.stringify(packageJSON, null, 4) + '\n')
-// writeFileSync(pathToChromeAppManifest, JSON.stringify(chromeAppManifest, null, 4) + '\n')
+writeFileSync(pathToChromeAppManifest, JSON.stringify(chromeAppManifest, null, 4) + '\n')
 writeFileSync(pathToREADME, README.replace(/\d+\.\d+\.\d+/g, packageJSON.version))
 
 execSync('npm i', {
