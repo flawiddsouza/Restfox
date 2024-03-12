@@ -1102,11 +1102,13 @@ export function findItemInTreeById(array, id) {
     return result
 }
 
-export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping) {
+export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping = null) {
     const parentId = treeItem._id
     treeItem.children.forEach(item => {
         const newId = nanoid()
-        oldIdNewIdMapping[item._id] = newId
+        if(oldIdNewIdMapping !== null) {
+            oldIdNewIdMapping[item._id] = newId
+        }
         item._id = newId
         item.parentId = parentId
         if('children' in item) {
