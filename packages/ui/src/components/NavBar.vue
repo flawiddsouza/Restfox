@@ -42,7 +42,7 @@
         </div>
     </div>
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
-    <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" />
+    <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" />
     <SettingsModal v-model:showModal="showSettingsModal" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" />
     <BackupAndRestoreModal />
@@ -131,7 +131,10 @@ export default {
         },
         activeTab() {
             return this.$store.state.activeTab
-        }
+        },
+        flags() {
+            return this.$store.state.flags
+        },
     },
     methods: {
         async exportCollection() {

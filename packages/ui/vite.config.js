@@ -4,6 +4,7 @@ import path from 'path'
 import copy from 'rollup-plugin-copy'
 import { VitePWA } from 'vite-plugin-pwa'
 import { ViteRevisionPlugin } from './vite-plugin-revision'
+import checker from 'vite-plugin-checker'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -47,7 +48,10 @@ export default defineConfig(({ mode }) => {
                     // default limit is 2 MB (https://vite-plugin-pwa.netlify.app/guide/faq.html#missing-assets-from-sw-precache-manifest)
                     maximumFileSizeToCacheInBytes: 4000000 // increase to 4 MB
                 }
-            })
+            }),
+            process.env.VITEST ? null : checker({
+                typescript: true
+            }),
         ],
         resolve: {
             alias: {

@@ -6,6 +6,25 @@
                 <input type="text" class="full-width-input" v-model="workspaceName" :placeholder="!workspace ? 'New Workspace' : 'Workspace Name'" required spellcheck="false" v-focus>
             </label>
 
+            <template v-if="isElectron">
+                <div style="margin-top: 1rem">
+                    <label>
+                        <div style="font-weight: 500; margin-bottom: 0.25rem">Type</div>
+                        <select class="full-width-input" v-model="workspaceType" :disabled="workspace">
+                            <option value="local">In Application (Default)</option>
+                            <option value="file">In Filesystem (Git Friendly)</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div style="margin-top: 1rem" v-if="workspaceType === 'file'">
+                    <label>
+                        <div style="font-weight: 500; margin-bottom: 0.25rem">Choose a folder</div>
+                        <input type="text" class="full-width-input" v-model="workspaceLocation" placeholder="Choose a folder" required spellcheck="false">
+                    </label>
+                </div>
+            </template>
+
             <template #footer>
                 <button class="button" v-if="!workspace">Create</button>
                 <button class="button" v-else>Rename</button>
@@ -33,14 +52,20 @@ export default {
         workspace: {
             type: Object,
             required: false
-        }
+        },
+        isElectron: {
+            type: Boolean,
+            default: false
+        },
     },
     components: {
         Modal
     },
     data() {
         return {
-            workspaceName: 'New Workspace'
+            workspaceName: 'New Workspace',
+            workspaceType: 'local',
+            workspaceLocation: '',
         }
     },
     computed: {
@@ -57,25 +82,49 @@ export default {
         workspace() {
             if(this.workspace) {
                 this.workspaceName = this.workspace.name
+                this.workspaceType = this.workspace._type ?? 'local'
+                if(this.workspace._type === 'file') {
+                    this.workspaceLocation = this.workspace.location
+                } else {
+                    this.workspaceLocation = ''
+                }
             }
         },
         showModal() {
             if(this.showModal && this.workspace === undefined) {
                 this.workspaceName = 'New Workspace'
+                this.workspaceType = 'local'
+                this.workspaceLocation = ''
             }
         }
     },
     methods: {
         async createWorkspace() {
             if(!this.workspace) {
-                this.$store.dispatch('createWorkspace', {
-                    name: this.workspaceName
-                })
+                if(this.workspaceType === 'file') {
+                    this.$store.dispatch('createWorkspace', {
+                        name: this.workspaceName,
+                        _type: this.workspaceType,
+                        location: this.workspaceLocation
+                    })
+                } else {
+                    this.$store.dispatch('createWorkspace', {
+                        name: this.workspaceName
+                    })
+                }
             } else {
-                this.$store.dispatch('updateWorkspace', {
-                    _id: this.workspace._id,
-                    name: this.workspaceName
-                })
+                if (this.workspaceType === 'file') {
+                    this.$store.dispatch('updateWorkspace', {
+                        _id: this.workspace._id,
+                        name: this.workspaceName,
+                        location: this.workspaceLocation
+                    })
+                } else {
+                    this.$store.dispatch('updateWorkspace', {
+                        _id: this.workspace._id,
+                        name: this.workspaceName
+                    })
+                }
             }
             this.showModalComp = false
         }

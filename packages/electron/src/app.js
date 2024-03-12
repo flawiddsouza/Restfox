@@ -5,6 +5,8 @@ const { Agent } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 const contextMenu = require('electron-context-menu')
+const db = require('./db')
+const TaskQueue = require('./task-queue')
 require('update-electron-app')()
 
 if(require('electron-squirrel-startup')) return app.quit()
@@ -32,7 +34,13 @@ function createWindow() {
     win.on('show', () => { win.focus() })
     win.maximize()
     win.show()
-    win.loadURL(`file://${resolve(__dirname, '../ui/index.html')}`)
+
+    if (!app.isPackaged) {
+        win.webContents.openDevTools()
+        win.loadURL('http://localhost:5173')
+    } else {
+        win.loadURL(`file://${resolve(__dirname, '../ui/index.html')}`)
+    }
 
     // open links with target="_blank" in an external browser instead of in the app
     win.webContents.setWindowOpenHandler(({ url }) => {
@@ -175,9 +183,46 @@ function cancelRequest(_event, requestId) {
     }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async() => {
+    if(!app.isPackaged) {
+        console.log('installing vue devtools as app is in development mode')
+        const { default: installExtension, VUEJS_DEVTOOLS } = require('electron-devtools-installer')
+        await installExtension(VUEJS_DEVTOOLS)
+    }
+
     ipcMain.handle('sendRequest', handleSendRequest)
     ipcMain.handle('cancelRequest', cancelRequest)
+
+    const operationQueue = new TaskQueue()
+
+    ipcMain.handle('getCollectionForWorkspace', (_, ...args) => {
+        return operationQueue.enqueue(() => db.getCollectionForWorkspace(...args))
+    })
+
+    ipcMain.handle('getCollectionById', (_, ...args) => {
+        return operationQueue.enqueue(() => db.getCollectionById(...args))
+    })
+
+    ipcMain.handle('createCollection', (_, ...args) => {
+        return operationQueue.enqueue(() => db.createCollection(...args))
+    })
+
+    ipcMain.handle('createCollections', (_, ...args) => {
+        return operationQueue.enqueue(() => db.createCollections(...args))
+    })
+
+    ipcMain.handle('updateCollection', (_, ...args) => {
+        return operationQueue.enqueue(() => db.updateCollection(...args))
+    })
+
+    ipcMain.handle('deleteCollectionsByWorkspaceId', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deleteCollectionsByWorkspaceId(...args))
+    })
+
+    ipcMain.handle('deleteCollectionsByIds', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deleteCollectionsByIds(...args))
+    })
+
     createWindow()
 })
 

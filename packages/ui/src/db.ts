@@ -1,7 +1,26 @@
 import Dexie from 'dexie'
 import 'dexie-export-import'
 
-export const db = new Dexie('Restfox')
+export class RestfoxDatabase extends Dexie {
+    workspaces!: Dexie.Table<any>
+    collections!: Dexie.Table<any>
+    plugins!: Dexie.Table<any>
+    responses!: Dexie.Table<any>
+
+    constructor() {
+        super('Restfox')
+
+        // Define the database schema
+        this.version(5).stores({
+            workspaces: '_id',
+            collections: '_id, workspaceId',
+            plugins: '_id, workspaceId, collectionId',
+            responses: '_id, collectionId',
+        })
+    }
+}
+
+export const db = new RestfoxDatabase()
 
 db.version(5).stores({
     workspaces: '_id',
@@ -47,7 +66,14 @@ export async function getAllCollectionIdsForGivenWorkspace(workspaceId) {
 }
 
 export async function getCollectionForWorkspace(workspaceId, type = null) {
-    let where = {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.getCollectionForWorkspace(workspace, type)
+        }
+    }
+
+    let where: any = {
         workspaceId
     }
 
@@ -55,22 +81,51 @@ export async function getCollectionForWorkspace(workspaceId, type = null) {
         where._type = type
     }
 
+    // @ts-ignore toArray does work on where, not sure why typescript is complaining
     return db.collections.where(where).toArray()
 }
 
-export async function getCollectionById(collectionId) {
+export async function getCollectionById(workspaceId, collectionId) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.getCollectionById(workspace, collectionId)
+        }
+    }
+
     return db.collections.where({ ':id': collectionId }).first()
 }
 
-export async function createCollection(collection) {
+export async function createCollection(workspaceId, collection) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.createCollection(workspace, collection)
+        }
+    }
+
     await db.collections.put(collection)
 }
 
-export async function createCollections(collections) {
+export async function createCollections(workspaceId, collections) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.createCollections(workspace, collections)
+        }
+    }
+
     await db.collections.bulkPut(collections)
 }
 
-export async function updateCollection(collectionId, updatedFields) {
+export async function updateCollection(workspaceId, collectionId, updatedFields) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.updateCollection(workspace, collectionId, updatedFields)
+        }
+    }
+
     await db.collections.update(collectionId, updatedFields)
 }
 
@@ -79,10 +134,24 @@ export async function modifyCollections(workspaceId) {
 }
 
 export async function deleteCollectionsByWorkspaceId(workspaceId) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.deleteCollectionsByWorkspaceId(workspace)
+        }
+    }
+
     await db.collections.where({ workspaceId }).delete()
 }
 
-export async function deleteCollectionsByIds(collectionIds) {
+export async function deleteCollectionsByIds(workspaceId, collectionIds) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.deleteCollectionsByIds(workspace, collectionIds)
+        }
+    }
+
     await db.collections.where(':id').anyOf(collectionIds).delete()
 }
 

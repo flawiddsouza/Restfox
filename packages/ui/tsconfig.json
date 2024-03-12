@@ -1,5 +1,10 @@
 {
     "compilerOptions": {
+        "strict": true,
+        "noImplicitAny": false,
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "skipLibCheck": true,
         "allowJs": true,
         "baseUrl": "./src",
         "paths": {
@@ -7,5 +12,9 @@
         },
         "noEmit": true
     },
-    "include": ["src"]
+    "include": ["src"],
+    "exclude": [
+        "node_modules",
+        "**/*.spec.ts",
+    ]
 }

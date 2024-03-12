@@ -106,14 +106,14 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActi
     }
 }
 
-async function getAllParents(parentArray, request) {
+async function getAllParents(workspaceId, parentArray, request) {
     if(!request.parentId) {
         return
     }
-    const requestParent = await getCollectionById(request.parentId)
+    const requestParent = await getCollectionById(workspaceId, request.parentId)
     if(requestParent) {
         parentArray.push(requestParent)
-        await getAllParents(parentArray, requestParent)
+        await getAllParents(workspaceId, parentArray, requestParent)
     }
 }
 
@@ -345,7 +345,7 @@ const store = createStore({
                     activeTabToSave.body.fileName = state.activeTab.body.fileName
                 }
 
-                updateCollection(state.activeTab._id, activeTabToSave)
+                updateCollection(state.activeTab.workspaceId, state.activeTab._id, activeTabToSave)
             }
         },
         setActiveSidebarItemForContextMenu(state, payload) {
@@ -356,9 +356,9 @@ const store = createStore({
             state.activeSidebarItemForContextMenu = null
             state.sidebarContextMenuElement = null
         },
-        async updateCollectionItemEnvironment(_state, { collectionId, environment }) {
+        async updateCollectionItemEnvironment(state, { collectionId, environment }) {
             if(environment) {
-                await updateCollection(collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
+                await updateCollection(state.activeWorkspace._id, collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
         async updateWorkspaceEnvironment(_state, { workspaceId, environment }) {
@@ -366,9 +366,9 @@ const store = createStore({
                 await updateWorkspace(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
-        async updateCollectionItemEnvironments(_state, { collectionId, environments }) {
+        async updateCollectionItemEnvironments(state, { collectionId, environments }) {
             if(environments) {
-                await updateCollection(collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
+                await updateCollection(state.activeWorkspace._id, collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
             }
         },
         async updateWorkspaceEnvironments(_state, { workspaceId, environments }) {
@@ -376,9 +376,9 @@ const store = createStore({
                 await updateWorkspace(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) })
             }
         },
-        async updateCollectionItemCurrentEnvironment(_state, { collectionId, currentEnvironment }) {
+        async updateCollectionItemCurrentEnvironment(state, { collectionId, currentEnvironment }) {
             if(currentEnvironment) {
-                await updateCollection(collectionId, { currentEnvironment: currentEnvironment })
+                await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment })
             }
         },
         async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
@@ -386,8 +386,8 @@ const store = createStore({
                 await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment })
             }
         },
-        async updateCollectionItemName(_state, collectionItem) {
-            await updateCollection(collectionItem._id, { name: collectionItem.name })
+        async updateCollectionItemName(state, collectionItem) {
+            await updateCollection(state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
 
             if(collectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'renamed')
@@ -487,7 +487,7 @@ const store = createStore({
             await deleteResponsesByCollectionIds(childIds)
             await deletePluginsByCollectionIds(childIds)
             context.state.plugins = context.state.plugins.filter(plugin => childIds.includes(plugin.collectionId) === false)
-            await deleteCollectionsByIds(childIds)
+            await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
             await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
@@ -517,7 +517,7 @@ const store = createStore({
             }
 
             const collectionItemsToSave = flattenTree([newCollectionItem])
-            await createCollections(collectionItemsToSave)
+            await createCollections(collectionItem.workspaceId, collectionItemsToSave)
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
 
             if(collectionItem.parentId) {
@@ -527,7 +527,7 @@ const store = createStore({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
                 })
             } else {
                 const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
@@ -535,7 +535,7 @@ const store = createStore({
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
                 })
             }
 
@@ -585,7 +585,7 @@ const store = createStore({
                 }
             }
 
-            await createCollection(newCollectionItem)
+            await createCollection(context.state.activeWorkspace._id, newCollectionItem)
             context.state.collection.push(newCollectionItem)
 
             if(newCollectionItem.parentId) {
@@ -594,14 +594,14 @@ const store = createStore({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
                 })
             } else {
                 context.state.collectionTree.splice(0, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
                 })
             }
 
@@ -645,11 +645,11 @@ const store = createStore({
             }
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
-            await updateCollection(sourceItem._id, { parentId: sourceItem.parentId })
+            await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
 
             targetParentCollection.forEach((item, index) => {
                 item.sortOrder = index
-                updateCollection(item._id, { sortOrder: index })
+                updateCollection(item.workspaceId, item._id, { sortOrder: index })
             })
         },
         async loadPlugins(context) {
@@ -658,7 +658,7 @@ const store = createStore({
         },
         async getEnvironmentForRequest(context, request) {
             let requestParentArray = []
-            await getAllParents(requestParentArray, request)
+            await getAllParents(context.state.activeWorkspace._id, requestParentArray, request)
             requestParentArray = requestParentArray.reverse()
 
             const environment = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
@@ -716,6 +716,8 @@ const store = createStore({
             const newWorkspace = {
                 _id: newWorkspaceId,
                 name: payload.name,
+                _type: payload._type,
+                location: payload.location,
                 createdAt: new Date().getTime(),
                 updatedAt: new Date().getTime()
             }
@@ -734,10 +736,12 @@ const store = createStore({
             const updatedAt = new Date().getTime()
             await updateWorkspace(payload._id, {
                 name: payload.name,
+                location: payload.location,
                 updatedAt
             })
             const workspace = context.state.workspaces.find(item => item._id === payload._id)
             workspace.name = payload.name
+            workspace.location = payload.location
             workspace.updatedAt = updatedAt
             context.state.workspaces.sort((a, b) => b.updatedAt - a.updatedAt)
         },
@@ -779,8 +783,8 @@ const store = createStore({
                 await modifyCollections(context.state.activeWorkspace._id)
             }
         },
-        async saveCollectionItemCollapsedState(_context, payload) {
-            await updateCollection(payload._id, { collapsed: payload.collapsed })
+        async saveCollectionItemCollapsedState(context, payload) {
+            await updateCollection(context.state.activeWorkspace._id, payload._id, { collapsed: payload.collapsed })
         },
         async duplicateWorkspace(context, workspace) {
             const newWorkspaceId = await context.dispatch('createWorkspace', {
@@ -792,7 +796,7 @@ const store = createStore({
             })
             const collectionTree = toTree(workspaceCollectionItems)
             generateNewIdsForTree(collectionTree)
-            await createCollections(flattenTree(collectionTree))
+            await createCollections(newWorkspaceId, flattenTree(collectionTree))
         },
         async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }) {
             if(parentId) {
@@ -805,7 +809,7 @@ const store = createStore({
             addSortOrderToTree(collectionTree)
 
             const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
-            await createCollections(flattenedCollectionTree)
+            await createCollections(context.state.activeWorkspace._id, flattenedCollectionTree)
 
             if (plugins.length > 0) {
                 // assign new ids to the imported / duplicated plugins

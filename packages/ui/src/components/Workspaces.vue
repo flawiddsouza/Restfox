@@ -12,7 +12,7 @@
             <div class="workspace-timestamp">{{ dateFormat(workspace.createdAt) }}</div>
         </div>
         <ContextMenu :options="options" v-model:show="showContextMenu" @click="handleContextMenuClick" :element="contextMenuElement" />
-        <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" />
+        <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :workspace="contextMenuWorkspace" :is-electron="flags.isElectron" />
         <DuplicateWorkspaceModal v-model:showModal="showDuplicateWorkspaceModal" :workspace-to-duplicate="workspaceToDuplicate" />
     </div>
 </template>
@@ -42,6 +42,9 @@ export default {
     computed: {
         workspaces() {
             return this.$store.state.workspaces
+        },
+        flags() {
+            return this.$store.state.flags
         },
         options() {
             return [
