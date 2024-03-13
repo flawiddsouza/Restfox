@@ -73,7 +73,7 @@ export async function getCollectionForWorkspace(workspaceId, type = null) {
         }
     }
 
-    let where: any = {
+    const where: any = {
         workspaceId
     }
 
@@ -81,7 +81,7 @@ export async function getCollectionForWorkspace(workspaceId, type = null) {
         where._type = type
     }
 
-    // @ts-ignore toArray does work on where, not sure why typescript is complaining
+    // @ts-expect-error toArray does work on where, not sure why typescript is complaining
     return db.collections.where(where).toArray()
 }
 

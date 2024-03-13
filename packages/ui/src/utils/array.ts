@@ -24,7 +24,6 @@ export function mergeArraysByProperty(arr1: object[], arr2: object[], property: 
     })
 
     // Populate the merged array with the values from the lookup map
-    // @ts-expect-error
     lookup.forEach(value => merged.push(value))
 
     return merged

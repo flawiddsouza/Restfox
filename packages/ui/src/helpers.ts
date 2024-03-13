@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
