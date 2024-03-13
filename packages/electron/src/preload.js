@@ -29,5 +29,26 @@ contextBridge.exposeInMainWorld (
         deleteCollectionsByIds(...args) {
             return ipcRenderer.invoke('deleteCollectionsByIds', ...args)
         },
+        getResponsesByCollectionId(...args) {
+            return ipcRenderer.invoke('getResponsesByCollectionId', ...args)
+        },
+        createResponse(...args) {
+            return ipcRenderer.invoke('createResponse', ...args)
+        },
+        updateResponse(...args) {
+            return ipcRenderer.invoke('updateResponse', ...args)
+        },
+        deleteResponse(...args) {
+            return ipcRenderer.invoke('deleteResponse', ...args)
+        },
+        deleteResponsesByIds(...args) {
+            return ipcRenderer.invoke('deleteResponsesByIds', ...args)
+        },
+        deleteResponsesByCollectionIds(...args) {
+            return ipcRenderer.invoke('deleteResponsesByCollectionIds', ...args)
+        },
+        deleteResponsesByCollectionId(...args) {
+            return ipcRenderer.invoke('deleteResponsesByCollectionId', ...args)
+        },
     }
 )

@@ -6,7 +6,7 @@
 export default {
     props: {
         buffer: {
-            type: ArrayBuffer,
+            type: [ArrayBuffer, Uint8Array],
             required: true
         }
     },

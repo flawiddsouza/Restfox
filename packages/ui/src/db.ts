@@ -157,31 +157,80 @@ export async function deleteCollectionsByIds(workspaceId, collectionIds) {
 
 // Responses
 
-export async function getResponsesByCollectionId(collectionId) {
+export async function getResponsesByCollectionId(workspaceId, collectionId) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.getResponsesByCollectionId(workspace, collectionId)
+        }
+    }
+
     return db.responses.where({ collectionId }).reverse().sortBy('createdAt')
 }
 
-export async function createResponse(response) {
+export async function createResponse(workspaceId, response) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.createResponse(workspace, response)
+        }
+    }
+
     await db.responses.put(response)
 }
 
-export async function updateResponse(responseId, updatedFields) {
+export async function updateResponse(workspaceId, collectionId, responseId, updatedFields) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.updateResponse(workspace, collectionId, responseId, updatedFields)
+        }
+    }
+
     await db.responses.update(responseId, updatedFields)
 }
 
-export async function deleteResponse(responseId) {
+export async function deleteResponse(workspaceId, collectionId, responseId) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.deleteResponse(workspace, collectionId, responseId)
+        }
+    }
+
     await db.responses.where({ _id: responseId }).delete()
 }
 
-export async function deleteResponsesByIds(responseIds) {
+export async function deleteResponsesByIds(workspaceId, collectionId, responseIds) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.deleteResponsesByIds(workspace, collectionId, responseIds)
+        }
+    }
+
     await db.responses.where(':id').anyOf(responseIds).delete()
 }
 
-export async function deleteResponsesByCollectionIds(collectionIds) {
+export async function deleteResponsesByCollectionIds(workspaceId, collectionIds) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.deleteResponsesByCollectionIds(workspace, collectionIds)
+        }
+    }
+
     await db.responses.where('collectionId').anyOf(collectionIds).delete()
 }
 
-export async function deleteResponsesByCollectionId(collectionId) {
+export async function deleteResponsesByCollectionId(workspaceId, collectionId) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            return window.electronIPC.deleteResponsesByCollectionId(workspace, collectionId)
+        }
+    }
+
     await db.responses.where({ collectionId }).delete()
 }
 

@@ -223,6 +223,34 @@ app.whenReady().then(async() => {
         return operationQueue.enqueue(() => db.deleteCollectionsByIds(...args))
     })
 
+    ipcMain.handle('getResponsesByCollectionId', (_, ...args) => {
+        return operationQueue.enqueue(() => db.getResponsesByCollectionId(...args))
+    })
+
+    ipcMain.handle('createResponse', (_, ...args) => {
+        return operationQueue.enqueue(() => db.createResponse(...args))
+    })
+
+    ipcMain.handle('updateResponse', (_, ...args) => {
+        return operationQueue.enqueue(() => db.updateResponse(...args))
+    })
+
+    ipcMain.handle('deleteResponse', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deleteResponse(...args))
+    })
+
+    ipcMain.handle('deleteResponsesByIds', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deleteResponsesByIds(...args))
+    })
+
+    ipcMain.handle('deleteResponsesByCollectionIds', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deleteResponsesByCollectionIds(...args))
+    })
+
+    ipcMain.handle('deleteResponsesByCollectionId', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deleteResponsesByCollectionId(...args))
+    })
+
     createWindow()
 })
 

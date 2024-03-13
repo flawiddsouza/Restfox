@@ -53,7 +53,7 @@ async function loadResponses(state, tabId) {
     if(tabId in state.responses) {
         return
     }
-    state.responses[tabId] = await getResponsesByCollectionId(tabId)
+    state.responses[tabId] = await getResponsesByCollectionId(state.activeWorkspace._id, tabId)
     if(state.responses[tabId].length > 0) {
         if((tabId in state.requestResponses) === false || (tabId in state.requestResponses && state.requestResponses[tabId] === null)) {
             state.requestResponses[tabId] = state.responses[tabId][0]
@@ -446,13 +446,13 @@ const store = createStore({
                 if(state.responses[state.activeTab._id].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
                     const responsesToDelete = state.responses[state.activeTab._id].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
                     const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
-                    await deleteResponsesByIds(responseIdsToDelete)
+                    await deleteResponsesByIds(state.activeTab.workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
                 }
-                await createResponse(response)
+                await createResponse(state.activeTab.workspaceId, response)
             }
         },
         async clearResponseHistory(state) {
-            await deleteResponsesByCollectionId(state.activeTab._id)
+            await deleteResponsesByCollectionId(state.activeTab.workspaceId, state.activeTab._id)
             state.responses[state.activeTab._id] = []
             state.requestResponses[state.activeTab._id] = null
             state.requestResponseStatus[state.activeTab._id] = 'pending'
@@ -460,11 +460,11 @@ const store = createStore({
         async renameCurrentlyActiveResponse(state, newResponseName) {
             const activeResponse = state.requestResponses[state.activeTab._id]
             activeResponse.name = newResponseName !== '' ? newResponseName : null
-            await updateResponse(activeResponse._id, { name: activeResponse.name })
+            await updateResponse(state.activeTab.workspaceId, activeResponse.collectionId, activeResponse._id, { name: activeResponse.name })
         },
         async deleteCurrentlyActiveResponse(state) {
-            const responseId = state.requestResponses[state.activeTab._id]._id
-            await deleteResponse(responseId)
+            const responseToDelete = state.requestResponses[state.activeTab._id]
+            await deleteResponse(state.activeTab.workspaceId, responseToDelete.collectionId, responseToDelete._id)
             state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseId)
             if(state.responses[state.activeTab._id].length > 0) {
                 state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
@@ -484,7 +484,7 @@ const store = createStore({
     actions: {
         async deleteCollectionItem(context, collectionItem) {
             const childIds = getChildIds(context.state.collection, collectionItem._id)
-            await deleteResponsesByCollectionIds(childIds)
+            await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
             await deletePluginsByCollectionIds(childIds)
             context.state.plugins = context.state.plugins.filter(plugin => childIds.includes(plugin.collectionId) === false)
             await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
@@ -747,7 +747,7 @@ const store = createStore({
         },
         async deleteWorkspace(context, workspaceId) {
             const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
-            await deleteResponsesByCollectionIds(collectionIds)
+            await deleteResponsesByCollectionIds(workspaceId, collectionIds)
             await deletePluginsByCollectionIds(collectionIds)
             context.state.plugins = context.state.plugins.filter(plugin => collectionIds.includes(plugin.collectionId) === false)
             await deletePluginsByWorkspace(workspaceId)

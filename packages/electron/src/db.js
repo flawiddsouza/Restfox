@@ -10,6 +10,10 @@ async function getCollection(workspace, dir = workspace.location) {
         const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
 
         for (let fileOrFolder of filesAndFolders) {
+            if (fileOrFolder.name.endsWith('.responses.json')) {
+                continue
+            }
+
             const fullPath = path.join(dir, fileOrFolder.name)
             if (fileOrFolder.isDirectory()) {
                 items.push({
@@ -257,6 +261,149 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
     }
 }
 
+async function getResponsesByCollectionId(workspace, collectionId) {
+    console.log('getResponsesByCollectionId', {
+        workspace,
+        collectionId,
+    })
+
+    const collectionPath = idMap.get(collectionId)
+
+    const responsesPath = collectionPath.replace('.json', '.responses.json')
+    const responsesPathExists = await fs.access(responsesPath).then(() => true).catch(() => false)
+
+    if (responsesPathExists) {
+        const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
+        responses.forEach((response) => {
+            response.buffer = Buffer.from(response.buffer, 'base64')
+        })
+        return responses
+    }
+
+    return []
+}
+
+async function createResponse(workspace, response) {
+    console.log('createResponse', {
+        workspace,
+        response,
+    })
+
+    const collectionPath = idMap.get(response.collectionId)
+
+    response.buffer = Buffer.from(response.buffer).toString('base64')
+
+    const responsesPath = collectionPath.replace('.json', '.responses.json')
+    const responsesPathExists = await fs.access(responsesPath).then(() => true).catch(() => false)
+    let responses = []
+
+    if (responsesPathExists) {
+        responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
+    }
+
+    responses.push(response)
+
+    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+}
+
+async function updateResponse(workspace, collectionId, responseId, updatedFields) {
+    console.log('updateResponse', {
+        workspace,
+        collectionId,
+        responseId,
+        updatedFields,
+    })
+
+    const collectionPath = idMap.get(collectionId)
+
+    const responsesPath = collectionPath.replace('.json', '.responses.json')
+
+    const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
+
+    const responseIndex = responses.findIndex((response) => response._id === responseId)
+
+    if (responseIndex === -1) {
+        return
+    }
+
+    responses[responseIndex] = {
+        ...responses[responseIndex],
+        ...updatedFields,
+    }
+
+    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+}
+
+async function deleteResponse(workspace, collectionId, responseId) {
+    console.log('deleteResponse', {
+        workspace,
+        collectionId,
+        responseId,
+    })
+
+    const collectionPath = idMap.get(collectionId)
+
+    const responsesPath = collectionPath.replace('.json', '.responses.json')
+
+    const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
+
+    const responseIndex = responses.findIndex((response) => response._id === responseId)
+
+    if (responseIndex === -1) {
+        return
+    }
+
+    responses.splice(responseIndex, 1)
+
+    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+}
+
+async function deleteResponsesByIds(workspace, collectionId, responseIds) {
+    console.log('deleteResponsesByIds', {
+        workspace,
+        collectionId,
+        responseIds,
+    })
+
+    const collectionPath = idMap.get(collectionId)
+
+    const responsesPath = collectionPath.replace('.json', '.responses.json')
+
+    const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
+
+    responses = responses.filter((response) => !responseIds.includes(response._id))
+
+    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+}
+
+async function deleteResponsesByCollectionIds(workspace, collectionIds) {
+    console.log('deleteResponsesByCollectionIds', {
+        workspace,
+        collectionIds,
+    })
+
+    for (const collectionId of collectionIds) {
+        const collectionPath = idMap.get(collectionId)
+
+        const responsesPath = collectionPath.replace('.json', '.responses.json')
+
+        await fs.rm(responsesPath)
+    }
+}
+
+async function deleteResponsesByCollectionId(workspace, collectionId) {
+    console.log('deleteResponsesByCollectionId', {
+        workspace,
+        collectionId,
+    })
+
+    const collectionPath = idMap.get(collectionId)
+
+    const responsesPath = collectionPath.replace('.json', '.responses.json')
+
+    await fs.rm(responsesPath)
+}
+
 module.exports = {
     getCollectionForWorkspace,
     getCollectionById,
@@ -265,4 +412,11 @@ module.exports = {
     updateCollection,
     deleteCollectionsByWorkspaceId,
     deleteCollectionsByIds,
+    getResponsesByCollectionId,
+    createResponse,
+    updateResponse,
+    deleteResponse,
+    deleteResponsesByIds,
+    deleteResponsesByCollectionIds,
+    deleteResponsesByCollectionId,
 }
