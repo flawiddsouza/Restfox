@@ -10,20 +10,33 @@ async function getCollection(workspace, dir = workspace.location) {
         const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
 
         for (let fileOrFolder of filesAndFolders) {
-            if (fileOrFolder.name.endsWith('.responses.json')) {
+            if (fileOrFolder.name.endsWith('.responses.json') || fileOrFolder.name === '_.json') {
                 continue
             }
 
             const fullPath = path.join(dir, fileOrFolder.name)
             if (fileOrFolder.isDirectory()) {
-                items.push({
+                let collection = {
                     _id: fullPath,
                     _type: 'request_group',
                     name: path.basename(fullPath),
                     parentId: dir === workspace.location ? null : dir,
                     children: [],
                     workspaceId: workspace._id,
-                })
+                }
+
+                try {
+                    const collectionData = JSON.parse(await fs.readFile(`${fullPath}/_.json`, 'utf8'))
+                    collection = {
+                        ...collection,
+                        ...collectionData,
+                    }
+                } catch (err) {
+                    console.error(`${fullPath}/_.json not found, so skipping adding it to the collection`)
+                }
+
+                items.push(collection)
+
                 // Recursively get files and folders inside this directory
                 const nestedItems = await getCollection(workspace, fullPath)
                 items = items.concat(nestedItems)
@@ -88,6 +101,26 @@ async function createCollection(workspace, collection) {
         await fs.mkdir(collectionPath)
         idMap.set(collectionId, collectionPath)
         console.log(`Created directory: ${collectionPath}`)
+
+        const collectionToSave = {}
+
+        if (collection.environments && collection.environment) {
+            collectionToSave.environment = collection.environment
+            collectionToSave.environments = collection.environments
+        }
+
+        if (collection.sortOrder !== undefined) {
+            collectionToSave.sortOrder = collection.sortOrder
+        }
+
+        if (collection.collapsed !== undefined) {
+            collectionToSave.collapsed = collection.collapsed
+        }
+
+        if (Object.keys(collectionToSave).length > 0) {
+            await fs.writeFile(`${collectionPath}/_.json`, JSON.stringify(collectionToSave, null, 4))
+            console.log(`Created file: ${collectionPath}/_.json`)
+        }
     }
 
     if (collection._type === 'request' || collection._type === 'socket') {
@@ -190,22 +223,29 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         return
     }
 
-    if (Object.keys(updatedFields).length === 1 && 'sortOrder' in updatedFields) {
-        // if collectionPath is a directory, return, as we cannot update sortOrder for a directory
+    if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'environment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
+        const fieldToUpdate = Object.keys(updatedFields)[0]
+        let collectionPathCopy = collectionPath
+
         const stats = await fs.stat(collectionPath)
+
         if (stats.isDirectory()) {
-            return
+            collectionPathCopy = `${collectionPath}/_.json`
         }
 
-        const collectionExisting = JSON.parse(await fs.readFile(collectionPath, 'utf8'))
+        let collectionExisting = {}
+
+        try {
+            collectionExisting = JSON.parse(await fs.readFile(collectionPathCopy, 'utf8'))
+        } catch {}
 
         const collectionUpdated = {
             ...collectionExisting,
             ...updatedFields,
         }
 
-        await fs.writeFile(collectionPath, JSON.stringify(collectionUpdated, null, 4))
-        console.log(`Updated sortOrder for ${collectionPath}`)
+        await fs.writeFile(collectionPathCopy, JSON.stringify(collectionUpdated, null, 4))
+        console.log(`Updated ${fieldToUpdate} for ${collectionPathCopy}`)
         return
     }
 
