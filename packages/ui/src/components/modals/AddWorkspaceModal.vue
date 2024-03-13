@@ -20,7 +20,10 @@
                 <div style="margin-top: 1rem" v-if="workspaceType === 'file'">
                     <label>
                         <div style="font-weight: 500; margin-bottom: 0.25rem">Choose a folder</div>
-                        <input type="text" class="full-width-input" v-model="workspaceLocation" placeholder="Choose a folder" required spellcheck="false">
+                        <div style="display: flex;">
+                            <input type="text" class="full-width-input" v-model="workspaceLocation" placeholder="Folder Path" required spellcheck="false">
+                            <button class="button" type="button" @click="openFolderDialog">Choose</button>
+                        </div>
                     </label>
                 </div>
             </template>
@@ -127,6 +130,12 @@ export default {
                 }
             }
             this.showModalComp = false
+        },
+        async openFolderDialog() {
+            this.workspaceLocation = await window.electronIPC.openFolderSelectionDialog()
+            if (this.workspaceLocation !== null && this.workspaceName === 'New Workspace') {
+                this.workspaceName = this.workspaceLocation.split('/').pop()
+            }
         }
     }
 }

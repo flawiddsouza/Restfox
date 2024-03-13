@@ -6,6 +6,7 @@ const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 const contextMenu = require('electron-context-menu')
 const db = require('./db')
+const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
 require('update-electron-app')()
 
@@ -250,6 +251,8 @@ app.whenReady().then(async() => {
     ipcMain.handle('deleteResponsesByCollectionId', (_, ...args) => {
         return operationQueue.enqueue(() => db.deleteResponsesByCollectionId(...args))
     })
+
+    ipcMain.handle('openFolderSelectionDialog', () => helpers.openFolderSelectionDialog())
 
     createWindow()
 })

@@ -50,5 +50,8 @@ contextBridge.exposeInMainWorld (
         deleteResponsesByCollectionId(...args) {
             return ipcRenderer.invoke('deleteResponsesByCollectionId', ...args)
         },
+        openFolderSelectionDialog(...args) {
+            return ipcRenderer.invoke('openFolderSelectionDialog', ...args)
+        },
     }
 )
