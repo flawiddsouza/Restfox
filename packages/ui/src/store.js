@@ -759,6 +759,14 @@ const store = createStore({
                 context.commit('closeTab', collectionId)
             })
         },
+        async closeWorkspace(context, workspaceId) {
+            const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
+            collectionIds.forEach(collectionId => {
+                context.commit('closeTab', collectionId)
+            })
+            await deleteWorkspace(workspaceId)
+            context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
+        },
         async loadWorkspaces(context) {
             let workspaces = await getAllWorkspaces()
 

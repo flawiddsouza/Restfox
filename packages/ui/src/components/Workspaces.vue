@@ -47,7 +47,7 @@ export default {
             return this.$store.state.flags
         },
         options() {
-            return [
+            const options = [
                 {
                     'type': 'option',
                     'label': 'Duplicate',
@@ -67,6 +67,20 @@ export default {
                     'value': 'Delete'
                 }
             ]
+
+            if(this.contextMenuWorkspace && this.contextMenuWorkspace._type === 'file') {
+                options.splice(
+                    4,
+                    0,
+                    {
+                        'type': 'option',
+                        'label': 'Close',
+                        'value': 'Close'
+                    }
+                )
+            }
+
+            return options
         }
     },
     methods: {
@@ -91,6 +105,12 @@ export default {
             if(clickedContextMenuItem === 'Delete') {
                 if(await window.createConfirm('Are you sure?')) {
                     this.$store.dispatch('deleteWorkspace', this.contextMenuWorkspace._id)
+                }
+            }
+
+            if(clickedContextMenuItem === 'Close') {
+                if(await window.createConfirm('Are you sure?')) {
+                    this.$store.dispatch('closeWorkspace', this.contextMenuWorkspace._id)
                 }
             }
         },
