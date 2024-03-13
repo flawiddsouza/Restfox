@@ -160,7 +160,18 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
         await fs.rename(renameFrom, renameTo)
         idMap.set(collectionId, renameTo)
+
+        try {
+            const responsesRenameFrom = renameFrom.replace('.json', '.responses.json')
+            const responsesRenameTo = renameTo.replace('.json', '.responses.json')
+            await fs.access(responsesRenameFrom)
+            await fs.rename(responsesRenameFrom, responsesRenameTo)
+        } catch (err) {
+            console.log(`Skipping renaming responses file: ${responsesPath} as it does not exist`)
+        }
+
         console.log(`Renamed ${renameFrom} to ${renameTo}`)
+
         return
     }
 
