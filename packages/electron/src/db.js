@@ -116,7 +116,7 @@ async function createCollections(workspace, collections) {
     })
 
     for (const collection of collections) {
-        await createCollection(collection)
+        await createCollection(workspace, collection)
     }
 }
 
