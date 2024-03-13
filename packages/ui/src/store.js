@@ -465,7 +465,7 @@ const store = createStore({
         async deleteCurrentlyActiveResponse(state) {
             const responseToDelete = state.requestResponses[state.activeTab._id]
             await deleteResponse(state.activeTab.workspaceId, responseToDelete.collectionId, responseToDelete._id)
-            state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseId)
+            state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseToDelete._id)
             if(state.responses[state.activeTab._id].length > 0) {
                 state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
                 state.requestResponseStatus[state.activeTab._id] = 'loaded'
