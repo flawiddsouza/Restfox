@@ -256,6 +256,14 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
 
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
+
+        try {
+            await fs.access(collectionPath)
+        } catch (err) {
+            console.log(`Skipping deleting: ${collectionPath} as parent directory has possibly already been deleted`)
+            return
+        }
+
         await fs.rm(collectionPath, { recursive: true })
         idMap.delete(collectionId)
     }
@@ -385,7 +393,21 @@ async function deleteResponsesByCollectionIds(workspace, collectionIds) {
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
 
+        const stats = await fs.stat(collectionPath)
+
+        if (stats.isDirectory()) {
+            console.log(`Skipping deleting responses for directory: ${collectionPath}`)
+            continue
+        }
+
         const responsesPath = collectionPath.replace('.json', '.responses.json')
+
+        try {
+            await fs.access(responsesPath)
+        } catch (err) {
+            console.log(`Skipping deleting responses: ${responsesPath} as it does not exist`)
+            continue
+        }
 
         await fs.rm(responsesPath)
     }
