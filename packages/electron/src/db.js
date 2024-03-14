@@ -69,7 +69,10 @@ async function getCollectionForWorkspace(workspace, type) {
 
         // this is the only type filter that's required by the app
         if (type === 'request_group') {
-            return collection.filter((item) => item._type === 'request_group')
+            return {
+                error: null,
+                collection: collection.filter((item) => item._type === 'request_group')
+            }
         }
 
         console.log(collection)
