@@ -30,7 +30,7 @@
     },
     "scripts": {
         "start": "electron-forge start",
-        "dev": "nodemon --watch src --ext js --exec 'npm start'",
+        "dev": "nodemon --watch src --ext js --exec \"npm start\"",
         "lint": "eslint src/*.ts",
         "lint-fix": "eslint src/*.ts --fix",
         "make": "electron-forge make",
