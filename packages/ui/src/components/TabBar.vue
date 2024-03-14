@@ -142,7 +142,10 @@ export default {
             if(tab._type === 'socket') {
                 return 'SOCK'
             }
-        }
+        },
+        scrollTabs(event) {
+            this.$refs.tabContainer.scrollLeft += event.deltaY
+        },
     },
     mounted() {
         document.addEventListener('dragstart', this.dragStart)
@@ -164,7 +167,11 @@ export default {
 </script>
 
 <template>
-    <div class="tabs-container">
+    <div
+        class="tabs-container"
+        ref="tabContainer"
+        @wheel.prevent="scrollTabs"
+    >
         <div
             class="tab"
             :class="{ 'tab-active': activeTab && activeTab._id === tab._id }"
