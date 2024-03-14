@@ -212,6 +212,7 @@ const store = createStore({
             sidebarContextMenuElement: null,
             workspaces: [],
             activeWorkspace: null,
+            activeWorkspaceLoaded: false,
             plugins: {
                 global: [],
                 workspace: [],
@@ -406,9 +407,10 @@ const store = createStore({
                 state.tabs = []
                 state.activeTab = null
                 state.plugins.workspace = []
-            } else {
-                state.plugins.workspace = await getWorkspacePlugins(workspace._id)
             }
+        },
+        async loadWorkspacePlugins(state, workspaceId) {
+            state.plugins.workspace = await getWorkspacePlugins(workspaceId)
         },
         async addPlugin(state, plugin) {
             const newPlugin = {
@@ -800,7 +802,7 @@ const store = createStore({
             await deleteWorkspace(workspaceId)
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
         },
-        async loadWorkspaces(context) {
+        async loadWorkspaces(context, noActiveWorkspaceCallback = null) {
             let workspaces = await getAllWorkspaces()
 
             if(workspaces.length > 0) {
@@ -811,6 +813,10 @@ const store = createStore({
                     const activeWorkspace = workspaces.find(item => item._id === activeWorkspaceId)
                     if(activeWorkspace) {
                         context.commit('setActiveWorkspace', activeWorkspace)
+                    }
+                } else {
+                    if (noActiveWorkspaceCallback) {
+                        noActiveWorkspaceCallback()
                     }
                 }
             } else {
@@ -866,7 +872,9 @@ const store = createStore({
                 context.state.plugins.workspace.push(...plugins)
             }
 
-            context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))
+            const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+
+            context.commit('setCollection', collection)
         },
         async updateActiveTabEnvironmentResolved(context) {
             if(!context.state.activeTab) {

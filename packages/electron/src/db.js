@@ -52,7 +52,7 @@ async function getCollection(workspace, dir = workspace.location) {
             idMap.set(fullPath, fullPath)
         }
     } catch (err) {
-        console.error(`Error reading directory: ${dir}`, err)
+        throw new Error(`Error getting collection for workspace at location: ${dir}`)
     }
 
     return items
@@ -64,16 +64,26 @@ async function getCollectionForWorkspace(workspace, type) {
         type,
     })
 
-    const collection = await getCollection(workspace)
+    try {
+        const collection = await getCollection(workspace)
 
-    // this is the only type filter that's required by the app
-    if (type === 'request_group') {
-        return collection.filter((item) => item._type === 'request_group')
+        // this is the only type filter that's required by the app
+        if (type === 'request_group') {
+            return collection.filter((item) => item._type === 'request_group')
+        }
+
+        console.log(collection)
+
+        return {
+            error: null,
+            collection,
+        }
+    } catch (error) {
+        return {
+            error,
+            collection: [],
+        }
     }
-
-    console.log(collection)
-
-    return collection
 }
 
 function getCollectionById(workspace, collectionId) {

@@ -120,7 +120,7 @@ export default {
     },
     methods: {
         async handleActiveWorkspace() {
-            let activeWorkspaceFolders = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
+            let { collection: activeWorkspaceFolders } = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
             activeWorkspaceFolders = toTree(activeWorkspaceFolders)
             sortTree(activeWorkspaceFolders)
             prependParentTitleToChildTitle(activeWorkspaceFolders)

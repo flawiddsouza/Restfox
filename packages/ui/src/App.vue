@@ -5,8 +5,8 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 </script>
 
 <template>
-    <WorkspacesFrame v-if="activeWorkspace === null" />
-    <Frame v-if="activeWorkspace" />
+    <WorkspacesFrame v-if="appLoaded && !activeWorkspaceLoaded" />
+    <Frame v-if="appLoaded && activeWorkspaceLoaded" />
     <ReloadPrompt />
     <alert-confirm-prompt />
 </template>
@@ -20,7 +20,8 @@ import './web-components/alert-confirm-prompt'
 export default {
     data() {
         return {
-            currentlySelectedContextMenuItemIndex: -1
+            currentlySelectedContextMenuItemIndex: -1,
+            appLoaded: false,
         }
     },
     computed: {
@@ -29,6 +30,14 @@ export default {
         },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
+        },
+        activeWorkspaceLoaded: {
+            get() {
+                return this.$store.state.activeWorkspaceLoaded
+            },
+            set(value) {
+                this.$store.state.activeWorkspaceLoaded = value
+            }
         },
         tabs() {
             return this.$store.state.tabs
@@ -157,11 +166,23 @@ export default {
     methods: {
         async fetchSetCollectionForWorkspace() {
             if(!this.activeWorkspace) {
+                this.activeWorkspaceLoaded = false
                 this.$store.commit('setCollection', [])
                 return
             }
 
-            const collections = await getCollectionForWorkspace(this.activeWorkspace._id)
+            const { error, collection: collections } = await getCollectionForWorkspace(this.activeWorkspace._id)
+
+            if(error) {
+                this.$store.commit('setActiveWorkspace', null)
+                this.$toast.error(error.message)
+                return
+            }
+
+            this.$store.commit('loadWorkspacePlugins', this.activeWorkspace._id)
+
+            this.appLoaded = true
+            this.activeWorkspaceLoaded = true
 
             if(collections.length > 0) {
                 this.$store.commit('setCollection', collections)
@@ -266,7 +287,9 @@ export default {
     },
     async created() {
         this.$store.dispatch('loadGlobalPlugins')
-        await this.$store.dispatch('loadWorkspaces')
+        await this.$store.dispatch('loadWorkspaces', () => {
+            this.appLoaded = true
+        })
 
         if(import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'desktop-electron' || import.meta.env.MODE === 'web-standalone') {
             this.$store.state.flags.isBrowser = false

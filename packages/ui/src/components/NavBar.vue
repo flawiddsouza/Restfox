@@ -1,7 +1,7 @@
 <template>
     <div class="navbar">
         <div class="heading">
-            <div v-if="activeWorkspace === null">Workspaces</div>
+            <div v-if="!activeWorkspaceLoaded">Workspaces</div>
             <template v-else>
                 <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
             </template>
@@ -44,7 +44,7 @@
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" />
     <SettingsModal v-model:showModal="showSettingsModal" />
-    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" />
+    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" />
     <BackupAndRestoreModal />
 </template>
 
@@ -80,6 +80,9 @@ export default {
     computed: {
         activeWorkspace() {
             return this.$store.state.activeWorkspace
+        },
+        activeWorkspaceLoaded() {
+            return this.$store.state.activeWorkspaceLoaded
         },
         environments() {
             return this.activeWorkspace.environments ?? [
@@ -138,7 +141,7 @@ export default {
     },
     methods: {
         async exportCollection() {
-            const collection = await getCollectionForWorkspace(this.activeWorkspace._id)
+            const { collection } = await getCollectionForWorkspace(this.activeWorkspace._id)
             for(const item of collection) {
                 item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
             }
