@@ -38,7 +38,8 @@ import {
     deletePluginsByCollectionIds,
     modifyCollections,
     deleteCollectionsByWorkspaceId,
-    getAllPlugins,
+    getGlobalPlugins,
+    getWorkspacePlugins,
     deleteCollectionsByIds,
     createPlugin,
     updatePlugin,
@@ -211,7 +212,10 @@ const store = createStore({
             sidebarContextMenuElement: null,
             workspaces: [],
             activeWorkspace: null,
-            plugins: [],
+            plugins: {
+                global: [],
+                workspace: [],
+            },
             requestResponseLayout: 'left-right',
             theme: 'light',
             githubStarCount: '0',
@@ -238,7 +242,7 @@ const store = createStore({
             return state.collectionTree
         },
         enabledPlugins(state) {
-            return state.plugins.filter(plugin => plugin.enabled)
+            return [...state.plugins.global, ...state.plugins.workspace].filter(plugin => plugin.enabled)
         }
     },
     mutations: {
@@ -396,11 +400,14 @@ const store = createStore({
         setWorkspaces(state, workspaces) {
             state.workspaces = workspaces
         },
-        setActiveWorkspace(state, workspace) {
+        async setActiveWorkspace(state, workspace) {
             state.activeWorkspace = workspace
             if(workspace === null) {
                 state.tabs = []
                 state.activeTab = null
+                state.plugins.workspace = []
+            } else {
+                state.plugins.workspace = await getWorkspacePlugins(workspace._id)
             }
         },
         async addPlugin(state, plugin) {
@@ -414,8 +421,15 @@ const store = createStore({
                 createdAt: new Date().getTime(),
                 updatedAt: new Date().getTime()
             }
-            await createPlugin(newPlugin)
-            state.plugins.push(newPlugin)
+
+
+            if(newPlugin.workspaceId === null && newPlugin.collectionId === null) {
+                await createPlugin(newPlugin)
+                state.plugins.global.push(newPlugin)
+            } else {
+                await createPlugin(newPlugin, state.activeWorkspace._id)
+                state.plugins.workspace.push(newPlugin)
+            }
         },
         async updatePlugin(state, plugin) {
             const updatePluginData = {
@@ -424,21 +438,41 @@ const store = createStore({
                 workspaceId: plugin.workspaceId,
                 updatedAt: new Date().getTime()
             }
-            await updatePlugin(plugin._id, updatePluginData)
-            const foundPlugin = state.plugins.find(item => item._id === plugin._id)
+
+            const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
+
+            if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
+                await updatePlugin(plugin._id, updatePluginData)
+            } else {
+                await updatePlugin(plugin._id, updatePluginData, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+            }
+
             foundPlugin.name = updatePluginData.name
             foundPlugin.code = updatePluginData.code
             foundPlugin.workspaceId = updatePluginData.workspaceId
             foundPlugin.updatedAt = updatePluginData.updatedAt
         },
         async updatePluginStatus(state, plugin) {
-            await updatePlugin(plugin._id, { enabled: plugin.enabled })
-            const foundPlugin = state.plugins.find(item => item._id === plugin._id)
+            const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
+
+            if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
+                await updatePlugin(plugin._id, { enabled: plugin.enabled })
+            } else {
+                await updatePlugin(plugin._id, { enabled: plugin.enabled }, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+            }
+
             foundPlugin.enabled = plugin.enabled
         },
         async deletePlugin(state, pluginId) {
-            await deletePlugin(pluginId)
-            state.plugins = state.plugins.filter(plugin => plugin._id !== pluginId)
+            const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === pluginId)
+
+            if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
+                await deletePlugin(pluginId)
+                state.plugins.global = state.plugins.global.filter(plugin => plugin._id !== pluginId)
+            } else {
+                await deletePlugin(pluginId, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+                state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
+            }
         },
         async saveResponse(state, response) {
             if(response._id) {
@@ -485,8 +519,8 @@ const store = createStore({
         async deleteCollectionItem(context, collectionItem) {
             const childIds = getChildIds(context.state.collection, collectionItem._id)
             await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
-            await deletePluginsByCollectionIds(childIds)
-            context.state.plugins = context.state.plugins.filter(plugin => childIds.includes(plugin.collectionId) === false)
+            await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
+            context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
             await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
             await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
@@ -652,9 +686,8 @@ const store = createStore({
                 updateCollection(item.workspaceId, item._id, { sortOrder: index })
             })
         },
-        async loadPlugins(context) {
-            const plugins = await getAllPlugins()
-            context.state.plugins = plugins
+        async loadGlobalPlugins(context) {
+            context.state.plugins.global = await getGlobalPlugins()
         },
         async getEnvironmentForRequest(context, request) {
             let requestParentArray = []
@@ -748,10 +781,10 @@ const store = createStore({
         async deleteWorkspace(context, workspaceId) {
             const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
             await deleteResponsesByCollectionIds(workspaceId, collectionIds)
-            await deletePluginsByCollectionIds(collectionIds)
-            context.state.plugins = context.state.plugins.filter(plugin => collectionIds.includes(plugin.collectionId) === false)
+            await deletePluginsByCollectionIds(workspaceId, collectionIds)
+            context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => collectionIds.includes(plugin.collectionId) === false)
             await deletePluginsByWorkspace(workspaceId)
-            context.state.plugins = context.state.plugins.filter(plugin => plugin.workspaceId !== workspaceId)
+            context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => plugin.workspaceId !== workspaceId)
             await deleteCollectionsByWorkspaceId(workspaceId)
             await deleteWorkspace(workspaceId)
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
@@ -829,8 +862,8 @@ const store = createStore({
                     plugin.createdAt = new Date().getTime()
                     plugin.updatedAt = new Date().getTime()
                 })
-                await createPlugins(plugins)
-                context.state.plugins.push(...plugins)
+                await createPlugins(plugins, context.state.activeWorkspace._id)
+                context.state.plugins.workspace.push(...plugins)
             }
 
             context.commit('setCollection', await getCollectionForWorkspace(context.state.activeWorkspace._id))

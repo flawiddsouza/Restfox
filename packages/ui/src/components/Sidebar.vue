@@ -304,7 +304,7 @@ export default {
                 collectionItemToExport.parentId = null
                 const collection = flattenTree([collectionItemToExport])
                 for(const item of collection) {
-                    item.plugins = this.$store.state.plugins.filter(plugin => plugin.collectionId === item._id)
+                    item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
                 }
                 exportRestfoxCollection(collection)
             }

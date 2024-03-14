@@ -236,31 +236,94 @@ export async function deleteResponsesByCollectionId(workspaceId, collectionId) {
 
 // Plugins
 
-export async function getAllPlugins() {
-    return db.plugins.toArray()
+export async function getGlobalPlugins() {
+    // we can't use where here because where null of workspaceId and collectionId is not supported by indexedDB
+    const allPlugins = await db.plugins.toArray()
+    return allPlugins.filter(plugin => plugin.workspaceId == null && plugin.collectionId == null)
 }
 
-export async function createPlugin(plugin) {
+export async function getWorkspacePlugins(workspaceId: string) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.getWorkspacePlugins(workspace)
+        }
+    }
+
+    const workspacePlugins = await db.plugins.where({ workspaceId }).toArray()
+
+    const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
+    const collectionItemPlugins = await db.plugins.where('collectionId').anyOf(collectionIds).toArray()
+
+    return [
+        ...workspacePlugins,
+        ...collectionItemPlugins
+    ]
+}
+
+export async function createPlugin(plugin, workspaceId = null) {
+    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.createPlugin(workspace, plugin)
+        }
+    }
+
     await db.plugins.put(plugin)
 }
 
-export async function updatePlugin(pluginId, updatedFields) {
+export async function updatePlugin(pluginId, updatedFields, workspaceId = null, collectionId = null) {
+    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.updatePlugin(workspace, collectionId, pluginId, updatedFields)
+        }
+    }
+
     await db.plugins.update(pluginId, updatedFields)
 }
 
-export async function deletePlugin(pluginId) {
+export async function deletePlugin(pluginId, workspaceId = null, collectionId = null) {
+    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.deletePlugin(workspace, collectionId, pluginId)
+        }
+    }
+
     await db.plugins.where({ _id: pluginId }).delete()
 }
 
 export async function deletePluginsByWorkspace(workspaceId) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.deletePluginsByWorkspace(workspace)
+        }
+    }
+
     await db.plugins.where({ workspaceId }).delete()
 }
 
-export async function deletePluginsByCollectionIds(collectionIds) {
+export async function deletePluginsByCollectionIds(workspaceId, collectionIds) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.deletePluginsByCollectionIds(workspace, collectionIds)
+        }
+    }
+
     await db.plugins.where('collectionId').anyOf(collectionIds).delete()
 }
 
 // used for import
-export async function createPlugins(plugin) {
+export async function createPlugins(plugin, workspaceId = null) {
+    if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
+        const workspace = await db.workspaces.get(workspaceId)
+        if (workspace._type === 'file') {
+            return window.electronIPC.createPlugins(workspace, plugin)
+        }
+    }
+
     await db.plugins.bulkPut(plugin)
 }

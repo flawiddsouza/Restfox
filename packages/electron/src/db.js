@@ -10,7 +10,7 @@ async function getCollection(workspace, dir = workspace.location) {
         const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
 
         for (let fileOrFolder of filesAndFolders) {
-            if (fileOrFolder.name.endsWith('.responses.json') || fileOrFolder.name === '_.json') {
+            if (fileOrFolder.name.endsWith('.responses.json') || fileOrFolder.name.endsWith('.plugins.json') || fileOrFolder.name === '_.json') {
                 continue
             }
 
@@ -194,13 +194,24 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         await fs.rename(renameFrom, renameTo)
         idMap.set(collectionId, renameTo)
 
+        const responsesRenameFrom = renameFrom.replace('.json', '.responses.json')
+        const responsesRenameTo = renameTo.replace('.json', '.responses.json')
+
         try {
-            const responsesRenameFrom = renameFrom.replace('.json', '.responses.json')
-            const responsesRenameTo = renameTo.replace('.json', '.responses.json')
             await fs.access(responsesRenameFrom)
             await fs.rename(responsesRenameFrom, responsesRenameTo)
         } catch (err) {
-            console.log(`Skipping renaming responses file: ${responsesPath} as it does not exist`)
+            console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
+        }
+
+        const pluginsRenameFrom = renameFrom.replace('.json', '.plugins.json')
+        const pluginsRenameTo = renameTo.replace('.json', '.plugins.json')
+
+        try {
+            await fs.access(pluginsRenameFrom)
+            await fs.rename(pluginsRenameFrom, pluginsRenameTo)
+        } catch (err) {
+            console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
         }
 
         console.log(`Renamed ${renameFrom} to ${renameTo}`)
@@ -213,12 +224,34 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         let renameTo = `${updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location}/${path.basename(collectionPath)}`
         await fs.rename(renameFrom, renameTo)
         idMap.set(collectionId, renameTo)
-        // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
-        // and will error out when trying to update them
-        const stats = await fs.stat(renameTo)
-        if (stats.isDirectory()) {
+
+        // endsWith('.json') means it's a file, else it's a folder
+        if (renameFrom.endsWith('.json')) {
+            const responsesRenameFrom = renameFrom.replace('.json', '.responses.json')
+            const responsesRenameTo = renameTo.replace('.json', '.responses.json')
+
+            try {
+                await fs.access(responsesRenameFrom)
+                await fs.rename(responsesRenameFrom, responsesRenameTo)
+            } catch (err) {
+                console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
+            }
+
+            const pluginsRenameFrom = renameFrom.replace('.json', '.plugins.json')
+            const pluginsRenameTo = renameTo.replace('.json', '.plugins.json')
+
+            try {
+                await fs.access(pluginsRenameFrom)
+                await fs.rename(pluginsRenameFrom, pluginsRenameTo)
+            } catch (err) {
+                console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
+            }
+        } else {
+            // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
+            // and will error out when trying to update them
             await updateIdMapForChildren(renameFrom, renameTo)
         }
+
         console.log(`Moved ${renameFrom} to ${renameTo}`)
         return
     }
@@ -336,7 +369,8 @@ async function getResponsesByCollectionId(workspace, collectionId) {
         responses.forEach((response) => {
             response.buffer = Buffer.from(response.buffer, 'base64')
         })
-        return responses
+        // reverse the responses so that the latest response is shown first
+        return responses.reverse()
     }
 
     return []
@@ -414,7 +448,14 @@ async function deleteResponse(workspace, collectionId, responseId) {
 
     responses.splice(responseIndex, 1)
 
+    if (responses.length === 0) {
+        await fs.unlink(responsesPath)
+        console.log(`Deleted responses file: ${responsesPath}`)
+        return
+    }
+
     await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+    console.log(`Deleted response: ${responseId} from ${responsesPath}`)
 }
 
 async function deleteResponsesByIds(workspace, collectionId, responseIds) {
@@ -433,6 +474,8 @@ async function deleteResponsesByIds(workspace, collectionId, responseIds) {
     responses = responses.filter((response) => !responseIds.includes(response._id))
 
     await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+
+    console.log(`Deleted responses: ${responseIds} from ${responsesPath}`)
 }
 
 async function deleteResponsesByCollectionIds(workspace, collectionIds) {
@@ -461,6 +504,8 @@ async function deleteResponsesByCollectionIds(workspace, collectionIds) {
         }
 
         await fs.rm(responsesPath)
+
+        console.log(`Deleted responses for collection: ${collectionId} from ${responsesPath}`)
     }
 }
 
@@ -475,6 +520,230 @@ async function deleteResponsesByCollectionId(workspace, collectionId) {
     const responsesPath = collectionPath.replace('.json', '.responses.json')
 
     await fs.rm(responsesPath)
+
+    console.log(`Deleted responses for collection: ${collectionId} from ${responsesPath}`)
+}
+
+async function getWorkspacePlugins(workspace) {
+    console.log('getWorkspacePlugins', {
+        workspace,
+    })
+
+    const items = []
+
+    // Workspace Plugins
+    const workspacePluginsPath = `${workspace.location}/_.plugins.json`
+    try {
+        const workspacePluginsData = JSON.parse(await fs.readFile(workspacePluginsPath, 'utf8'))
+        workspacePluginsData.forEach((plugin) => {
+            plugin.workspaceId = workspace._id
+        })
+        items.push(...workspacePluginsData)
+    } catch (err) {
+        // If there is no plugins file for a workspace, it's fine, just continue
+    }
+
+    // Collection and Folder Plugins
+    const collectionItems = await getCollection(workspace)
+    for (const item of collectionItems) {
+        if (item._type === 'request_group') {
+            const collectionPluginsPath = `${item._id}/_.plugins.json`
+            try {
+                const collectionPluginsData = JSON.parse(await fs.readFile(collectionPluginsPath, 'utf8'))
+                collectionPluginsData.forEach((plugin) => {
+                    plugin.collectionId = item._id
+                })
+                items.push(...collectionPluginsData)
+            } catch (err) {
+                // If there is no plugins file for a collection, it's fine, just continue
+            }
+        } else {
+            const itemPluginsPath = item._id.replace('.json', '.plugins.json')
+            try {
+                const itemPluginsData = JSON.parse(await fs.readFile(itemPluginsPath, 'utf8'))
+                itemPluginsData.forEach((plugin) => {
+                    plugin.collectionId = item._id
+                })
+                items.push(...itemPluginsData)
+            } catch (err) {
+                // If there is no plugins file for an item, it's fine, just continue
+            }
+        }
+    }
+
+    return items
+}
+
+async function createPlugin(workspace, plugin) {
+    console.log('createPlugin', {
+        workspace,
+        plugin,
+    })
+
+    let pluginPath = ''
+    if (plugin.collectionId) {
+        const collectionPath = idMap.get(plugin.collectionId)
+        const stats = await fs.stat(collectionPath)
+        if (stats.isDirectory()) {
+            pluginPath = `${collectionPath}/_.plugins.json`
+        } else {
+            const collectionItemName = path.basename(collectionPath, '.json')
+            const collectionPathParentPath = path.dirname(collectionPath)
+            pluginPath = `${collectionPathParentPath}/${collectionItemName}.plugins.json`
+        }
+    } else {
+        pluginPath = `${workspace.location}/_.plugins.json`
+    }
+
+    try {
+        let existingPlugins = []
+        try {
+            existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
+        } catch (err) {
+            // If file doesn't exist, we will create a new one
+        }
+
+        delete plugin.workspaceId
+        delete plugin.collectionId
+
+        existingPlugins.push(plugin)
+        await fs.writeFile(pluginPath, JSON.stringify(existingPlugins, null, 4))
+        console.log(`Plugin created at: ${pluginPath}`)
+    } catch (err) {
+        console.error(`Error creating plugin in: ${pluginPath}`, err)
+    }
+}
+
+async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
+    console.log('updatePlugin', {
+        workspace,
+        collectionId,
+        pluginId,
+        updatedFields,
+    })
+
+    const collectionPath = idMap.get(collectionId)
+
+    let pluginPath = null
+
+    if (collectionId == null) {
+        pluginPath = `${workspace.location}/_.plugins.json`
+    } else {
+        pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', '.plugins.json') : `${collectionPath}/_.plugins.json`
+    }
+
+    try {
+        const existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
+        const pluginIndex = existingPlugins.findIndex(plugin => plugin._id === pluginId)
+
+        if (pluginIndex !== -1) {
+            delete updatedFields.workspaceId
+            delete updatedFields.collectionId
+
+            existingPlugins[pluginIndex] = { ...existingPlugins[pluginIndex], ...updatedFields }
+            await fs.writeFile(pluginPath, JSON.stringify(existingPlugins, null, 4))
+            console.log(`Plugin ${pluginId} updated in ${pluginPath}`)
+        } else {
+            console.log(`Plugin ${pluginId} not found for update in ${pluginPath}`)
+        }
+    } catch (err) {
+        console.error(`Error updating plugin ${pluginId} in ${pluginPath}`, err)
+    }
+}
+
+async function deletePlugin(workspace, collectionId, pluginId) {
+    console.log('deletePlugin', {
+        workspace,
+        collectionId,
+        pluginId,
+    })
+
+    // If collectionId is null, it means it's a workspace plugin
+    if (collectionId === null) {
+        const workspacePluginsPath = `${workspace.location}/_.plugins.json`
+        try {
+            let existingPlugins = JSON.parse(await fs.readFile(workspacePluginsPath, 'utf8'))
+            const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
+
+            if (filteredPlugins.length < existingPlugins.length) {
+                if (filteredPlugins.length === 0) {
+                    await fs.unlink(workspacePluginsPath)
+                    console.log(`All workspace plugins deleted: ${workspace.location}`)
+                } else {
+                    await fs.writeFile(workspacePluginsPath, JSON.stringify(filteredPlugins, null, 4))
+                    console.log(`Plugin ${pluginId} deleted in ${workspacePluginsPath}`)
+                }
+            } else {
+                console.log(`Plugin ${pluginId} not found for deletion in ${workspacePluginsPath}`)
+            }
+        } catch (err) {
+            console.error(`Error deleting plugin ${pluginId} in ${workspacePluginsPath}`, err)
+        }
+        return
+    }
+
+    const collectionPath = idMap.get(collectionId)
+    const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', '.plugins.json') : `${collectionPath}/_.plugins.json`
+
+    try {
+        let existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
+        const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
+
+        if (filteredPlugins.length < existingPlugins.length) {
+            await fs.writeFile(pluginPath, JSON.stringify(filteredPlugins, null, 4))
+            console.log(`Plugin ${pluginId} deleted in${pluginPath}`)
+        } else {
+            console.log(`Plugin ${pluginId} not found for deletion in ${pluginPath}`)
+        }
+    } catch (err) {
+        console.error(`Error deleting plugin ${pluginId} in ${pluginPath}`, err)
+    }
+}
+
+async function deletePluginsByWorkspace(workspace) {
+    console.log('deletePluginsByWorkspace', {
+        workspace,
+    })
+
+    const workspacePluginsPath = `${workspace.location}/_.plugins.json`
+    try {
+        await fs.access(workspacePluginsPath)
+        await fs.unlink(workspacePluginsPath)
+        console.log(`All workspace plugins deleted: ${workspace.location}`)
+    } catch (err) {
+        console.log(`No workspace plugins found for deletion in: ${workspace.location}`)
+    }
+}
+
+async function deletePluginsByCollectionIds(workspace, collectionIds) {
+    console.log('deletePluginsByCollectionIds', {
+        workspace,
+        collectionIds,
+    })
+
+    for (const collectionId of collectionIds) {
+        const collectionPath = idMap.get(collectionId)
+        const pluginPath = collectionPath.endsWith('_.json') ? `${path.dirname(collectionPath)}/_.plugins.json` : collectionPath.replace('.json', '.plugins.json')
+
+        try {
+            await fs.access(pluginPath)
+            await fs.unlink(pluginPath)
+            console.log(`Deleted plugins for collection: ${collectionId}`)
+        } catch(err) {
+            console.log(`No plugins found for deletion for collection: ${collectionId}`)
+        }
+    }
+}
+
+async function createPlugins(workspace, plugins) {
+    console.log('createPlugins', {
+        workspace,
+        plugins,
+    })
+
+    for (const plugin of plugins) {
+        await createPlugin(workspace, plugin)
+    }
 }
 
 module.exports = {
@@ -492,4 +761,11 @@ module.exports = {
     deleteResponsesByIds,
     deleteResponsesByCollectionIds,
     deleteResponsesByCollectionId,
+    getWorkspacePlugins,
+    createPlugin,
+    updatePlugin,
+    deletePlugin,
+    deletePluginsByWorkspace,
+    deletePluginsByCollectionIds,
+    createPlugins,
 }

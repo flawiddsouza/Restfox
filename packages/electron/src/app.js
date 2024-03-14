@@ -252,6 +252,34 @@ app.whenReady().then(async() => {
         return operationQueue.enqueue(() => db.deleteResponsesByCollectionId(...args))
     })
 
+    ipcMain.handle('getWorkspacePlugins', (_, ...args) => {
+        return operationQueue.enqueue(() => db.getWorkspacePlugins(...args))
+    })
+
+    ipcMain.handle('createPlugin', (_, ...args) => {
+        return operationQueue.enqueue(() => db.createPlugin(...args))
+    })
+
+    ipcMain.handle('updatePlugin', (_, ...args) => {
+        return operationQueue.enqueue(() => db.updatePlugin(...args))
+    })
+
+    ipcMain.handle('deletePlugin', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deletePlugin(...args))
+    })
+
+    ipcMain.handle('deletePluginsByWorkspace', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deletePluginsByWorkspace(...args))
+    })
+
+    ipcMain.handle('deletePluginsByCollectionIds', (_, ...args) => {
+        return operationQueue.enqueue(() => db.deletePluginsByCollectionIds(...args))
+    })
+
+    ipcMain.handle('createPlugins', (_, ...args) => {
+        return operationQueue.enqueue(() => db.createPlugins(...args))
+    })
+
     ipcMain.handle('openFolderSelectionDialog', () => helpers.openFolderSelectionDialog())
 
     createWindow()

@@ -1,5 +1,5 @@
 export function mergeArraysByProperty(arr1: object[], arr2: object[], property: string) {
-    const merged = []
+    const merged: any[] = []
     const lookup = new Map()
 
     // Add all items from the first array to the lookup map

@@ -134,21 +134,17 @@ export default {
             }
         },
         plugins() {
-            let plugins = this.$store.state.plugins.filter(plugin => !plugin.workspaceId)
-
             if(this.collectionItem) {
-                plugins = plugins.filter(plugin => plugin.collectionId === this.collectionItem._id)
-            } else {
-                plugins = plugins.filter(plugin => !plugin.collectionId)
+                return this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === this.collectionItem._id)
             }
 
-            return plugins
+            return this.$store.state.plugins.global
         },
         currentWorkspacePlugins() {
             if(!this.activeWorkspace) {
                 return []
             }
-            return this.$store.state.plugins.filter(plugin => plugin.workspaceId === this.activeWorkspace._id)
+            return this.$store.state.plugins.workspace.filter(plugin => plugin.workspaceId === this.activeWorkspace._id)
         },
         activeWorkspace() {
             return this.$store.state.activeWorkspace

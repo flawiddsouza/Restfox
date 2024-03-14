@@ -265,7 +265,7 @@ export default {
         }
     },
     async created() {
-        this.$store.dispatch('loadPlugins')
+        this.$store.dispatch('loadGlobalPlugins')
         await this.$store.dispatch('loadWorkspaces')
 
         if(import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'desktop-electron' || import.meta.env.MODE === 'web-standalone') {
