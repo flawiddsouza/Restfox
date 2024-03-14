@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
 const { resolve } = require('path')
 const contextMenu = require('electron-context-menu')
 const requests = require('./request')
@@ -45,9 +45,30 @@ function createWindow() {
         shell.openExternal(url)
         return { action: 'deny' }
     })
+
+    app.on('second-instance', () => {
+        console.log('Second instance was opened, showing the existing window and focusing it')
+        if (win.isMinimized()) {
+            win.restore()
+        }
+        win.focus()
+        win.show()
+    })
 }
 
 app.whenReady().then(async() => {
+    const isSingleInstance = app.requestSingleInstanceLock()
+
+    if (!isSingleInstance) {
+        dialog.showMessageBoxSync({
+            type: 'info',
+            message: 'Another instance of the app is already running',
+            buttons: ['OK'],
+        })
+        app.quit()
+        return
+    }
+
     if(!app.isPackaged) {
         console.log('installing vue devtools as app is in development mode')
         const { default: installExtension, VUEJS_DEVTOOLS } = require('electron-devtools-installer')
