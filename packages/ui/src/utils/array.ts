@@ -3,10 +3,10 @@ export function mergeArraysByProperty(arr1: object[], arr2: object[], property: 
     const lookup = new Map()
 
     // Add all items from the first array to the lookup map
-    arr1.forEach(item => lookup.set(item[property], { ...item }))
+    arr1.forEach((item: any) => lookup.set(item[property], { ...item }))
 
     // Merge items from the second array with the first, performing a deep merge if necessary
-    arr2.forEach(item => {
+    arr2.forEach((item: any) => {
         const itemFromArr1 = lookup.get(item[property])
 
         // Create a new merged item using all enumerable properties from both items

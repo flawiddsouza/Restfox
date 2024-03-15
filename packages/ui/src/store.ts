@@ -50,16 +50,23 @@ import { nextTick } from 'vue'
 import constants from './constants'
 import { emitter } from './event-bus'
 import {
-    State,
-    Request,
+    CollectionItem,
     Plugin,
     RequestParam,
+    State,
+    WorkspaceCache,
+    Workspace,
 } from './global'
 
-async function loadResponses(state, tabId) {
+async function loadResponses(state: State, tabId: string) {
     if(tabId in state.responses) {
         return
     }
+
+    if(state.activeWorkspace === null) {
+        throw new Error('activeWorkspace is null')
+    }
+
     state.responses[tabId] = await getResponsesByCollectionId(state.activeWorkspace._id, tabId)
     if(state.responses[tabId].length > 0) {
         if((tabId in state.requestResponses) === false || (tabId in state.requestResponses && state.requestResponses[tabId] === null)) {
@@ -72,7 +79,7 @@ async function loadResponses(state, tabId) {
     }
 }
 
-function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActiveWorkspaceTabsBool = true) {
+function setActiveTab(state: State, tab: CollectionItem, scrollSidebarItemIntoView = false, persistActiveWorkspaceTabsBool = true) {
     // skip setActiveTab as it's already the active tab
     if(state.activeTab && state.activeTab._id === tab._id) {
         return
@@ -81,7 +88,7 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActi
     loadResponses(state, tab._id)
     if(scrollSidebarItemIntoView) {
         if(tab.parentId) {
-            let currentParentId = tab.parentId
+            let currentParentId: string | null | undefined = tab.parentId
             while (currentParentId) {
                 const parentFolder = findItemInTreeById(state.collectionTree, currentParentId)
                 if(parentFolder && parentFolder.collapsed) {
@@ -113,7 +120,7 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActi
     }
 }
 
-async function getAllParents(workspaceId, parentArray, request) {
+async function getAllParents(workspaceId: string, parentArray: CollectionItem[], request: CollectionItem) {
     if(!request.parentId) {
         return
     }
@@ -124,7 +131,7 @@ async function getAllParents(workspaceId, parentArray, request) {
     }
 }
 
-async function getEnvironmentForRequest(requestWorkspace, requestParentArray) {
+async function getEnvironmentForRequest(requestWorkspace: Workspace, requestParentArray: CollectionItem[]) {
     const environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
     for(const parent of requestParentArray) {
@@ -139,26 +146,30 @@ async function getEnvironmentForRequest(requestWorkspace, requestParentArray) {
     return environment
 }
 
-const workspaceCache = {
+const workspaceCache: WorkspaceCache = {
     tabs: {},
     activeTab: {}
 }
 
-async function loadWorkspaceTabs(state, workspaceId) {
+async function loadWorkspaceTabs(state: State, workspaceId: string) {
     if(workspaceId in workspaceCache.tabs) {
         state.tabs = workspaceCache.tabs[workspaceId]
         if(workspaceCache.activeTab[workspaceId]) {
-            setActiveTab(state, workspaceCache.activeTab[workspaceId], true, false)
+            setActiveTab(state, workspaceCache.activeTab[workspaceId] as CollectionItem, true, false)
         } else {
             state.activeTab = null
         }
         return
     }
 
-    const tabIds = state.activeWorkspace.tabIds ?? []
+    if(state.activeWorkspace === null) {
+        throw new Error('activeWorkspace is null')
+    }
+
+    const tabIds: string[] = state.activeWorkspace.tabIds ?? []
     const activeTabId = state.activeWorkspace.activeTabId ?? null
 
-    const tabIdsOrder = {}
+    const tabIdsOrder: { [tabId: string]: number } = {}
 
     // to restore tab ordering
     tabIds.forEach((tabId, index) => {
@@ -172,7 +183,7 @@ async function loadWorkspaceTabs(state, workspaceId) {
     state.activeTab = null
 
     if(workspaceCache.activeTab[workspaceId]) {
-        setActiveTab(state, workspaceCache.activeTab[workspaceId], true, false)
+        setActiveTab(state, workspaceCache.activeTab[workspaceId] as CollectionItem, true, false)
     }
 }
 
@@ -181,7 +192,11 @@ async function loadWorkspaceTabs(state, workspaceId) {
 // - Tab made active / switched to
 // - Tab closed
 // - Tab reordered
-async function persistActiveWorkspaceTabs(state) {
+async function persistActiveWorkspaceTabs(state: State) {
+    if(state.activeWorkspace === null) {
+        throw new Error('activeWorkspace is null')
+    }
+
     workspaceCache.tabs[state.activeWorkspace._id] = state.tabs
     workspaceCache.activeTab[state.activeWorkspace._id] = state.activeTab
 
@@ -369,6 +384,10 @@ const store = createStore<State>({
         },
         async updateCollectionItemEnvironment(state, { collectionId, environment }) {
             if(environment) {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await updateCollection(state.activeWorkspace._id, collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
@@ -379,6 +398,10 @@ const store = createStore<State>({
         },
         async updateCollectionItemEnvironments(state, { collectionId, environments }) {
             if(environments) {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await updateCollection(state.activeWorkspace._id, collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
             }
         },
@@ -389,6 +412,10 @@ const store = createStore<State>({
         },
         async updateCollectionItemCurrentEnvironment(state, { collectionId, currentEnvironment }) {
             if(currentEnvironment) {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment })
             }
         },
@@ -398,6 +425,10 @@ const store = createStore<State>({
             }
         },
         async updateCollectionItemName(state, collectionItem) {
+            if(state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
             await updateCollection(state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
 
             if(collectionItem._type === 'request_group') {
@@ -435,6 +466,10 @@ const store = createStore<State>({
                 await createPlugin(newPlugin)
                 state.plugins.global.push(newPlugin)
             } else {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await createPlugin(newPlugin, state.activeWorkspace._id)
                 state.plugins.workspace.push(newPlugin)
             }
@@ -452,6 +487,10 @@ const store = createStore<State>({
             if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
                 await updatePlugin(plugin._id, updatePluginData)
             } else {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await updatePlugin(plugin._id, updatePluginData, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
             }
 
@@ -466,6 +505,10 @@ const store = createStore<State>({
             if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
                 await updatePlugin(plugin._id, { enabled: plugin.enabled })
             } else {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await updatePlugin(plugin._id, { enabled: plugin.enabled }, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
             }
 
@@ -478,6 +521,10 @@ const store = createStore<State>({
                 await deletePlugin(pluginId)
                 state.plugins.global = state.plugins.global.filter(plugin => plugin._id !== pluginId)
             } else {
+                if(state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await deletePlugin(pluginId, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
                 state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
             }
@@ -520,17 +567,25 @@ const store = createStore<State>({
             persistActiveWorkspaceTabs(state)
         },
         loadWorkspaceTabs(state) {
+            if(state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
             loadWorkspaceTabs(state, state.activeWorkspace._id)
         }
     },
     actions: {
         async deleteCollectionItem(context, collectionItem) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
             const childIds = getChildIds(context.state.collection, collectionItem._id)
             await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
             await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
             context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
             await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
-            await removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
+            removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
                 // clear unneeded response cache
@@ -596,7 +651,11 @@ const store = createStore<State>({
             }
         },
         async createCollectionItem(context, payload) {
-            let newCollectionItem: Request | null = null
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            let newCollectionItem: CollectionItem | null = null
 
             if(payload.type === 'request') {
                 newCollectionItem = {
@@ -717,8 +776,12 @@ const store = createStore<State>({
         async loadGlobalPlugins(context) {
             context.state.plugins.global = await getGlobalPlugins()
         },
-        async getEnvironmentForRequest(context, request) {
-            let requestParentArray = []
+        async getEnvironmentForRequest(context, request): Promise<{ environment: any, requestParentArray: CollectionItem[] }> {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            let requestParentArray: CollectionItem[] = []
             await getAllParents(context.state.activeWorkspace._id, requestParentArray, request)
             requestParentArray = requestParentArray.reverse()
 
@@ -727,29 +790,33 @@ const store = createStore<State>({
             return { environment, requestParentArray }
         },
         async sendRequest(context, activeTab) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
             context.state.requestResponseStatus[activeTab._id] = 'loading'
 
-            const { environment, requestParentArray } = await context.dispatch('getEnvironmentForRequest', activeTab)
+            const { environment, requestParentArray }: { environment: any, requestParentArray: CollectionItem[] } = await context.dispatch('getEnvironmentForRequest', activeTab)
 
-            const setEnvironmentVariableWrapper = (objectPath, value) => {
+            const setEnvironmentVariableWrapper = (objectPath: string, value: string) => {
                 setEnvironmentVariable(context, objectPath, value)
             }
 
             const globalPlugins: Plugin[] = []
             const workspacePlugins: Plugin[] = []
             const requestGroupPlugins: Plugin[] = []
-            const requestPlugins: Plugin[] = []
+            const requestPlugins: Plugin[] = [];
 
-            context.getters.enabledPlugins.forEach(enabledPlugin => {
+            (context.getters.enabledPlugins as Plugin[]).forEach(enabledPlugin => {
                 if(!enabledPlugin.workspaceId && !enabledPlugin.collectionId) {
                     globalPlugins.push(enabledPlugin)
                 }
 
-                if(enabledPlugin.workspaceId === context.state.activeWorkspace._id) {
+                if(context.state.activeWorkspace !== null && enabledPlugin.workspaceId === context.state.activeWorkspace._id) {
                     workspacePlugins.push(enabledPlugin)
                 }
 
-                if(requestParentArray.map(collectionItem => collectionItem._id).includes(enabledPlugin.collectionId)) {
+                if(enabledPlugin.collectionId !== null && requestParentArray.map(collectionItem => collectionItem._id).includes(enabledPlugin.collectionId)) {
                     requestGroupPlugins.push(enabledPlugin)
                 }
 
@@ -794,13 +861,18 @@ const store = createStore<State>({
             return newWorkspaceId
         },
         async updateWorkspace(context, payload) {
+            const workspace = context.state.workspaces.find(item => item._id === payload._id)
+
+            if(!workspace) {
+                throw new Error('Workspace not found')
+            }
+
             const updatedAt = new Date().getTime()
             await updateWorkspace(payload._id, {
                 name: payload.name,
                 location: payload.location,
                 updatedAt
             })
-            const workspace = context.state.workspaces.find(item => item._id === payload._id)
             workspace.name = payload.name
             workspace.location = payload.location
             workspace.updatedAt = updatedAt
@@ -846,6 +918,10 @@ const store = createStore<State>({
                     }
                 }
             } else {
+                if (context.state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
+
                 await context.dispatch('createWorkspace', {
                     name: 'My Collection',
                     setAsActive: true
@@ -857,13 +933,16 @@ const store = createStore<State>({
             }
         },
         async saveCollectionItemCollapsedState(context, payload) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
             await updateCollection(context.state.activeWorkspace._id, payload._id, { collapsed: payload.collapsed })
         },
         async duplicateWorkspace(context, workspace) {
             const newWorkspaceId = await context.dispatch('createWorkspace', {
                 name: workspace.name
             })
-            const workspaceCollectionItems = await getCollectionForWorkspace(workspace.sourceWorkspaceId)
+            const { collection: workspaceCollectionItems } = await getCollectionForWorkspace(workspace.sourceWorkspaceId)
             workspaceCollectionItems.forEach(collectionItem => {
                 collectionItem.workspaceId = newWorkspaceId
             })
@@ -871,7 +950,11 @@ const store = createStore<State>({
             generateNewIdsForTree(collectionTree)
             await createCollections(newWorkspaceId, flattenTree(collectionTree))
         },
-        async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }) {
+        async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }: { collectionTree: CollectionItem[], parentId: string | null, plugins: Plugin[] }) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
             if(parentId) {
                 const parentCollection = findItemInTreeById(context.state.collectionTree, parentId)
                 if(parentCollection === null) {

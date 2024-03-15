@@ -68,6 +68,7 @@ module.exports = {
         'vue/max-attributes-per-line': 'off',
         'vue/attributes-order': 'off',
         'vue/singleline-html-element-content-newline': 'off',
-        'vue/order-in-components': 'off'
+        'vue/order-in-components': 'off',
+        'vue/require-explicit-emits': 'off',
     }
 }

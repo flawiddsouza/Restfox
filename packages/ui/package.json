@@ -47,6 +47,9 @@
         "vuex": "^4.0.2"
     },
     "devDependencies": {
+        "@types/lodash.get": "^4.4.9",
+        "@types/lodash.set": "^4.3.9",
+        "@types/shell-quote": "^1.7.5",
         "@typescript-eslint/eslint-plugin": "^5.43.0",
         "@typescript-eslint/parser": "^5.43.0",
         "@vitejs/plugin-vue": "^4.4.0",

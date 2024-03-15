@@ -2,13 +2,13 @@ import { assert, test, describe } from 'vitest'
 import {
     substituteEnvironmentVariables,
     parseContentDispositionHeaderAndGetFileName,
-} from './helpers.ts'
+} from './helpers'
 
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
     // build environment vars
-    const env = {}
+    const env: any = {}
 
     env.i = 1
     env.nothing = null
@@ -296,18 +296,18 @@ describe(`Function: ${parseContentDispositionHeaderAndGetFileName.name}`, () => 
     test('Type 1', () => {
         const input = `inline; filename="file.txt"`
         const expectedOutput = 'file.txt'
-        assert.equal(parseContentDispositionHeaderAndGetFileName(input), expectedOutput)
+        assert.equal(parseContentDispositionHeaderAndGetFileName(input, 'fallbackFileName'), expectedOutput)
     })
 
     test('Type 2', () => {
         const input = `attachment; filename="image.jpg"`
         const expectedOutput = 'image.jpg'
-        assert.equal(parseContentDispositionHeaderAndGetFileName(input), expectedOutput)
+        assert.equal(parseContentDispositionHeaderAndGetFileName(input, 'fallbackFileName'), expectedOutput)
     })
 
     test('Type 3', () => {
         const input = `attachment; filename=annacerrato_vbb_ritratti-02056.jpg; filename*=UTF-8''annacerrato_vbb_ritratti-02056.jpg`
         const expectedOutput = 'annacerrato_vbb_ritratti-02056.jpg'
-        assert.equal(parseContentDispositionHeaderAndGetFileName(input), expectedOutput)
+        assert.equal(parseContentDispositionHeaderAndGetFileName(input, 'fallbackFileName'), expectedOutput)
     })
 })

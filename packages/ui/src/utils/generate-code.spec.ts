@@ -5,7 +5,7 @@ describe(`${generateCode.name}`, () => {
     test('shell - curl', async() => {
         const request = {
             '_id': 'dUrySgUfq8DUMn5Az6z2H',
-            '_type': 'request',
+            '_type': 'request' as const,
             'name': 'New Request',
             'method': 'POST',
             'body': {

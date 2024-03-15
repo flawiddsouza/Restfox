@@ -1,12 +1,10 @@
 {
     "compilerOptions": {
         "strict": true,
-        "noImplicitAny": false,
         "module": "ESNext",
         "moduleResolution": "node",
         "skipLibCheck": true,
-        "allowJs": true,
-        // "checkJs": true, // Uncomment this line to enable type checking for js files
+        "allowJs": false,
         "allowSyntheticDefaultImports": true,
         "baseUrl": "./src",
         "paths": {
@@ -23,6 +21,5 @@
     "include": ["src"],
     "exclude": [
         "node_modules",
-        "**/*.spec.ts",
     ]
 }

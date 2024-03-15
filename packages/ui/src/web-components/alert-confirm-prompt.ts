@@ -5,7 +5,7 @@ class AlertConfirmPrompt extends HTMLElement {
         this.attachShadow({ mode: 'open' })
     }
 
-    createDialog = (type, title, defaultValue = '', selectList = []) => {
+    createDialog = (type: 'prompt' | 'confirm' | 'alert', title: string, defaultValue = '', selectList = []) => {
         const div = document.createElement('div')
 
         let inputHtml = ''
@@ -33,26 +33,36 @@ class AlertConfirmPrompt extends HTMLElement {
         </div>
         `
 
-        this.shadowRoot.querySelector('#root').appendChild(div)
+        const shadowRoot = this.shadowRoot
+
+        if (shadowRoot === null) {
+            throw new Error('Shadow root is null')
+        }
+
+        shadowRoot.querySelector('#root')?.appendChild(div)
 
         if (type === 'prompt') {
-            this.shadowRoot.getElementById('dialog-input').focus()
-            this.shadowRoot.getElementById('dialog-input').select()
+            shadowRoot.getElementById('dialog-input')?.focus();
+            (shadowRoot.getElementById('dialog-input') as HTMLInputElement).select()
         } else {
-            this.shadowRoot.getElementById('dialog-confirm').focus()
+            shadowRoot.getElementById('dialog-confirm')?.focus()
         }
 
         return new Promise((resolve) => {
+            if (this === null) {
+                throw new Error('Shadow root is null')
+            }
+
             const closeModal = () => {
                 document.removeEventListener('click', eventHandler)
                 document.removeEventListener('keyup', eventHandler)
                 document.removeEventListener('keydown', eventHandler)
-                this.shadowRoot.querySelector('#root').removeChild(div)
+                shadowRoot.querySelector('#root')?.removeChild(div)
             }
 
             const confirm = () => {
                 if (type === 'prompt') {
-                    resolve(this.shadowRoot.getElementById('dialog-input').value)
+                    resolve((shadowRoot.getElementById('dialog-input') as HTMLInputElement).value)
                 } else {
                     resolve(true)
                 }
@@ -64,7 +74,7 @@ class AlertConfirmPrompt extends HTMLElement {
                 closeModal()
             }
 
-            const eventHandler = e => {
+            const eventHandler = (e: any) => {
                 if (e.type === 'keyup') {
                     if (e.key === 'Enter') {
                         confirm()
@@ -79,7 +89,7 @@ class AlertConfirmPrompt extends HTMLElement {
 
                 // Trap focus inside dialog
                 if (e.type === 'keydown') {
-                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled)')
+                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled)') as NodeListOf<HTMLElement>
                     const firstFocusableEl = focusableEls[0]
                     const lastFocusableEl = focusableEls[focusableEls.length - 1]
 
@@ -89,12 +99,12 @@ class AlertConfirmPrompt extends HTMLElement {
                     }
 
                     if (e.shiftKey) {
-                        if (this.shadowRoot.activeElement === firstFocusableEl) {
+                        if (shadowRoot && shadowRoot.activeElement === firstFocusableEl) {
                             lastFocusableEl.focus()
                             e.preventDefault()
                         }
                     } else {
-                        if (this.shadowRoot.activeElement === lastFocusableEl) {
+                        if (shadowRoot && shadowRoot.activeElement === lastFocusableEl) {
                             firstFocusableEl.focus()
                             e.preventDefault()
                         }
@@ -119,19 +129,23 @@ class AlertConfirmPrompt extends HTMLElement {
         })
     }
 
-    createPrompt = (title, defaultValue = '', selectList = []) => {
+    createPrompt = (title: string, defaultValue = '', selectList = []) => {
         return this.createDialog('prompt', title, defaultValue, selectList)
     }
 
-    createConfirm = (title) => {
+    createConfirm = (title: string) => {
         return this.createDialog('confirm', title)
     }
 
-    createAlert = (message) => {
+    createAlert = (message: string) => {
         return this.createDialog('alert', message)
     }
 
     connectedCallback() {
+        if (this.shadowRoot === null) {
+            return
+        }
+
         this.shadowRoot.innerHTML = /* html */ `
         <div id="root"></div>
         <style>

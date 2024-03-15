@@ -8,18 +8,22 @@ import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { convert as curlConvert } from './parsers/curl'
 import {
-    Request,
+    CollectionItem,
     RequestBody,
     RequestAuthentication,
     RequestParam,
     RequestInitialResponse,
     RequestFinalResponse,
-    TreeItem,
+    Plugin,
+    CreateRequestDataReturn,
+    HandleRequestState,
+    State,
 } from './global'
+import { ActionContext } from 'vuex'
 
 // From: https://stackoverflow.com/a/67802481/4932305
-export function toTree(array): TreeItem[] {
-    const map = {}
+export function toTree(array: CollectionItem[]): CollectionItem[] {
+    const map: Record<string, number> = {}
     let i
 
     for(i = 0; i < array.length; i += 1) {
@@ -35,7 +39,7 @@ export function toTree(array): TreeItem[] {
     for(i = 0; i < array.length; i += 1) {
         node = array[i]
         if(node.parentId !== null) {
-            array[map[node.parentId]].children.push(node)
+            array[map[node.parentId]].children?.push(node)
         } else {
             res.push(node)
         }
@@ -44,7 +48,7 @@ export function toTree(array): TreeItem[] {
     return res
 }
 
-export function flattenTree(array) {
+export function flattenTree(array: CollectionItem[]) {
     const level: any = []
 
     array.forEach(item => {
@@ -60,7 +64,7 @@ export function flattenTree(array) {
     return level
 }
 
-export function substituteEnvironmentVariables(environment: object, string: string) {
+export function substituteEnvironmentVariables(environment: any, string: string) {
     let substitutedString = String(string)
 
     const possibleEnvironmentObjectPaths = getObjectPaths(environment)
@@ -89,11 +93,14 @@ export function substituteEnvironmentVariables(environment: object, string: stri
     return substitutedString
 }
 
-export function generateBasicAuthString(username, password) {
+export function generateBasicAuthString(username: string, password: string) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-export async function fetchWrapper(url, method, headers, body, abortControllerSignal, flags): Promise<RequestInitialResponse> {
+export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
+    electronSwitchToChromiumFetch: boolean,
+    disableSSLVerification: boolean
+}): Promise<RequestInitialResponse> {
     if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
         let bodyHint: any = null
 
@@ -137,7 +144,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 }
             })
 
-            const messageHandler = message => {
+            const messageHandler = (message: any) => {
                 if (message.data.eventId !== undefined && message.data.eventId !== eventId) {
                     return
                 }
@@ -167,8 +174,8 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
     }
 
     if(import.meta.env.MODE === 'web-standalone') {
-        const proxyHeaders = {
-            'x-proxy-req-url': url,
+        const proxyHeaders: Record<string, string> = {
+            'x-proxy-req-url': url.toString(),
             'x-proxy-req-method': method
         }
 
@@ -242,7 +249,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 body,
                 bodyHint,
                 disableSSLVerification: flags.disableSSLVerification,
-            }).then(data => {
+            }).then((data: any) => {
                 if(data.event === 'response') {
                     data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
                     resolve(data.eventData)
@@ -251,7 +258,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
                 if(data.event === 'responseError') {
                     reject(new Error(data.eventData))
                 }
-            }).catch(error => {
+            }).catch((error: any) => {
                 reject(error)
             })
         })
@@ -288,7 +295,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
     }
 }
 
-export async function createRequestData(state, request, environment, setEnvironmentVariable, plugins) {
+export async function createRequestData(state: HandleRequestState, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, plugins: Plugin[]): Promise<CreateRequestDataReturn> {
     for(const plugin of plugins) {
         const { context: requestContext, expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
@@ -303,8 +310,8 @@ export async function createRequestData(state, request, environment, setEnvironm
 
     let body: any = null
 
-    if(request.body.mimeType === 'application/x-www-form-urlencoded') {
-        if('params' in request.body) {
+    if(request.body && request.body.mimeType === 'application/x-www-form-urlencoded') {
+        if('params' in request.body && request.body.params) {
             body = new URLSearchParams(
                 Object.fromEntries(
                     request.body.params.filter(item => !item.disabled).map(item => {
@@ -318,33 +325,35 @@ export async function createRequestData(state, request, environment, setEnvironm
         }
     }
 
-    if(request.body.mimeType === 'multipart/form-data') {
-        if('params' in request.body) {
-            const formData = new FormData()
-            request.body.params.filter(item => !item.disabled).forEach(param => {
-                if(param.type === 'text') {
-                    formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
-                } else {
-                    for(const file of param.files) {
-                        formData.append(substituteEnvironmentVariables(environment, param.name), file)
+    if(request.body) {
+        if(request.body.mimeType === 'multipart/form-data') {
+            if('params' in request.body) {
+                const formData = new FormData()
+                request.body.params?.filter(item => !item.disabled).forEach(param => {
+                    if(param.type === 'text') {
+                        formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
+                    } else if (param.files) {
+                        for(const file of param.files) {
+                            formData.append(substituteEnvironmentVariables(environment, param.name), file)
+                        }
                     }
-                }
-            })
-            body = formData
+                })
+                body = formData
+            }
+        }
+
+        if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
+            body = substituteEnvironmentVariables(environment, request.body.text ?? '')
+        }
+
+        if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
+            body = request.body.fileName
         }
     }
 
-    if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
-        body = substituteEnvironmentVariables(environment, request.body.text)
-    }
+    let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url!)
 
-    if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
-        body = request.body.fileName
-    }
-
-    let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url)
-
-    if('pathParameters' in request) {
+    if(request.pathParameters) {
         request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
             urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
                 `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
@@ -379,7 +388,7 @@ export async function createRequestData(state, request, environment, setEnvironm
         })
     }
 
-    const headers = {}
+    const headers: Record<string, string> = {}
 
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
@@ -403,11 +412,11 @@ export async function createRequestData(state, request, environment, setEnvironm
         }
     }
 
-    if('authentication' in request && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
+    if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
         if(request.authentication.type === 'basic') {
             headers['Authorization'] = generateBasicAuthString(
-                substituteEnvironmentVariables(environment, request.authentication.username),
-                substituteEnvironmentVariables(environment, request.authentication.password)
+                substituteEnvironmentVariables(environment, request.authentication.username ?? ''),
+                substituteEnvironmentVariables(environment, request.authentication.password ?? '')
             )
         }
 
@@ -425,8 +434,11 @@ export async function createRequestData(state, request, environment, setEnvironm
     }
 }
 
-export async function handleRequest(request, environment, setEnvironmentVariable, plugins, abortControllerSignal, flags) {
-    const state = {
+export async function handleRequest(request: CollectionItem, environment: any, setEnvironmentVariable: (name: string, value: string) => void, plugins: Plugin[], abortControllerSignal: AbortSignal, flags: {
+    electronSwitchToChromiumFetch: boolean,
+    disableSSLVerification: boolean
+}) {
+    const state: HandleRequestState = {
         currentPlugin: null,
         testResults: [],
     }
@@ -434,7 +446,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins)
 
-        const response = await fetchWrapper(url, request.method, headers, body, abortControllerSignal, flags)
+        const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
 
@@ -469,11 +481,11 @@ export async function handleRequest(request, environment, setEnvironmentVariable
 
         const originRequestBodyToSave = JSON.parse(JSON.stringify(request.body))
 
-        if(request.body.mimeType === 'multipart/form-data' && 'params' in request.body) {
+        if(request.body && request.body.mimeType === 'multipart/form-data' && 'params' in request.body && request.body.params) {
             const params: any = []
             for(const param of request.body.params) {
                 const paramExtracted = {...param}
-                if('files' in paramExtracted) {
+                if(paramExtracted.files) {
                     paramExtracted.files = [...paramExtracted.files]
                 }
                 params.push(paramExtracted)
@@ -492,14 +504,14 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             buffer: response.buffer,
             timeTaken: response.timeTaken,
             request: {
-                method: request.method,
+                method: request.method!,
                 query: url.search,
                 headers: headersToSave,
-                body: request.method !== 'GET' && request.body.mimeType === 'multipart/form-data' === false ? body : null,
+                body: request.method !== 'GET' && request.body && request.body.mimeType === 'multipart/form-data' === false ? body : null,
                 original: {
                     url: request.url,
                     body: originRequestBodyToSave
-                } as Request
+                } as CollectionItem
             },
             createdAt: new Date().getTime(),
             testResults: [],
@@ -570,12 +582,12 @@ export async function handleRequest(request, environment, setEnvironmentVariable
     }
 }
 
-export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
-    const collection: any = []
+export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId: string) {
+    const collection: CollectionItem[] = []
 
-    const workspace = json.resources.find(item => item._type === 'workspace')
+    const workspace = json.resources.find((item: any) => item._type === 'workspace')
 
-    json.resources.filter(item => ['cookie_jar', 'api_spec', 'environment', 'proto_file', 'unit_test_suite'].includes(item._type) == false).forEach(item => {
+    json.resources.filter((item: any) => ['cookie_jar', 'api_spec', 'environment', 'proto_file', 'unit_test_suite'].includes(item._type) == false).forEach((item: any) => {
         if(item._type === 'workspace' || item._type === 'request_group') {
             let parentId = item.parentId
 
@@ -599,7 +611,7 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
             if(item.body.mimeType === 'application/x-www-form-urlencoded') {
                 body = {
                     mimeType: item.body.mimeType,
-                    params: 'params' in item.body ? item.body.params.map(parameter => ({
+                    params: 'params' in item.body ? item.body.params.map((parameter: RequestParam) => ({
                         name: parameter.name,
                         value: parameter.value,
                         description: parameter.description,
@@ -628,13 +640,13 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
                 url: item.url,
                 method: item.method,
                 body: body,
-                headers: item.headers ? item.headers.map(header => ({
+                headers: item.headers ? item.headers.map((header: RequestParam) => ({
                     name: header.name,
                     value: header.value,
                     description: header.description,
                     disabled: header.disabled
                 })) : [],
-                parameters: item.parameters ? item.parameters.map(parameter => ({
+                parameters: item.parameters ? item.parameters.map((parameter: RequestParam) => ({
                     name: parameter.name,
                     value: parameter.value,
                     description: parameter.description,
@@ -651,12 +663,12 @@ export function convertInsomniaExportToRestfoxCollection(json, workspaceId) {
     return toTree(collection)
 }
 
-export async function convertPostmanExportToRestfoxCollection(json, isZip, workspaceId) {
+export async function convertPostmanExportToRestfoxCollection(json: any, isZip: boolean, workspaceId: string) {
     if(isZip) {
         const zip = new JSZip()
         const extractedZip = await zip.loadAsync(json)
         const filePaths = Object.keys(extractedZip.files)
-        const filePathMap = {}
+        const filePathMap: Record<string, string> = {}
         const basePath = filePaths[filePaths.length - 1].replace('archive.json', '')
         filePaths.forEach(filePath => {
             filePathMap[filePath.replace(basePath, '')] = filePath
@@ -684,13 +696,13 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip, works
     }
 }
 
-function importPostmanV1(collections, workspaceId) {
-    const collection: Request[]  = []
+function importPostmanV1(collections: any[], workspaceId: string) {
+    const collection: CollectionItem[]  = []
 
     collections.forEach(item => {
-        const requests: Request[] = []
+        const requests: CollectionItem[] = []
 
-        item.requests.forEach(request => {
+        item.requests.forEach((request: any) => {
             let body: RequestBody = {
                 mimeType: 'No Body'
             }
@@ -698,7 +710,7 @@ function importPostmanV1(collections, workspaceId) {
             if(request.dataMode === 'urlencoded') {
                 const params: RequestParam[] = []
                 const requestData = request.data !== null ? request.data : []
-                requestData.forEach(requestDataItem => {
+                requestData.forEach((requestDataItem: any) => {
                     params.push({
                         name: requestDataItem.key,
                         value: requestDataItem.value,
@@ -720,7 +732,7 @@ function importPostmanV1(collections, workspaceId) {
             }
 
             const headers: RequestParam[] = []
-            request.headerData.forEach(header => {
+            request.headerData.forEach((header: any) => {
                 headers.push({
                     name: header.key,
                     value: header.value,
@@ -731,7 +743,7 @@ function importPostmanV1(collections, workspaceId) {
 
             const parameters: RequestParam[] = []
             const queryParams = request.queryParams !== null ? request.queryParams : []
-            queryParams.forEach(queryParam => {
+            queryParams.forEach((queryParam: any) => {
                 parameters.push({
                     name: queryParam.key,
                     value: queryParam.value,
@@ -767,10 +779,10 @@ function importPostmanV1(collections, workspaceId) {
     return collection
 }
 
-function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, workspaceId) {
-    const requests: Request[] = []
+function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: string | null = null, workspaceId: string) {
+    const requests: CollectionItem[] = []
 
-    postmanCollectionItem.item.forEach(request => {
+    postmanCollectionItem.item.forEach((request: any) => {
         const requestId = request.id ?? nanoid()
         if('item' in request) {
             requests.push({
@@ -792,7 +804,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             if(request.request.body.mode === 'urlencoded') {
                 const params: RequestParam[] = []
                 const requestData = request.request.body.urlencoded
-                requestData.forEach(requestDataItem => {
+                requestData.forEach((requestDataItem: any) => {
                     params.push({
                         name: requestDataItem.key,
                         value: requestDataItem.value,
@@ -828,7 +840,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
         }
 
         const headers: RequestParam[] = []
-        request.request.header.forEach(header => {
+        request.request.header.forEach((header: any) => {
             headers.push({
                 name: header.key,
                 value: header.value,
@@ -839,7 +851,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
 
         const parameters: RequestParam[] = []
         const queryParams = 'url' in request.request && typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
-        queryParams.forEach(queryParam => {
+        queryParams.forEach((queryParam: any) => {
             parameters.push({
                 name: queryParam.key,
                 value: queryParam.value,
@@ -891,15 +903,15 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
     return requests
 }
 
-function importPostmanV2(collections, workspaceId) {
-    const collection: Request[] = []
+function importPostmanV2(collections: any[], workspaceId: string) {
+    const collection: CollectionItem[] = []
 
     collections.forEach(postmanCollectionItem => {
         collection.push({
             _id: postmanCollectionItem.info._postman_id,
             _type: 'request_group',
             name: postmanCollectionItem.info.name,
-            environment: 'variable' in postmanCollectionItem ? postmanCollectionItem.variable.reduce((prev, acc) => {
+            environment: 'variable' in postmanCollectionItem ? postmanCollectionItem.variable.reduce((prev: any, acc: any) => {
                 prev[acc.key] = acc.value
                 return prev
             }, {}) : undefined,
@@ -912,9 +924,9 @@ function importPostmanV2(collections, workspaceId) {
     return collection
 }
 
-function importRestfoxV1(collections, workspaceId) {
-    const collection: Request[] = []
-    const plugins: any[] = []
+function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
+    const collection: CollectionItem[] = []
+    const plugins: Plugin[] = []
 
     collections.forEach(item => {
         if(item._type === 'request_group') {
@@ -955,7 +967,7 @@ function importRestfoxV1(collections, workspaceId) {
                         description: parameter.description,
                         disabled: parameter.disabled
                     })) : [],
-                    authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
+                    authentication: item.authentication && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
                     parentId: item.parentId,
                     workspaceId,
                     sortOrder: item.sortOrder
@@ -977,7 +989,7 @@ function importRestfoxV1(collections, workspaceId) {
     }
 }
 
-export function convertRestfoxExportToRestfoxCollection(json, workspaceId) {
+export function convertRestfoxExportToRestfoxCollection(json: any, workspaceId: string) {
     if('exportedFrom' in json) {
         if(json.exportedFrom === 'Restfox-1.0.0') {
             return importRestfoxV1(json.collection, workspaceId)
@@ -994,7 +1006,7 @@ export async function convertOpenAPIExportToRestfoxCollection(exportString: stri
 }
 
 export async function convertCurlCommandToRestfoxCollection(curlCommand: string, workspaceId: string) {
-    const insomniaExport = curlConvert(curlCommand)
+    const insomniaExport: any = curlConvert(curlCommand)
 
     if(insomniaExport === null) {
         throw new Error('Invalid Curl Command')
@@ -1010,7 +1022,7 @@ export async function convertCurlCommandToRestfoxCollection(curlCommand: string,
 }
 
 // From: https://stackoverflow.com/a/66387148/4932305
-export async function fileToJSON(file) {
+export async function fileToJSON(file: File) {
     return new Promise((resolve, reject) => {
         const fileReader = new FileReader()
         fileReader.onload = (event: ProgressEvent<FileReader>) => {
@@ -1029,7 +1041,7 @@ export async function fileToJSON(file) {
     })
 }
 
-export async function fileToString(file): Promise<string> {
+export async function fileToString(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const fileReader = new FileReader()
         fileReader.onload = (event: ProgressEvent<FileReader>) => {
@@ -1045,8 +1057,8 @@ export async function fileToString(file): Promise<string> {
 }
 
 // From: https://stackoverflow.com/a/57218589/4932305 but modified to return children on parent matches
-export function filterTree(array, name) {
-    return array.reduce((r, { children = [], ...o }) => {
+export function filterTree(array: CollectionItem[], name: string) {
+    return array.reduce((r: any[], { children = [], ...o }) => {
         if(o.name.toLowerCase().includes(name.toLowerCase())) {
             r.push(Object.assign(o, { children }))
             return r
@@ -1059,25 +1071,25 @@ export function filterTree(array, name) {
     }, [])
 }
 
-export function addSortOrderToTree(array) {
+export function addSortOrderToTree(array: CollectionItem[]) {
     array.forEach((item, index) => {
         item.sortOrder = index
-        if('children' in item) {
+        if(item.children) {
             addSortOrderToTree(item.children)
         }
     })
 }
 
-export function sortTree(array) {
-    array.sort((a, b) => a.sortOrder - b.sortOrder)
+export function sortTree(array: CollectionItem[]) {
+    array.sort((a, b) => a.sortOrder! - b.sortOrder!)
     array.forEach(item => {
-        if('children' in item) {
+        if(item.children) {
             sortTree(item.children)
         }
     })
 }
 
-export function removeFromTree(array, key, keyValue) {
+export function removeFromTree(array: any[], key: string, keyValue: string): boolean {
     const index = array.findIndex(x => x[key] === keyValue)
     if (index > -1) {
         array.splice(index, 1)
@@ -1095,7 +1107,7 @@ export function removeFromTree(array, key, keyValue) {
 
 // From: https://stackoverflow.com/a/34720792/4932305
 // Note: the final array includes the initially passed id as well
-export function getChildIds(arr, id) {
+export function getChildIds(arr: any[], id: string) {
     const ret: any[] = []
     for (let i = 0; i < arr.length; i++) {
         const item = arr[i]
@@ -1123,16 +1135,16 @@ export function getChildIds(arr, id) {
     return ret
 }
 
-export function findItemInTreeById(array: TreeItem[], id: string): TreeItem | null {
+export function findItemInTreeById(array: CollectionItem[], id: string): CollectionItem | null {
     let result = null
-    function findItemInTreeByIdRecurse(array2, id2) {
+    function findItemInTreeByIdRecurse(array2: CollectionItem[], id2: string) {
         for(let i = 0; i < array2.length; i++) {
             if(array2[i]._id === id2) {
                 result = array2[i]
             }
 
             if('children' in array2[i]) {
-                findItemInTreeByIdRecurse(array2[i].children, id2)
+                findItemInTreeByIdRecurse(array2[i].children as CollectionItem[], id2)
             }
         }
     }
@@ -1140,9 +1152,9 @@ export function findItemInTreeById(array: TreeItem[], id: string): TreeItem | nu
     return result
 }
 
-export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping: any = null) {
+export function generateNewIdsForTreeItemChildren(treeItem: CollectionItem, oldIdNewIdMapping: Record<string, string> | null = null) {
     const parentId = treeItem._id
-    treeItem.children.forEach(item => {
+    treeItem.children?.forEach(item => {
         const newId = nanoid()
         if(oldIdNewIdMapping !== null) {
             oldIdNewIdMapping[item._id] = newId
@@ -1155,15 +1167,15 @@ export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping: a
     })
 }
 
-export function generateNewIdsForTree(array) {
-    const oldIdNewIdMapping = {}
+export function generateNewIdsForTree(array: CollectionItem[]) {
+    const oldIdNewIdMapping: Record<string, string> = {}
 
     array.forEach(treeItem => {
         const newId = nanoid()
         oldIdNewIdMapping[treeItem._id] = newId
         treeItem._id = newId
         if('children' in treeItem) {
-            treeItem.children.forEach(item => {
+            treeItem.children?.forEach(item => {
                 const newId = nanoid()
                 oldIdNewIdMapping[item._id] = newId
                 item._id = newId
@@ -1179,14 +1191,14 @@ export function generateNewIdsForTree(array) {
 }
 
 // From: https://stackoverflow.com/a/6470794/4932305
-export function arrayMove(array, fromIndex, toIndex) {
+export function arrayMove(array: any[], fromIndex: number, toIndex: number) {
     const element = array[fromIndex]
     array.splice(fromIndex, 1)
     array.splice(toIndex, 0, element)
 }
 
 // From: https://stackoverflow.com/a/65939108/4932305
-export function downloadObjectAsJSON(filename, dataObjToWrite) {
+export function downloadObjectAsJSON(filename: string, dataObjToWrite: any) {
     const blob = new Blob([JSON.stringify(dataObjToWrite)], { type: 'text/json' })
     const link = document.createElement('a')
 
@@ -1209,10 +1221,10 @@ export function todayISODate() {
 }
 
 // From: https://stackoverflow.com/a/46800515/4932305
-export function isFirstIdIndirectOrDirectParentOfSecondIdInTree(array, firstId, secondId) {
+export function isFirstIdIndirectOrDirectParentOfSecondIdInTree(array: any, firstId: any, secondId: any) {
     let result = false
 
-    function f(data, a, b, p = false) {
+    function f(data: any, a: any, b: any, p = false) {
         if (Array.isArray(data)) {
             data.forEach(function(o) {
                 if(p && a == o._id) {
@@ -1235,7 +1247,7 @@ export function isFirstIdIndirectOrDirectParentOfSecondIdInTree(array, firstId, 
     return result
 }
 
-export function dateFormat(date, includeSeconds = false) {
+export function dateFormat(date: number, includeSeconds = false) {
     let format = 'DD-MMM-YY hh:mm A'
 
     if(includeSeconds) {
@@ -1246,7 +1258,7 @@ export function dateFormat(date, includeSeconds = false) {
 }
 
 // From: https://github.com/Kong/insomnia/blob/e5b6f9034e34afc06def38c9d6a79a978fb19bb2/packages/insomnia-app/app/ui/components/tags/time-tag.tsx
-export function humanFriendlyTime(milliseconds) {
+export function humanFriendlyTime(milliseconds: number) {
     let unit = 'ms'
     let number = milliseconds
 
@@ -1273,7 +1285,7 @@ export function humanFriendlyTime(milliseconds) {
 export function getObjectPaths(object: object): string[] {
     const paths: any[] = []
 
-    function recurse(obj, keyParent = '') {
+    function recurse(obj: any, keyParent = '') {
         if(typeof obj === 'number' || typeof obj === 'string' || obj === null) {
             return
         }
@@ -1299,7 +1311,7 @@ export function getObjectPaths(object: object): string[] {
     return paths
 }
 
-export function exportRestfoxCollection(collection, environments = undefined) {
+export function exportRestfoxCollection(collection: CollectionItem[], environments = undefined) {
     downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
         exportedFrom: 'Restfox-1.0.0',
         collection,
@@ -1308,7 +1320,7 @@ export function exportRestfoxCollection(collection, environments = undefined) {
 }
 
 // From: https://github.com/Kong/insomnia/blob/fac2627d695a10865d0f7f9ea7b2c04a77d92194/packages/insomnia/src/common/misc.ts#L169-L192
-export function humanFriendlySize(bytes, long = false) {
+export function humanFriendlySize(bytes: number, long = false) {
     bytes = Math.round(bytes * 10) / 10
     let size
     // NOTE: We multiply these by 2 so we don't end up with
@@ -1379,7 +1391,7 @@ export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent)
     return hotkeyMatched
 }
 
-export function setObjectPathValue(object, path, value) {
+export function setObjectPathValue(object: any, path: string, value: string) {
     setObjectPathValueLodash(object, path, value)
 }
 
@@ -1420,7 +1432,7 @@ export function codeMirrorSyntaxHighlighting() {
     return highlightStyle
 }
 
-export function downloadBlob(filename, blob) {
+export function downloadBlob(filename: string, blob: Blob) {
     const link = document.createElement('a')
 
     link.download = filename
@@ -1456,8 +1468,12 @@ export function generateId() {
     return nanoid()
 }
 
-export function setEnvironmentVariable(store, objectPath, value) {
+export function setEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string) {
     try {
+        if(store.state.activeWorkspace === null) {
+            throw new Error('activeWorkspace is null')
+        }
+
         const environmentToModify = store.state.activeWorkspace.environment ?? {}
         const environmentsToModify = store.state.activeWorkspace.environments ?? [
             {
@@ -1471,7 +1487,7 @@ export function setEnvironmentVariable(store, objectPath, value) {
             workspaceId: store.state.activeWorkspace._id,
             environment: environmentToModify
         })
-        const currentEnvironment = environmentsToModify.find(environmentItem => environmentItem.name === (store.state.activeWorkspace.currentEnvironment ?? 'Default'))
+        const currentEnvironment = environmentsToModify.find(environmentItem => environmentItem.name === (store.state.activeWorkspace!.currentEnvironment ?? 'Default'))
         currentEnvironment.environment = environmentToModify
         store.commit('updateWorkspaceEnvironments',  {
             workspaceId: store.state.activeWorkspace._id,

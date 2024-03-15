@@ -1,21 +1,21 @@
-import { ViewPlugin, Decoration } from '@codemirror/view'
+import { ViewPlugin, Decoration, EditorView, ViewUpdate } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
 
-export function envVarDecoration(envVariables) {
+export function envVarDecoration(envVariables: any) {
     return ViewPlugin.fromClass(class {
         decorations
 
-        constructor(view) {
+        constructor(view: EditorView) {
             this.decorations = this.highlightEnvVariables(view, envVariables)
         }
 
-        update(update) {
+        update(update: ViewUpdate) {
             if (update.docChanged || update.viewportChanged) {
                 this.decorations = this.highlightEnvVariables(update.view, envVariables)
             }
         }
 
-        highlightEnvVariables(view, envVariables) {
+        highlightEnvVariables(view: EditorView, envVariables: any) {
             const builder = new RangeSetBuilder()
             const re = /{{\s*(\w+)\s*}}/g
             for (const { from, to } of view.visibleRanges) {
@@ -38,6 +38,6 @@ export function envVarDecoration(envVariables) {
             return builder.finish()
         }
     }, {
-        decorations: v => v.decorations
+        decorations: (v: any) => v.decorations
     })
 }

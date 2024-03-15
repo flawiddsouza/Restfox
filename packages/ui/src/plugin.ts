@@ -3,15 +3,24 @@ import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
 import { substituteEnvironmentVariables } from './helpers'
+import {
+    CollectionItem,
+    RequestParam,
+    Plugin,
+    PluginTestResult,
+    PluginExpose,
+    RequestInitialResponseHeader,
+    RequestFinalResponse,
+} from './global'
 
-const test = (testResults) => (description, callback) => {
+const test = (testResults: PluginTestResult[]) => (description: string, callback: () => void) => {
     try {
         callback()
         testResults.push({
             description,
             passed: true
         })
-    } catch(error) {
+    } catch(error: any) {
         testResults.push({
             description,
             passed: false,
@@ -20,14 +29,20 @@ const test = (testResults) => (description, callback) => {
     }
 }
 
-export function createRequestContextForPlugin(request, environment, setEnvironmentVariable, testResults) {
-    let state = JSON.parse(JSON.stringify(request))
+export function createRequestContextForPlugin(request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, testResults: PluginTestResult[]) {
+    const state: CollectionItem = JSON.parse(JSON.stringify(request))
 
-    if('params' in request) {
-        let params = []
-        for(const param of request.params) {
-            let paramExtracted = {...param}
-            if('files' in paramExtracted) {
+    if(state.body === undefined) {
+        state.body = {
+            mimeType: 'No Body'
+        }
+    }
+
+    if(request.body?.params) {
+        const params: RequestParam[] = []
+        for(const param of request.body.params) {
+            const paramExtracted = {...param}
+            if(paramExtracted.files) {
                 paramExtracted.files = [...paramExtracted.files]
             }
             params.push(paramExtracted)
@@ -35,7 +50,7 @@ export function createRequestContextForPlugin(request, environment, setEnvironme
         state.body.params = params
     }
 
-    if('fileName' in request.body) {
+    if(request.body && 'fileName' in request.body) {
         state.body.fileName = request.body.fileName
     }
 
@@ -48,36 +63,47 @@ export function createRequestContextForPlugin(request, environment, setEnvironme
                 getBody() {
                     return state.body
                 },
-                getEnvironmentVariable(objectPath) {
+                getEnvironmentVariable(objectPath: string) {
                     return getObjectPathValue(environment, objectPath)
                 },
-                setBody(requestBody) {
+                setBody(requestBody: CollectionItem['body']) {
                     state.body = requestBody
                 },
-                setEnvironmentVariable(objectPath, value) {
-                    setEnvironmentVariable(objectPath, value)
+                setEnvironmentVariable(objectPath: string, value: string) {
+                    if(setEnvironmentVariable) {
+                        setEnvironmentVariable(objectPath, value)
+                    }
                 },
                 getQueryParams() {
                     return state.parameters ?? []
                 },
-                setQueryParams(queryParams) {
+                setQueryParams(queryParams: CollectionItem['parameters']) {
                     state.parameters = queryParams
                 },
                 getURL() {
+                    if (state.url === undefined) {
+                        return undefined
+                    }
                     return substituteEnvironmentVariables(environment, state.url)
                 },
                 getHeaders() {
                     return state.headers
                 },
-                setHeaders(requestHeaders) {
+                setHeaders(requestHeaders: CollectionItem['headers']) {
                     state.headers = requestHeaders
                 },
-                getHeader(headerName) {
-                    var header = state.headers.find((header) => header.name.toLowerCase() == headerName.toLowerCase())
+                getHeader(headerName: string) {
+                    if(state.headers === undefined) {
+                        state.headers = []
+                    }
+                    const header = state.headers.find((header) => header.name.toLowerCase() == headerName.toLowerCase())
                     return header ? substituteEnvironmentVariables(environment, header.value) : undefined
                 },
-                setHeader(headerName, value) {
-                    var headerIndex = state.headers.findIndex((header) => header.name.toLowerCase() == headerName.toLowerCase())
+                setHeader(headerName: string, value: string) {
+                    if(state.headers === undefined) {
+                        state.headers = []
+                    }
+                    const headerIndex = state.headers.findIndex((header) => header.name.toLowerCase() == headerName.toLowerCase())
                     if(headerIndex >= 0) {
                         state.headers[headerIndex].value = value
                     } else {
@@ -94,9 +120,9 @@ export function createRequestContextForPlugin(request, environment, setEnvironme
     }
 }
 
-export function createResponseContextForPlugin(response, environment, setEnvironmentVariable, testResults) {
+export function createResponseContextForPlugin(response: RequestFinalResponse, environment: any, setEnvironmentVariable: (name: string, value: string) => void, testResults: PluginTestResult[]) {
     let bufferCopy = response.buffer.slice(0)
-    let headers = response.headers
+    const headers = response.headers
 
     return {
         context: {
@@ -107,16 +133,16 @@ export function createResponseContextForPlugin(response, environment, setEnviron
                 getBodyText() {
                     return (new TextDecoder('utf-8')).decode(bufferCopy)
                 },
-                getEnvironmentVariable(objectPath) {
+                getEnvironmentVariable(objectPath: string) {
                     return getObjectPathValue(environment, objectPath)
                 },
-                setBody(buffer) {
+                setBody(buffer: ArrayBuffer) {
                     bufferCopy = buffer
                 },
-                setBodyText(bodyText) {
-                    bufferCopy = (new TextEncoder('utf-8')).encode(bodyText)
+                setBodyText(bodyText: string) {
+                    bufferCopy = (new TextEncoder()).encode(bodyText)
                 },
-                setEnvironmentVariable(objectPath, value) {
+                setEnvironmentVariable(objectPath: string, value: string) {
                     setEnvironmentVariable(objectPath, value)
                 },
                 getURL() {
@@ -125,8 +151,8 @@ export function createResponseContextForPlugin(response, environment, setEnviron
                 getHeaders() {
                     return headers
                 },
-                getHeader(headerName) {
-                    var header = headers.find((header) => header[0].toLowerCase() == headerName.toLowerCase())
+                getHeader(headerName: string) {
+                    const header = headers.find((header: RequestInitialResponseHeader) => header[0].toLowerCase() == headerName.toLowerCase())
                     return header ? header[1] : undefined
                 }
             }
@@ -139,7 +165,7 @@ export function createResponseContextForPlugin(response, environment, setEnviron
     }
 }
 
-export async function usePlugin(context, expose, plugin) {
+export async function usePlugin(context: any, expose: PluginExpose, plugin: Partial<Plugin>) {
     const vm = (await getQuickJS()).newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 
@@ -152,12 +178,12 @@ export async function usePlugin(context, expose, plugin) {
     })
 
     try {
-        arena.evalCode(plugin.code)
+        arena.evalCode(plugin.code ?? '')
     } catch(e) {
         console.log(e)
         // console.log(plugin.code.split('\n').slice(e.lineNumber - 3, e.lineNumber + 3).join('\n'))
-        const error = new Error('Unable to parse plugin')
-        error.originalError = e
+        const error = new Error('Unable to parse plugin');
+        (error as any).originalError = e
         throw error
     }
 
