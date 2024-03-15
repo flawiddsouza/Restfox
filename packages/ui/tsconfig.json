@@ -6,10 +6,18 @@
         "moduleResolution": "node",
         "skipLibCheck": true,
         "allowJs": true,
+        // "checkJs": true, // Uncomment this line to enable type checking for js files
+        "allowSyntheticDefaultImports": true,
         "baseUrl": "./src",
         "paths": {
             "@/*": ["*"]
         },
+        "lib": [
+            "ESNext",
+            "DOM",
+            "DOM.Iterable",
+        ],
+        "target": "ES6",
         "noEmit": true
     },
     "include": ["src"],

@@ -7,6 +7,14 @@ import setObjectPathValueLodash from 'lodash.set'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { convert as curlConvert } from './parsers/curl'
+import {
+    Request,
+    RequestBody,
+    RequestAuthentication,
+    RequestParam,
+    RequestInitialResponse,
+    RequestFinalResponse,
+} from './global'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array) {
@@ -21,7 +29,7 @@ export function toTree(array) {
     }
 
     let node
-    const res = []
+    const res: any[] = []
 
     for(i = 0; i < array.length; i += 1) {
         node = array[i]
@@ -36,7 +44,7 @@ export function toTree(array) {
 }
 
 export function flattenTree(array) {
-    const level = []
+    const level: any = []
 
     array.forEach(item => {
         const newItem = Object.assign({}, item)
@@ -84,7 +92,7 @@ export function generateBasicAuthString(username, password) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-export async function fetchWrapper(url, method, headers, body, abortControllerSignal, flags) {
+export async function fetchWrapper(url, method, headers, body, abortControllerSignal, flags): Promise<RequestInitialResponse> {
     if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
         let bodyHint: any = null
 
@@ -267,7 +275,7 @@ export async function fetchWrapper(url, method, headers, body, abortControllerSi
     const mimeType = responseBlob.type
     const buffer = await responseBlob.arrayBuffer()
 
-    const timeTaken = endTime - startTime
+    const timeTaken = Number(endTime) - Number(startTime)
 
     return {
         status,
@@ -355,8 +363,10 @@ export async function createRequestData(state, request, environment, setEnvironm
             const paramValue = substituteEnvironmentVariables(environment, param.value)
 
             // if the parameter with the same name & value is already in the url, then we remove it, to prevent duplicate parameters
+            // @ts-expect-error searchParams.has has no 2nd parameter on any browser other than firefox
             if(urlCopy.searchParams.has(paramName, paramValue) && urlCopy.searchParams.getAll(paramName).some(value => value === paramValue)) {
                 // console.log('Removing duplicate parameter', paramName, paramValue)
+                // @ts-expect-error searchParams.delete has no 2nd parameter on any browser other than firefox
                 url.searchParams.delete(paramName, paramValue)
             }
 
@@ -470,7 +480,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             originRequestBodyToSave.params = params
         }
 
-        let responseToSend = {
+        let responseToSend: RequestFinalResponse = {
             _id: nanoid(),
             collectionId: request._id,
             url: url.origin + url.pathname,
@@ -488,7 +498,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
                 original: {
                     url: request.url,
                     body: originRequestBodyToSave
-                }
+                } as Request
             },
             createdAt: new Date().getTime(),
             testResults: [],
@@ -523,7 +533,7 @@ export async function handleRequest(request, environment, setEnvironmentVariable
         responseToSend.testResults = state.testResults
 
         return responseToSend
-    } catch(e) {
+    } catch(e: any) {
         console.log(e)
 
         let error = 'Error: Request failed'
@@ -538,7 +548,15 @@ export async function handleRequest(request, environment, setEnvironmentVariable
             }
 
             if(e.message === 'Unable to parse plugin') {
-                const lineNumber = e.originalError.lineNumber ?? /\(eval\.js:(.*?)\)/.exec(e.originalError.stack)[1]
+                let lineNumber = ''
+                if(e.originalError.lineNumber !== null && e.originalError.lineNumber !== undefined) {
+                    lineNumber = e.originalError.lineNumber
+                } else {
+                    const lineNumberInfo = /\(eval\.js:(.*?)\)/.exec(e.originalError.stack)
+                    if(lineNumberInfo) {
+                        lineNumber = lineNumberInfo[1]
+                    }
+                }
                 error = `Error: Plugin "${state.currentPlugin}" has an error at line number ${lineNumber}\n\n${e.originalError.name}: ${e.originalError.message}`
             }
         }
@@ -643,11 +661,10 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip, works
             filePathMap[filePath.replace(basePath, '')] = filePath
         })
 
-        let archive = await extractedZip.files[filePathMap['archive.json']].async('text')
-        archive = JSON.parse(archive)
-        const archiveCollection = archive.collection
+        const archive = await extractedZip.files[filePathMap['archive.json']].async('text')
+        const archiveCollection = JSON.parse(archive).collection
 
-        const collections = []
+        const collections: any[] = []
 
         for(const collectionId of Object.keys(archiveCollection)) {
             collections.push(JSON.parse(await extractedZip.files[filePathMap[`collection/${collectionId}.json`]].async('text')))
@@ -667,18 +684,18 @@ export async function convertPostmanExportToRestfoxCollection(json, isZip, works
 }
 
 function importPostmanV1(collections, workspaceId) {
-    const collection = []
+    const collection: Request[]  = []
 
     collections.forEach(item => {
-        const requests = []
+        const requests: Request[] = []
 
         item.requests.forEach(request => {
-            let body = {
+            let body: RequestBody = {
                 mimeType: 'No Body'
             }
 
             if(request.dataMode === 'urlencoded') {
-                const params = []
+                const params: RequestParam[] = []
                 const requestData = request.data !== null ? request.data : []
                 requestData.forEach(requestDataItem => {
                     params.push({
@@ -701,7 +718,7 @@ function importPostmanV1(collections, workspaceId) {
                 }
             }
 
-            const headers = []
+            const headers: RequestParam[] = []
             request.headerData.forEach(header => {
                 headers.push({
                     name: header.key,
@@ -711,7 +728,7 @@ function importPostmanV1(collections, workspaceId) {
                 })
             })
 
-            const parameters = []
+            const parameters: RequestParam[] = []
             const queryParams = request.queryParams !== null ? request.queryParams : []
             queryParams.forEach(queryParam => {
                 parameters.push({
@@ -733,7 +750,7 @@ function importPostmanV1(collections, workspaceId) {
                 parameters,
                 parentId: item.id,
                 workspaceId
-            })
+            } as Request)
         })
 
         collection.push({
@@ -750,7 +767,7 @@ function importPostmanV1(collections, workspaceId) {
 }
 
 function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, workspaceId) {
-    const requests = []
+    const requests: Request[] = []
 
     postmanCollectionItem.item.forEach(request => {
         const requestId = request.id ?? nanoid()
@@ -766,13 +783,13 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             return
         }
 
-        let body = {
+        let body: RequestBody = {
             mimeType: 'No Body'
         }
 
         if('body' in request.request && 'mode' in request.request.body) {
             if(request.request.body.mode === 'urlencoded') {
-                const params = []
+                const params: RequestParam[] = []
                 const requestData = request.request.body.urlencoded
                 requestData.forEach(requestDataItem => {
                     params.push({
@@ -809,7 +826,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             }
         }
 
-        const headers = []
+        const headers: RequestParam[] = []
         request.request.header.forEach(header => {
             headers.push({
                 name: header.key,
@@ -819,7 +836,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             })
         })
 
-        const parameters = []
+        const parameters: RequestParam[] = []
         const queryParams = 'url' in request.request && typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
         queryParams.forEach(queryParam => {
             parameters.push({
@@ -837,7 +854,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             url = typeof request.request.url === 'string' ? request.request.url : request.request.url.raw
         }
 
-        let authentication = { type: 'No Auth' }
+        let authentication: RequestAuthentication = { type: 'No Auth' }
 
         if('auth' in request.request) {
             if(request.request.auth.type === 'bearer') {
@@ -867,14 +884,14 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             description: 'description' in request.request ? request.request.description : undefined,
             parentId,
             workspaceId
-        })
+        } as Request)
     })
 
     return requests
 }
 
 function importPostmanV2(collections, workspaceId) {
-    const collection = []
+    const collection: Request[] = []
 
     collections.forEach(postmanCollectionItem => {
         collection.push({
@@ -895,8 +912,8 @@ function importPostmanV2(collections, workspaceId) {
 }
 
 function importRestfoxV1(collections, workspaceId) {
-    const collection = []
-    const plugins = []
+    const collection: Request[] = []
+    const plugins: any[] = []
 
     collections.forEach(item => {
         if(item._type === 'request_group') {
@@ -910,7 +927,7 @@ function importRestfoxV1(collections, workspaceId) {
                 parentId: item.parentId,
                 workspaceId,
                 sortOrder: item.sortOrder
-            })
+            } as Request)
         } else {
             if(item._type === 'socket') {
                 collection.push({
@@ -941,7 +958,7 @@ function importRestfoxV1(collections, workspaceId) {
                     parentId: item.parentId,
                     workspaceId,
                     sortOrder: item.sortOrder
-                })
+                } as Request)
             }
         }
 
@@ -977,6 +994,11 @@ export async function convertOpenAPIExportToRestfoxCollection(exportString: stri
 
 export async function convertCurlCommandToRestfoxCollection(curlCommand: string, workspaceId: string) {
     const insomniaExport = curlConvert(curlCommand)
+
+    if(insomniaExport === null) {
+        throw new Error('Invalid Curl Command')
+    }
+
     if('body' in insomniaExport[0]) {
         if('text' in insomniaExport[0].body) {
             // for some reason we get \\n instead of \n in the text field
@@ -990,16 +1012,32 @@ export async function convertCurlCommandToRestfoxCollection(curlCommand: string,
 export async function fileToJSON(file) {
     return new Promise((resolve, reject) => {
         const fileReader = new FileReader()
-        fileReader.onload = event => resolve(JSON.parse(event.target.result))
+        fileReader.onload = (event: ProgressEvent<FileReader>) => {
+            if (event.target) {
+                try {
+                    resolve(JSON.parse(event.target.result as string))
+                } catch(e) {
+                    reject(e)
+                }
+            } else {
+                reject(new Error('Failed to read file'))
+            }
+        }
         fileReader.onerror = error => reject(error)
         fileReader.readAsText(file)
     })
 }
 
-export async function fileToString(file) {
+export async function fileToString(file): Promise<string> {
     return new Promise((resolve, reject) => {
         const fileReader = new FileReader()
-        fileReader.onload = event => resolve(event.target.result)
+        fileReader.onload = (event: ProgressEvent<FileReader>) => {
+            if (event.target) {
+                resolve(event.target.result as string)
+            } else {
+                reject(new Error('Failed to read file'))
+            }
+        }
         fileReader.onerror = error => reject(error)
         fileReader.readAsText(file)
     })
@@ -1057,14 +1095,13 @@ export function removeFromTree(array, key, keyValue) {
 // From: https://stackoverflow.com/a/34720792/4932305
 // Note: the final array includes the initially passed id as well
 export function getChildIds(arr, id) {
-    arr = arr || data
-    const ret = []
+    const ret: any[] = []
     for (let i = 0; i < arr.length; i++) {
         const item = arr[i]
         if (item.parentId == id || item._id == id) {
             if (ret.indexOf(item._id) < 0) {
                 ret.push(item._id)
-                const newret = []
+                const newret: any[] = []
                 for (let x = 0; x < arr.length; x++) {
                     if (x != i) {
                         newret.push(arr[x])
@@ -1102,7 +1139,7 @@ export function findItemInTreeById(array, id) {
     return result
 }
 
-export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping = null) {
+export function generateNewIdsForTreeItemChildren(treeItem, oldIdNewIdMapping: any = null) {
     const parentId = treeItem._id
     treeItem.children.forEach(item => {
         const newId = nanoid()
@@ -1233,7 +1270,7 @@ export function humanFriendlyTime(milliseconds) {
 }
 
 export function getObjectPaths(object: object): string[] {
-    const paths = []
+    const paths: any[] = []
 
     function recurse(obj, keyParent = '') {
         if(typeof obj === 'number' || typeof obj === 'string' || obj === null) {
