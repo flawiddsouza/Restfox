@@ -49,6 +49,12 @@ import {
 import { nextTick } from 'vue'
 import constants from './constants'
 import { emitter } from './event-bus'
+import {
+    State,
+    Request,
+    Plugin,
+    RequestParam,
+} from './global'
 
 async function loadResponses(state, tabId) {
     if(tabId in state.responses) {
@@ -83,7 +89,7 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActi
                     store.dispatch('saveCollectionItemCollapsedState', { _id: parentFolder._id, collapsed: parentFolder.collapsed })
                     console.log(`parent folder ${parentFolder.name} was collapsed and has been auto expanded`)
                 }
-                currentParentId = parentFolder.parentId
+                currentParentId = parentFolder?.parentId
             }
         }
         nextTick(() => {
@@ -98,7 +104,7 @@ function setActiveTab(state, tab, scrollSidebarItemIntoView = false, persistActi
 
             // also scroll active tab element into view
             const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${tab._id}"]`)
-            activeTabElement.scrollIntoView()
+            activeTabElement?.scrollIntoView()
         })
     }
 
@@ -119,7 +125,7 @@ async function getAllParents(workspaceId, parentArray, request) {
 }
 
 async function getEnvironmentForRequest(requestWorkspace, requestParentArray) {
-    let environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
+    const environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
     for(const parent of requestParentArray) {
         if(parent.environment) {
@@ -133,7 +139,7 @@ async function getEnvironmentForRequest(requestWorkspace, requestParentArray) {
     return environment
 }
 
-let workspaceCache = {
+const workspaceCache = {
     tabs: {},
     activeTab: {}
 }
@@ -152,7 +158,7 @@ async function loadWorkspaceTabs(state, workspaceId) {
     const tabIds = state.activeWorkspace.tabIds ?? []
     const activeTabId = state.activeWorkspace.activeTabId ?? null
 
-    let tabIdsOrder = {}
+    const tabIdsOrder = {}
 
     // to restore tab ordering
     tabIds.forEach((tabId, index) => {
@@ -193,7 +199,7 @@ async function persistActiveWorkspaceTabs(state) {
     })
 }
 
-const store = createStore({
+const store = createStore<State>({
     state() {
         return {
             collection: [],
@@ -257,9 +263,9 @@ const store = createStore({
 
                 if('body' in tab) {
                     if('params' in tab.body) {
-                        let params = []
+                        const params: RequestParam[] = []
                         for(const param of tab.body.params) {
-                            let paramExtracted = {...param}
+                            const paramExtracted = {...param}
                             if('files' in paramExtracted) {
                                 paramExtracted.files = [...paramExtracted.files]
                             }
@@ -280,7 +286,7 @@ const store = createStore({
 
             nextTick(() => {
                 const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${id}"]`)
-                activeTabElement.scrollIntoView()
+                activeTabElement?.scrollIntoView()
             })
         },
         setActiveTab(state, tab) {
@@ -323,7 +329,7 @@ const store = createStore({
         },
         setCollection(state, collection) {
             state.collection = collection
-            let collectionTree = toTree(state.collection)
+            const collectionTree = toTree(state.collection)
             sortTree(collectionTree)
             state.collectionTree = collectionTree
         },
@@ -335,9 +341,9 @@ const store = createStore({
                 const activeTabToSave = JSON.parse(JSON.stringify(state.activeTab))
 
                 if('body' in state.activeTab && 'params' in state.activeTab.body) {
-                    let params = []
+                    const params: RequestParam[] = []
                     for(const param of state.activeTab.body.params) {
-                        let paramExtracted = {...param}
+                        const paramExtracted = {...param}
                         if('files' in paramExtracted) {
                             paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
                         }
@@ -557,7 +563,13 @@ const store = createStore({
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
 
             if(collectionItem.parentId) {
-                let parentCollection = findItemInTreeById(context.state.collectionTree, collectionItem.parentId)
+                const parentCollection = findItemInTreeById(context.state.collectionTree, collectionItem.parentId)
+                if(parentCollection === null) {
+                    throw new Error('Parent collection not found')
+                }
+                if(parentCollection.children === undefined) {
+                    throw new Error('Parent collection children not found')
+                }
                 const childIndex = parentCollection.children.findIndex(item => item._id === collectionItem._id)
                 parentCollection.children.splice(childIndex + 1, 0, newCollectionItem)
                 // new sort order for new item and its siblings
@@ -584,7 +596,7 @@ const store = createStore({
             }
         },
         async createCollectionItem(context, payload) {
-            let newCollectionItem = null
+            let newCollectionItem: Request | null = null
 
             if(payload.type === 'request') {
                 newCollectionItem = {
@@ -621,11 +633,21 @@ const store = createStore({
                 }
             }
 
+            if (newCollectionItem === null) {
+                throw new Error('Invalid collection item type')
+            }
+
             await createCollection(context.state.activeWorkspace._id, newCollectionItem)
             context.state.collection.push(newCollectionItem)
 
             if(newCollectionItem.parentId) {
-                let parentCollection = findItemInTreeById(context.state.collectionTree, newCollectionItem.parentId)
+                const parentCollection = findItemInTreeById(context.state.collectionTree, newCollectionItem.parentId)
+                if(parentCollection === null) {
+                    throw new Error('Parent collection not found')
+                }
+                if(parentCollection.children === undefined) {
+                    throw new Error('Parent collection children not found')
+                }
                 parentCollection.children.splice(0, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
@@ -664,10 +686,14 @@ const store = createStore({
                 targetKey = 'id'
             }
 
-            const sourceParentCollection = !payload.from.parentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.from.parentId).children
-            const targetParentCollection = !payload.to[targetKey] ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.to[targetKey]).children
+            const sourceParentCollection = !payload.from.parentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.from.parentId)?.children
+            const targetParentCollection = !payload.to[targetKey] ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.to[targetKey])?.children
 
-            let sourceIndex = sourceParentCollection.findIndex(item => item._id === payload.from.id)
+            if (!sourceParentCollection || !targetParentCollection) {
+                throw new Error('Source or target parent collection not found')
+            }
+
+            const sourceIndex = sourceParentCollection.findIndex(item => item._id === payload.from.id)
             const sourceItem = sourceParentCollection[sourceIndex]
             sourceParentCollection.splice(sourceIndex, 1)
             sourceItem.parentId = payload.to[targetKey] ?? null
@@ -709,10 +735,10 @@ const store = createStore({
                 setEnvironmentVariable(context, objectPath, value)
             }
 
-            const globalPlugins = []
-            const workspacePlugins = []
-            const requestGroupPlugins = []
-            const requestPlugins = []
+            const globalPlugins: Plugin[] = []
+            const workspacePlugins: Plugin[] = []
+            const requestGroupPlugins: Plugin[] = []
+            const requestPlugins: Plugin[] = []
 
             context.getters.enabledPlugins.forEach(enabledPlugin => {
                 if(!enabledPlugin.workspaceId && !enabledPlugin.collectionId) {
@@ -803,7 +829,7 @@ const store = createStore({
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
         },
         async loadWorkspaces(context, noActiveWorkspaceCallback = null) {
-            let workspaces = await getAllWorkspaces()
+            const workspaces = await getAllWorkspaces()
 
             if(workspaces.length > 0) {
                 context.commit('setWorkspaces', workspaces)
@@ -848,6 +874,12 @@ const store = createStore({
         async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }) {
             if(parentId) {
                 const parentCollection = findItemInTreeById(context.state.collectionTree, parentId)
+                if(parentCollection === null) {
+                    throw new Error('Parent collection not found')
+                }
+                if(parentCollection.children === undefined) {
+                    throw new Error('Parent collection children not found')
+                }
                 collectionTree = parentCollection.children.concat(collectionTree)
             } else {
                 collectionTree = context.state.collectionTree.concat(collectionTree)

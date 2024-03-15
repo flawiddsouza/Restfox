@@ -14,10 +14,11 @@ import {
     RequestParam,
     RequestInitialResponse,
     RequestFinalResponse,
+    TreeItem,
 } from './global'
 
 // From: https://stackoverflow.com/a/67802481/4932305
-export function toTree(array) {
+export function toTree(array): TreeItem[] {
     const map = {}
     let i
 
@@ -750,7 +751,7 @@ function importPostmanV1(collections, workspaceId) {
                 parameters,
                 parentId: item.id,
                 workspaceId
-            } as Request)
+            })
         })
 
         collection.push({
@@ -884,7 +885,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem, parentId = null, w
             description: 'description' in request.request ? request.request.description : undefined,
             parentId,
             workspaceId
-        } as Request)
+        })
     })
 
     return requests
@@ -927,7 +928,7 @@ function importRestfoxV1(collections, workspaceId) {
                 parentId: item.parentId,
                 workspaceId,
                 sortOrder: item.sortOrder
-            } as Request)
+            })
         } else {
             if(item._type === 'socket') {
                 collection.push({
@@ -958,7 +959,7 @@ function importRestfoxV1(collections, workspaceId) {
                     parentId: item.parentId,
                     workspaceId,
                     sortOrder: item.sortOrder
-                } as Request)
+                })
             }
         }
 
@@ -1122,7 +1123,7 @@ export function getChildIds(arr, id) {
     return ret
 }
 
-export function findItemInTreeById(array, id) {
+export function findItemInTreeById(array: TreeItem[], id: string): TreeItem | null {
     let result = null
     function findItemInTreeByIdRecurse(array2, id2) {
         for(let i = 0; i < array2.length; i++) {
