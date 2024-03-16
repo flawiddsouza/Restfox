@@ -151,56 +151,74 @@ async function createCollection(workspace, collection) {
         collection,
     })
 
-    const collectionId = collection._id
+    const collectionName = collection.name
 
-    if (collection._type === 'request_group') {
-        let collectionPath = ''
-        if (collection.parentId) {
-            collectionPath = `${idMap.get(collection.parentId)}/${collection.name}`
-        } else {
-            collectionPath = `${workspace.location}/${collection.name}`
-        }
-        await fs.mkdir(collectionPath)
-        idMap.set(collectionId, collectionPath)
-        console.log(`Created directory: ${collectionPath}`)
+    try {
+        const collectionId = collection._id
 
-        const collectionToSave = {}
+        if (collection._type === 'request_group') {
+            let collectionPath = ''
+            if (collection.parentId) {
+                collectionPath = `${idMap.get(collection.parentId)}/${collection.name}`
+            } else {
+                collectionPath = `${workspace.location}/${collection.name}`
+            }
+            await fs.mkdir(collectionPath)
+            idMap.set(collectionId, collectionPath)
+            console.log(`Created directory: ${collectionPath}`)
 
-        if (collection.environments && collection.environment) {
-            collectionToSave.environment = collection.environment
-            collectionToSave.environments = collection.environments
-        }
+            const collectionToSave = {}
 
-        if (collection.sortOrder !== undefined) {
-            collectionToSave.sortOrder = collection.sortOrder
-        }
+            if (collection.environments && collection.environment) {
+                collectionToSave.environment = collection.environment
+                collectionToSave.environments = collection.environments
+            }
 
-        if (collection.collapsed !== undefined) {
-            collectionToSave.collapsed = collection.collapsed
-        }
+            if (collection.sortOrder !== undefined) {
+                collectionToSave.sortOrder = collection.sortOrder
+            }
 
-        if (Object.keys(collectionToSave).length > 0) {
-            await fs.writeFile(`${collectionPath}/_.json`, JSON.stringify(collectionToSave, null, 4))
-            console.log(`Created file: ${collectionPath}/_.json`)
-        }
-    }
+            if (collection.collapsed !== undefined) {
+                collectionToSave.collapsed = collection.collapsed
+            }
 
-    if (collection._type === 'request' || collection._type === 'socket') {
-        let collectionPath = ''
-        if (collection.parentId) {
-            collectionPath = `${idMap.get(collection.parentId)}/${collection.name}.json`
-        } else {
-            collectionPath = `${workspace.location}/${collection.name}.json`
+            if (Object.keys(collectionToSave).length > 0) {
+                await fs.writeFile(`${collectionPath}/_.json`, JSON.stringify(collectionToSave, null, 4), { flag: 'wx' })
+                console.log(`Created file: ${collectionPath}/_.json`)
+            }
         }
 
-        delete collection._id
-        delete collection.parentId
-        delete collection.workspaceId
-        delete collection.name
+        if (collection._type === 'request' || collection._type === 'socket') {
+            let collectionPath = ''
+            if (collection.parentId) {
+                collectionPath = `${idMap.get(collection.parentId)}/${collection.name}.json`
+            } else {
+                collectionPath = `${workspace.location}/${collection.name}.json`
+            }
 
-        await fs.writeFile(collectionPath, JSON.stringify(collection, null, 4))
-        idMap.set(collectionId, collectionPath)
-        console.log(`Created file: ${collectionPath}`)
+            delete collection._id
+            delete collection.parentId
+            delete collection.workspaceId
+            delete collection.name
+
+            await fs.writeFile(collectionPath, JSON.stringify(collection, null, 4), { flag: 'wx' })
+            idMap.set(collectionId, collectionPath)
+            console.log(`Created file: ${collectionPath}`)
+        }
+
+        return {
+            error: null,
+        }
+    } catch (err) {
+        if (err.code === 'EEXIST') {
+            return {
+                error: `Cannot create ${collectionName} as it already exists`,
+            }
+        }
+
+        return {
+            error: `Error creating collection: ${collectionName}: ${err.message}`,
+        }
     }
 }
 

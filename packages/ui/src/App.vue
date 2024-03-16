@@ -15,6 +15,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
 import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme } from './helpers'
+import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
 
 export default {
@@ -283,7 +284,10 @@ export default {
 
                 return
             }
-        }
+        },
+        handleError(errorMessage) {
+            this.$toast.error(errorMessage)
+        },
     },
     async created() {
         this.$store.dispatch('loadGlobalPlugins')
@@ -379,9 +383,12 @@ export default {
                 this.$store.state.flags.electronSwitchToChromiumFetch = false
             }
         }
+
+        emitter.on('error', this.handleError)
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)
+        emitter.off('error', this.handleError)
     }
 }
 </script>

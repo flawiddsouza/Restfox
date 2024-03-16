@@ -105,7 +105,7 @@ export async function getCollectionById(workspaceId: string, collectionId: strin
     return db.collections.where({ ':id': collectionId }).first()
 }
 
-export async function createCollection(workspaceId: string, collection: CollectionItem) {
+export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<{ error: string | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -114,6 +114,10 @@ export async function createCollection(workspaceId: string, collection: Collecti
     }
 
     await db.collections.put(collection)
+
+    return {
+        error: null,
+    }
 }
 
 export async function createCollections(workspaceId: string, collections: CollectionItem[]) {

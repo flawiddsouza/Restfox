@@ -60,14 +60,17 @@ export default {
     },
     methods: {
         async createRequest() {
-            this.$store.dispatch('createCollectionItem', {
+            const result = await this.$store.dispatch('createCollectionItem', {
                 type: 'request',
                 name: this.requestName,
                 method: this.requestMethod,
                 mimeType: 'No Body',
                 parentId: this.parentId
             })
-            this.showModalComp = false
+
+            if(!result.error) {
+                this.showModalComp = false
+            }
         }
     }
 }

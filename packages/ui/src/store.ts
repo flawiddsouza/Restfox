@@ -696,7 +696,13 @@ const store = createStore<State>({
                 throw new Error('Invalid collection item type')
             }
 
-            await createCollection(context.state.activeWorkspace._id, newCollectionItem)
+            const result = await createCollection(context.state.activeWorkspace._id, newCollectionItem)
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return result
+            }
+
             context.state.collection.push(newCollectionItem)
 
             if(newCollectionItem.parentId) {
@@ -729,6 +735,8 @@ const store = createStore<State>({
             if(payload.type === 'request_group') {
                 emitter.emit('request_group', 'added')
             }
+
+            return result
         },
         async reorderCollectionItem(context, payload) {
             if(payload.from.id === payload.to.id) { // don't allow an item to be dropped onto itself

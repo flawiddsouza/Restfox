@@ -59,12 +59,15 @@ export default {
     },
     methods: {
         async createFolder() {
-            this.$store.dispatch('createCollectionItem', {
+            const result = await this.$store.dispatch('createCollectionItem', {
                 type: 'request_group',
                 name: this.folderName,
                 parentId: this.parentId
             })
-            this.showModalComp = false
+
+            if(!result.error) {
+                this.showModalComp = false
+            }
         }
     }
 }

@@ -59,12 +59,15 @@ export default {
     },
     methods: {
         async createSocket() {
-            this.$store.dispatch('createCollectionItem', {
+            const result = await this.$store.dispatch('createCollectionItem', {
                 type: 'socket',
                 name: this.socketName,
                 parentId: this.parentId
             })
-            this.showModalComp = false
+
+            if(!result.error) {
+                this.showModalComp = false
+            }
         }
     },
 }
