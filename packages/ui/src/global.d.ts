@@ -100,7 +100,7 @@ export interface RequestFinalResponse {
 export interface State {
     collection: CollectionItem[]
     collectionTree: CollectionItem[]
-    tabs: any[]
+    tabs: CollectionItem[]
     activeTab: any | null
     requestResponseStatus: { [key: string]: string }
     requestResponses: { [key: string]: any | null }

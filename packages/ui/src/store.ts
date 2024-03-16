@@ -998,7 +998,64 @@ const store = createStore<State>({
             }
             const { environment } = await context.dispatch('getEnvironmentForRequest', context.state.activeTab)
             context.state.activeTabEnvironmentResolved = environment
-        }
+        },
+        async refreshWorkspaceCollection(context) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+            context.commit('setCollection', collection)
+        },
+        async refreshWorkspaceTabs(context) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            const tabIds = context.state.activeWorkspace.tabIds ?? []
+            const tabs = context.state.collection.filter(collectionItem => tabIds.includes(collectionItem._id))
+
+            const sortedTabs = tabIds
+                .map(id => tabs.find(tab => tab._id === id))
+                .filter(tab => tab !== undefined) as CollectionItem[]
+
+            context.state.tabs = sortedTabs
+            workspaceCache.tabs[context.state.activeWorkspace._id] = context.state.tabs
+            context.state.activeTab = sortedTabs.find(tab => tab._id === context.state.activeWorkspace?.activeTabId) ?? null
+            workspaceCache.activeTab[context.state.activeWorkspace._id] = context.state.activeTab
+        },
+        async refreshWorkspace(context) {
+            await context.dispatch('refreshWorkspaceCollection')
+            await context.dispatch('refreshWorkspaceTabs')
+        },
+        async updateCollectionItemNameAndParentId(context, { collectionId, name, parentId }) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            if(context.state.activeWorkspace._type === 'file') {
+                // we split the operations, as the file workspace does not support updating name & parentId together
+                await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    name
+                })
+                await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    parentId
+                })
+            } else {
+                await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    name,
+                    parentId
+                })
+            }
+
+            const collectionItem = context.state.collection.find(item => item._id === collectionId)
+
+            if(collectionItem?._type === 'request_group') {
+                emitter.emit('request_group', 'renamed')
+            }
+
+            await context.dispatch('refreshWorkspace')
+        },
     }
 })
 

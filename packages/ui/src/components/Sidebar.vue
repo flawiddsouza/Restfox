@@ -26,7 +26,7 @@
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
     <PluginManagerModal v-model:showModal="pluginManagerShow" :collection-item="pluginManagerCollectionItem" />
-    <SettingsModal v-model:showModal="settingsModalShow" :collection-item="settingsModalCollectionItem" />
+    <SettingsModal :show-modal="settingsModalShow" :collection-item="settingsModalCollectionItem" @update:collection-item="updateCollectionItem" />
     <DuplicateCollectionItemModal v-model:showModal="showDuplicateCollectionItemModal" :collection-item-to-duplicate="collectionItemToDuplicate" />
     <GenerateCodeModal v-model:showModal="generateCodeModalShow" :collection-item="generateCodeModalCollectionItem" />
 </template>
@@ -364,7 +364,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Properties') {
-                this.settingsModalCollectionItem = this.activeSidebarItemForContextMenu
+                this.settingsModalCollectionItem = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
                 this.settingsModalShow = true
             }
 
@@ -479,7 +479,15 @@ export default {
                 this.draggedSidebarElement.style.opacity = ''
                 this.draggedSidebarElement = null
             }
-        }
+        },
+        async updateCollectionItem(collectionItem) {
+            await this.$store.dispatch('updateCollectionItemNameAndParentId', {
+                collectionId: collectionItem._id,
+                name: collectionItem.name,
+                parentId: collectionItem.parentId,
+            })
+            this.settingsModalShow = false
+        },
     },
     mounted() {
         document.addEventListener('dragstart', this.dragStart)

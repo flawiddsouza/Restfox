@@ -5,7 +5,21 @@
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
                 <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" v-focus>
             </label>
+
+            <div style="padding-top: 1rem"></div>
+
+            <div>
+                <label>
+                    <div style="font-weight: 500; margin-bottom: 0.25rem">Folder</div>
+                    <select class="full-width-input" v-model="collectionItem.parentId">
+                        <option :value="null">Root of the workspace</option>
+                        <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
+                    </select>
+                </label>
+            </div>
+
             <div style="padding-bottom: 1rem"></div>
+
             <template #footer>
                 <button class="button" @click="showModalComp = false">Done</button>
             </template>
@@ -15,6 +29,8 @@
 
 <script>
 import Modal from '@/components/Modal.vue'
+import { getCollectionForWorkspace } from '@/db'
+import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '@/helpers'
 
 export default {
     directives: {
@@ -31,13 +47,22 @@ export default {
     components: {
         Modal
     },
+    data() {
+        return {
+            activeWorkspaceFolders: [],
+        }
+    },
     computed: {
         showModalComp: {
             get() {
                 return this.showModal
             },
             set(value) {
-                this.$emit('update:showModal', value)
+                if (value === false) {
+                    this.$emit('update:collectionItem', this.collectionItem)
+                } else {
+                    this.$emit('update:showModal', value)
+                }
             }
         },
         title() {
@@ -69,11 +94,44 @@ export default {
             }
 
             return ''
-        }
+        },
+        activeWorkspace() {
+            return this.$store.state.activeWorkspace
+        },
     },
     watch: {
-        'collectionItem.name'() {
-            this.$store.commit('updateCollectionItemName', this.collectionItem)
+        showModal() {
+            if(this.showModal) {
+                this.getAllFolders()
+            }
+        }
+    },
+    methods: {
+        async getAllFolders() {
+            let { collection: activeWorkspaceFolders } = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
+            activeWorkspaceFolders = toTree(activeWorkspaceFolders)
+            sortTree(activeWorkspaceFolders)
+
+            // prevent moving parent into child folders, so exclude child folders from dropdown if collection item type is request_group
+            if(this.collectionItem._type === 'request_group') {
+                const filterChildFolders = (folders, parentId) => {
+                    return folders.filter(folder => {
+                        // Keep the folder if it's not a child of the parentId and it's not the parentId itself
+                        if(folder.parentId !== parentId && folder._id !== parentId) {
+                            if(folder.children) {
+                                folder.children = filterChildFolders(folder.children, parentId)
+                            }
+                            return true
+                        }
+                        return false
+                    })
+                }
+                activeWorkspaceFolders = filterChildFolders(activeWorkspaceFolders, this.collectionItem._id)
+            }
+
+            prependParentTitleToChildTitle(activeWorkspaceFolders)
+            activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
+            this.activeWorkspaceFolders = activeWorkspaceFolders
         }
     }
 }

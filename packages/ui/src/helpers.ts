@@ -1498,3 +1498,12 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
         console.log(e)
     }
 }
+
+export function prependParentTitleToChildTitle(array: CollectionItem[], prepend = '') {
+    array.forEach(item => {
+        item.name = `${prepend ? prepend + ' ' : ''}${item.name}`
+        if(item.children) {
+            prependParentTitleToChildTitle(item.children, item.name + ' → ')
+        }
+    })
+}

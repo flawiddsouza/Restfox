@@ -52,17 +52,8 @@ import {
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
-import { flattenTree, sortTree, toTree } from '../helpers'
+import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '../helpers'
 import { mergeArraysByProperty } from '@/utils/array'
-
-function prependParentTitleToChildTitle(array, prepend = '') {
-    array.forEach(item => {
-        item.name = `${prepend ? prepend + ' ' : ''}${item.name}`
-        if('children' in item) {
-            prependParentTitleToChildTitle(item.children, item.name + ' → ')
-        }
-    })
-}
 
 export default {
     components: {
