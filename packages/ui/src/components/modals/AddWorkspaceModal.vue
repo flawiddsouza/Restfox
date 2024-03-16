@@ -1,6 +1,6 @@
 <template>
     <form @submit.prevent="createWorkspace" v-if="showModalComp">
-        <modal :title="!workspace ? 'New Workspace' : 'Rename Workspace'" v-model="showModalComp">
+        <modal :title="!workspace ? 'New Workspace' : 'Workspace Properties'" v-model="showModalComp">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
                 <input type="text" class="full-width-input" v-model="workspaceName" :placeholder="!workspace ? 'New Workspace' : 'Workspace Name'" required spellcheck="false" v-focus>
@@ -30,7 +30,7 @@
 
             <template #footer>
                 <button class="button" v-if="!workspace">Create</button>
-                <button class="button" v-else>Rename</button>
+                <button class="button" v-else>Update</button>
             </template>
         </modal>
     </form>

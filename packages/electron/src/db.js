@@ -10,7 +10,7 @@ async function getCollection(workspace, dir = workspace.location) {
         const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
 
         for (let fileOrFolder of filesAndFolders) {
-            if (fileOrFolder.name.endsWith('.responses.json') || fileOrFolder.name.endsWith('.plugins.json') || fileOrFolder.name === '_.json') {
+            if (fileOrFolder.name.startsWith('.') || fileOrFolder.name.endsWith('.responses.json') || fileOrFolder.name.endsWith('.plugins.json') || fileOrFolder.name === '_.json') {
                 continue
             }
 
@@ -52,10 +52,57 @@ async function getCollection(workspace, dir = workspace.location) {
             idMap.set(fullPath, fullPath)
         }
     } catch (err) {
+        console.error(err)
         throw new Error(`Error getting collection for workspace at location: ${dir}`)
     }
 
     return items
+}
+
+async function ensureRestfoxCollection(workspace) {
+    try {
+        const restfoxJson = await fs.readFile(`${workspace.location}/_.json`, 'utf8')
+        const restfoxData = JSON.parse(restfoxJson)
+        if (restfoxData.version !== 1) {
+            throw new Error('Unsupported Restfox collection version')
+        }
+    } catch {
+        // check if given workspace.location is a directory & is empty - if yes, create _.json
+        let ls
+        try {
+            ls = await fs.readdir(workspace.location)
+        } catch (err) {
+            // Given folder path does not exist
+            if (err.code === 'ENOENT') {
+                try {
+                    await fs.mkdir(workspace.location)
+                    const restfoxData = {
+                        version: 1,
+                        name: workspace.name,
+                    }
+                    await fs.writeFile(`${workspace.location}/_.json`, JSON.stringify(restfoxData, null, 4))
+                } catch (err) {
+                    console.error(err)
+                    throw new Error(`Error creating new directory and _.json file for Restfox collection at ${workspace.location}`)
+                }
+                return
+            } else if (err.code === 'ENOTDIR'){
+                throw new Error(`Given folder path is not a directory: ${workspace.location}`)
+            } else {
+                console.log(err)
+                throw err
+            }
+        }
+        if (ls.length === 0) {
+            const restfoxData = {
+                version: 1,
+                name: workspace.name,
+            }
+            await fs.writeFile(`${workspace.location}/_.json`, JSON.stringify(restfoxData, null, 4))
+        } else {
+            throw new Error(`Given folder path is not empty and does not have a Restfox collection: ${workspace.location}`)
+        }
+    }
 }
 
 async function getCollectionForWorkspace(workspace, type) {
@@ -65,6 +112,8 @@ async function getCollectionForWorkspace(workspace, type) {
     })
 
     try {
+        await ensureRestfoxCollection(workspace)
+
         const collection = await getCollection(workspace)
 
         // this is the only type filter that's required by the app

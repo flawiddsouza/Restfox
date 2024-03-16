@@ -55,14 +55,6 @@ export default {
                 },
                 {
                     'type': 'option',
-                    'label': 'Rename',
-                    'value': 'Rename'
-                },
-                {
-                    'type': 'separator'
-                },
-                {
-                    'type': 'option',
                     'label': 'Delete',
                     'value': 'Delete'
                 }
@@ -79,6 +71,17 @@ export default {
                     }
                 )
             }
+
+            options.push(
+                {
+                    'type': 'separator'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Properties',
+                    'value': 'Properties'
+                }
+            )
 
             return options
         }
@@ -98,14 +101,14 @@ export default {
                 this.showDuplicateWorkspaceModal = true
             }
 
-            if(clickedContextMenuItem === 'Rename') {
-                this.showAddWorkspaceModal = true
-            }
-
             if(clickedContextMenuItem === 'Delete') {
                 if(await window.createConfirm('Are you sure?')) {
                     this.$store.dispatch('deleteWorkspace', this.contextMenuWorkspace._id)
                 }
+            }
+
+            if(clickedContextMenuItem === 'Properties') {
+                this.showAddWorkspaceModal = true
             }
 
             if(clickedContextMenuItem === 'Close') {
