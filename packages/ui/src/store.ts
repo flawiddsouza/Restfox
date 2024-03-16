@@ -918,14 +918,14 @@ const store = createStore<State>({
                     }
                 }
             } else {
-                if (context.state.activeWorkspace === null) {
-                    throw new Error('activeWorkspace is null')
-                }
-
                 await context.dispatch('createWorkspace', {
                     name: 'My Collection',
                     setAsActive: true
                 })
+
+                if (context.state.activeWorkspace === null) {
+                    throw new Error('activeWorkspace is null')
+                }
 
                 // update pre-existing collections with a default workspaceId, so as to not break
                 // collections created before the introduction of workspaces
