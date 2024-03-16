@@ -229,7 +229,15 @@ async function createCollections(workspace, collections) {
     })
 
     for (const collection of collections) {
-        await createCollection(workspace, collection)
+        const result = await createCollection(workspace, collection)
+
+        if (result.error) {
+            return result
+        }
+    }
+
+    return {
+        error: null,
     }
 }
 

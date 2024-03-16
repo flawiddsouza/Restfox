@@ -120,7 +120,7 @@ export async function createCollection(workspaceId: string, collection: Collecti
     }
 }
 
-export async function createCollections(workspaceId: string, collections: CollectionItem[]) {
+export async function createCollections(workspaceId: string, collections: CollectionItem[]): Promise<{ error: string | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -129,6 +129,10 @@ export async function createCollections(workspaceId: string, collections: Collec
     }
 
     await db.collections.bulkPut(collections)
+
+    return {
+        error: null,
+    }
 }
 
 export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>) {

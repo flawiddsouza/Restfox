@@ -88,8 +88,11 @@ export default {
         async duplicateCollectionItem() {
             const newCollectionItem = JSON.parse(JSON.stringify(this.collectionItemToDuplicate))
             newCollectionItem.name = this.newName
-            this.$store.dispatch('duplicateCollectionItem', newCollectionItem)
-            this.showModalComp = false
+            const result = await this.$store.dispatch('duplicateCollectionItem', newCollectionItem)
+
+            if(!result.error) {
+                this.showModalComp = false
+            }
         }
     }
 }

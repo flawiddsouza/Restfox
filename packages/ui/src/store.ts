@@ -614,7 +614,13 @@ const store = createStore<State>({
             }
 
             const collectionItemsToSave = flattenTree([newCollectionItem])
-            await createCollections(collectionItem.workspaceId, collectionItemsToSave)
+            const result = await createCollections(collectionItem.workspaceId, collectionItemsToSave)
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return result
+            }
+
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
 
             if(collectionItem.parentId) {
@@ -649,6 +655,8 @@ const store = createStore<State>({
             if(newCollectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'added')
             }
+
+            return result
         },
         async createCollectionItem(context, payload) {
             if(context.state.activeWorkspace === null) {
