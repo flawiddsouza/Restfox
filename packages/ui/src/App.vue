@@ -177,6 +177,7 @@ export default {
             if(error) {
                 this.$store.commit('setActiveWorkspace', null)
                 this.$toast.error(error.message)
+                this.appLoaded = true
                 return
             }
 
