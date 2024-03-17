@@ -4,6 +4,22 @@ const constants = require('./constants')
 
 const idMap = new Map()
 
+async function getWorkspaceAtLocation(location) {
+    try {
+        const workspaceData = JSON.parse(await fs.readFile(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8'))
+
+        if('environments' in workspaceData) {
+            workspaceData.currentEnvironment = workspaceData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
+            workspaceData.environment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment).environment
+        }
+
+        return workspaceData
+    } catch (err) {
+        console.error(err)
+        throw new Error(`Error getting workspace at location: ${location}`)
+    }
+}
+
 async function updateWorkspace(workspace, updatedFields) {
     console.log('updateWorkspace', {
         workspace,
@@ -150,22 +166,6 @@ async function ensureRestfoxCollection(workspace) {
     }
 }
 
-async function getWorkspace(location) {
-    try {
-        const workspaceData = JSON.parse(await fs.readFile(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8'))
-
-        if('environments' in workspaceData) {
-            workspaceData.currentEnvironment = workspaceData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
-            workspaceData.environment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment).environment
-        }
-
-        return workspaceData
-    } catch (err) {
-        console.error(err)
-        throw new Error(`Error getting workspace at location: ${location}`)
-    }
-}
-
 async function getCollectionForWorkspace(workspace, type) {
     console.log('getCollectionForWorkspace', {
         workspace,
@@ -177,7 +177,7 @@ async function getCollectionForWorkspace(workspace, type) {
 
         const [ collection, workspaceData ] = await Promise.all([
             getCollection(workspace),
-            getWorkspace(workspace.location),
+            getWorkspaceAtLocation(workspace.location),
         ])
 
         // this is the only type filter that's required by the app
@@ -901,6 +901,7 @@ async function createPlugins(workspace, plugins) {
 }
 
 module.exports = {
+    getWorkspaceAtLocation,
     updateWorkspace,
     getCollectionForWorkspace,
     getCollectionById,

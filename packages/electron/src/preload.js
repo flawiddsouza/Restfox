@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 const ipcFunctions = [
     'sendRequest',
     'cancelRequest',
+    'getWorkspaceAtLocation',
     'updateWorkspace',
     'getCollectionForWorkspace',
     'getCollectionById',

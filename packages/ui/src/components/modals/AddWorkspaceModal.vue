@@ -99,6 +99,11 @@ export default {
                 this.workspaceType = 'local'
                 this.workspaceLocation = ''
             }
+        },
+        async workspaceLocation() {
+            if(this.workspaceLocation) {
+                this.getSetWorkspaceName()
+            }
         }
     },
     methods: {
@@ -131,10 +136,16 @@ export default {
             }
             this.showModalComp = false
         },
+        async getSetWorkspaceName() {
+            try {
+                const workspace = await window.electronIPC.getWorkspaceAtLocation(this.workspaceLocation)
+                this.workspaceName = workspace.name
+            } catch {}
+        },
         async openFolderDialog() {
             this.workspaceLocation = await window.electronIPC.openFolderSelectionDialog()
-            if (this.workspaceLocation !== null && this.workspaceName === 'New Workspace') {
-                this.workspaceName = this.workspaceLocation.split('/').pop()
+            if (this.workspaceLocation) {
+                this.getSetWorkspaceName()
             }
         }
     }
