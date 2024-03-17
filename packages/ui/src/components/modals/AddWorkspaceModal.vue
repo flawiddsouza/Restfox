@@ -25,6 +25,7 @@
                             <button class="button" type="button" @click="openFolderDialog">Choose</button>
                         </div>
                     </label>
+                    <div style="margin-top: 0.5rem">Provide an empty folder or select a folder with an existing workspace</div>
                 </div>
             </template>
 
