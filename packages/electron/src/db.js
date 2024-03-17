@@ -27,6 +27,12 @@ async function getCollection(workspace, dir = workspace.location) {
 
                 try {
                     const collectionData = JSON.parse(await fs.readFile(`${fullPath}/_.json`, 'utf8'))
+
+                    if('environments' in collectionData) {
+                        collection.currentEnvironment = collectionData.currentEnvironment ?? 'Default'
+                        collection.environment = collectionData.environments.find((env) => env.name === collection.currentEnvironment).environment
+                    }
+
                     collection = {
                         ...collection,
                         ...collectionData,
@@ -169,8 +175,8 @@ async function createCollection(workspace, collection) {
 
             const collectionToSave = {}
 
-            if (collection.environments && collection.environment) {
-                collectionToSave.environment = collection.environment
+            if (collection.environments) {
+                collectionToSave.currentEnvironment = collection.currentEnvironment ?? 'Default'
                 collectionToSave.environments = collection.environments
             }
 
@@ -344,7 +350,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         return
     }
 
-    if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'environment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
+    if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
         const fieldToUpdate = Object.keys(updatedFields)[0]
         let collectionPathCopy = collectionPath
 
