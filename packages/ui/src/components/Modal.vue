@@ -3,9 +3,9 @@
         <div class="modal__container" :style="{ width: width }">
             <div class="modal__content" :style="{ height: fullHeight ? '90vh': undefined }">
                 <header>
-                    <div style="display: flex; justify-content: space-between;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
                         <h3>{{ title }}</h3>
-                        <div style="margin-right: 1rem;">
+                        <div style="margin-right: 1rem; white-space: nowrap;">
                             <slot name="after-title"></slot>
                         </div>
                     </div>
