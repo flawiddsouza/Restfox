@@ -1,6 +1,7 @@
 const fs = require('fs').promises
 const path = require('path')
 const dbHelpers = require('./db-helpers')
+const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
 const idMap = new Map()
@@ -142,10 +143,6 @@ async function createCollection(workspace, collection) {
 
             if (collection.sortOrder !== undefined) {
                 collectionToSave.sortOrder = collection.sortOrder
-            }
-
-            if (collection.collapsed !== undefined) {
-                collectionToSave.collapsed = collection.collapsed
             }
 
             if (Object.keys(collectionToSave).length > 0) {
@@ -317,6 +314,26 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             return
         }
 
+        if('collapsed' in updatedFields) {
+            const collapsedFilePath = path.join(collectionPath, '_collapsed')
+            if (updatedFields.collapsed) {
+                try {
+                    await fs.writeFile(collapsedFilePath, '', { flag: 'wx' })
+                    console.log(`Marked as collapsed: ${collapsedFilePath}`)
+                } catch (err) {
+                    console.error(`Error marking directory as collapsed: ${collapsedFilePath}`, err)
+                }
+            } else {
+                try {
+                    await fs.unlink(collapsedFilePath)
+                    console.log(`Marked as expanded (collapsed file removed): ${collapsedFilePath}`)
+                } catch (err) {
+                    console.error(`Error marking directory as expanded: ${collapsedFilePath}`, err)
+                }
+            }
+            return
+        }
+
         const fieldToUpdate = Object.keys(updatedFields)[0]
         let collectionPathCopy = collectionPath
 
@@ -422,7 +439,7 @@ async function getResponsesByCollectionId(workspace, collectionId) {
     const collectionPath = idMap.get(collectionId)
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
-    const responsesPathExists = await fs.access(responsesPath).then(() => true).catch(() => false)
+    const responsesPathExists = await fileUtils.pathExists(responsesPath)
 
     if (responsesPathExists) {
         const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
@@ -447,7 +464,7 @@ async function createResponse(workspace, response) {
     response.buffer = Buffer.from(response.buffer).toString('base64')
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
-    const responsesPathExists = await fs.access(responsesPath).then(() => true).catch(() => false)
+    const responsesPathExists = await fileUtils.pathExists(responsesPath)
     let responses = []
 
     if (responsesPathExists) {

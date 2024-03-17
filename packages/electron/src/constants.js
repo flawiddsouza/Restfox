@@ -7,6 +7,7 @@ module.exports = {
         FOLDER_PLUGINS: '_.plugins.json',
         PLUGINS: '.plugins.json',
         RESPONSES: '.responses.json',
+        COLLAPSED: '_collapsed',
     },
     FOLDERS: {
         ENVIRONMENTS: '_environments',

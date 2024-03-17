@@ -8,6 +8,11 @@ async function readdirIgnoreError(path) {
     }
 }
 
+async function pathExists(pathToCheck) {
+    return fs.access(pathToCheck).then(() => true).catch(() => false)
+}
+
 module.exports = {
-    readdirIgnoreError
+    readdirIgnoreError,
+    pathExists,
 }

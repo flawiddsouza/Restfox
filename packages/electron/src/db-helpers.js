@@ -11,13 +11,15 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
         const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
 
         for (let fileOrFolder of filesAndFolders) {
-            if (fileOrFolder.name.startsWith('.') || fileOrFolder.name === constants.FOLDERS.ENVIRONMENTS || fileOrFolder.name.endsWith(constants.FILES.RESPONSES) || fileOrFolder.name.endsWith(constants.FILES.PLUGINS) || fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG || fileOrFolder.name === constants.FILES.FOLDER_CONFIG) {
+            if (fileOrFolder.name.startsWith('.') || fileOrFolder.name === constants.FOLDERS.ENVIRONMENTS || fileOrFolder.name.endsWith(constants.FILES.RESPONSES) || fileOrFolder.name.endsWith(constants.FILES.PLUGINS) || fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG || fileOrFolder.name === constants.FILES.FOLDER_CONFIG || fileOrFolder.name === constants.FILES.COLLAPSED) {
                 continue
             }
 
             const fullPath = path.join(dir, fileOrFolder.name)
 
             if (fileOrFolder.isDirectory()) {
+                const collapsed = await fileUtils.pathExists(path.join(fullPath, constants.FILES.COLLAPSED))
+
                 let collection = {
                     _id: fullPath,
                     _type: 'request_group',
@@ -25,6 +27,7 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
                     parentId: dir === workspace.location ? null : dir,
                     children: [],
                     workspaceId: workspace._id,
+                    collapsed,
                 }
 
                 try {
