@@ -1,16 +1,22 @@
 const fs = require('fs').promises
 const path = require('path')
+const dbHelpers = require('./db-helpers')
 const constants = require('./constants')
 
 const idMap = new Map()
 
-async function getWorkspaceAtLocation(location) {
+async function getWorkspaceAtLocation(location, getEnvironments = false) {
     try {
         const workspaceData = JSON.parse(await fs.readFile(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8'))
 
-        if('environments' in workspaceData) {
-            workspaceData.currentEnvironment = workspaceData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
-            workspaceData.environment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment).environment
+        if(getEnvironments) {
+            const envsDirPath = path.join(location, constants.FOLDERS.ENVIRONMENTS)
+            const environments = await dbHelpers.getEnvironments(envsDirPath)
+            if (environments.length > 0) {
+                workspaceData.environments = environments
+                workspaceData.currentEnvironment = workspaceData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
+                workspaceData.environment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment).environment
+            }
         }
 
         return workspaceData
@@ -37,7 +43,8 @@ async function updateWorkspace(workspace, updatedFields) {
     }
 
     if (updatedFields.environments) {
-        update.environments = updatedFields.environments
+        const envsDirPath = path.join(workspacePath, constants.FOLDERS.ENVIRONMENTS)
+        await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments)
     }
 
     if (updatedFields.currentEnvironment) {
@@ -58,114 +65,6 @@ async function updateWorkspace(workspace, updatedFields) {
     console.log(`Updated workspace: ${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`)
 }
 
-async function getCollection(workspace, dir = workspace.location) {
-    let items = []
-
-    try {
-        const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
-
-        for (let fileOrFolder of filesAndFolders) {
-            if (fileOrFolder.name.startsWith('.') || fileOrFolder.name.endsWith(constants.FILES.RESPONSES) || fileOrFolder.name.endsWith(constants.FILES.PLUGINS) || fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG || fileOrFolder.name === constants.FILES.FOLDER_CONFIG) {
-                continue
-            }
-
-            const fullPath = path.join(dir, fileOrFolder.name)
-            if (fileOrFolder.isDirectory()) {
-                let collection = {
-                    _id: fullPath,
-                    _type: 'request_group',
-                    name: path.basename(fullPath),
-                    parentId: dir === workspace.location ? null : dir,
-                    children: [],
-                    workspaceId: workspace._id,
-                }
-
-                try {
-                    const collectionData = JSON.parse(await fs.readFile(`${fullPath}/${constants.FILES.FOLDER_CONFIG}`, 'utf8'))
-
-                    if('environments' in collectionData) {
-                        collection.currentEnvironment = collectionData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
-                        collection.environment = collectionData.environments.find((env) => env.name === collection.currentEnvironment).environment
-                    }
-
-                    collection = {
-                        ...collection,
-                        ...collectionData,
-                    }
-                } catch (err) {
-                    console.error(`${fullPath}/${constants.FILES.FOLDER_CONFIG} not found, so skipping adding it to the collection`)
-                }
-
-                items.push(collection)
-
-                // Recursively get files and folders inside this directory
-                const nestedItems = await getCollection(workspace, fullPath)
-                items = items.concat(nestedItems)
-            } else {
-                items.push({
-                    ...JSON.parse(await fs.readFile(fullPath, 'utf8')),
-                    _id: fullPath,
-                    parentId: dir === workspace.location ? null : dir,
-                    name: path.basename(fullPath, '.json'),
-                    workspaceId: workspace._id,
-                })
-            }
-            idMap.set(fullPath, fullPath)
-        }
-    } catch (err) {
-        console.error(err)
-        throw new Error(`Error getting collection for workspace at location: ${dir}`)
-    }
-
-    return items
-}
-
-async function ensureRestfoxCollection(workspace) {
-    try {
-        const restfoxJson = await fs.readFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8')
-        const restfoxData = JSON.parse(restfoxJson)
-        if (restfoxData.version !== 1) {
-            throw new Error('Unsupported Restfox collection version')
-        }
-    } catch {
-        // check if given workspace.location is a directory & is empty - if yes, create constants.FILES.WORKSPACE_CONFIG
-        let ls
-        try {
-            ls = await fs.readdir(workspace.location)
-        } catch (err) {
-            // Given folder path does not exist
-            if (err.code === 'ENOENT') {
-                try {
-                    await fs.mkdir(workspace.location)
-                    const restfoxData = {
-                        version: 1,
-                        name: workspace.name,
-                    }
-                    await fs.writeFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(restfoxData, null, 4))
-                } catch (err) {
-                    console.error(err)
-                    throw new Error(`Error creating new directory and ${constants.FILES.WORKSPACE_CONFIG} file for Restfox collection at ${workspace.location}`)
-                }
-                return
-            } else if (err.code === 'ENOTDIR'){
-                throw new Error(`Given folder path is not a directory: ${workspace.location}`)
-            } else {
-                console.log(err)
-                throw err
-            }
-        }
-        if (ls.length === 0) {
-            const restfoxData = {
-                version: 1,
-                name: workspace.name,
-            }
-            await fs.writeFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(restfoxData, null, 4))
-        } else {
-            throw new Error(`Given folder path is not empty and does not have a Restfox collection: ${workspace.location}`)
-        }
-    }
-}
-
 async function getCollectionForWorkspace(workspace, type) {
     console.log('getCollectionForWorkspace', {
         workspace,
@@ -173,11 +72,11 @@ async function getCollectionForWorkspace(workspace, type) {
     })
 
     try {
-        await ensureRestfoxCollection(workspace)
+        await dbHelpers.ensureRestfoxCollection(workspace)
 
         const [ collection, workspaceData ] = await Promise.all([
-            getCollection(workspace),
-            getWorkspaceAtLocation(workspace.location),
+            dbHelpers.getCollection(idMap, workspace),
+            getWorkspaceAtLocation(workspace.location, true),
         ])
 
         // this is the only type filter that's required by the app
@@ -236,8 +135,9 @@ async function createCollection(workspace, collection) {
             const collectionToSave = {}
 
             if (collection.environments) {
+                const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
+                await dbHelpers.saveEnvironments(envsDirPath, collection.environments)
                 collectionToSave.currentEnvironment = collection.currentEnvironment ?? 'Default'
-                collectionToSave.environments = collection.environments
             }
 
             if (collection.sortOrder !== undefined) {
@@ -411,6 +311,12 @@ async function updateCollection(workspace, collectionId, updatedFields) {
     }
 
     if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
+        if(updatedFields.environments) {
+            const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
+            await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments)
+            return
+        }
+
         const fieldToUpdate = Object.keys(updatedFields)[0]
         let collectionPathCopy = collectionPath
 
@@ -698,7 +604,7 @@ async function getWorkspacePlugins(workspace) {
     }
 
     // Collection and Folder Plugins
-    const collectionItems = await getCollection(workspace)
+    const collectionItems = await dbHelpers.getCollection(idMap, workspace)
     for (const item of collectionItems) {
         if (item._type === 'request_group') {
             const collectionPluginsPath = `${item._id}/${constants.FILES.FOLDER_PLUGINS}`

@@ -8,4 +8,7 @@ module.exports = {
         PLUGINS: '.plugins.json',
         RESPONSES: '.responses.json',
     },
+    FOLDERS: {
+        ENVIRONMENTS: '_environments',
+    }
 }
