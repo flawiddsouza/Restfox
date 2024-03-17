@@ -177,6 +177,14 @@ export interface Workspace {
     updatedAt: number
 }
 
+export interface FileWorkspace {
+    version: number
+    name: string
+    environment?: any
+    environments?: any[]
+    currentEnvironment?: string
+}
+
 export interface PluginTestResult {
     description: string;
     passed: boolean;

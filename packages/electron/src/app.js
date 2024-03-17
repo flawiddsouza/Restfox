@@ -80,6 +80,10 @@ app.whenReady().then(async() => {
 
     const operationQueue = new TaskQueue()
 
+    ipcMain.handle('updateWorkspace', (_, ...args) => {
+        return operationQueue.enqueue(() => db.updateWorkspace(...args))
+    })
+
     ipcMain.handle('getCollectionForWorkspace', (_, ...args) => {
         return operationQueue.enqueue(() => db.getCollectionForWorkspace(...args))
     })

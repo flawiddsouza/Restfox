@@ -3,6 +3,44 @@ const path = require('path')
 
 const idMap = new Map()
 
+async function updateWorkspace(workspace, updatedFields) {
+    console.log('updateWorkspace', {
+        workspace,
+        updatedFields,
+    })
+
+    const workspacePath = workspace.location
+
+    const workspaceExisting = JSON.parse(await fs.readFile(`${workspacePath}/_.json`, 'utf8'))
+
+    const update = {}
+
+    if (updatedFields.name) {
+        update.name = updatedFields.name
+    }
+
+    if (updatedFields.environments) {
+        update.environments = updatedFields.environments
+    }
+
+    if (updatedFields.currentEnvironment) {
+        update.currentEnvironment = updatedFields.currentEnvironment
+    }
+
+    if (Object.keys(update).length === 0) {
+        console.log('No fields to update for workspace')
+        return
+    }
+
+    const workspaceUpdated = {
+        ...workspaceExisting,
+        ...update,
+    }
+
+    await fs.writeFile(`${workspacePath}/_.json`, JSON.stringify(workspaceUpdated, null, 4))
+    console.log(`Updated workspace: ${workspacePath}/_.json`)
+}
+
 async function getCollection(workspace, dir = workspace.location) {
     let items = []
 
@@ -111,6 +149,22 @@ async function ensureRestfoxCollection(workspace) {
     }
 }
 
+async function getWorkspace(location) {
+    try {
+        const workspaceData = JSON.parse(await fs.readFile(`${location}/_.json`, 'utf8'))
+
+        if('environments' in workspaceData) {
+            workspaceData.currentEnvironment = workspaceData.currentEnvironment ?? 'Default'
+            workspaceData.environment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment).environment
+        }
+
+        return workspaceData
+    } catch (err) {
+        console.error(err)
+        throw new Error(`Error getting workspace at location: ${location}`)
+    }
+}
+
 async function getCollectionForWorkspace(workspace, type) {
     console.log('getCollectionForWorkspace', {
         workspace,
@@ -120,7 +174,10 @@ async function getCollectionForWorkspace(workspace, type) {
     try {
         await ensureRestfoxCollection(workspace)
 
-        const collection = await getCollection(workspace)
+        const [ collection, workspaceData ] = await Promise.all([
+            getCollection(workspace),
+            getWorkspace(workspace.location),
+        ])
 
         // this is the only type filter that's required by the app
         if (type === 'request_group') {
@@ -130,16 +187,18 @@ async function getCollectionForWorkspace(workspace, type) {
             }
         }
 
-        console.log(collection)
+        console.log({ collection, workspaceData })
 
         return {
             error: null,
             collection,
+            workspace: workspaceData,
         }
     } catch (error) {
         return {
             error,
             collection: [],
+            workspace: null,
         }
     }
 }
@@ -841,6 +900,7 @@ async function createPlugins(workspace, plugins) {
 }
 
 module.exports = {
+    updateWorkspace,
     getCollectionForWorkspace,
     getCollectionById,
     createCollection,

@@ -172,12 +172,22 @@ export default {
                 return
             }
 
-            const { error, collection: collections } = await getCollectionForWorkspace(this.activeWorkspace._id)
+            const { error, collection: collections, workspace } = await getCollectionForWorkspace(this.activeWorkspace._id)
 
             if(error) {
                 this.$store.commit('setActiveWorkspace', null)
                 this.$toast.error(error.message)
                 return
+            }
+
+            // is not null if file workspace
+            if(workspace) {
+                this.activeWorkspace.name = workspace.name
+                if(workspace.environment) {
+                    this.activeWorkspace.environment = workspace.environment
+                    this.activeWorkspace.environments = workspace.environments
+                    this.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+                }
             }
 
             this.$store.commit('loadWorkspacePlugins', this.activeWorkspace._id)

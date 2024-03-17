@@ -2,6 +2,7 @@ import Dexie from 'dexie'
 import 'dexie-export-import'
 import {
     CollectionItem,
+    FileWorkspace,
     Plugin,
     RequestFinalResponse,
     Workspace,
@@ -58,6 +59,22 @@ export async function putWorkspace(workspace: Workspace) {
 }
 
 export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>) {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace._type === 'file') {
+            // this will used for updating workspace name, environments & currentEnvironment
+            await window.electronIPC.updateWorkspace(workspace, updatedFields)
+            // we don't want to update these fields into indexedDB if file workspace
+            delete updatedFields.currentEnvironment
+            delete updatedFields.environment
+            delete updatedFields.environments
+        }
+    }
+
+    if(Object.keys(updatedFields).length === 0) {
+        return
+    }
+
     await db.workspaces.update(workspaceId, updatedFields)
 }
 
@@ -71,7 +88,7 @@ export async function getAllCollectionIdsForGivenWorkspace(workspaceId: string) 
     return db.collections.where({ workspaceId }).primaryKeys()
 }
 
-export async function getCollectionForWorkspace(workspaceId: string, type = null): Promise<{ error: string | null, collection: CollectionItem[] }> {
+export async function getCollectionForWorkspace(workspaceId: string, type = null): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -91,6 +108,7 @@ export async function getCollectionForWorkspace(workspaceId: string, type = null
         error: null,
         // @ts-expect-error toArray does work on where, not sure why typescript is complaining
         collection: await db.collections.where(where).toArray(),
+        workspace: null,
     }
 }
 
