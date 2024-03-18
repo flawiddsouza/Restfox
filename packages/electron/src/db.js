@@ -115,6 +115,10 @@ function getCollectionById(workspace, collectionId) {
         workspace,
         collectionId,
     })
+
+    const collectionPath = idMap.get(collectionId)
+
+    return dbHelpers.getCollectionItem(workspace, collectionPath)
 }
 
 async function createCollection(workspace, collection) {

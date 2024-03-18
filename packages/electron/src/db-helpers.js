@@ -4,6 +4,73 @@ const path = require('path')
 const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
+async function getCollectionItem(workspace, fullPath) {
+    const isFolder = fullPath.endsWith('.json') === false
+    const fileOrFolderName = path.basename(fullPath)
+    const dir = path.dirname(fullPath)
+
+    if (isFolder) {
+        const collapsed = await fileUtils.pathExists(path.join(fullPath, constants.FILES.COLLAPSED))
+
+        const collectionName = fileOrFolderName
+
+        let collectionItem = {
+            _id: fullPath,
+            _type: 'request_group',
+            name: fileUtils.decodeFilename(collectionName),
+            parentId: dir === workspace.location ? null : dir,
+            children: [],
+            workspaceId: workspace._id,
+            collapsed,
+        }
+
+        try {
+            const collectionData = JSON.parse(await fs.readFile(`${fullPath}/${constants.FILES.FOLDER_CONFIG}`, 'utf8'))
+
+            const environments = await getEnvironments(`${fullPath}/${constants.FOLDERS.ENVIRONMENTS}`)
+            if (environments.length > 0) {
+                collectionData.environments = environments
+                collectionItem.currentEnvironment = collectionData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
+                collectionItem.environment = collectionData.environments.find((env) => env.name === collectionItem.currentEnvironment).environment
+            }
+
+            collectionItem = {
+                ...collectionItem,
+                ...collectionData,
+            }
+
+            return collectionItem
+        } catch (err) {
+            console.error(`${fullPath}/${constants.FILES.FOLDER_CONFIG} not found, so skipping adding it to the collection`)
+        }
+    } else {
+        let collectionItem = JSON.parse(await fs.readFile(fullPath, 'utf8'))
+
+        if (collectionItem._type === 'socket') {
+            const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
+            if (await fileUtils.pathExists(messagesPath)) {
+                const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
+                console.log(clientMessages)
+                collectionItem.clients.forEach((client) => {
+                    client.messages = clientMessages[client.id]
+                })
+            }
+        }
+
+        const collectionName = fileOrFolderName.replace('.json', '')
+
+        collectionItem = {
+            ...collectionItem,
+            _id: fullPath,
+            parentId: dir === workspace.location ? null : dir,
+            name: fileUtils.decodeFilename(collectionName),
+            workspaceId: workspace._id,
+        }
+
+        return collectionItem
+    }
+}
+
 async function getCollection(idMap, workspace, dir = workspace.location) {
     let items = []
 
@@ -27,66 +94,15 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
             const fullPath = path.join(dir, fileOrFolder.name)
 
             if (fileOrFolder.isDirectory()) {
-                const collapsed = await fileUtils.pathExists(path.join(fullPath, constants.FILES.COLLAPSED))
-
-                const collectionName = fileOrFolder.name
-
-                let collection = {
-                    _id: fullPath,
-                    _type: 'request_group',
-                    name: fileUtils.decodeFilename(collectionName),
-                    parentId: dir === workspace.location ? null : dir,
-                    children: [],
-                    workspaceId: workspace._id,
-                    collapsed,
-                }
-
-                try {
-                    const collectionData = JSON.parse(await fs.readFile(`${fullPath}/${constants.FILES.FOLDER_CONFIG}`, 'utf8'))
-
-                    const environments = await getEnvironments(`${fullPath}/${constants.FOLDERS.ENVIRONMENTS}`)
-                    if (environments.length > 0) {
-                        collectionData.environments = environments
-                        collection.currentEnvironment = collectionData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
-                        collection.environment = collectionData.environments.find((env) => env.name === collection.currentEnvironment).environment
-                    }
-
-                    collection = {
-                        ...collection,
-                        ...collectionData,
-                    }
-                } catch (err) {
-                    console.error(`${fullPath}/${constants.FILES.FOLDER_CONFIG} not found, so skipping adding it to the collection`)
-                }
-
+                const collection = await getCollectionItem(workspace, fullPath)
                 items.push(collection)
 
                 // Recursively get files and folders inside this directory
                 const nestedItems = await getCollection(idMap, workspace, fullPath)
                 items = items.concat(nestedItems)
             } else {
-                const collectionItem = JSON.parse(await fs.readFile(fullPath, 'utf8'))
-
-                if (collectionItem._type === 'socket') {
-                    const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
-                    if (await fileUtils.pathExists(messagesPath)) {
-                        const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
-                        console.log(clientMessages)
-                        collectionItem.clients.forEach((client) => {
-                            client.messages = clientMessages[client.id]
-                        })
-                    }
-                }
-
-                const collectionName = fileOrFolder.name.replace('.json', '')
-
-                items.push({
-                    ...collectionItem,
-                    _id: fullPath,
-                    parentId: dir === workspace.location ? null : dir,
-                    name: fileUtils.decodeFilename(collectionName),
-                    workspaceId: workspace._id,
-                })
+                const collectionItem = await getCollectionItem(workspace, fullPath)
+                items.push(collectionItem)
             }
             idMap.set(fullPath, fullPath)
         }
@@ -199,6 +215,7 @@ async function saveEnvironments(envsDirPath, environments) {
 }
 
 module.exports = {
+    getCollectionItem,
     getCollection,
     ensureRestfoxCollection,
     getEnvironments,
