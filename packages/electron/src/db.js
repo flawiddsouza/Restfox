@@ -367,6 +367,27 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
         const collectionExisting = JSON.parse(await fs.readFile(collectionPath, 'utf8'))
 
+        if (updatedFields._type === 'socket') {
+            if (updatedFields.clients) {
+                let existingMessages = {}
+                try {
+                    existingMessages = JSON.parse(await fs.readFile(collectionPath.replace('.json', constants.FILES.MESSAGES), 'utf8'))
+                } catch {}
+                const clientIds = []
+                for(const client of updatedFields.clients) {
+                    existingMessages[client.id] = client.messages
+                    clientIds.push(client.id)
+                    delete client.messages
+                }
+                Object.keys(existingMessages).forEach((clientId) => {
+                    if(!clientIds.includes(clientId)) {
+                        delete existingMessages[clientId]
+                    }
+                })
+                await fs.writeFile(collectionPath.replace('.json', constants.FILES.MESSAGES), JSON.stringify(existingMessages, null, 4))
+            }
+        }
+
         const collectionUpdated = {
             ...collectionExisting,
             ...updatedFields,

@@ -11,7 +11,16 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
         const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
 
         for (let fileOrFolder of filesAndFolders) {
-            if (fileOrFolder.name.startsWith('.') || fileOrFolder.name === constants.FOLDERS.ENVIRONMENTS || fileOrFolder.name.endsWith(constants.FILES.RESPONSES) || fileOrFolder.name.endsWith(constants.FILES.PLUGINS) || fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG || fileOrFolder.name === constants.FILES.FOLDER_CONFIG || fileOrFolder.name === constants.FILES.COLLAPSED) {
+            if (
+                fileOrFolder.name.startsWith('.') ||
+                fileOrFolder.name === constants.FOLDERS.ENVIRONMENTS ||
+                fileOrFolder.name.endsWith(constants.FILES.PLUGINS) ||
+                fileOrFolder.name.endsWith(constants.FILES.RESPONSES) ||
+                fileOrFolder.name.endsWith(constants.FILES.MESSAGES) ||
+                fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG ||
+                fileOrFolder.name === constants.FILES.FOLDER_CONFIG ||
+                fileOrFolder.name === constants.FILES.COLLAPSED
+            ) {
                 continue
             }
 
@@ -54,8 +63,21 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
                 const nestedItems = await getCollection(idMap, workspace, fullPath)
                 items = items.concat(nestedItems)
             } else {
+                const collectionItem = JSON.parse(await fs.readFile(fullPath, 'utf8'))
+
+                if (collectionItem._type === 'socket') {
+                    const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
+                    if (await fileUtils.pathExists(messagesPath)) {
+                        const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
+                        console.log(clientMessages)
+                        collectionItem.clients.forEach((client) => {
+                            client.messages = clientMessages[client.id]
+                        })
+                    }
+                }
+
                 items.push({
-                    ...JSON.parse(await fs.readFile(fullPath, 'utf8')),
+                    ...collectionItem,
                     _id: fullPath,
                     parentId: dir === workspace.location ? null : dir,
                     name: path.basename(fullPath, '.json'),
