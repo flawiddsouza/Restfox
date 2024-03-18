@@ -14,7 +14,10 @@ contextMenu()
 
 // fix blacked out select dropdowns + freezes, mostly when running the snap on ubuntu
 // no downsides to doing this, it renders the app just fine
-if (process.platform === 'linux') {
+// 18-Mar-24 17:59 PM: I was wrong - the colors rendered with software acceleration are
+// not the same as the ones rendered with hardware acceleration on
+// so we'll only disable hardware acceleration on linux if running as a snap
+if (process.platform === 'linux' && process.env.SNAP) {
     app.disableHardwareAcceleration()
 }
 
