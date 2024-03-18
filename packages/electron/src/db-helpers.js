@@ -94,6 +94,19 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
     return items
 }
 
+async function initRestfoxCollection(workspace) {
+    const restfoxData = {
+        version: 1,
+        name: workspace.name,
+    }
+
+    await fs.writeFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(restfoxData, null, 4))
+
+    if(await fileUtils.pathExists(`${workspace.location}/.gitignore`) === false) {
+        await fs.writeFile(`${workspace.location}/.gitignore`, constants.GITIGNORE_CONTENT)
+    }
+}
+
 async function ensureRestfoxCollection(workspace) {
     try {
         const restfoxJson = await fs.readFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8')
@@ -106,16 +119,14 @@ async function ensureRestfoxCollection(workspace) {
         let ls
         try {
             ls = await fs.readdir(workspace.location)
+            // ignore hidden files
+            ls = ls.filter(filename => !filename.startsWith('.'))
         } catch (err) {
             // Given folder path does not exist
             if (err.code === 'ENOENT') {
                 try {
                     await fs.mkdir(workspace.location)
-                    const restfoxData = {
-                        version: 1,
-                        name: workspace.name,
-                    }
-                    await fs.writeFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(restfoxData, null, 4))
+                    await initRestfoxCollection(workspace)
                 } catch (err) {
                     console.error(err)
                     throw new Error(`Error creating new directory and ${constants.FILES.WORKSPACE_CONFIG} file for Restfox collection at ${workspace.location}`)
@@ -129,11 +140,7 @@ async function ensureRestfoxCollection(workspace) {
             }
         }
         if (ls.length === 0) {
-            const restfoxData = {
-                version: 1,
-                name: workspace.name,
-            }
-            await fs.writeFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(restfoxData, null, 4))
+            await initRestfoxCollection(workspace)
         } else {
             throw new Error(`Given folder path is not empty and does not have a Restfox collection: ${workspace.location}`)
         }

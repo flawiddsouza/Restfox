@@ -12,5 +12,6 @@ module.exports = {
     },
     FOLDERS: {
         ENVIRONMENTS: '_environments',
-    }
+    },
+    GITIGNORE_CONTENT: '_collapsed\n*.responses.json\n*.messages.json\n',
 }
