@@ -29,10 +29,12 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
             if (fileOrFolder.isDirectory()) {
                 const collapsed = await fileUtils.pathExists(path.join(fullPath, constants.FILES.COLLAPSED))
 
+                const collectionName = fileOrFolder.name
+
                 let collection = {
                     _id: fullPath,
                     _type: 'request_group',
-                    name: path.basename(fullPath),
+                    name: fileUtils.decodeFilename(collectionName),
                     parentId: dir === workspace.location ? null : dir,
                     children: [],
                     workspaceId: workspace._id,
@@ -76,11 +78,13 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
                     }
                 }
 
+                const collectionName = fileOrFolder.name.replace('.json', '')
+
                 items.push({
                     ...collectionItem,
                     _id: fullPath,
                     parentId: dir === workspace.location ? null : dir,
-                    name: path.basename(fullPath, '.json'),
+                    name: fileUtils.decodeFilename(collectionName),
                     workspaceId: workspace._id,
                 })
             }
@@ -156,7 +160,7 @@ async function getEnvironments(envsDirPath) {
         try {
             const envData = JSON.parse(await fs.readFile(path.join(envsDirPath, fileName), 'utf8'))
             environments.push({
-                name: fileName.replace('.json', ''),
+                name: fileUtils.decodeFilename(fileName.replace('.json', '')),
                 environment: envData,
             })
         } catch (err) {
@@ -171,7 +175,7 @@ async function saveEnvironments(envsDirPath, environments) {
     await fs.mkdir(envsDirPath, { recursive: true })
 
     const existingEnvironments = await fileUtils.readdirIgnoreError(envsDirPath)
-    const environmentNames = environments.map((env) => `${env.name}.json`)
+    const environmentNames = environments.map((env) => `${fileUtils.encodeFilename(env.name)}.json`)
 
     for (const existingEnvironment of existingEnvironments) {
         if (!environmentNames.includes(existingEnvironment)) {
@@ -185,10 +189,11 @@ async function saveEnvironments(envsDirPath, environments) {
     }
 
     for (const env of environments) {
+        const envName = fileUtils.encodeFilename(env.name)
         try {
-            await fs.writeFile(path.join(envsDirPath, `${env.name}.json`), JSON.stringify(env.environment, null, 4))
+            await fs.writeFile(path.join(envsDirPath, `${envName}.json`), JSON.stringify(env.environment, null, 4))
         } catch (err) {
-            console.error(`Error writing environment file: ${env.name}.json`, err)
+            console.error(`Error writing environment file: ${envName}.json`, err)
         }
     }
 }

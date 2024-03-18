@@ -15,8 +15,14 @@ async function getWorkspaceAtLocation(location, getEnvironments = false) {
             const environments = await dbHelpers.getEnvironments(envsDirPath)
             if (environments.length > 0) {
                 workspaceData.environments = environments
-                workspaceData.currentEnvironment = workspaceData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
-                workspaceData.environment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment).environment
+                const currentEnvironment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment)
+                if (currentEnvironment) {
+                    workspaceData.environment = currentEnvironment.environment
+                    workspaceData.currentEnvironment = workspaceData.currentEnvironment
+                } else {
+                    workspaceData.environment = workspaceData.environments[0].environment
+                    workspaceData.currentEnvironment = workspaceData.environments[0].name
+                }
             }
         }
 
@@ -117,7 +123,7 @@ async function createCollection(workspace, collection) {
         collection,
     })
 
-    const collectionName = collection.name
+    const collectionName = fileUtils.encodeFilename(collection.name)
 
     try {
         const collectionId = collection._id
@@ -125,9 +131,9 @@ async function createCollection(workspace, collection) {
         if (collection._type === 'request_group') {
             let collectionPath = ''
             if (collection.parentId) {
-                collectionPath = `${idMap.get(collection.parentId)}/${collection.name}`
+                collectionPath = `${idMap.get(collection.parentId)}/${collectionName}`
             } else {
-                collectionPath = `${workspace.location}/${collection.name}`
+                collectionPath = `${workspace.location}/${collectionName}`
             }
             await fs.mkdir(collectionPath)
             idMap.set(collectionId, collectionPath)
@@ -154,9 +160,9 @@ async function createCollection(workspace, collection) {
         if (collection._type === 'request' || collection._type === 'socket') {
             let collectionPath = ''
             if (collection.parentId) {
-                collectionPath = `${idMap.get(collection.parentId)}/${collection.name}.json`
+                collectionPath = `${idMap.get(collection.parentId)}/${collectionName}.json`
             } else {
-                collectionPath = `${workspace.location}/${collection.name}.json`
+                collectionPath = `${workspace.location}/${collectionName}.json`
             }
 
             delete collection._id
@@ -233,6 +239,8 @@ async function updateCollection(workspace, collectionId, updatedFields) {
     const collectionPath = idMap.get(collectionId)
 
     if (Object.keys(updatedFields).length === 1 && 'name' in updatedFields) {
+        updatedFields.name = fileUtils.encodeFilename(updatedFields.name)
+
         const renameFrom = collectionPath
         let renameTo = `${path.dirname(collectionPath)}/${updatedFields.name}`
 
