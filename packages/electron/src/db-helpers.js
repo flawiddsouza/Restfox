@@ -86,7 +86,11 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
                 fileOrFolder.name.endsWith(constants.FILES.MESSAGES) ||
                 fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG ||
                 fileOrFolder.name === constants.FILES.FOLDER_CONFIG ||
-                fileOrFolder.name === constants.FILES.COLLAPSED
+                fileOrFolder.name === constants.FILES.COLLAPSED ||
+                // just to be on the safer side, we only allow .json get through if fileOrFolder is a file
+                // this way if the user creates random files that are not related to restfox, they will be ignored
+                // as long as they are not json
+                (fileOrFolder.isDirectory() === false && fileOrFolder.name.endsWith('.json') === false)
             ) {
                 continue
             }
