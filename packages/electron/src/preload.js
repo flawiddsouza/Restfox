@@ -34,4 +34,8 @@ const electronIPC = ipcFunctions.reduce((acc, funcName) => {
     return acc
 }, {})
 
+electronIPC.workspaceChanged = (callback) => {
+    ipcRenderer.on('workspaceChanged', (_, ...args) => callback(...args))
+}
+
 contextBridge.exposeInMainWorld('electronIPC', electronIPC)

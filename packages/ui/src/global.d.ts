@@ -134,6 +134,7 @@ export interface State {
     openContextMenuElement: HTMLElement | null
     sockets: { [key: string]: WebSocket | null }
     activeTabEnvironmentResolved: any
+    lastPersistedTabJSON: string | null
 }
 
 export interface Plugin {

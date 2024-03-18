@@ -253,6 +253,7 @@ const store = createStore<State>({
             openContextMenuElement: null,
             sockets: {},
             activeTabEnvironmentResolved: {},
+            lastPersistedTabJSON: null,
         }
     },
     getters: {
@@ -353,7 +354,17 @@ const store = createStore<State>({
         },
         persistActiveTab(state) {
             if(state.activeTab) {
-                const activeTabToSave = JSON.parse(JSON.stringify(state.activeTab))
+                const activeTabToSaveJSON = JSON.stringify(state.activeTab)
+                const activeTabToSave = JSON.parse(activeTabToSaveJSON)
+
+                if (activeTabToSaveJSON === state.lastPersistedTabJSON) {
+                    console.log('persistActiveTab: no change, so skipping')
+                    return
+                } else {
+                    console.log('persistActiveTab: changed, so saving')
+                }
+
+                state.lastPersistedTabJSON = JSON.stringify(state.activeTab)
 
                 if('body' in state.activeTab && 'params' in state.activeTab.body) {
                     const params: RequestParam[] = []
@@ -1016,6 +1027,8 @@ const store = createStore<State>({
             context.state.activeTabEnvironmentResolved = environment
         },
         async refreshWorkspaceCollection(context) {
+            console.log('refreshWorkspaceCollection')
+
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
@@ -1024,6 +1037,8 @@ const store = createStore<State>({
             context.commit('setCollection', collection)
         },
         async refreshWorkspaceTabs(context) {
+            console.log('refreshWorkspaceTabs')
+
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }

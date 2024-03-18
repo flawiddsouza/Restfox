@@ -57,6 +57,8 @@ function createWindow() {
         win.focus()
         win.show()
     })
+
+    globalThis.electronApplicationWindow = win
 }
 
 app.whenReady().then(async() => {

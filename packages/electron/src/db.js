@@ -1,12 +1,29 @@
 const fs = require('fs').promises
 const path = require('path')
+const chokidar = require('chokidar')
 const dbHelpers = require('./db-helpers')
 const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
 const idMap = new Map()
 
+const LOG_ONLY_METHOD_NAME = true
+const LOG_ONLY_METHOD_NAME_EXCEPT = []
+
+function logMethodCall(methodName, args) {
+    if (LOG_ONLY_METHOD_NAME && !LOG_ONLY_METHOD_NAME_EXCEPT.includes(methodName)) {
+        console.log(methodName)
+        return
+    }
+    console.log(methodName, args)
+}
+
 async function getWorkspaceAtLocation(location, getEnvironments = false) {
+    logMethodCall('getWorkspaceAtLocation', {
+        location,
+        getEnvironments,
+    })
+
     try {
         const workspaceData = JSON.parse(await fs.readFile(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8'))
 
@@ -34,7 +51,7 @@ async function getWorkspaceAtLocation(location, getEnvironments = false) {
 }
 
 async function updateWorkspace(workspace, updatedFields) {
-    console.log('updateWorkspace', {
+    logMethodCall('updateWorkspace', {
         workspace,
         updatedFields,
     })
@@ -72,14 +89,32 @@ async function updateWorkspace(workspace, updatedFields) {
     console.log(`Updated workspace: ${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`)
 }
 
+/** @type{chokidar.FSWatcher} */
+let workspaceWatcher = null
+
 async function getCollectionForWorkspace(workspace, type) {
-    console.log('getCollectionForWorkspace', {
+    logMethodCall('getCollectionForWorkspace', {
         workspace,
         type,
     })
 
     try {
         await dbHelpers.ensureRestfoxCollection(workspace)
+
+        if (type === null) {
+            if (workspaceWatcher) {
+                await workspaceWatcher.close()
+                workspaceWatcher = null
+            }
+
+            workspaceWatcher = chokidar.watch(workspace.location, {
+                ignored: /(^|[\/\\])\../, // ignore dotfiles
+                ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
+            }).on('all', (event, path) => {
+                console.log(event, path)
+                globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path)
+            })
+        }
 
         const [ collection, workspaceData ] = await Promise.all([
             dbHelpers.getCollection(idMap, workspace),
@@ -94,7 +129,7 @@ async function getCollectionForWorkspace(workspace, type) {
             }
         }
 
-        console.log({ collection, workspaceData })
+        // console.log({ collection, workspaceData })
 
         return {
             error: null,
@@ -111,7 +146,7 @@ async function getCollectionForWorkspace(workspace, type) {
 }
 
 function getCollectionById(workspace, collectionId) {
-    console.log('getCollectionById', {
+    logMethodCall('getCollectionById', {
         workspace,
         collectionId,
     })
@@ -122,7 +157,7 @@ function getCollectionById(workspace, collectionId) {
 }
 
 async function createCollection(workspace, collection) {
-    console.log('createCollection', {
+    logMethodCall('createCollection', {
         workspace,
         collection,
     })
@@ -196,7 +231,7 @@ async function createCollection(workspace, collection) {
 }
 
 async function createCollections(workspace, collections) {
-    console.log('createCollections', {
+    logMethodCall('createCollections', {
         workspace,
         collections,
     })
@@ -234,7 +269,7 @@ async function updateIdMapForChildren(oldBasePath, newBasePath) {
 }
 
 async function updateCollection(workspace, collectionId, updatedFields) {
-    console.log('updateCollection', {
+    logMethodCall('updateCollection', {
         workspace,
         collectionId,
         updatedFields,
@@ -412,7 +447,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 }
 
 async function deleteCollectionsByWorkspaceId(workspace) {
-    console.log('deleteCollectionsByWorkspaceId', {
+    logMethodCall('deleteCollectionsByWorkspaceId', {
         workspace,
     })
 
@@ -443,7 +478,7 @@ async function deleteCollectionsByWorkspaceId(workspace) {
 }
 
 async function deleteCollectionsByIds(workspace, collectionIds) {
-    console.log('deleteCollectionsByIds', {
+    logMethodCall('deleteCollectionsByIds', {
         workspace,
         collectionIds,
     })
@@ -464,7 +499,7 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
 }
 
 async function getResponsesByCollectionId(workspace, collectionId) {
-    console.log('getResponsesByCollectionId', {
+    logMethodCall('getResponsesByCollectionId', {
         workspace,
         collectionId,
     })
@@ -487,7 +522,7 @@ async function getResponsesByCollectionId(workspace, collectionId) {
 }
 
 async function createResponse(workspace, response) {
-    console.log('createResponse', {
+    logMethodCall('createResponse', {
         workspace,
         response,
     })
@@ -510,7 +545,7 @@ async function createResponse(workspace, response) {
 }
 
 async function updateResponse(workspace, collectionId, responseId, updatedFields) {
-    console.log('updateResponse', {
+    logMethodCall('updateResponse', {
         workspace,
         collectionId,
         responseId,
@@ -538,7 +573,7 @@ async function updateResponse(workspace, collectionId, responseId, updatedFields
 }
 
 async function deleteResponse(workspace, collectionId, responseId) {
-    console.log('deleteResponse', {
+    logMethodCall('deleteResponse', {
         workspace,
         collectionId,
         responseId,
@@ -569,7 +604,7 @@ async function deleteResponse(workspace, collectionId, responseId) {
 }
 
 async function deleteResponsesByIds(workspace, collectionId, responseIds) {
-    console.log('deleteResponsesByIds', {
+    logMethodCall('deleteResponsesByIds', {
         workspace,
         collectionId,
         responseIds,
@@ -589,7 +624,7 @@ async function deleteResponsesByIds(workspace, collectionId, responseIds) {
 }
 
 async function deleteResponsesByCollectionIds(workspace, collectionIds) {
-    console.log('deleteResponsesByCollectionIds', {
+    logMethodCall('deleteResponsesByCollectionIds', {
         workspace,
         collectionIds,
     })
@@ -620,7 +655,7 @@ async function deleteResponsesByCollectionIds(workspace, collectionIds) {
 }
 
 async function deleteResponsesByCollectionId(workspace, collectionId) {
-    console.log('deleteResponsesByCollectionId', {
+    logMethodCall('deleteResponsesByCollectionId', {
         workspace,
         collectionId,
     })
@@ -635,7 +670,7 @@ async function deleteResponsesByCollectionId(workspace, collectionId) {
 }
 
 async function getWorkspacePlugins(workspace) {
-    console.log('getWorkspacePlugins', {
+    logMethodCall('getWorkspacePlugins', {
         workspace,
     })
 
@@ -685,7 +720,7 @@ async function getWorkspacePlugins(workspace) {
 }
 
 async function createPlugin(workspace, plugin) {
-    console.log('createPlugin', {
+    logMethodCall('createPlugin', {
         workspace,
         plugin,
     })
@@ -725,7 +760,7 @@ async function createPlugin(workspace, plugin) {
 }
 
 async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
-    console.log('updatePlugin', {
+    logMethodCall('updatePlugin', {
         workspace,
         collectionId,
         pluginId,
@@ -762,7 +797,7 @@ async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
 }
 
 async function deletePlugin(workspace, collectionId, pluginId) {
-    console.log('deletePlugin', {
+    logMethodCall('deletePlugin', {
         workspace,
         collectionId,
         pluginId,
@@ -811,7 +846,7 @@ async function deletePlugin(workspace, collectionId, pluginId) {
 }
 
 async function deletePluginsByWorkspace(workspace) {
-    console.log('deletePluginsByWorkspace', {
+    logMethodCall('deletePluginsByWorkspace', {
         workspace,
     })
 
@@ -826,7 +861,7 @@ async function deletePluginsByWorkspace(workspace) {
 }
 
 async function deletePluginsByCollectionIds(workspace, collectionIds) {
-    console.log('deletePluginsByCollectionIds', {
+    logMethodCall('deletePluginsByCollectionIds', {
         workspace,
         collectionIds,
     })
@@ -846,7 +881,7 @@ async function deletePluginsByCollectionIds(workspace, collectionIds) {
 }
 
 async function createPlugins(workspace, plugins) {
-    console.log('createPlugins', {
+    logMethodCall('createPlugins', {
         workspace,
         plugins,
     })
