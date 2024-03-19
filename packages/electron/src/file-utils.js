@@ -67,19 +67,114 @@ function decodeFilename(name) {
     return name.replace(regex, matched => decodeMap[matched])
 }
 
-async function writeFileJson(path, data, fsLog) {
+async function writeFileJson(path, data, fsLog, fsLogReason) {
     const id = Date.now()
-    if (fsLog) {
-        fsLog.push({ id, event: 'change', path })
-    }
+    const event = await pathExists(path) ? 'change' : 'add'
+    fsLog.push({ id, event: event, path, reason: fsLogReason })
     try {
         await fs.writeFile(path, JSON.stringify(data, null, 4))
     } catch (e) {
-        if (fsLog) {
-            fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
-        }
+        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
         throw e
     }
+}
+
+async function writeFileJsonNewOnly(path, data, fsLog, fsLogReason) {
+    const id = Date.now()
+    fsLog.push({ id, event: 'add', path, reason: fsLogReason })
+    try {
+        await fs.writeFile(path, JSON.stringify(data, null, 4), { flag: 'wx' })
+    } catch (e) {
+        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        throw e
+    }
+}
+
+async function writeEmptyFileNewOnly(path, fsLog, fsLogReason) {
+    const id = Date.now()
+    fsLog.push({ id, event: 'add', path, reason: fsLogReason })
+    try {
+        await fs.writeFile(path, '', { flag: 'wx' })
+    } catch (e) {
+        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        throw e
+    }
+}
+
+async function deleteFileOrFolder(path, fsLog, fsLogReason) {
+    const id = Date.now()
+    const isDirectory = (await fs.stat(path)).isDirectory()
+    const event = isDirectory ? 'unlinkDir' : 'unlink'
+    fsLog.push({ id, event, path, reason: fsLogReason })
+    try {
+        if (isDirectory) {
+            await fs.rmdir(path)
+        } else {
+            await fs.unlink(path)
+        }
+    } catch (e) {
+        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        throw e
+    }
+}
+
+async function mkdir(path, fsLog, fsLogReason)
+{
+    const id = Date.now()
+    fsLog.push({ id, event: 'addDir', path, reason: fsLogReason })
+    try {
+        await fs.mkdir(path)
+    } catch (e) {
+        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        throw e
+    }
+}
+
+async function renameFileOrFolder(oldPath, newPath, fsLog, fsLogReason) {
+    const id = Date.now()
+    const isDirectory = (await fs.stat(oldPath)).isDirectory()
+
+    if (isDirectory) {
+        await renameAndLogRecursively(oldPath, newPath, fsLog, fsLogReason, id)
+    } else {
+        logEvent(fsLog, id, 'unlink', oldPath, fsLogReason)
+        logEvent(fsLog, id, 'add', newPath, fsLogReason)
+    }
+
+    try {
+        await fs.rename(oldPath, newPath)
+    } catch (e) {
+        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        throw e
+    }
+}
+
+async function renameAndLogRecursively(oldPath, newPath, fsLog, fsLogReason, id, isSubFolder = false) {
+    if (!isSubFolder) { // Only log the root folder being renamed on the first call
+        logEvent(fsLog, id, 'unlinkDir', oldPath, fsLogReason)
+        logEvent(fsLog, id, 'addDir', newPath, fsLogReason)
+    }
+
+    let entries = await fs.readdir(oldPath, { withFileTypes: true })
+    for (let entry of entries) {
+        const oldEntryPath = `${oldPath}/${entry.name}`
+        const newEntryPath = `${newPath}/${entry.name}`
+
+        if (entry.isDirectory()) {
+            // Log and rename subdirectories recursively
+            logEvent(fsLog, id, 'unlinkDir', oldEntryPath, fsLogReason)
+            logEvent(fsLog, id, 'addDir', newEntryPath, fsLogReason)
+            await renameAndLogRecursively(oldEntryPath, newEntryPath, fsLog, fsLogReason, id, true)
+        } else {
+            // Log rename events for files
+            logEvent(fsLog, id, 'unlink', oldEntryPath, fsLogReason)
+            logEvent(fsLog, id, 'add', newEntryPath, fsLogReason)
+        }
+    }
+}
+
+function logEvent(fsLog, id, event, path, reason) {
+    fsLog.push({ id, event, path, reason })
 }
 
 module.exports = {
@@ -88,4 +183,9 @@ module.exports = {
     encodeFilename,
     decodeFilename,
     writeFileJson,
+    writeFileJsonNewOnly,
+    writeEmptyFileNewOnly,
+    deleteFileOrFolder,
+    mkdir,
+    renameFileOrFolder,
 }

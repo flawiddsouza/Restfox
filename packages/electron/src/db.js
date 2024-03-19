@@ -69,7 +69,7 @@ async function updateWorkspace(workspace, updatedFields) {
 
     if (updatedFields.environments) {
         const envsDirPath = path.join(workspacePath, constants.FOLDERS.ENVIRONMENTS)
-        await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments)
+        await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)
     }
 
     if (updatedFields.currentEnvironment) {
@@ -86,7 +86,7 @@ async function updateWorkspace(workspace, updatedFields) {
         ...update,
     }
 
-    await fs.writeFile(`${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(workspaceUpdated, null, 4))
+    await fileUtils.writeFileJson(`${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`, workspaceUpdated, fsLog, `Update workspace`)
     console.log(`Updated workspace: ${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`)
 }
 
@@ -100,26 +100,30 @@ async function getCollectionForWorkspace(workspace, type) {
     })
 
     try {
-        await dbHelpers.ensureRestfoxCollection(workspace)
-
         if (type === null) {
             if (workspaceWatcher) {
                 await workspaceWatcher.close()
                 workspaceWatcher = null
+                fsLog.length = 0
             }
+
+            await dbHelpers.ensureRestfoxCollection(workspace)
 
             workspaceWatcher = chokidar.watch(workspace.location, {
                 ignored: /(^|[\/\\])\../, // ignore dotfiles
                 ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
+                awaitWriteFinish: true, // was getting an add & change event even thought there was only one fs.writeFile wx call - this seems to fix it
             }).on('all', (event, path) => {
                 console.log(event, path)
                 let controlledChange = false
+                let controlledChangeReason = null
                 const checkIfFsLogExists = fsLog.findIndex((log) => log.path === path && log.event === event)
                 if (checkIfFsLogExists !== -1) {
+                    controlledChangeReason = fsLog[checkIfFsLogExists].reason ?? null
                     fsLog.splice(checkIfFsLogExists, 1)
                     controlledChange = true
                 }
-                globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path, controlledChange)
+                globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path, controlledChange, controlledChangeReason)
             })
         }
 
@@ -181,7 +185,7 @@ async function createCollection(workspace, collection) {
             } else {
                 collectionPath = `${workspace.location}/${collectionName}`
             }
-            await fs.mkdir(collectionPath)
+            await fileUtils.mkdir(collectionPath, fsLog, 'Create collection item folder')
             idMap.set(collectionId, collectionPath)
             console.log(`Created directory: ${collectionPath}`)
 
@@ -189,7 +193,7 @@ async function createCollection(workspace, collection) {
 
             if (collection.environments) {
                 const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
-                await dbHelpers.saveEnvironments(envsDirPath, collection.environments)
+                await dbHelpers.saveEnvironments(fsLog, envsDirPath, collection.environments)
                 collectionToSave.currentEnvironment = collection.currentEnvironment ?? 'Default'
             }
 
@@ -198,7 +202,7 @@ async function createCollection(workspace, collection) {
             }
 
             if (Object.keys(collectionToSave).length > 0) {
-                await fs.writeFile(`${collectionPath}/${constants.FILES.FOLDER_CONFIG}`, JSON.stringify(collectionToSave, null, 4), { flag: 'wx' })
+                await fileUtils.writeFileJsonNewOnly(`${collectionPath}/${constants.FILES.FOLDER_CONFIG}`, collectionToSave, fsLog, `Create collection item folder config`)
                 console.log(`Created file: ${collectionPath}/${constants.FILES.FOLDER_CONFIG}`)
             }
         }
@@ -216,7 +220,7 @@ async function createCollection(workspace, collection) {
             delete collection.workspaceId
             delete collection.name
 
-            await fs.writeFile(collectionPath, JSON.stringify(collection, null, 4), { flag: 'wx' })
+            await fileUtils.writeFileJsonNewOnly(collectionPath, collection, fsLog, `Create collection item of type ${collection._type}`)
             idMap.set(collectionId, collectionPath)
             console.log(`Created file: ${collectionPath}`)
         }
@@ -296,27 +300,30 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             renameTo += extension
         }
 
-        await fs.rename(renameFrom, renameTo)
+        await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`)
         idMap.set(collectionId, renameTo)
 
-        const responsesRenameFrom = renameFrom.replace('.json', constants.FILES.RESPONSES)
-        const responsesRenameTo = renameTo.replace('.json', constants.FILES.RESPONSES)
+        // endsWith('.json') means it's a file, else it's a folder
+        if (renameFrom.endsWith('.json')) {
+            const responsesRenameFrom = renameFrom.replace('.json', constants.FILES.RESPONSES)
+            const responsesRenameTo = renameTo.replace('.json', constants.FILES.RESPONSES)
 
-        try {
-            await fs.access(responsesRenameFrom)
-            await fs.rename(responsesRenameFrom, responsesRenameTo)
-        } catch (err) {
-            console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
-        }
+            try {
+                await fs.access(responsesRenameFrom)
+                await fileUtils.renameFileOrFolder(responsesRenameFrom, responsesRenameTo, fsLog, `Rename responses file`)
+            } catch (err) {
+                console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
+            }
 
-        const pluginsRenameFrom = renameFrom.replace('.json', constants.FILES.PLUGINS)
-        const pluginsRenameTo = renameTo.replace('.json', constants.FILES.PLUGINS)
+            const pluginsRenameFrom = renameFrom.replace('.json', constants.FILES.PLUGINS)
+            const pluginsRenameTo = renameTo.replace('.json', constants.FILES.PLUGINS)
 
-        try {
-            await fs.access(pluginsRenameFrom)
-            await fs.rename(pluginsRenameFrom, pluginsRenameTo)
-        } catch (err) {
-            console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
+            try {
+                await fs.access(pluginsRenameFrom)
+                await fileUtils.renameFileOrFolder(pluginsRenameFrom, pluginsRenameTo, fsLog, `Rename plugins file`)
+            } catch (err) {
+                console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
+            }
         }
 
         console.log(`Renamed ${renameFrom} to ${renameTo}`)
@@ -327,7 +334,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
     if (Object.keys(updatedFields).length === 1 && 'parentId' in updatedFields) {
         const renameFrom = collectionPath
         let renameTo = `${updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location}/${path.basename(collectionPath)}`
-        await fs.rename(renameFrom, renameTo)
+        await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Move collection item`)
         idMap.set(collectionId, renameTo)
 
         // endsWith('.json') means it's a file, else it's a folder
@@ -337,7 +344,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
             try {
                 await fs.access(responsesRenameFrom)
-                await fs.rename(responsesRenameFrom, responsesRenameTo)
+                await fileUtils.renameFileOrFolder(responsesRenameFrom, responsesRenameTo, fsLog, `Rename responses file`)
             } catch (err) {
                 console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
             }
@@ -347,7 +354,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
             try {
                 await fs.access(pluginsRenameFrom)
-                await fs.rename(pluginsRenameFrom, pluginsRenameTo)
+                await fileUtils.renameFileOrFolder(pluginsRenameFrom, pluginsRenameTo, fsLog, `Rename plugins file`)
             } catch (err) {
                 console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
             }
@@ -364,22 +371,22 @@ async function updateCollection(workspace, collectionId, updatedFields) {
     if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
         if(updatedFields.environments) {
             const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
-            await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments)
+            await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)
             return
         }
 
         if('collapsed' in updatedFields) {
-            const collapsedFilePath = path.join(collectionPath, '_collapsed')
+            const collapsedFilePath = path.join(collectionPath, constants.FILES.COLLAPSED)
             if (updatedFields.collapsed) {
                 try {
-                    await fs.writeFile(collapsedFilePath, '', { flag: 'wx' })
+                    await fileUtils.writeEmptyFileNewOnly(collapsedFilePath, fsLog, `Mark directory as collapsed`)
                     console.log(`Marked as collapsed: ${collapsedFilePath}`)
                 } catch (err) {
                     console.error(`Error marking directory as collapsed: ${collapsedFilePath}`, err)
                 }
             } else {
                 try {
-                    await fs.unlink(collapsedFilePath)
+                    await fileUtils.deleteFileOrFolder(collapsedFilePath, fsLog, `Mark directory as expanded`)
                     console.log(`Marked as expanded (collapsed file removed): ${collapsedFilePath}`)
                 } catch (err) {
                     console.error(`Error marking directory as expanded: ${collapsedFilePath}`, err)
@@ -408,7 +415,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             ...updatedFields,
         }
 
-        await fs.writeFile(collectionPathCopy, JSON.stringify(collectionUpdated, null, 4))
+        await fileUtils.writeFileJson(collectionPathCopy, collectionUpdated, fsLog, `Update ${fieldToUpdate}`)
         console.log(`Updated ${fieldToUpdate} for ${collectionPathCopy}`)
         return
     }
@@ -438,7 +445,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
                         delete existingMessages[clientId]
                     }
                 })
-                await fs.writeFile(collectionPath.replace('.json', constants.FILES.MESSAGES), JSON.stringify(existingMessages, null, 4))
+                await fileUtils.writeFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), existingMessages, fsLog, 'Save socket client messages')
             }
         }
 
@@ -470,7 +477,7 @@ async function deleteCollectionsByWorkspaceId(workspace) {
             await fs.rm(itemPath, { recursive: true })
         } else {
             if (item.name.endsWith('.json')) {
-                await fs.rm(itemPath)
+                await fileUtils.deleteFileOrFolder(itemPath, fsLog, `Delete collection item`)
             }
         }
     }
@@ -490,18 +497,37 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
         collectionIds,
     })
 
+    let collectionItemsToDelete = []
+
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
+        collectionItemsToDelete.push({ collectionId, collectionPath })
+    }
 
-        try {
-            await fs.access(collectionPath)
-        } catch (err) {
-            console.log(`Skipping deleting: ${collectionPath} as parent directory has possibly already been deleted`)
-            return
+    collectionItemsToDelete = collectionItemsToDelete.sort((a, b) => b.collectionPath.localeCompare(a.collectionPath))
+
+    for (const collectionItem of collectionItemsToDelete) {
+        if (collectionItem.collectionPath.endsWith('.json') === false) {
+            await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.FOLDER_CONFIG), fsLog, `Delete collection item folder config`)
+
+            try {
+                await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.COLLAPSED), fsLog, `Delete collection item collapsed state marker`)
+            } catch {
+                console.log(`No collapsed state marker found for deletion for collection: ${collectionItem.collectionPath}`)
+            }
+
+            try {
+                const environmentsDir = await fs.readdir(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS))
+                for (const envFile of environmentsDir) {
+                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS, envFile), fsLog, `Delete collection item environment`)
+                }
+                await fileUtils.deleteFileOrFolder((path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS)), fsLog, `Delete collection item environments folder`)
+            } catch {
+                console.log(`No environments found for deletion for collection: ${collectionItem.collectionPath}`)
+            }
         }
-
-        await fs.rm(collectionPath, { recursive: true })
-        idMap.delete(collectionId)
+        await fileUtils.deleteFileOrFolder(collectionItem.collectionPath, fsLog, `Delete collection item`)
+        idMap.delete(collectionItem.collectionId)
     }
 }
 
@@ -548,7 +574,7 @@ async function createResponse(workspace, response) {
 
     responses.push(response)
 
-    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+    await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Create response`)
 }
 
 async function updateResponse(workspace, collectionId, responseId, updatedFields) {
@@ -576,7 +602,7 @@ async function updateResponse(workspace, collectionId, responseId, updatedFields
         ...updatedFields,
     }
 
-    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+    await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Update response`)
 }
 
 async function deleteResponse(workspace, collectionId, responseId) {
@@ -601,12 +627,12 @@ async function deleteResponse(workspace, collectionId, responseId) {
     responses.splice(responseIndex, 1)
 
     if (responses.length === 0) {
-        await fs.unlink(responsesPath)
+        await fileUtils.deleteFileOrFolder(responsesPath, fsLog, `Delete responses file`)
         console.log(`Deleted responses file: ${responsesPath}`)
         return
     }
 
-    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+    await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Delete response`)
     console.log(`Deleted response: ${responseId} from ${responsesPath}`)
 }
 
@@ -625,7 +651,7 @@ async function deleteResponsesByIds(workspace, collectionId, responseIds) {
 
     responses = responses.filter((response) => !responseIds.includes(response._id))
 
-    await fs.writeFile(responsesPath, JSON.stringify(responses, null, 4))
+    await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Delete responses`)
 
     console.log(`Deleted responses: ${responseIds} from ${responsesPath}`)
 }
@@ -655,7 +681,7 @@ async function deleteResponsesByCollectionIds(workspace, collectionIds) {
             continue
         }
 
-        await fs.rm(responsesPath)
+        await fileUtils.deleteFileOrFolder(responsesPath, fsLog, `Delete responses for collection item`)
 
         console.log(`Deleted responses for collection: ${collectionId} from ${responsesPath}`)
     }
@@ -671,7 +697,7 @@ async function deleteResponsesByCollectionId(workspace, collectionId) {
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
 
-    await fs.rm(responsesPath)
+    await fileUtils.deleteFileOrFolder(responsesPath, fsLog, `Delete responses for collection item`)
 
     console.log(`Deleted responses for collection: ${collectionId} from ${responsesPath}`)
 }
@@ -759,7 +785,7 @@ async function createPlugin(workspace, plugin) {
         delete plugin.collectionId
 
         existingPlugins.push(plugin)
-        await fs.writeFile(pluginPath, JSON.stringify(existingPlugins, null, 4))
+        await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Create plugin`)
         console.log(`Plugin created at: ${pluginPath}`)
     } catch (err) {
         console.error(`Error creating plugin in: ${pluginPath}`, err)
@@ -793,7 +819,7 @@ async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
             delete updatedFields.collectionId
 
             existingPlugins[pluginIndex] = { ...existingPlugins[pluginIndex], ...updatedFields }
-            await fs.writeFile(pluginPath, JSON.stringify(existingPlugins, null, 4))
+            await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Update plugin`)
             console.log(`Plugin ${pluginId} updated in ${pluginPath}`)
         } else {
             console.log(`Plugin ${pluginId} not found for update in ${pluginPath}`)
@@ -819,10 +845,10 @@ async function deletePlugin(workspace, collectionId, pluginId) {
 
             if (filteredPlugins.length < existingPlugins.length) {
                 if (filteredPlugins.length === 0) {
-                    await fs.unlink(workspacePluginsPath)
+                    await fileUtils.deleteFileOrFolder(workspacePluginsPath, fsLog, `Delete workspace plugins`)
                     console.log(`All workspace plugins deleted: ${workspace.location}`)
                 } else {
-                    await fs.writeFile(workspacePluginsPath, JSON.stringify(filteredPlugins, null, 4))
+                    await fileUtils.writeFileJson(workspacePluginsPath, filteredPlugins, fsLog, `Delete plugin`)
                     console.log(`Plugin ${pluginId} deleted in ${workspacePluginsPath}`)
                 }
             } else {
@@ -842,7 +868,7 @@ async function deletePlugin(workspace, collectionId, pluginId) {
         const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
 
         if (filteredPlugins.length < existingPlugins.length) {
-            await fs.writeFile(pluginPath, JSON.stringify(filteredPlugins, null, 4))
+            await fileUtils.writeFileJson(pluginPath, filteredPlugins, fsLog, `Delete plugin`)
             console.log(`Plugin ${pluginId} deleted in${pluginPath}`)
         } else {
             console.log(`Plugin ${pluginId} not found for deletion in ${pluginPath}`)
@@ -860,7 +886,7 @@ async function deletePluginsByWorkspace(workspace) {
     const workspacePluginsPath = `${workspace.location}/${constants.FILES.WORKSPACE_PLUGINS}`
     try {
         await fs.access(workspacePluginsPath)
-        await fs.unlink(workspacePluginsPath)
+        await fileUtils.deleteFileOrFolder(workspacePluginsPath, fsLog, `Delete workspace plugins`)
         console.log(`All workspace plugins deleted: ${workspace.location}`)
     } catch (err) {
         console.log(`No workspace plugins found for deletion in: ${workspace.location}`)
@@ -878,8 +904,7 @@ async function deletePluginsByCollectionIds(workspace, collectionIds) {
         const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : `${collectionPath}/${constants.FILES.FOLDER_PLUGINS}`
 
         try {
-            await fs.access(pluginPath)
-            await fs.unlink(pluginPath)
+            await fileUtils.deleteFileOrFolder(pluginPath, fsLog, `Delete plugins for collection item`)
             console.log(`Deleted plugins for collection: ${collectionId}`)
         } catch(err) {
             console.log(`No plugins found for deletion for collection: ${collectionId}`)

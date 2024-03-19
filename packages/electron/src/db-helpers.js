@@ -50,7 +50,6 @@ async function getCollectionItem(workspace, fullPath) {
             const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
             if (await fileUtils.pathExists(messagesPath)) {
                 const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
-                console.log(clientMessages)
                 collectionItem.clients.forEach((client) => {
                     client.messages = clientMessages[client.id]
                 })
@@ -191,8 +190,16 @@ async function getEnvironments(envsDirPath) {
     return environments
 }
 
-async function saveEnvironments(envsDirPath, environments) {
-    await fs.mkdir(envsDirPath, { recursive: true })
+async function saveEnvironments(fsLog, envsDirPath, environments) {
+    try {
+        await fileUtils.mkdir(envsDirPath, fsLog, 'Create environments directory')
+    } catch (err) {
+        if (err.code === 'EEXIST') {
+            console.error('Environment directory already exists, skipping creating it')
+        } else {
+            throw err
+        }
+    }
 
     const existingEnvironments = await fileUtils.readdirIgnoreError(envsDirPath)
     const environmentNames = environments.map((env) => `${fileUtils.encodeFilename(env.name)}.json`)
@@ -201,7 +208,7 @@ async function saveEnvironments(envsDirPath, environments) {
         if (!environmentNames.includes(existingEnvironment)) {
             // this means the environment was removed
             try {
-                await fs.rm(path.join(envsDirPath, existingEnvironment), { force: true })
+                await fileUtils.deleteFileOrFolder(path.join(envsDirPath, existingEnvironment), fsLog, 'Deleting environment')
             } catch (err) {
                 console.error(`Error removing environment file: ${existingEnvironment}`, err)
             }
@@ -211,7 +218,7 @@ async function saveEnvironments(envsDirPath, environments) {
     for (const env of environments) {
         const envName = fileUtils.encodeFilename(env.name)
         try {
-            await fs.writeFile(path.join(envsDirPath, `${envName}.json`), JSON.stringify(env.environment, null, 4))
+            await fileUtils.writeFileJson(path.join(envsDirPath, `${envName}.json`), env.environment, fsLog, 'Saving environment')
         } catch (err) {
             console.error(`Error writing environment file: ${envName}.json`, err)
         }
