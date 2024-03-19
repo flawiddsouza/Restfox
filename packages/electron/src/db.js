@@ -513,7 +513,7 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
             try {
                 await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.COLLAPSED), fsLog, `Delete collection item collapsed state marker`)
             } catch {
-                console.log(`No collapsed state marker found for deletion for collection: ${collectionItem.collectionPath}`)
+                console.log(`No collapsed state marker found for deletion for collection item: ${collectionItem.collectionPath}`)
             }
 
             try {
@@ -523,9 +523,16 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
                 }
                 await fileUtils.deleteFileOrFolder((path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS)), fsLog, `Delete collection item environments folder`)
             } catch {
-                console.log(`No environments found for deletion for collection: ${collectionItem.collectionPath}`)
+                console.log(`No environments found for deletion for collection item: ${collectionItem.collectionPath}`)
             }
         }
+
+        try {
+            await fileUtils.deleteFileOrFolder(collectionItem.collectionPath.replace('.json', constants.FILES.MESSAGES), fsLog, `Delete messages for collection item`)
+        } catch {
+            console.log(`No messages found for deletion for collection item: ${collectionItem.collectionPath}`)
+        }
+
         await fileUtils.deleteFileOrFolder(collectionItem.collectionPath, fsLog, `Delete collection item`)
         idMap.delete(collectionItem.collectionId)
     }
