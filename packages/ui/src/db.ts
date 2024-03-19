@@ -88,7 +88,7 @@ export async function getAllCollectionIdsForGivenWorkspace(workspaceId: string) 
     return db.collections.where({ workspaceId }).primaryKeys()
 }
 
-export async function getCollectionForWorkspace(workspaceId: string, type = null): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null }> {
+export async function getCollectionForWorkspace(workspaceId: string, type = null): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null, idMap: Map<string, string> | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -109,6 +109,7 @@ export async function getCollectionForWorkspace(workspaceId: string, type = null
         // @ts-expect-error toArray does work on where, not sure why typescript is complaining
         collection: await db.collections.where(where).toArray(),
         workspace: null,
+        idMap: null,
     }
 }
 
@@ -123,7 +124,7 @@ export async function getCollectionById(workspaceId: string, collectionId: strin
     return db.collections.where({ ':id': collectionId }).first()
 }
 
-export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<{ error: string | null }> {
+export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<{ error: string | null, newCollectionId: string | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -135,6 +136,7 @@ export async function createCollection(workspaceId: string, collection: Collecti
 
     return {
         error: null,
+        newCollectionId: null,
     }
 }
 
@@ -153,7 +155,7 @@ export async function createCollections(workspaceId: string, collections: Collec
     }
 }
 
-export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>) {
+export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>): Promise<{ error: string | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -162,6 +164,10 @@ export async function updateCollection(workspaceId: string, collectionId: string
     }
 
     await db.collections.update(collectionId, updatedFields)
+
+    return {
+        error: null,
+    }
 }
 
 export async function modifyCollections(workspaceId: string) {

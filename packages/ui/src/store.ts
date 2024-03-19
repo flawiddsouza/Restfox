@@ -84,6 +84,7 @@ function setActiveTab(state: State, tab: CollectionItem, scrollSidebarItemIntoVi
     if(state.activeTab && state.activeTab._id === tab._id) {
         return
     }
+    // console.log('setActiveTab', tab._id)
     state.activeTab = tab
     loadResponses(state, tab._id)
     if(scrollSidebarItemIntoView) {
@@ -166,8 +167,26 @@ async function loadWorkspaceTabs(state: State, workspaceId: string) {
         throw new Error('activeWorkspace is null')
     }
 
-    const tabIds: string[] = state.activeWorkspace.tabIds ?? []
-    const activeTabId = state.activeWorkspace.activeTabId ?? null
+    const originalTabIds = state.activeWorkspace.tabIds ?? []
+    const tabIds: string[] = []
+
+    const idMap = state.idMap
+    let activeTabId: string | null = null
+
+    if(idMap !== null) {
+        originalTabIds.forEach(tabId => {
+            const retrievedTabId = idMap.get(tabId)
+            if(retrievedTabId) {
+                tabIds.push(retrievedTabId)
+            }
+        })
+        if(state.activeWorkspace.activeTabId) {
+            activeTabId = idMap.get(state.activeWorkspace.activeTabId) ?? null
+        }
+    } else {
+        tabIds.push(...originalTabIds)
+        activeTabId = state.activeWorkspace.activeTabId ?? null
+    }
 
     const tabIdsOrder: { [tabId: string]: number } = {}
 
@@ -177,7 +196,14 @@ async function loadWorkspaceTabs(state: State, workspaceId: string) {
     })
 
     workspaceCache.tabs[workspaceId] = state.collection.filter(collectionItem => tabIds.includes(collectionItem._id)).sort((a, b) => tabIdsOrder[a._id] - tabIdsOrder[b._id])
-    workspaceCache.activeTab[workspaceId] = workspaceCache.tabs[workspaceId].find(tab => tab._id === activeTabId) ?? null
+
+    let activeTab = workspaceCache.tabs[workspaceId].find(tab => tab._id === activeTabId)
+    if(activeTab === undefined) {
+        if(workspaceCache.tabs[workspaceId].length > 0) {
+            activeTab = workspaceCache.tabs[workspaceId][0]
+        }
+    }
+    workspaceCache.activeTab[workspaceId] =  activeTab ?? null
 
     state.tabs = workspaceCache.tabs[workspaceId]
     state.activeTab = null
@@ -209,6 +235,11 @@ async function persistActiveWorkspaceTabs(state: State) {
 
     // persist to db
     await updateWorkspace(state.activeWorkspace._id, {
+        tabIds,
+        activeTabId
+    })
+
+    console.log('persistActiveWorkspaceTabs', {
         tabIds,
         activeTabId
     })
@@ -254,6 +285,7 @@ const store = createStore<State>({
             sockets: {},
             activeTabEnvironmentResolved: {},
             lastPersistedTabJSON: null,
+            idMap: null,
         }
     },
     getters: {
@@ -433,17 +465,6 @@ const store = createStore<State>({
         async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
             if(currentEnvironment) {
                 await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment })
-            }
-        },
-        async updateCollectionItemName(state, collectionItem) {
-            if(state.activeWorkspace === null) {
-                throw new Error('activeWorkspace is null')
-            }
-
-            await updateCollection(state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
-
-            if(collectionItem._type === 'request_group') {
-                emitter.emit('request_group', 'renamed')
             }
         },
         setWorkspaces(state, workspaces) {
@@ -722,6 +743,10 @@ const store = createStore<State>({
                 return result
             }
 
+            if(result.newCollectionId) {
+                newCollectionItem._id = result.newCollectionId
+            }
+
             context.state.collection.push(newCollectionItem)
 
             if(newCollectionItem.parentId) {
@@ -795,10 +820,18 @@ const store = createStore<State>({
 
             await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
 
+            const sortOrderUpdates: Promise<{ error: string | null }>[] = []
+
             targetParentCollection.forEach((item, index) => {
                 item.sortOrder = index
-                updateCollection(item.workspaceId, item._id, { sortOrder: index })
+                sortOrderUpdates.push(updateCollection(item.workspaceId, item._id, { sortOrder: index }))
             })
+
+            await Promise.all(sortOrderUpdates)
+
+            if(context.state.activeWorkspace?._type === 'file') {
+                context.dispatch('refreshWorkspace')
+            }
         },
         async loadGlobalPlugins(context) {
             context.state.plugins.global = await getGlobalPlugins()
@@ -1033,8 +1066,9 @@ const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
-            const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+            const { collection, idMap } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
             context.commit('setCollection', collection)
+            context.state.idMap = idMap
         },
         async refreshWorkspaceTabs(context) {
             console.log('refreshWorkspaceTabs')
@@ -1043,21 +1077,30 @@ const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
-            const tabIds = context.state.activeWorkspace.tabIds ?? []
-            const tabs = context.state.collection.filter(collectionItem => tabIds.includes(collectionItem._id))
+            delete workspaceCache.tabs[context.state.activeWorkspace._id]
 
-            const sortedTabs = tabIds
-                .map(id => tabs.find(tab => tab._id === id))
-                .filter(tab => tab !== undefined) as CollectionItem[]
+            loadWorkspaceTabs(context.state, context.state.activeWorkspace._id)
 
-            context.state.tabs = sortedTabs
-            workspaceCache.tabs[context.state.activeWorkspace._id] = context.state.tabs
-            context.state.activeTab = sortedTabs.find(tab => tab._id === context.state.activeWorkspace?.activeTabId) ?? null
-            workspaceCache.activeTab[context.state.activeWorkspace._id] = context.state.activeTab
+            context.commit('persistActiveWorkspaceTabs')
         },
         async refreshWorkspace(context) {
             await context.dispatch('refreshWorkspaceCollection')
             await context.dispatch('refreshWorkspaceTabs')
+        },
+        async updateCollectionItemName(context, collectionItem) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            await updateCollection(context.state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
+
+            if(context.state.activeWorkspace._type === 'file') {
+                context.dispatch('refreshWorkspace')
+            }
+
+            if(collectionItem._type === 'request_group') {
+                emitter.emit('request_group', 'renamed')
+            }
         },
         async updateCollectionItemNameAndParentId(context, { collectionId, name, parentId }) {
             if(context.state.activeWorkspace === null) {

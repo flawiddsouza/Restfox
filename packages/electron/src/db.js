@@ -100,12 +100,17 @@ async function getCollectionForWorkspace(workspace, type) {
     })
 
     try {
+        let idMapBeforeClear = null
+
         if (type === null) {
             if (workspaceWatcher) {
                 await workspaceWatcher.close()
                 workspaceWatcher = null
-                fsLog.length = 0
             }
+
+            fsLog.length = 0
+            idMapBeforeClear = new Map(idMap)
+            idMap.clear()
 
             await dbHelpers.ensureRestfoxCollection(workspace)
 
@@ -128,7 +133,9 @@ async function getCollectionForWorkspace(workspace, type) {
         }
 
         const [ collection, workspaceData ] = await Promise.all([
-            dbHelpers.getCollection(idMap, workspace),
+            // we do not want to modify the idMap if returning the request_group type
+            // this messes up the idMap - as ui and elecron will go out of sync
+            dbHelpers.getCollection(type === null ? idMap : new Map(), workspace),
             getWorkspaceAtLocation(workspace.location, true),
         ])
 
@@ -136,7 +143,9 @@ async function getCollectionForWorkspace(workspace, type) {
         if (type === 'request_group') {
             return {
                 error: null,
-                collection: collection.filter((item) => item._type === 'request_group')
+                collection: collection.filter((item) => item._type === 'request_group'),
+                workspace: null,
+                idMap: null,
             }
         }
 
@@ -146,12 +155,14 @@ async function getCollectionForWorkspace(workspace, type) {
             error: null,
             collection,
             workspace: workspaceData,
+            idMap: idMapBeforeClear,
         }
     } catch (error) {
         return {
             error,
             collection: [],
             workspace: null,
+            idMap: null,
         }
     }
 }
@@ -176,17 +187,16 @@ async function createCollection(workspace, collection) {
     const collectionName = fileUtils.encodeFilename(collection.name)
 
     try {
-        const collectionId = collection._id
+        let collectionPath = ''
 
         if (collection._type === 'request_group') {
-            let collectionPath = ''
             if (collection.parentId) {
                 collectionPath = `${idMap.get(collection.parentId)}/${collectionName}`
             } else {
                 collectionPath = `${workspace.location}/${collectionName}`
             }
             await fileUtils.mkdir(collectionPath, fsLog, 'Create collection item folder')
-            idMap.set(collectionId, collectionPath)
+            idMap.set(collectionPath, collectionPath)
             console.log(`Created directory: ${collectionPath}`)
 
             const collectionToSave = {}
@@ -208,7 +218,6 @@ async function createCollection(workspace, collection) {
         }
 
         if (collection._type === 'request' || collection._type === 'socket') {
-            let collectionPath = ''
             if (collection.parentId) {
                 collectionPath = `${idMap.get(collection.parentId)}/${collectionName}.json`
             } else {
@@ -221,12 +230,13 @@ async function createCollection(workspace, collection) {
             delete collection.name
 
             await fileUtils.writeFileJsonNewOnly(collectionPath, collection, fsLog, `Create collection item of type ${collection._type}`)
-            idMap.set(collectionId, collectionPath)
+            idMap.set(collectionPath, collectionPath)
             console.log(`Created file: ${collectionPath}`)
         }
 
         return {
             error: null,
+            newCollectionId: collectionPath,
         }
     } catch (err) {
         if (err.code === 'EEXIST') {
@@ -260,9 +270,9 @@ async function createCollections(workspace, collections) {
     }
 }
 
-async function updateIdMapForChildren(oldBasePath, newBasePath) {
+async function updateIdMapForChildren(oldBasePath, newBasePath, ignoreId = null) {
     for (const [id, pathValue] of idMap) {
-        if (pathValue.startsWith(oldBasePath)) {
+        if (pathValue.startsWith(oldBasePath) && id !== ignoreId) {
             const newPathValue = pathValue.replace(oldBasePath, newBasePath)
             idMap.set(id, newPathValue)
         }
@@ -274,7 +284,7 @@ async function updateIdMapForChildren(oldBasePath, newBasePath) {
         const newItemPath = path.join(newBasePath, item.name)
 
         if (item.isDirectory()) {
-            await updateIdMapForChildren(oldItemPath, newItemPath)
+            await updateIdMapForChildren(oldItemPath, newItemPath, ignoreId)
         }
     }
 }
@@ -303,7 +313,6 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`)
         idMap.set(collectionId, renameTo)
 
-        // endsWith('.json') means it's a file, else it's a folder
         if (renameFrom.endsWith('.json')) {
             const responsesRenameFrom = renameFrom.replace('.json', constants.FILES.RESPONSES)
             const responsesRenameTo = renameTo.replace('.json', constants.FILES.RESPONSES)
@@ -324,11 +333,17 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             } catch (err) {
                 console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
             }
+        } else {
+            // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
+            // and will error out when trying to update them
+            await updateIdMapForChildren(renameFrom, renameTo, collectionId)
         }
 
         console.log(`Renamed ${renameFrom} to ${renameTo}`)
 
-        return
+        return {
+            error: null,
+        }
     }
 
     if (Object.keys(updatedFields).length === 1 && 'parentId' in updatedFields) {
@@ -365,7 +380,9 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         }
 
         console.log(`Moved ${renameFrom} to ${renameTo}`)
-        return
+        return {
+            error: null,
+        }
     }
 
     if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
@@ -392,7 +409,9 @@ async function updateCollection(workspace, collectionId, updatedFields) {
                     console.error(`Error marking directory as expanded: ${collapsedFilePath}`, err)
                 }
             }
-            return
+            return {
+                error: null,
+            }
         }
 
         const fieldToUpdate = Object.keys(updatedFields)[0]
@@ -417,7 +436,10 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
         await fileUtils.writeFileJson(collectionPathCopy, collectionUpdated, fsLog, `Update ${fieldToUpdate}`)
         console.log(`Updated ${fieldToUpdate} for ${collectionPathCopy}`)
-        return
+
+        return {
+            error: null,
+        }
     }
 
     if (updatedFields._type === 'request' || updatedFields._type === 'socket') {

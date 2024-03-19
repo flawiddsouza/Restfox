@@ -127,7 +127,7 @@ export default {
                 return
             }
 
-            this.$store.commit('updateCollectionItemName', {
+            this.$store.dispatch('updateCollectionItemName', {
                 _id: sidebarItem._id,
                 _type: sidebarItem._type,
                 name: this.newSidebarItemName

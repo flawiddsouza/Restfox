@@ -135,6 +135,7 @@ export interface State {
     sockets: { [key: string]: WebSocket | null }
     activeTabEnvironmentResolved: any
     lastPersistedTabJSON: string | null
+    idMap: Map<string, string> | null
 }
 
 export interface Plugin {
