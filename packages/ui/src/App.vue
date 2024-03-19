@@ -398,9 +398,11 @@ export default {
         emitter.on('error', this.handleError)
 
         if(import.meta.env.MODE === 'desktop-electron') {
-            window.electronIPC.workspaceChanged((event, path) => {
-                console.log('workspaceChanged', { event, path })
-                this.$store.dispatch('refreshWorkspace')
+            window.electronIPC.workspaceChanged((event, path, controlledChange) => {
+                console.log('workspaceChanged', { event, path, controlledChange })
+                if(!controlledChange) {
+                    this.$store.dispatch('refreshWorkspace')
+                }
             })
         }
     },

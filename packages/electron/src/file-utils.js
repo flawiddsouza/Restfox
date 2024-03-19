@@ -67,9 +67,25 @@ function decodeFilename(name) {
     return name.replace(regex, matched => decodeMap[matched])
 }
 
+async function writeFileJson(path, data, fsLog) {
+    const id = Date.now()
+    if (fsLog) {
+        fsLog.push({ id, event: 'change', path })
+    }
+    try {
+        await fs.writeFile(path, JSON.stringify(data, null, 4))
+    } catch (e) {
+        if (fsLog) {
+            fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        }
+        throw e
+    }
+}
+
 module.exports = {
     readdirIgnoreError,
     pathExists,
     encodeFilename,
     decodeFilename,
+    writeFileJson,
 }

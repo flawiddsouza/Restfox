@@ -6,6 +6,7 @@ const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
 const idMap = new Map()
+const fsLog = []
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []
@@ -112,7 +113,13 @@ async function getCollectionForWorkspace(workspace, type) {
                 ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
             }).on('all', (event, path) => {
                 console.log(event, path)
-                globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path)
+                let controlledChange = false
+                const checkIfFsLogExists = fsLog.findIndex((log) => log.path === path && log.event === event)
+                if (checkIfFsLogExists !== -1) {
+                    fsLog.splice(checkIfFsLogExists, 1)
+                    controlledChange = true
+                }
+                globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path, controlledChange)
             })
         }
 
@@ -440,7 +447,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             ...updatedFields,
         }
 
-        await fs.writeFile(collectionPath, JSON.stringify(collectionUpdated, null, 4))
+        await fileUtils.writeFileJson(collectionPath, collectionUpdated, fsLog)
         console.log(`Updated file: ${collectionPath}`)
         return
     }
