@@ -268,18 +268,54 @@ export default {
             return null
         },
         responseRequestBodyOutput() {
-            if(this.response.request.body === null) {
+            if(this.response.request.body === null && !this.response.request.original.body.params) {
+                return null
+            }
+
+            if(this.response.request.method === 'GET') {
                 return null
             }
 
             if(this.response.request.body instanceof File) {
                 // prevent memory leak
-                if('responseRequestBodyObjectUrl' in window) {
-                    URL.revokeObjectURL(window.responseRequestBodyObjectUrl)
+                if('responseRequestBodyObjectUrls' in window) {
+                    window.responseRequestBodyObjectUrls.forEach(objectUrl => {
+                        URL.revokeObjectURL(objectUrl)
+                    })
+                } else {
+                    window.responseRequestBodyObjectUrls = []
                 }
-                window.responseRequestBodyObjectUrl = URL.createObjectURL(this.response.request.body)
-                return `<div><a href="${window.responseRequestBodyObjectUrl}" download="${this.response.request.body.name}">${this.response.request.body.name}</a></div>`
+                const downloadUrl = URL.createObjectURL(this.response.request.body)
+                window.responseRequestBodyObjectUrls.push(downloadUrl)
+                return `<div><a href="${downloadUrl}" download="${this.response.request.body.name}">${this.response.request.body.name}</a></div>`
             } else {
+                if(this.response.request.original.body.mimeType === 'multipart/form-data' && this.response.request.original.body.params && this.response.request.original.body.params.length > 0) {
+                    // prevent memory leak
+                    if('responseRequestBodyObjectUrls' in window) {
+                        window.responseRequestBodyObjectUrls.forEach(objectUrl => {
+                            URL.revokeObjectURL(objectUrl)
+                        })
+                    } else {
+                        window.responseRequestBodyObjectUrls = []
+                    }
+                    let html = '<table style="border-collapse: collapse; width: 100%;"><tbody>'
+                    const tdStyle = 'border: 1px solid var(--default-border-color); padding: 0.5rem;'
+                    html += this.response.request.original.body.params.map(param => {
+                        const handleFile = item => {
+                            const downloadUrl = URL.createObjectURL(item)
+                            window.responseRequestBodyObjectUrls.push(downloadUrl)
+                            return `<div><a href="${downloadUrl}" download="${item.name}">${item.name}</div>`
+                        }
+                        return `
+                            <tr>
+                                <td style="${tdStyle}">${param.name}</td>
+                                <td style="${tdStyle}">${param.type === 'text' ? param.value : param.files.map(handleFile)}</td>
+                            </tr>
+                        `
+                    }).join('')
+                    html += '</tbody></table>'
+                    return html
+                }
                 return `<div>${this.response.request.body}</div>`
             }
         },
