@@ -200,7 +200,12 @@ export default {
                     }
                 })
 
-                this.$store.dispatch('setCollectionTree', { collectionTree, parentId: this.selectedRequestGroupId, plugins })
+                const result = await this.$store.dispatch('setCollectionTree', { collectionTree, parentId: this.selectedRequestGroupId, plugins })
+
+                if(result.error) {
+                    this.$toast.error('Import failed')
+                    return
+                }
 
                 const importedFileCount = this.filesToImport.length
 

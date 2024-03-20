@@ -141,6 +141,8 @@ export async function createCollection(workspaceId: string, collection: Collecti
 }
 
 export async function createCollections(workspaceId: string, collections: CollectionItem[]): Promise<{ error: string | null }> {
+    console.log('createCollections', collections)
+
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {

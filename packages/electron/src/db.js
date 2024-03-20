@@ -245,6 +245,8 @@ async function createCollection(workspace, collection) {
             }
         }
 
+        console.log(err)
+
         return {
             error: `Error creating collection: ${collectionName}: ${err.message}`,
         }
@@ -258,9 +260,20 @@ async function createCollections(workspace, collections) {
     })
 
     for (const collection of collections) {
-        const result = await createCollection(workspace, collection)
+        let result = null
 
-        if (result.error) {
+        if (idMap.get(collection._id)) {
+            result = await updateCollection(workspace, collection._id, collection)
+        } else {
+            result = await createCollection(workspace, collection)
+            collections.forEach(item => {
+                if (item.parentId !== null && item.parentId === collection._id) {
+                    item.parentId = result.newCollectionId
+                }
+            })
+        }
+
+        if (result && result.error) {
             return result
         }
     }

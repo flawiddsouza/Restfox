@@ -1031,7 +1031,12 @@ const store = createStore<State>({
             addSortOrderToTree(collectionTree)
 
             const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
-            await createCollections(context.state.activeWorkspace._id, flattenedCollectionTree)
+            const result = await createCollections(context.state.activeWorkspace._id, flattenedCollectionTree)
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return result
+            }
 
             if (plugins.length > 0) {
                 // assign new ids to the imported / duplicated plugins
@@ -1050,6 +1055,8 @@ const store = createStore<State>({
             const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
 
             context.commit('setCollection', collection)
+
+            return result
         },
         async updateActiveTabEnvironmentResolved(context) {
             if(!context.state.activeTab) {
