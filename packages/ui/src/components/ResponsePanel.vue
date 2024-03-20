@@ -131,6 +131,7 @@
 </template>
 
 <script>
+import { toRaw } from 'vue'
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
@@ -417,7 +418,7 @@ export default {
 
             const originalRequestBody = this.response.request.original.body
 
-            this.activeTab.body = JSON.parse(JSON.stringify(originalRequestBody))
+            this.activeTab.body = structuredClone(toRaw(originalRequestBody))
 
             if(originalRequestBody.mimeType === 'multipart/form-data' && 'params' in originalRequestBody) {
                 let params = []

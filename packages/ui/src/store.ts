@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import { createStore } from 'vuex'
 import { nanoid } from 'nanoid'
 import {
@@ -284,7 +285,6 @@ const store = createStore<State>({
             openContextMenuElement: null,
             sockets: {},
             activeTabEnvironmentResolved: {},
-            lastPersistedTabJSON: null,
             idMap: null,
         }
     },
@@ -389,15 +389,6 @@ const store = createStore<State>({
                 const activeTabToSaveJSON = JSON.stringify(state.activeTab)
                 const activeTabToSave = JSON.parse(activeTabToSaveJSON)
 
-                if (activeTabToSaveJSON === state.lastPersistedTabJSON) {
-                    console.log('persistActiveTab: no change, so skipping')
-                    return
-                } else {
-                    console.log('persistActiveTab: changed, so saving')
-                }
-
-                state.lastPersistedTabJSON = JSON.stringify(state.activeTab)
-
                 if('body' in state.activeTab && 'params' in state.activeTab.body) {
                     const params: RequestParam[] = []
                     for(const param of state.activeTab.body.params) {
@@ -411,7 +402,7 @@ const store = createStore<State>({
                 }
 
                 if('body' in state.activeTab && 'fileName' in state.activeTab.body) {
-                    activeTabToSave.body.fileName = state.activeTab.body.fileName
+                    activeTabToSave.body.fileName = toRaw(state.activeTab.body.fileName)
                 }
 
                 updateCollection(state.activeTab.workspaceId, state.activeTab._id, activeTabToSave)
@@ -563,13 +554,14 @@ const store = createStore<State>({
         },
         async saveResponse(state, response) {
             if(response._id) {
-                state.responses[state.activeTab._id].unshift(response)
+                const responseToSave = structuredClone(toRaw(response))
+                state.responses[state.activeTab._id].unshift(responseToSave)
                 if(state.responses[state.activeTab._id].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
                     const responsesToDelete = state.responses[state.activeTab._id].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
                     const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
                     await deleteResponsesByIds(state.activeTab.workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
                 }
-                await createResponse(state.activeTab.workspaceId, response)
+                await createResponse(state.activeTab.workspaceId, structuredClone(responseToSave))
             }
         },
         async clearResponseHistory(state) {

@@ -177,6 +177,22 @@ function logEvent(fsLog, id, event, path, reason) {
     fsLog.push({ id, event, path, reason })
 }
 
+function transformFileObjectToSaveableFileObject(file) {
+    return {
+        name: file.name,
+        type: file.type,
+        buffer: Buffer.from(file.buffer).toString('base64')
+    }
+}
+
+function transformSavedFileObjectToFileObject(file) {
+    return {
+        name: file.name,
+        type: file.type,
+        buffer: Buffer.from(file.buffer, 'base64')
+    }
+}
+
 module.exports = {
     readdirIgnoreError,
     pathExists,
@@ -188,4 +204,6 @@ module.exports = {
     deleteFileOrFolder,
     mkdir,
     renameFileOrFolder,
+    transformFileObjectToSaveableFileObject,
+    transformSavedFileObjectToFileObject,
 }

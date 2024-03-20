@@ -4,6 +4,7 @@ import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugi
 import dayjs from 'dayjs'
 import getObjectPathValue from 'lodash.get'
 import setObjectPathValueLodash from 'lodash.set'
+import { toRaw } from 'vue'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { convert as curlConvert } from './parsers/curl'
@@ -334,7 +335,7 @@ export async function createRequestData(state: HandleRequestState, request: Coll
                         formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
                     } else if (param.files) {
                         for(const file of param.files) {
-                            formData.append(substituteEnvironmentVariables(environment, param.name), file)
+                            formData.append(substituteEnvironmentVariables(environment, param.name), file as File)
                         }
                     }
                 })
@@ -479,19 +480,7 @@ export async function handleRequest(request: CollectionItem, environment: any, s
             delete headersToSave[forbiddenHeader.toLowerCase()]
         })
 
-        const originRequestBodyToSave = JSON.parse(JSON.stringify(request.body))
-
-        if(request.body && request.body.mimeType === 'multipart/form-data' && 'params' in request.body && request.body.params) {
-            const params: any = []
-            for(const param of request.body.params) {
-                const paramExtracted = {...param}
-                if(paramExtracted.files) {
-                    paramExtracted.files = [...paramExtracted.files]
-                }
-                params.push(paramExtracted)
-            }
-            originRequestBodyToSave.params = params
-        }
+        const originRequestBodyToSave = structuredClone(toRaw(request.body))
 
         let responseToSend: RequestFinalResponse = {
             _id: nanoid(),

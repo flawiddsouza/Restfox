@@ -2,6 +2,7 @@ import Dexie from 'dexie'
 import 'dexie-export-import'
 import {
     CollectionItem,
+    FileObject,
     FileWorkspace,
     Plugin,
     RequestFinalResponse,
@@ -92,7 +93,15 @@ export async function getCollectionForWorkspace(workspaceId: string, type = null
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.getCollectionForWorkspace(workspace, type)
+            const result = await window.electronIPC.getCollectionForWorkspace(workspace, type)
+
+            if (type === null) {
+                for(const collectionItem of result.collection) {
+                    deserializeRequestFiles(collectionItem)
+                }
+            }
+
+            return result
         }
     }
 
@@ -157,10 +166,91 @@ export async function createCollections(workspaceId: string, collections: Collec
     }
 }
 
+async function transformFileToFileObject(file: File): Promise<FileObject> {
+    return {
+        name: file.name,
+        type: file.type,
+        buffer: await file.arrayBuffer()
+    }
+}
+
+function transformFileObjectToFile(file: FileObject): File {
+    return new File([file.buffer], file.name, { type: file.type })
+}
+
+async function serializeRequestFiles(collection: Partial<CollectionItem>) {
+    if(collection.body && collection.body.fileName && collection.body.fileName instanceof File) {
+        collection.body.fileName = await transformFileToFileObject(collection.body.fileName)
+    }
+
+    if(collection.body && collection.body.params) {
+        for(const param of collection.body.params) {
+            if(param.files) {
+                param.files = await Promise.all(param.files.map(async file => await transformFileToFileObject(file as File)))
+            }
+        }
+    }
+}
+
+function deserializeRequestFiles(collection: Partial<CollectionItem>) {
+    if(collection.body && collection.body.fileName && 'buffer' in collection.body.fileName && collection.body.fileName.buffer instanceof Uint8Array) {
+        collection.body.fileName = transformFileObjectToFile(collection.body.fileName)
+    }
+
+    if(collection.body && collection.body.params) {
+        for(const param of collection.body.params) {
+            if(param.files) {
+                param.files = param.files.map(file => transformFileObjectToFile(file as FileObject))
+            }
+        }
+    }
+}
+
+async function serializeRequestResponseFiles(response: RequestFinalResponse) {
+    if(response.request.body instanceof File) {
+        response.request.body = await transformFileToFileObject(response.request.body)
+    }
+
+    if(response.request.original.body) {
+        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof File) {
+            response.request.original.body.fileName = await transformFileToFileObject(response.request.original.body.fileName)
+        }
+
+        if(response.request.original.body.params) {
+            for(const param of response.request.original.body.params) {
+                if(param.files) {
+                    param.files = await Promise.all(param.files.map(file => transformFileToFileObject(file as File)))
+                }
+            }
+        }
+    }
+}
+
+function deserializeRequestResponseFiles(response: RequestFinalResponse) {
+    if(response.request.body && response.request.body.buffer instanceof Uint8Array) {
+        response.request.body = transformFileObjectToFile(response.request.body)
+    }
+
+    if(response.request.original.body) {
+        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof Uint8Array) {
+            response.request.original.body.fileName = transformFileObjectToFile(response.request.original.body.fileName)
+        }
+
+        if(response.request.original.body.params) {
+            for(const param of response.request.original.body.params) {
+                if(param.files) {
+                    param.files = param.files.map(file => transformFileObjectToFile(file as FileObject))
+                }
+            }
+        }
+    }
+}
+
 export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>): Promise<{ error: string | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
+            await serializeRequestFiles(updatedFields)
             return window.electronIPC.updateCollection(workspace, collectionId, updatedFields)
         }
     }
@@ -208,7 +298,11 @@ export async function getResponsesByCollectionId(workspaceId: string, collection
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.getResponsesByCollectionId(workspace, collectionId)
+            const responses = await window.electronIPC.getResponsesByCollectionId(workspace, collectionId)
+            for(const response of responses) {
+                deserializeRequestResponseFiles(response)
+            }
+            return responses
         }
     }
 
@@ -219,6 +313,7 @@ export async function createResponse(workspaceId: string, response: RequestFinal
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
+            await serializeRequestResponseFiles(response)
             return window.electronIPC.createResponse(workspace, response)
         }
     }

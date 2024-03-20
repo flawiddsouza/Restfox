@@ -56,6 +56,8 @@ async function getCollectionItem(workspace, fullPath) {
             }
         }
 
+        deserializeRequestFiles(collectionItem)
+
         const collectionName = fileOrFolderName.replace('.json', '')
 
         collectionItem = {
@@ -228,10 +230,86 @@ async function saveEnvironments(fsLog, envsDirPath, environments) {
     }
 }
 
+function serializeRequestFiles(collection) {
+    if(collection.body && collection.body.fileName && collection.body.fileName.buffer instanceof ArrayBuffer) {
+        collection.body.fileName = fileUtils.transformFileObjectToSaveableFileObject(collection.body.fileName)
+    }
+
+    if(collection.body && collection.body.params) {
+        for(const param of collection.body.params) {
+            if(param.files) {
+                param.files = param.files.map(file => fileUtils.transformFileObjectToSaveableFileObject(file))
+            }
+        }
+    }
+}
+
+function deserializeRequestFiles(collection) {
+    if(collection.body && collection.body.fileName && typeof collection.body.fileName.buffer === 'string') {
+        collection.body.fileName = fileUtils.transformSavedFileObjectToFileObject(collection.body.fileName)
+    }
+
+    if(collection.body && collection.body.params) {
+        for(const param of collection.body.params) {
+            if(param.files) {
+                param.files = param.files.map(file => fileUtils.transformSavedFileObjectToFileObject(file))
+            }
+        }
+    }
+}
+
+async function serializeRequestResponseFiles(response) {
+    response.buffer = Buffer.from(response.buffer).toString('base64')
+
+    if(response.request.body && response.request.body.buffer instanceof ArrayBuffer) {
+        response.request.body = fileUtils.transformFileObjectToSaveableFileObject(response.request.body)
+    }
+
+    if(response.request.original.body) {
+        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof ArrayBuffer) {
+            response.request.original.body.fileName = fileUtils.transformFileObjectToSaveableFileObject(response.request.original.body.fileName)
+        }
+
+        if(response.request.original.body.params) {
+            for(const param of response.request.original.body.params) {
+                if(param.files) {
+                    param.files = param.files.map(file => fileUtils.transformFileObjectToSaveableFileObject(file))
+                }
+            }
+        }
+    }
+}
+
+function deserializeRequestResponseFiles(response) {
+    response.buffer = Buffer.from(response.buffer, 'base64')
+
+    if(response.request.body && typeof response.request.body.buffer === 'string') {
+        response.request.body = fileUtils.transformSavedFileObjectToFileObject(response.request.body)
+    }
+
+    if(response.request.original.body) {
+        if(response.request.original.body.fileName && response.request.original.body.fileName instanceof ArrayBuffer) {
+            response.request.original.body.fileName = fileUtils.transformSavedFileObjectToFileObject(response.request.original.body.fileName)
+        }
+
+        if(response.request.original.body.params) {
+            for(const param of response.request.original.body.params) {
+                if(param.files) {
+                    param.files = param.files.map(file => fileUtils.transformSavedFileObjectToFileObject(file))
+                }
+            }
+        }
+    }
+}
+
 module.exports = {
     getCollectionItem,
     getCollection,
     ensureRestfoxCollection,
     getEnvironments,
     saveEnvironments,
+    serializeRequestFiles,
+    deserializeRequestFiles,
+    serializeRequestResponseFiles,
+    deserializeRequestResponseFiles,
 }

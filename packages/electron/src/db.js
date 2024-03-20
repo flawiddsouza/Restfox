@@ -484,6 +484,8 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             }
         }
 
+        dbHelpers.serializeRequestFiles(updatedFields)
+
         const collectionUpdated = {
             ...collectionExisting,
             ...updatedFields,
@@ -600,7 +602,7 @@ async function getResponsesByCollectionId(workspace, collectionId) {
     if (responsesPathExists) {
         const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
         responses.forEach((response) => {
-            response.buffer = Buffer.from(response.buffer, 'base64')
+            dbHelpers.deserializeRequestResponseFiles(response)
         })
         // reverse the responses so that the latest response is shown first
         return responses.reverse()
@@ -617,8 +619,6 @@ async function createResponse(workspace, response) {
 
     const collectionPath = idMap.get(response.collectionId)
 
-    response.buffer = Buffer.from(response.buffer).toString('base64')
-
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
     const responsesPathExists = await fileUtils.pathExists(responsesPath)
     let responses = []
@@ -626,6 +626,10 @@ async function createResponse(workspace, response) {
     if (responsesPathExists) {
         responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
     }
+
+    delete response.collectionId
+
+    dbHelpers.serializeRequestResponseFiles(response)
 
     responses.push(response)
 

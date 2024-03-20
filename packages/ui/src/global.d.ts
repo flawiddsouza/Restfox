@@ -48,20 +48,26 @@ export interface RequestAuthentication {
     disabled?: boolean
 }
 
+export interface FileObject {
+    name: string
+    type: string
+    buffer: ArrayBuffer
+}
+
 export interface RequestParam {
     name: string
     value: string
     description?: string
     disabled?: boolean
     type?: string
-    files?: File[]
+    files?: File[] | FileObject[]
 }
 
 export interface RequestBody {
     mimeType: string
     text?: string
     params?: RequestParam[]
-    fileName?: ArrayBuffer | { name: string; type: string; buffer: ArrayBuffer }
+    fileName?: File | FileObject
 }
 
 export type RequestInitialResponseHeader = [string, string]
@@ -134,7 +140,6 @@ export interface State {
     openContextMenuElement: HTMLElement | null
     sockets: { [key: string]: WebSocket | null }
     activeTabEnvironmentResolved: any
-    lastPersistedTabJSON: string | null
     idMap: Map<string, string> | null
 }
 

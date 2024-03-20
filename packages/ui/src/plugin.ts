@@ -43,7 +43,7 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
         for(const param of request.body.params) {
             const paramExtracted = {...param}
             if(paramExtracted.files) {
-                paramExtracted.files = [...paramExtracted.files]
+                paramExtracted.files = [...paramExtracted.files] as File[]
             }
             params.push(paramExtracted)
         }
