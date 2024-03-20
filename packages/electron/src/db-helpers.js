@@ -98,11 +98,14 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
 
             if (fileOrFolder.isDirectory()) {
                 const collection = await getCollectionItem(workspace, fullPath)
-                items.push(collection)
 
-                // Recursively get files and folders inside this directory
-                const nestedItems = await getCollection(idMap, workspace, fullPath)
-                items = items.concat(nestedItems)
+                if(collection) {
+                    items.push(collection)
+
+                    // Recursively get files and folders inside this directory
+                    const nestedItems = await getCollection(idMap, workspace, fullPath)
+                    items = items.concat(nestedItems)
+                }
             } else {
                 const collectionItem = await getCollectionItem(workspace, fullPath)
                 items.push(collectionItem)
