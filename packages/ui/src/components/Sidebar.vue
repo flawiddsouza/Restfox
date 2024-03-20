@@ -290,7 +290,7 @@ export default {
             if(clickedSidebarItem === 'Delete') {
                 const collectionItemToDelete = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
                 if(await window.createConfirm('Are you sure?')) {
-                    this.$store.dispatch('deleteCollectionItem', collectionItemToDelete)
+                    await this.$store.dispatch('deleteCollectionItem', collectionItemToDelete)
                 }
             }
 

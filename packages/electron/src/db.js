@@ -532,44 +532,57 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
         collectionIds,
     })
 
-    let collectionItemsToDelete = []
+    try {
+        let collectionItemsToDelete = []
 
-    for (const collectionId of collectionIds) {
-        const collectionPath = idMap.get(collectionId)
-        collectionItemsToDelete.push({ collectionId, collectionPath })
-    }
+        for (const collectionId of collectionIds) {
+            const collectionPath = idMap.get(collectionId)
+            collectionItemsToDelete.push({ collectionId, collectionPath })
+        }
 
-    collectionItemsToDelete = collectionItemsToDelete.sort((a, b) => b.collectionPath.localeCompare(a.collectionPath))
+        collectionItemsToDelete.sort((a, b) => b.collectionPath.localeCompare(a.collectionPath))
 
-    for (const collectionItem of collectionItemsToDelete) {
-        if (collectionItem.collectionPath.endsWith('.json') === false) {
-            await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.FOLDER_CONFIG), fsLog, `Delete collection item folder config`)
+        for (const collectionItem of collectionItemsToDelete) {
+            console.log(`Deleting collection item: ${collectionItem.collectionPath}`)
 
-            try {
-                await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.COLLAPSED), fsLog, `Delete collection item collapsed state marker`)
-            } catch {
-                console.log(`No collapsed state marker found for deletion for collection item: ${collectionItem.collectionPath}`)
-            }
+            if (collectionItem.collectionPath.endsWith('.json') === false) {
+                await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.FOLDER_CONFIG), fsLog, `Delete collection item folder config`)
 
-            try {
-                const environmentsDir = await fs.readdir(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS))
-                for (const envFile of environmentsDir) {
-                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS, envFile), fsLog, `Delete collection item environment`)
+                try {
+                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.COLLAPSED), fsLog, `Delete collection item collapsed state marker`)
+                } catch {
+                    console.log(`No collapsed state marker found for deletion for collection item: ${collectionItem.collectionPath}`)
                 }
-                await fileUtils.deleteFileOrFolder((path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS)), fsLog, `Delete collection item environments folder`)
-            } catch {
-                console.log(`No environments found for deletion for collection item: ${collectionItem.collectionPath}`)
+
+                try {
+                    const environmentsDir = await fs.readdir(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS))
+                    for (const envFile of environmentsDir) {
+                        await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS, envFile), fsLog, `Delete collection item environment`)
+                    }
+                    await fileUtils.deleteFileOrFolder((path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS)), fsLog, `Delete collection item environments folder`)
+                } catch {
+                    console.log(`No environments found for deletion for collection item: ${collectionItem.collectionPath}`)
+                }
+            } else {
+                try {
+                    await fileUtils.deleteFileOrFolder(collectionItem.collectionPath.replace('.json', constants.FILES.MESSAGES), fsLog, `Delete messages for collection item`)
+                } catch {
+                    console.log(`No messages found for deletion for collection item: ${collectionItem.collectionPath}`)
+                }
             }
+
+            await fileUtils.deleteFileOrFolder(collectionItem.collectionPath, fsLog, `Delete collection item`)
+            idMap.delete(collectionItem.collectionId)
         }
 
-        try {
-            await fileUtils.deleteFileOrFolder(collectionItem.collectionPath.replace('.json', constants.FILES.MESSAGES), fsLog, `Delete messages for collection item`)
-        } catch {
-            console.log(`No messages found for deletion for collection item: ${collectionItem.collectionPath}`)
+        return {
+            error: null,
         }
-
-        await fileUtils.deleteFileOrFolder(collectionItem.collectionPath, fsLog, `Delete collection item`)
-        idMap.delete(collectionItem.collectionId)
+    } catch (err) {
+        console.error(arguments.callee.name, err)
+        return {
+            error: `Error deleting collections: ${err.message}`,
+        }
     }
 }
 

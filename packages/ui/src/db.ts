@@ -187,7 +187,7 @@ export async function deleteCollectionsByWorkspaceId(workspaceId: string) {
     await db.collections.where({ workspaceId }).delete()
 }
 
-export async function deleteCollectionsByIds(workspaceId: string, collectionIds: string[]) {
+export async function deleteCollectionsByIds(workspaceId: string, collectionIds: string[]): Promise<{ error: string | null }> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -196,6 +196,10 @@ export async function deleteCollectionsByIds(workspaceId: string, collectionIds:
     }
 
     await db.collections.where(':id').anyOf(collectionIds).delete()
+
+    return {
+        error: null,
+    }
 }
 
 // Responses

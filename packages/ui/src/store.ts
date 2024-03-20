@@ -616,8 +616,16 @@ const store = createStore<State>({
             await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
             await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
             context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
-            await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
+
+            const result = await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return
+            }
+
             removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
+
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
                 // clear unneeded response cache
