@@ -2,9 +2,12 @@
     <div class="navbar">
         <div class="heading">
             <div v-if="!activeWorkspaceLoaded">Workspaces</div>
-            <template v-else>
+            <div v-else>
                 <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
-            </template>
+            </div>
+            <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded && activeWorkspace._type === 'file'">
+                <button class="button" @click="openWorkspaceFolder">Open Folder</button>
+            </div>
         </div>
         <div class="right-nav-container">
             <a href="#" @click.prevent="theme = 'dark'" v-if="theme === 'light'" class="bl">Theme: Light</a>
@@ -165,7 +168,10 @@ export default {
         },
         backupAndRestore() {
             this.$store.commit('showBackupAndRestoreModal', true)
-        }
+        },
+        async openWorkspaceFolder() {
+            await window.electronIPC.openFolder(this.activeWorkspace.location)
+        },
     }
 }
 </script>
@@ -186,6 +192,8 @@ export default {
 
 .heading {
     font-weight: 500;
+    display: flex;
+    align-items: center;
 }
 
 .right-nav-container {

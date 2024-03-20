@@ -179,6 +179,8 @@ app.whenReady().then(async() => {
 
     ipcMain.handle('openFolderSelectionDialog', () => helpers.openFolderSelectionDialog())
 
+    ipcMain.handle('openFolder', (_, ...args) => helpers.openFolder(...args))
+
     createWindow()
 })
 

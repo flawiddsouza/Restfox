@@ -1,4 +1,4 @@
-const { dialog } = require('electron')
+const { dialog, shell } = require('electron')
 
 async function openFolderSelectionDialog() {
     const result = await dialog.showOpenDialog({
@@ -12,6 +12,11 @@ async function openFolderSelectionDialog() {
     return result.filePaths[0]
 }
 
+async function openFolder(path) {
+    await shell.openPath(path)
+}
+
 module.exports = {
     openFolderSelectionDialog,
+    openFolder,
 }

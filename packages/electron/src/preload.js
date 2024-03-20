@@ -27,6 +27,7 @@ const ipcFunctions = [
     'deletePluginsByCollectionIds',
     'createPlugins',
     'openFolderSelectionDialog',
+    'openFolder',
 ]
 
 const electronIPC = ipcFunctions.reduce((acc, funcName) => {
