@@ -86,7 +86,7 @@
                                 />
                             </td>
                             <td>
-                                <div style="display: flex">
+                                <div style="display: flex; align-items: center;">
                                     <template v-if="param.type === 'text'">
                                         <CodeMirrorSingleLine
                                             v-model="param.value"
@@ -100,17 +100,18 @@
                                     </template>
                                     <template v-else>
                                         <label style="width: 100%; display: flex; align-items: center;">
-                                            <div :style="{ filter: !param.disabled ? undefined : 'opacity(0.4)' }">
-                                                <span style="border: 1px solid lightgrey; padding: 3px;">Choose Files</span>
+                                            <div :style="{ filter: !param.disabled ? undefined : 'opacity(0.4)' }" style="display: flex; align-items: center; width: 100%;">
+                                                <span style="border: 1px solid lightgrey; padding: 3px; white-space: nowrap;">Choose Files</span>
                                                 <span style="margin-left: 0.5rem">
                                                     <template v-if="param.files && param.files.length > 0">{{ param.files.length === 1 ? param.files[0].name : `${param.files.length} files selected` }}</template>
                                                     <template v-else>No File Selected</template>
                                                 </span>
+                                                <span style="border: 1px solid lightgrey; padding: 1px 5px; white-space: nowrap; margin-left: auto;" @click.prevent="setFilesForParam([], param)" v-show="param.files && param.files.length > 0">x</span>
                                             </div>
                                             <input type="file" @change="setFilesForParam($event.target.files, param)" multiple :disabled="param.disabled" style="display: none;">
                                         </label>
                                     </template>
-                                    <select v-model="param.type" style="padding: 0;" :disabled="param.disabled">
+                                    <select v-model="param.type" style="padding: 1px 0px; margin-left: 0.5rem;" :disabled="param.disabled">
                                         <option value="text">Text</option>
                                         <option value="file">File</option>
                                     </select>
@@ -182,12 +183,13 @@
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/octet-stream'">
                     <label style="width: 100%; display: flex; align-items: center; border: 1px solid var(--default-border-color);  padding: 0.5rem;">
-                        <div style="display: flex; align-items: center;">
+                        <div style="display: flex; align-items: center; width: 100%;">
                             <span style="border: 1px solid lightgrey; padding: 3px; white-space: nowrap;">Choose File</span>
                             <span style="margin-left: 0.5rem">
                                 <template v-if="activeTab.body.fileName">{{ activeTab.body.fileName.name }}</template>
                                 <template v-else>No File Selected</template>
                             </span>
+                            <span style="border: 1px solid lightgrey; padding: 1px 5px; white-space: nowrap; margin-left: auto;" @click.prevent="activeTab.body.fileName = null" v-show="activeTab.body.fileName">x</span>
                         </div>
                         <input type="file" @change="activeTab.body.fileName = $event.target.files[0]" style="display: none;">
                     </label>
