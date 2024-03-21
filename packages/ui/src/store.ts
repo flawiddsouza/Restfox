@@ -153,7 +153,20 @@ const workspaceCache: WorkspaceCache = {
     activeTab: {}
 }
 
-async function loadWorkspaceTabs(state: State, workspaceId: string) {
+async function loadWorkspaceTabs(state: State) {
+    if(state.activeWorkspace === null) {
+        throw new Error('activeWorkspace is null')
+    }
+
+    const workspaceId = state.activeWorkspace._id
+
+    // we always reset the cache for file workspaces
+    // as we don't want to load outdated data for tabs
+    // if the files for the tabs have changed meanwhile
+    if(state.activeWorkspace._type === 'file') {
+        delete workspaceCache.tabs[workspaceId]
+    }
+
     if(workspaceId in workspaceCache.tabs) {
         state.tabs = workspaceCache.tabs[workspaceId]
         if(workspaceCache.activeTab[workspaceId]) {
@@ -162,10 +175,6 @@ async function loadWorkspaceTabs(state: State, workspaceId: string) {
             state.activeTab = null
         }
         return
-    }
-
-    if(state.activeWorkspace === null) {
-        throw new Error('activeWorkspace is null')
     }
 
     const originalTabIds = state.activeWorkspace.tabIds ?? []
@@ -604,7 +613,7 @@ const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
-            loadWorkspaceTabs(state, state.activeWorkspace._id)
+            loadWorkspaceTabs(state)
         }
     },
     actions: {
@@ -1112,10 +1121,8 @@ const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
-            delete workspaceCache.tabs[context.state.activeWorkspace._id]
-
             context.state.skipPersistingActiveTab = true
-            loadWorkspaceTabs(context.state, context.state.activeWorkspace._id)
+            loadWorkspaceTabs(context.state)
 
             context.commit('persistActiveWorkspaceTabs')
         },
