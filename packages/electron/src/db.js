@@ -361,9 +361,29 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
     if (Object.keys(updatedFields).length === 1 && 'parentId' in updatedFields) {
         const renameFrom = collectionPath
-        let renameTo = `${updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location}/${path.basename(collectionPath)}`
-        await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Move collection item`)
-        idMap.set(collectionId, renameTo)
+        const renameTo = `${updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location}/${path.basename(collectionPath)}`
+
+        if (renameFrom === renameTo) {
+            // no change in parent
+            return {
+                error: null,
+            }
+        }
+
+        try {
+            if(await fileUtils.pathExists(renameTo)) {
+                return {
+                    error: `An item of the same name already exists in the destination folder. Please rename the item and try again.`
+                }
+            }
+            await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Move collection item`)
+            idMap.set(collectionId, renameTo)
+        }  catch (err) {
+            console.error(`Error renaming ${renameFrom} to ${renameTo}`, err)
+            return {
+                error: `Error renaming ${renameFrom} to ${renameTo}: ${err.message}`,
+            }
+        }
 
         // endsWith('.json') means it's a file, else it's a folder
         if (renameFrom.endsWith('.json')) {

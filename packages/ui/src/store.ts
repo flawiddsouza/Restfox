@@ -797,8 +797,22 @@ const store = createStore<State>({
                 targetKey = 'id'
             }
 
-            const sourceParentCollection = !payload.from.parentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.from.parentId)?.children
-            const targetParentCollection = !payload.to[targetKey] ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.to[targetKey])?.children
+            let sourceParentCollection = !payload.from.parentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.from.parentId)?.children
+            let targetParentCollection = !payload.to[targetKey] ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.to[targetKey])?.children
+
+            if(context.state.activeWorkspace?._type === 'file') {
+                if(sourceParentCollection === targetParentCollection) {
+                    sourceParentCollection = structuredClone(toRaw(sourceParentCollection)?.map(item => toRaw(item)))
+                    // we do this because when we move an item within the same parent,
+                    // if both variables don't reference the same array, the item will get doubled in
+                    // 2nd array - since we only splice 1 the item from the first array
+                    // causing sortOrder update to have duplicates for the reordered item
+                    targetParentCollection = sourceParentCollection
+                } else {
+                    sourceParentCollection = structuredClone(toRaw(sourceParentCollection)?.map(item => toRaw(item)))
+                    targetParentCollection = structuredClone(toRaw(targetParentCollection)?.map(item => toRaw(item)))
+                }
+            }
 
             if (!sourceParentCollection || !targetParentCollection) {
                 throw new Error('Source or target parent collection not found')
@@ -818,7 +832,12 @@ const store = createStore<State>({
             }
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
-            await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
+            const result = await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return
+            }
 
             const sortOrderUpdates: Promise<{ error: string | null }>[] = []
 
