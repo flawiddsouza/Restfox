@@ -117,7 +117,10 @@ async function getCollectionForWorkspace(workspace, type) {
             workspaceWatcher = chokidar.watch(workspace.location, {
                 ignored: /(^|[\/\\])\../, // ignore dotfiles
                 ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
-                awaitWriteFinish: true, // was getting an add & change event even thought there was only one fs.writeFile wx call - this seems to fix it
+                awaitWriteFinish: {
+                    stabilityThreshold: 80,
+                    pollInterval: 10
+                }, // was getting an add & change event even thought there was only one fs.writeFile wx call - this seems to fix it
             }).on('all', (event, path) => {
                 console.log(event, path)
                 let controlledChange = false

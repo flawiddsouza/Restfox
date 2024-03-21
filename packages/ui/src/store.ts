@@ -386,6 +386,8 @@ const store = createStore<State>({
         },
         persistActiveTab(state) {
             if(state.activeTab) {
+                console.log('persistActiveTab')
+
                 const activeTabToSaveJSON = JSON.stringify(state.activeTab)
                 const activeTabToSave = JSON.parse(activeTabToSaveJSON)
 
