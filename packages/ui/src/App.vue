@@ -400,7 +400,7 @@ export default {
         if(import.meta.env.MODE === 'desktop-electron') {
             window.electronIPC.workspaceChanged((event, path, controlledChange, controlledChangeReason) => {
                 console.log('workspaceChanged', { event, path, controlledChange, controlledChangeReason })
-                if(!controlledChange) {
+                if(!controlledChange && this.activeWorkspace) {
                     this.$store.dispatch('refreshWorkspace')
                 }
             })
