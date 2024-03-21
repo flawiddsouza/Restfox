@@ -1,9 +1,9 @@
 <template>
-    <div v-if="showModalComp">
+    <form @submit.prevent="showModalComp = false" v-if="showModalComp">
         <modal :title="title" v-model="showModalComp">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
-                <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" v-focus>
+                <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" required v-focus>
             </label>
 
             <div style="padding-top: 1rem"></div>
@@ -11,7 +11,7 @@
             <div>
                 <label>
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Folder</div>
-                    <select class="full-width-input" v-model="collectionItem.parentId">
+                    <select class="full-width-input" v-model="collectionItem.parentId" required>
                         <option :value="null">Root of the workspace</option>
                         <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
                     </select>
@@ -21,10 +21,10 @@
             <div style="padding-bottom: 1rem"></div>
 
             <template #footer>
-                <button class="button" @click="showModalComp = false">Done</button>
+                <button>Done</button>
             </template>
         </modal>
-    </div>
+    </form>
 </template>
 
 <script>
