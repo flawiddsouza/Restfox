@@ -286,6 +286,7 @@ const store = createStore<State>({
             sockets: {},
             activeTabEnvironmentResolved: {},
             idMap: null,
+            skipPersistingActiveTab: false,
         }
     },
     getters: {
@@ -386,7 +387,13 @@ const store = createStore<State>({
         },
         persistActiveTab(state) {
             if(state.activeTab) {
-                console.log('persistActiveTab')
+                if(state.skipPersistingActiveTab) {
+                    console.log('persistActiveTab: skipPersistingActiveTab is true, so skipping')
+                    state.skipPersistingActiveTab = false
+                    return
+                }
+
+                console.log('persistActiveTab: skipPersistingActiveTab is false, so persisting')
 
                 const activeTabToSaveJSON = JSON.stringify(state.activeTab)
                 const activeTabToSave = JSON.parse(activeTabToSaveJSON)
@@ -1107,6 +1114,7 @@ const store = createStore<State>({
 
             delete workspaceCache.tabs[context.state.activeWorkspace._id]
 
+            context.state.skipPersistingActiveTab = true
             loadWorkspaceTabs(context.state, context.state.activeWorkspace._id)
 
             context.commit('persistActiveWorkspaceTabs')

@@ -514,7 +514,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             ...updatedFields,
         }
 
-        await fileUtils.writeFileJson(collectionPath, collectionUpdated, fsLog)
+        await fileUtils.writeFileJson(collectionPath, collectionUpdated, fsLog, 'Update collection item')
         console.log(`Updated file: ${collectionPath}`)
         return
     }
