@@ -122,25 +122,30 @@ export default {
 
             return sidebarItem.collapsed === undefined || sidebarItem.collapsed === false
         },
-        saveSidebarItemName(sidebarItem) {
+        async saveSidebarItemName(sidebarItem) {
             if(!this.showInputToRenameRequest) {
                 return
             }
 
-            this.$store.dispatch('updateCollectionItemName', {
+            const result = await this.$store.dispatch('updateCollectionItemName', {
                 _id: sidebarItem._id,
                 _type: sidebarItem._type,
                 name: this.newSidebarItemName
             })
 
-            const sidebarItemToUpdate = findItemInTreeById(this.$store.state.collectionTree, sidebarItem._id)
-            if(sidebarItemToUpdate) {
-                sidebarItemToUpdate.name = this.newSidebarItemName
-            }
+            if(!result.error) {
+                const sidebarItemToUpdate = findItemInTreeById(this.$store.state.collectionTree, sidebarItem._id)
+                if(sidebarItemToUpdate) {
+                    sidebarItemToUpdate.name = this.newSidebarItemName
+                }
 
-            const tab = this.$store.state.tabs.find(tab => tab._id === sidebarItem._id)
-            if(tab) {
-                tab.name = this.newSidebarItemName
+                const tab = this.$store.state.tabs.find(tab => tab._id === sidebarItem._id)
+                if(tab) {
+                    if(tab === this.activeTab) {
+                        this.$store.state.skipPersistingActiveTab = true
+                    }
+                    tab.name = this.newSidebarItemName
+                }
             }
 
             delete this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id]

@@ -326,6 +326,19 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             renameTo += extension
         }
 
+        if (renameFrom === renameTo) {
+            // no change in name
+            return {
+                error: null,
+            }
+        }
+
+        if(await fileUtils.pathExists(renameTo)) {
+            return {
+                error: `An item of the same name already exists in the destination folder. Please rename the item and try again.`
+            }
+        }
+
         await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`)
         idMap.set(collectionId, renameTo)
 

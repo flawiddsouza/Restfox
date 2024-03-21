@@ -481,11 +481,16 @@ export default {
             }
         },
         async updateCollectionItem(collectionItem) {
-            await this.$store.dispatch('updateCollectionItemNameAndParentId', {
+            const result = await this.$store.dispatch('updateCollectionItemNameAndParentId', {
                 collectionId: collectionItem._id,
                 name: collectionItem.name,
                 parentId: collectionItem.parentId,
             })
+
+            if(result.error) {
+                return
+            }
+
             this.settingsModalShow = false
         },
     },

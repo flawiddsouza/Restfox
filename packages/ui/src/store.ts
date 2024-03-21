@@ -1135,7 +1135,12 @@ const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
-            await updateCollection(context.state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
+            const result = await updateCollection(context.state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return result
+            }
 
             if(context.state.activeWorkspace._type === 'file') {
                 context.dispatch('refreshWorkspace')
@@ -1144,6 +1149,8 @@ const store = createStore<State>({
             if(collectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'renamed')
             }
+
+            return result
         },
         async updateCollectionItemNameAndParentId(context, { collectionId, name, parentId }) {
             if(context.state.activeWorkspace === null) {
@@ -1152,9 +1159,15 @@ const store = createStore<State>({
 
             if(context.state.activeWorkspace._type === 'file') {
                 // we split the operations, as the file workspace does not support updating name & parentId together
-                await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
                     name
                 })
+
+                if(result.error) {
+                    emitter.emit('error', result.error)
+                    return result
+                }
+
                 await updateCollection(context.state.activeWorkspace._id, collectionId, {
                     parentId
                 })
@@ -1172,6 +1185,10 @@ const store = createStore<State>({
             }
 
             await context.dispatch('refreshWorkspace')
+
+            return {
+                error: null
+            }
         },
     }
 })
