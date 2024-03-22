@@ -28,6 +28,7 @@
             </div>
             <template v-if="nav === 'workspaces'">
                 <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
+                <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron">Open File Workspace</a>
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
             <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
@@ -171,6 +172,28 @@ export default {
         },
         async openWorkspaceFolder() {
             await window.electronIPC.openFolder(this.activeWorkspace.location)
+        },
+        async openFileWorkspace() {
+            const selectedFolderPath = await window.electronIPC.openFolderSelectionDialog()
+            if(selectedFolderPath) {
+                try {
+                    const workspace = await window.electronIPC.getWorkspaceAtLocation(selectedFolderPath)
+                    const existingWorkspace = this.$store.state.workspaces.find(workspaceItem => workspaceItem.location === selectedFolderPath)
+                    if(existingWorkspace) {
+                        console.log(existingWorkspace)
+                        this.setActiveWorkspace(existingWorkspace)
+                    } else {
+                        this.$store.dispatch('createWorkspace', {
+                            name: workspace.name,
+                            _type: 'file',
+                            location: selectedFolderPath,
+                            setAsActive: true
+                        })
+                    }
+                } catch(e) {
+                    this.$toast.error('No workspace found in the selected folder')
+                }
+            }
         },
     }
 }
