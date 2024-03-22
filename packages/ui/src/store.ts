@@ -1075,6 +1075,15 @@ const store = createStore<State>({
                 return result
             }
 
+            const idMap = new Map<string, string>()
+
+            result.results.forEach((collectionItemResult) => {
+                console.log(collectionItemResult)
+                if(collectionItemResult.oldCollectionId && collectionItemResult.newCollectionId) {
+                    idMap.set(collectionItemResult.oldCollectionId, collectionItemResult.newCollectionId)
+                }
+            })
+
             if (plugins.length > 0) {
                 // assign new ids to the imported / duplicated plugins
                 // else the original request & request folders where the
@@ -1082,6 +1091,7 @@ const store = createStore<State>({
                 // also update timestamps
                 plugins.forEach(plugin => {
                     plugin._id = nanoid()
+                    plugin.collectionId = (plugin.collectionId ? idMap.get(plugin.collectionId) : null) ?? plugin.collectionId
                     plugin.createdAt = new Date().getTime()
                     plugin.updatedAt = new Date().getTime()
                 })

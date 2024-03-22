@@ -133,7 +133,13 @@ export async function getCollectionById(workspaceId: string, collectionId: strin
     return db.collections.where({ ':id': collectionId }).first()
 }
 
-export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<{ error: string | null, newCollectionId: string | null }> {
+interface CreateCollectionResult {
+    error: string | null,
+    oldCollectionId: string | null,
+    newCollectionId: string | null
+}
+
+export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<CreateCollectionResult> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -145,11 +151,15 @@ export async function createCollection(workspaceId: string, collection: Collecti
 
     return {
         error: null,
+        oldCollectionId: null,
         newCollectionId: null,
     }
 }
 
-export async function createCollections(workspaceId: string, collections: CollectionItem[]): Promise<{ error: string | null }> {
+export async function createCollections(workspaceId: string, collections: CollectionItem[]): Promise<{
+    error: string | null,
+    results: CreateCollectionResult[]
+}> {
     console.log('createCollections', collections)
 
     if(import.meta.env.MODE === 'desktop-electron') {
@@ -163,6 +173,7 @@ export async function createCollections(workspaceId: string, collections: Collec
 
     return {
         error: null,
+        results: []
     }
 }
 

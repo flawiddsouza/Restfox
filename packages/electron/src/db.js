@@ -187,6 +187,7 @@ async function createCollection(workspace, collection) {
         collection,
     })
 
+    const oldCollectionId = collection._id
     const collectionName = fileUtils.encodeFilename(collection.name)
 
     try {
@@ -239,6 +240,7 @@ async function createCollection(workspace, collection) {
 
         return {
             error: null,
+            oldCollectionId,
             newCollectionId: collectionPath,
         }
     } catch (err) {
@@ -262,11 +264,21 @@ async function createCollections(workspace, collections) {
         collections,
     })
 
+    const results = []
+
     for (const collection of collections) {
         let result = null
 
         if (idMap.get(collection._id)) {
             result = await updateCollection(workspace, collection._id, collection)
+
+            if (result === undefined) {
+                result = {
+                    error: null,
+                    oldCollectionId: null,
+                    newCollectionId: null,
+                }
+            }
         } else {
             result = await createCollection(workspace, collection)
             collections.forEach(item => {
@@ -277,12 +289,18 @@ async function createCollections(workspace, collections) {
         }
 
         if (result && result.error) {
-            return result
+            return {
+                error: result.error,
+                results: results,
+            }
         }
+
+        results.push(result)
     }
 
     return {
         error: null,
+        results,
     }
 }
 
