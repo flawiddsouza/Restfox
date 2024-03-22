@@ -1,5 +1,5 @@
 const { File } = require('node:buffer')
-const { Agent } = require('undici')
+const { fetch, Agent } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 
@@ -123,7 +123,7 @@ async function handleSendRequest(data) {
         console.error('request failed', e)
         return {
             event: 'responseError',
-            eventData: e.message
+            eventData: e.stack + (e.cause ? '\n' + e.cause?.stack : '')
         }
     } finally {
         delete abortController[data.requestId]

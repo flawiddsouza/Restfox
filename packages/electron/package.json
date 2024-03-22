@@ -44,7 +44,7 @@
         "chokidar": "^3.6.0",
         "electron-context-menu": "^3.6.1",
         "electron-squirrel-startup": "^1.0.0",
-        "undici": "^5.28.2",
+        "undici": "^6.10.1",
         "update-electron-app": "^2.0.1"
     },
     "config": {
