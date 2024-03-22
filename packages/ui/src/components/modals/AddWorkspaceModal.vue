@@ -11,8 +11,7 @@
                     <label>
                         <div style="font-weight: 500; margin-bottom: 0.25rem">Type</div>
                         <select class="full-width-input" v-model="workspaceType" :disabled="workspace">
-                            <option value="local">In Application (Default)</option>
-                            <option value="file">In Filesystem (Git Friendly)</option>
+                            <option v-for="workspaceTypeItem in workspaceTypes" :value="workspaceTypeItem.value">{{ workspaceTypeItem.label }}</option>
                         </select>
                     </label>
                 </div>
@@ -70,6 +69,10 @@ export default {
             workspaceName: 'New Workspace',
             workspaceType: 'local',
             workspaceLocation: '',
+            workspaceTypes: [
+                { label: 'In Filesystem (Git Friendly)', value: 'file' },
+                { label: 'In Application', value: 'local' }
+            ]
         }
     },
     computed: {
@@ -97,7 +100,11 @@ export default {
         showModal() {
             if(this.showModal && this.workspace === undefined) {
                 this.workspaceName = 'New Workspace'
-                this.workspaceType = 'local'
+                if(this.isElectron) {
+                    this.workspaceType = 'file'
+                } else {
+                    this.workspaceType = 'local'
+                }
                 this.workspaceLocation = ''
             }
         },
