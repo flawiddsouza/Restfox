@@ -191,7 +191,7 @@ export default {
                 }
             }
 
-            this.$store.commit('loadWorkspacePlugins', this.activeWorkspace._id)
+            this.$store.commit('loadWorkspacePlugins')
 
             this.appLoaded = true
             this.activeWorkspaceLoaded = true
@@ -402,6 +402,18 @@ export default {
                 console.log('workspaceChanged', { event, path, controlledChange, controlledChangeReason })
                 if(!controlledChange && this.activeWorkspace) {
                     this.$store.dispatch('refreshWorkspace')
+                    this.$store.commit('loadWorkspacePlugins')
+                    // if a collection item is deleted
+                    if((event === 'unlinkDir' || event === 'unlink') && path.endsWith('.plugins.json') === false && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
+                        const event = {
+                            name: 'deleted',
+                            data: {
+                                path
+                            }
+                        }
+                        console.log('emit: collectionItem', event)
+                        emitter.emit('collectionItem', event)
+                    }
                 }
             })
         }

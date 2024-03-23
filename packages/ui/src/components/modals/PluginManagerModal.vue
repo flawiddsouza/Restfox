@@ -95,6 +95,7 @@
 import Modal from '@/components/Modal.vue'
 import PluginManagerEditModal from '@/components/modals/PluginManagerEditModal.vue'
 import dayjs from 'dayjs'
+import { emitter } from '@/event-bus'
 
 export default {
     props: {
@@ -195,7 +196,31 @@ export default {
         },
         dateFormat(date) {
             return dayjs(date).format('DD-MMM-YY hh:mm A')
+        },
+        handlePluginsEvent(event) {
+            if(event.name === 'loaded') {
+                // we close the modal as soon if we receive the plugins loaded event
+                // if we don't do this, the plugin being edited might have been deleted
+                // and we would get an error when saving
+                this.showPluginManagerEditModal = false
+            }
+        },
+        handleCollectionItemEvent(event) {
+            // close the modal if the parent is no more
+            // doesn't matter for which collection item - it could be the parent, sibling or grandparent
+            // too much work to figure out which one it is, so just close the modal
+            if(event.name === 'deleted') {
+                this.showModalComp = false
+            }
         }
+    },
+    created() {
+        emitter.on('plugins', this.handlePluginsEvent)
+        emitter.on('collectionItem', this.handleCollectionItemEvent)
+    },
+    beforeUnmount() {
+        emitter.off('plugins', this.handlePluginsEvent)
+        emitter.off('collectionItem', this.handleCollectionItemEvent)
     }
 }
 </script>

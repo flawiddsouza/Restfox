@@ -487,8 +487,15 @@ const store = createStore<State>({
                 state.plugins.workspace = []
             }
         },
-        async loadWorkspacePlugins(state, workspaceId) {
-            state.plugins.workspace = await getWorkspacePlugins(workspaceId)
+        async loadWorkspacePlugins(state) {
+            if(state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+            console.log('loadWorkspacePlugins')
+            state.plugins.workspace = await getWorkspacePlugins(state.activeWorkspace._id)
+            emitter.emit('plugins', {
+                name: 'loaded'
+            })
         },
         async addPlugin(state, plugin) {
             const newPlugin = {
