@@ -183,6 +183,16 @@ export default {
 
             // is not null if file workspace
             if(workspace) {
+                if(this.activeWorkspace.name !== workspace.name) {
+                    console.log('workspace name is different, updating in IndexedDB', {
+                        oldName: this.activeWorkspace.name,
+                        newName: workspace.name
+                    })
+                    this.$store.commit('updateWorkspaceNameInIndexedDB', {
+                        workspaceId: this.activeWorkspace._id,
+                        name: workspace.name
+                    })
+                }
                 this.activeWorkspace.name = workspace.name
                 if(workspace.environment) {
                     this.activeWorkspace.environment = workspace.environment

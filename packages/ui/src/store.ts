@@ -621,7 +621,10 @@ const store = createStore<State>({
             }
 
             loadWorkspaceTabs(state)
-        }
+        },
+        async updateWorkspaceNameInIndexedDB(_state, { workspaceId, name }) {
+            await updateWorkspace(workspaceId, { name }, true)
+        },
     },
     actions: {
         async deleteCollectionItem(context, collectionItem) {

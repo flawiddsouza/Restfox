@@ -59,8 +59,8 @@ export async function putWorkspace(workspace: Workspace) {
     await db.workspaces.put(workspace)
 }
 
-export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>) {
-    if(import.meta.env.MODE === 'desktop-electron') {
+export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>, skipUpdateForFileWorkspace = false) {
+    if(import.meta.env.MODE === 'desktop-electron' && !skipUpdateForFileWorkspace) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             // this will used for updating workspace name, environments & currentEnvironment
