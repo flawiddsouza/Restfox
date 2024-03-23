@@ -670,12 +670,34 @@ const store = createStore<State>({
                 generateNewIdsForTreeItemChildren(newCollectionItem)
             }
 
-            const collectionItemsToSave = flattenTree([newCollectionItem])
+            const collectionItemsToSave: CollectionItem[] = flattenTree([newCollectionItem])
             const result = await createCollections(collectionItem.workspaceId, collectionItemsToSave)
 
             if(result.error) {
                 emitter.emit('error', result.error)
                 return result
+            }
+
+            const idMap = new Map<string, string>()
+
+            result.results.forEach((collectionItemResult) => {
+                if(collectionItemResult.oldCollectionId && collectionItemResult.newCollectionId) {
+                    idMap.set(collectionItemResult.oldCollectionId, collectionItemResult.newCollectionId)
+                }
+            })
+
+            if(idMap.size > 0) {
+                collectionItemsToSave.forEach((collectionItemToSave) => {
+                    collectionItemToSave._id = idMap.get(collectionItemToSave._id) ?? collectionItemToSave._id
+                    if(collectionItemToSave.parentId) {
+                        collectionItemToSave.parentId = idMap.get(collectionItemToSave.parentId) ?? collectionItemToSave.parentId
+                    }
+                })
+
+                newCollectionItem._id = idMap.get(newCollectionItem._id) ?? newCollectionItem._id
+                if(newCollectionItem.parentId) {
+                    newCollectionItem.parentId = idMap.get(newCollectionItem.parentId) ?? newCollectionItem.parentId
+                }
             }
 
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
@@ -1085,7 +1107,6 @@ const store = createStore<State>({
             const idMap = new Map<string, string>()
 
             result.results.forEach((collectionItemResult) => {
-                console.log(collectionItemResult)
                 if(collectionItemResult.oldCollectionId && collectionItemResult.newCollectionId) {
                     idMap.set(collectionItemResult.oldCollectionId, collectionItemResult.newCollectionId)
                 }
