@@ -1127,9 +1127,19 @@ const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
-            const { collection, idMap } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+            const { collection, workspace, idMap } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
             context.commit('setCollection', collection)
             context.state.idMap = idMap
+
+            // is not null if file workspace
+            if(workspace) {
+                context.state.activeWorkspace.name = workspace.name
+                if(workspace.environment) {
+                    context.state.activeWorkspace.environment = workspace.environment
+                    context.state.activeWorkspace.environments = workspace.environments
+                    context.state.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+                }
+            }
         },
         async refreshWorkspaceTabs(context) {
             console.log('refreshWorkspaceTabs')

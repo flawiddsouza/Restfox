@@ -30,18 +30,15 @@ async function getWorkspaceAtLocation(location, getEnvironments = false) {
 
         if(getEnvironments) {
             const envsDirPath = path.join(location, constants.FOLDERS.ENVIRONMENTS)
-            const environments = await dbHelpers.getEnvironments(envsDirPath)
-            if (environments.length > 0) {
-                workspaceData.environments = environments
-                const currentEnvironment = workspaceData.environments.find((env) => env.name === workspaceData.currentEnvironment)
-                if (currentEnvironment) {
-                    workspaceData.environment = currentEnvironment.environment
-                    workspaceData.currentEnvironment = workspaceData.currentEnvironment
-                } else {
-                    workspaceData.environment = workspaceData.environments[0].environment
-                    workspaceData.currentEnvironment = workspaceData.environments[0].name
-                }
+            const { environments, environment, currentEnvironment } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
+
+            if(currentEnvironment !== workspaceData.currentEnvironment) {
+                await fileUtils.writeFileJson(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, { ...workspaceData, currentEnvironment }, fsLog, `Update workspace current environment`)
             }
+
+            workspaceData.environments = environments
+            workspaceData.environment = environment
+            workspaceData.currentEnvironment = currentEnvironment
         }
 
         return workspaceData
@@ -138,7 +135,7 @@ async function getCollectionForWorkspace(workspace, type) {
         const [ collection, workspaceData ] = await Promise.all([
             // we do not want to modify the idMap if returning the request_group type
             // this messes up the idMap - as ui and elecron will go out of sync
-            dbHelpers.getCollection(type === null ? idMap : new Map(), workspace),
+            dbHelpers.getCollection(type === null ? idMap : new Map(), fsLog, workspace),
             getWorkspaceAtLocation(workspace.location, true),
         ])
 
@@ -178,7 +175,7 @@ function getCollectionById(workspace, collectionId) {
 
     const collectionPath = idMap.get(collectionId)
 
-    return dbHelpers.getCollectionItem(workspace, collectionPath)
+    return dbHelpers.getCollectionItem(fsLog, workspace, collectionPath)
 }
 
 async function createCollection(workspace, collection) {
@@ -835,7 +832,7 @@ async function getWorkspacePlugins(workspace) {
     }
 
     // Collection and Folder Plugins
-    const collectionItems = await dbHelpers.getCollection(idMap, workspace)
+    const collectionItems = await dbHelpers.getCollection(idMap, fsLog, workspace)
     for (const item of collectionItems) {
         if (item._type === 'request_group') {
             const collectionPluginsPath = `${item._id}/${constants.FILES.FOLDER_PLUGINS}`

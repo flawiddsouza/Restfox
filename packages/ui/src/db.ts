@@ -28,7 +28,7 @@ export class RestfoxDatabase extends Dexie {
     }
 }
 
-export const db = new RestfoxDatabase()
+const db = new RestfoxDatabase()
 
 db.version(5).stores({
     workspaces: '_id',

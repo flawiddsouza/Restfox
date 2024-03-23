@@ -66,6 +66,7 @@
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import { nextTick } from 'vue'
+import { emitter } from '@/event-bus'
 
 export default {
     props: {
@@ -450,7 +451,30 @@ export default {
             const request = JSON.parse(JSON.stringify(this.collectionItem))
             const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
             this.envVariables = environment
-        }
+        },
+        handleCollectionItemEvent(event) {
+            // close the modal if the parent is no more
+            // doesn't matter for which collection item - it could be the parent, sibling or grandparent
+            // too much work to figure out which one it is, so just close the modal
+            if(this.collectionItem && event.name === 'deleted') {
+                this.showModalComp = false
+            }
+        },
+        handleEnvironmentEvent(event) {
+            // close open environment modal if the environment is added, updated or deleted
+            // doesn't matter for which collection item or if workspace
+            if(event.name === 'added' || event.name === 'updated' || event.name === 'deleted') {
+                this.showModalComp = false
+            }
+        },
+    },
+    created() {
+        emitter.on('collectionItem', this.handleCollectionItemEvent)
+        emitter.on('environment', this.handleEnvironmentEvent)
+    },
+    beforeUnmount() {
+        emitter.on('collectionItem', this.handleCollectionItemEvent)
+        emitter.off('environment', this.handleEnvironmentEvent)
     }
 }
 </script>

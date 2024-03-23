@@ -4,7 +4,7 @@ const path = require('path')
 const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
-async function getCollectionItem(workspace, fullPath) {
+async function getCollectionItem(fsLog, workspace, fullPath) {
     const isFolder = fullPath.endsWith('.json') === false
     const fileOrFolderName = path.basename(fullPath)
     const dir = path.dirname(fullPath)
@@ -27,16 +27,23 @@ async function getCollectionItem(workspace, fullPath) {
         try {
             const collectionData = JSON.parse(await fs.readFile(`${fullPath}/${constants.FILES.FOLDER_CONFIG}`, 'utf8'))
 
-            const environments = await getEnvironments(`${fullPath}/${constants.FOLDERS.ENVIRONMENTS}`)
-            if (environments.length > 0) {
-                collectionData.environments = environments
-                collectionItem.currentEnvironment = collectionData.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
-                collectionItem.environment = collectionData.environments.find((env) => env.name === collectionItem.currentEnvironment).environment
+            const { environments, environment, currentEnvironment } = await getEnvironments(`${fullPath}/${constants.FOLDERS.ENVIRONMENTS}`, collectionData.currentEnvironment)
+
+            if(currentEnvironment !== collectionData.currentEnvironment) {
+                await fileUtils.writeFileJson(path.join(fullPath, constants.FILES.FOLDER_CONFIG), {
+                    ...collectionData,
+                    currentEnvironment,
+                }, fsLog, 'Update current environment in folder config')
             }
+
+            collectionItem.currentEnvironment = currentEnvironment
 
             collectionItem = {
                 ...collectionItem,
                 ...collectionData,
+                environments: environments,
+                environment: environment,
+                currentEnvironment: currentEnvironment,
             }
 
             return collectionItem
@@ -72,7 +79,7 @@ async function getCollectionItem(workspace, fullPath) {
     }
 }
 
-async function getCollection(idMap, workspace, dir = workspace.location) {
+async function getCollection(idMap, fsLog, workspace, dir = workspace.location) {
     let items = []
 
     try {
@@ -99,17 +106,17 @@ async function getCollection(idMap, workspace, dir = workspace.location) {
             const fullPath = path.join(dir, fileOrFolder.name)
 
             if (fileOrFolder.isDirectory()) {
-                const collection = await getCollectionItem(workspace, fullPath)
+                const collection = await getCollectionItem(fsLog, workspace, fullPath)
 
                 if(collection) {
                     items.push(collection)
 
                     // Recursively get files and folders inside this directory
-                    const nestedItems = await getCollection(idMap, workspace, fullPath)
+                    const nestedItems = await getCollection(idMap, fsLog, workspace, fullPath)
                     items = items.concat(nestedItems)
                 }
             } else {
-                const collectionItem = await getCollectionItem(workspace, fullPath)
+                const collectionItem = await getCollectionItem(fsLog, workspace, fullPath)
                 items.push(collectionItem)
             }
             idMap.set(fullPath, fullPath)
@@ -175,7 +182,7 @@ async function ensureRestfoxCollection(workspace) {
     }
 }
 
-async function getEnvironments(envsDirPath) {
+async function getEnvironments(envsDirPath, currentEnvironment) {
     const environments = []
 
     const envFiles = await fileUtils.readdirIgnoreError(envsDirPath)
@@ -192,7 +199,34 @@ async function getEnvironments(envsDirPath) {
         }
     }
 
-    return environments
+    const returnData ={
+        environments: [],
+        environment: {},
+        currentEnvironment: currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
+    }
+
+    if (environments.length > 0) {
+        returnData.environments = environments
+        const currentEnvironment = returnData.environments.find((env) => env.name === returnData.currentEnvironment)
+        if (currentEnvironment) {
+            returnData.environment = currentEnvironment.environment
+            returnData.currentEnvironment = returnData.currentEnvironment
+        } else {
+            returnData.environment = returnData.environments[0].environment
+            returnData.currentEnvironment = returnData.environments[0].name
+        }
+    } else {
+        returnData.environments = [
+            {
+                name: constants.DEFAULT_ENVIRONMENT,
+                environment: {},
+            }
+        ]
+        returnData.environment = {}
+        returnData.currentEnvironment = constants.DEFAULT_ENVIRONMENT
+    }
+
+    return returnData
 }
 
 async function saveEnvironments(fsLog, envsDirPath, environments) {
