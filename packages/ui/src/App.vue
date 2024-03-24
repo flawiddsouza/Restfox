@@ -14,7 +14,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 <script>
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
-import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme } from './helpers'
+import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme, debounce } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
 
@@ -309,6 +309,78 @@ export default {
         handleError(errorMessage) {
             this.$toast.error(errorMessage)
         },
+        onWorkspaceChanged(refreshWorkspace, event, path, controlledChange, controlledChangeReason) {
+            console.log('workspaceChanged', { event, path, controlledChange, controlledChangeReason })
+            if(!controlledChange && this.activeWorkspace) {
+                refreshWorkspace()
+
+                if((event === 'add' || event === 'addDir') && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
+                    let eventType = 'collectionItem'
+
+                    const event = {
+                        name: 'added',
+                        data: {
+                            path
+                        }
+                    }
+
+                    if(path.includes('_environments')) {
+                        eventType = 'environment'
+                    }
+
+                    if(path.endsWith('.plugins.json')) {
+                        eventType = 'plugin'
+                    }
+
+                    console.log(`emit: ${eventType}`, event)
+                    emitter.emit(eventType, event)
+                }
+
+                if((event === 'change') && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
+                    let eventType = 'collectionItem'
+
+                    const event = {
+                        name: 'updated',
+                        data: {
+                            path
+                        }
+                    }
+
+                    if(path.includes('_environments')) {
+                        eventType = 'environment'
+                    }
+
+                    if(path.endsWith('.plugins.json')) {
+                        eventType = 'plugin'
+                    }
+
+                    console.log(`emit: ${eventType}`, event)
+                    emitter.emit(eventType, event)
+                }
+
+                if((event === 'unlinkDir' || event === 'unlink') && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
+                    let eventType = 'collectionItem'
+
+                    const event = {
+                        name: 'deleted',
+                        data: {
+                            path
+                        }
+                    }
+
+                    if(path.includes('_environments')) {
+                        eventType = 'environment'
+                    }
+
+                    if(path.endsWith('.plugins.json')) {
+                        eventType = 'plugin'
+                    }
+
+                    console.log(`emit: ${eventType}`, event)
+                    emitter.emit(eventType, event)
+                }
+            }
+        }
     },
     async created() {
         this.$store.dispatch('loadGlobalPlugins')
@@ -408,79 +480,11 @@ export default {
         emitter.on('error', this.handleError)
 
         if(import.meta.env.MODE === 'desktop-electron') {
-            window.electronIPC.workspaceChanged((event, path, controlledChange, controlledChangeReason) => {
-                console.log('workspaceChanged', { event, path, controlledChange, controlledChangeReason })
-                if(!controlledChange && this.activeWorkspace) {
-                    this.$store.dispatch('refreshWorkspace')
-                    this.$store.commit('loadWorkspacePlugins')
-
-                    if((event === 'add' || event === 'addDir') && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
-                        let eventType = 'collectionItem'
-
-                        const event = {
-                            name: 'added',
-                            data: {
-                                path
-                            }
-                        }
-
-                        if(path.includes('_environments')) {
-                            eventType = 'environment'
-                        }
-
-                        if(path.endsWith('.plugins.json')) {
-                            eventType = 'plugin'
-                        }
-
-                        console.log(`emit: ${eventType}`, event)
-                        emitter.emit(eventType, event)
-                    }
-
-                    if((event === 'change') && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
-                        let eventType = 'collectionItem'
-
-                        const event = {
-                            name: 'updated',
-                            data: {
-                                path
-                            }
-                        }
-
-                        if(path.includes('_environments')) {
-                            eventType = 'environment'
-                        }
-
-                        if(path.endsWith('.plugins.json')) {
-                            eventType = 'plugin'
-                        }
-
-                        console.log(`emit: ${eventType}`, event)
-                        emitter.emit(eventType, event)
-                    }
-
-                    if((event === 'unlinkDir' || event === 'unlink') && path.endsWith('.responses.json') === false && path.endsWith('_collapsed') === false) {
-                        let eventType = 'collectionItem'
-
-                        const event = {
-                            name: 'deleted',
-                            data: {
-                                path
-                            }
-                        }
-
-                        if(path.includes('_environments')) {
-                            eventType = 'environment'
-                        }
-
-                        if(path.endsWith('.plugins.json')) {
-                            eventType = 'plugin'
-                        }
-
-                        console.log(`emit: ${eventType}`, event)
-                        emitter.emit(eventType, event)
-                    }
-                }
-            })
+            const refreshWorkspace = debounce(() => {
+                this.$store.dispatch('refreshWorkspace')
+                this.$store.commit('loadWorkspacePlugins')
+            }, 500)
+            window.electronIPC.workspaceChanged((...args) => this.onWorkspaceChanged(refreshWorkspace, ...args))
         }
     },
     beforeUnmount() {
