@@ -25,9 +25,9 @@ async function getCollectionItem(fsLog, workspace, fullPath) {
         }
 
         try {
-            const collectionData = JSON.parse(await fs.readFile(`${fullPath}/${constants.FILES.FOLDER_CONFIG}`, 'utf8'))
+            const collectionData = JSON.parse(await fs.readFile(path.join(fullPath, constants.FILES.FOLDER_CONFIG), 'utf8'))
 
-            const { environments, environment, currentEnvironment } = await getEnvironments(`${fullPath}/${constants.FOLDERS.ENVIRONMENTS}`, collectionData.currentEnvironment)
+            const { environments, environment, currentEnvironment } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
 
             if(currentEnvironment !== collectionData.currentEnvironment) {
                 await fileUtils.writeFileJson(path.join(fullPath, constants.FILES.FOLDER_CONFIG), {
@@ -48,7 +48,7 @@ async function getCollectionItem(fsLog, workspace, fullPath) {
 
             return collectionItem
         } catch (err) {
-            console.error(`${fullPath}/${constants.FILES.FOLDER_CONFIG} not found, so skipping adding it to the collection`)
+            console.error(`${path.join(fullPath, constants.FILES.FOLDER_CONFIG)} not found, so skipping adding it to the collection`)
         }
     } else {
         let collectionItem = JSON.parse(await fs.readFile(fullPath, 'utf8'))
@@ -135,16 +135,16 @@ async function initRestfoxCollection(workspace) {
         name: workspace.name,
     }
 
-    await fs.writeFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, JSON.stringify(restfoxData, null, 4))
+    await fs.writeFile(path.join(workspace.location, constants.FILES.WORKSPACE_CONFIG), JSON.stringify(restfoxData, null, 4))
 
-    if(await fileUtils.pathExists(`${workspace.location}/.gitignore`) === false) {
-        await fs.writeFile(`${workspace.location}/.gitignore`, constants.GITIGNORE_CONTENT)
+    if(await fileUtils.pathExists(path.join(workspace.location, '.gitignore')) === false) {
+        await fs.writeFile(path.join(workspace.location, '.gitignore'), constants.GITIGNORE_CONTENT)
     }
 }
 
 async function ensureRestfoxCollection(workspace) {
     try {
-        const restfoxJson = await fs.readFile(`${workspace.location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8')
+        const restfoxJson = await fs.readFile(path.join(workspace.location, constants.FILES.WORKSPACE_CONFIG), 'utf8')
         const restfoxData = JSON.parse(restfoxJson)
         if (restfoxData.version !== 1) {
             throw new Error('Unsupported Restfox collection version')

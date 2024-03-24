@@ -1,4 +1,5 @@
 const fs = require('fs').promises
+const pathLib = require('path')
 
 async function readdirIgnoreError(path) {
     try {
@@ -157,8 +158,8 @@ async function renameAndLogRecursively(oldPath, newPath, fsLog, fsLogReason, id,
 
     let entries = await fs.readdir(oldPath, { withFileTypes: true })
     for (let entry of entries) {
-        const oldEntryPath = `${oldPath}/${entry.name}`
-        const newEntryPath = `${newPath}/${entry.name}`
+        const oldEntryPath = pathLib.join(oldPath, entry.name)
+        const newEntryPath = pathLib.join(newPath, entry.name)
 
         if (entry.isDirectory()) {
             // Log and rename subdirectories recursively

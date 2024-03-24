@@ -26,14 +26,14 @@ async function getWorkspaceAtLocation(location, getEnvironments = false) {
     })
 
     try {
-        const workspaceData = JSON.parse(await fs.readFile(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8'))
+        const workspaceData = JSON.parse(await fs.readFile(path.join(location, constants.FILES.WORKSPACE_CONFIG), 'utf8'))
 
         if(getEnvironments) {
             const envsDirPath = path.join(location, constants.FOLDERS.ENVIRONMENTS)
             const { environments, environment, currentEnvironment } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
 
             if(currentEnvironment !== workspaceData.currentEnvironment) {
-                await fileUtils.writeFileJson(`${location}/${constants.FILES.WORKSPACE_CONFIG}`, { ...workspaceData, currentEnvironment }, fsLog, `Update workspace current environment`)
+                await fileUtils.writeFileJson(path.join(location, constants.FILES.WORKSPACE_CONFIG), { ...workspaceData, currentEnvironment }, fsLog, `Update workspace current environment`)
             }
 
             workspaceData.environments = environments
@@ -56,7 +56,7 @@ async function updateWorkspace(workspace, updatedFields) {
 
     const workspacePath = workspace.location
 
-    const workspaceExisting = JSON.parse(await fs.readFile(`${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`, 'utf8'))
+    const workspaceExisting = JSON.parse(await fs.readFile(path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG), 'utf8'))
 
     const update = {}
 
@@ -83,8 +83,8 @@ async function updateWorkspace(workspace, updatedFields) {
         ...update,
     }
 
-    await fileUtils.writeFileJson(`${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`, workspaceUpdated, fsLog, `Update workspace`)
-    console.log(`Updated workspace: ${workspacePath}/${constants.FILES.WORKSPACE_CONFIG}`)
+    await fileUtils.writeFileJson(path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG), workspaceUpdated, fsLog, `Update workspace`)
+    console.log(`Updated workspace: ${path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG)}`)
 }
 
 /** @type{chokidar.FSWatcher} */
@@ -192,9 +192,9 @@ async function createCollection(workspace, collection) {
 
         if (collection._type === 'request_group') {
             if (collection.parentId) {
-                collectionPath = `${idMap.get(collection.parentId)}/${collectionName}`
+                collectionPath = path.join(idMap.get(collection.parentId), collectionName)
             } else {
-                collectionPath = `${workspace.location}/${collectionName}`
+                collectionPath = path.join(workspace.location, collectionName)
             }
             await fileUtils.mkdir(collectionPath, fsLog, 'Create collection item folder')
             idMap.set(collectionPath, collectionPath)
@@ -213,16 +213,16 @@ async function createCollection(workspace, collection) {
             }
 
             if (Object.keys(collectionToSave).length > 0) {
-                await fileUtils.writeFileJsonNewOnly(`${collectionPath}/${constants.FILES.FOLDER_CONFIG}`, collectionToSave, fsLog, `Create collection item folder config`)
-                console.log(`Created file: ${collectionPath}/${constants.FILES.FOLDER_CONFIG}`)
+                await fileUtils.writeFileJsonNewOnly(path.join(collectionPath, constants.FILES.FOLDER_CONFIG), collectionToSave, fsLog, `Create collection item folder config`)
+                console.log(`Created file: ${path.join(collectionPath, constants.FILES.FOLDER_CONFIG)}`)
             }
         }
 
         if (collection._type === 'request' || collection._type === 'socket') {
             if (collection.parentId) {
-                collectionPath = `${idMap.get(collection.parentId)}/${collectionName}.json`
+                collectionPath = path.join(idMap.get(collection.parentId), `${collectionName}.json`)
             } else {
-                collectionPath = `${workspace.location}/${collectionName}.json`
+                collectionPath = path.join(workspace.location, `${collectionName}.json`)
             }
 
             delete collection._id
@@ -333,7 +333,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         updatedFields.name = fileUtils.encodeFilename(updatedFields.name)
 
         const renameFrom = collectionPath
-        let renameTo = `${path.dirname(collectionPath)}/${updatedFields.name}`
+        let renameTo = path.join(path.dirname(collectionPath), updatedFields.name)
 
         const extension = path.extname(renameFrom)
 
@@ -392,7 +392,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
 
     if (Object.keys(updatedFields).length === 1 && 'parentId' in updatedFields) {
         const renameFrom = collectionPath
-        const renameTo = `${updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location}/${path.basename(collectionPath)}`
+        const renameTo = path.join(updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location, path.basename(collectionPath))
 
         if (renameFrom === renameTo) {
             // no change in parent
@@ -484,7 +484,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         const stats = await fs.stat(collectionPath)
 
         if (stats.isDirectory()) {
-            collectionPathCopy = `${collectionPath}/${constants.FILES.FOLDER_CONFIG}`
+            collectionPathCopy = path.join(collectionPath, constants.FILES.FOLDER_CONFIG)
         }
 
         let collectionExisting = {}
@@ -612,7 +612,7 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
                     for (const envFile of environmentsDir) {
                         await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS, envFile), fsLog, `Delete collection item environment`)
                     }
-                    await fileUtils.deleteFileOrFolder((path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS)), fsLog, `Delete collection item environments folder`)
+                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS), fsLog, `Delete collection item environments folder`)
                 } catch {
                     console.log(`No environments found for deletion for collection item: ${collectionItem.collectionPath}`)
                 }
@@ -820,7 +820,7 @@ async function getWorkspacePlugins(workspace) {
     const items = []
 
     // Workspace Plugins
-    const workspacePluginsPath = `${workspace.location}/${constants.FILES.WORKSPACE_PLUGINS}`
+    const workspacePluginsPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
     try {
         const workspacePluginsData = JSON.parse(await fs.readFile(workspacePluginsPath, 'utf8'))
         workspacePluginsData.forEach((plugin) => {
@@ -835,7 +835,7 @@ async function getWorkspacePlugins(workspace) {
     const collectionItems = await dbHelpers.getCollection(idMap, fsLog, workspace)
     for (const item of collectionItems) {
         if (item._type === 'request_group') {
-            const collectionPluginsPath = `${item._id}/${constants.FILES.FOLDER_PLUGINS}`
+            const collectionPluginsPath = path.join(item._id, constants.FILES.FOLDER_PLUGINS)
             try {
                 const collectionPluginsData = JSON.parse(await fs.readFile(collectionPluginsPath, 'utf8'))
                 collectionPluginsData.forEach((plugin) => {
@@ -873,14 +873,14 @@ async function createPlugin(workspace, plugin) {
         const collectionPath = idMap.get(plugin.collectionId)
         const stats = await fs.stat(collectionPath)
         if (stats.isDirectory()) {
-            pluginPath = `${collectionPath}/${constants.FILES.FOLDER_PLUGINS}`
+            pluginPath = path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
         } else {
             const collectionItemName = path.basename(collectionPath, '.json')
             const collectionPathParentPath = path.dirname(collectionPath)
-            pluginPath = `${collectionPathParentPath}/${collectionItemName}${constants.FILES.PLUGINS}`
+            pluginPath = `${path.join(collectionPathParentPath, collectionItemName)}${constants.FILES.PLUGINS}`
         }
     } else {
-        pluginPath = `${workspace.location}/${constants.FILES.WORKSPACE_PLUGINS}`
+        pluginPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
     }
 
     try {
@@ -915,9 +915,9 @@ async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
     let pluginPath = null
 
     if (collectionId == null) {
-        pluginPath = `${workspace.location}/${constants.FILES.WORKSPACE_PLUGINS}`
+        pluginPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
     } else {
-        pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : `${collectionPath}/${constants.FILES.FOLDER_PLUGINS}`
+        pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
     }
 
     try {
@@ -948,7 +948,7 @@ async function deletePlugin(workspace, collectionId, pluginId) {
 
     // If collectionId is null, it means it's a workspace plugin
     if (collectionId === null) {
-        const workspacePluginsPath = `${workspace.location}/${constants.FILES.WORKSPACE_PLUGINS}`
+        const workspacePluginsPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
         try {
             let existingPlugins = JSON.parse(await fs.readFile(workspacePluginsPath, 'utf8'))
             const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
@@ -971,7 +971,7 @@ async function deletePlugin(workspace, collectionId, pluginId) {
     }
 
     const collectionPath = idMap.get(collectionId)
-    const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : `${collectionPath}/${constants.FILES.FOLDER_PLUGINS}`
+    const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
 
     try {
         let existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
@@ -993,7 +993,7 @@ async function deletePluginsByWorkspace(workspace) {
         workspace,
     })
 
-    const workspacePluginsPath = `${workspace.location}/${constants.FILES.WORKSPACE_PLUGINS}`
+    const workspacePluginsPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
     try {
         await fs.access(workspacePluginsPath)
         await fileUtils.deleteFileOrFolder(workspacePluginsPath, fsLog, `Delete workspace plugins`)
@@ -1011,7 +1011,7 @@ async function deletePluginsByCollectionIds(workspace, collectionIds) {
 
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
-        const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : `${collectionPath}/${constants.FILES.FOLDER_PLUGINS}`
+        const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
 
         try {
             await fileUtils.deleteFileOrFolder(pluginPath, fsLog, `Delete plugins for collection item`)
