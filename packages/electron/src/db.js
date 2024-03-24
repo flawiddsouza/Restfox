@@ -229,6 +229,18 @@ async function createCollection(workspace, collection) {
             delete collection.parentId
             delete collection.workspaceId
             delete collection.name
+            delete collection.plugins
+
+            if (collection._type === 'socket') {
+                if (collection.clients) {
+                    let messages = {}
+                    for(const client of collection.clients) {
+                        messages[client.id] = client.messages
+                        delete client.messages
+                    }
+                    await fileUtils.writeFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), messages, fsLog, 'Save socket client messages')
+                }
+            }
 
             await fileUtils.writeFileJsonNewOnly(collectionPath, collection, fsLog, `Create collection item of type ${collection._type}`)
             idMap.set(collectionPath, collectionPath)
