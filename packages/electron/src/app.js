@@ -1,11 +1,14 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
 const { resolve } = require('path')
 const contextMenu = require('electron-context-menu')
+const log = require('electron-log/main')
 const requests = require('./request')
 const db = require('./db')
 const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
 require('update-electron-app')()
+
+Object.assign(console, log.functions)
 
 if(require('electron-squirrel-startup')) return app.quit()
 
