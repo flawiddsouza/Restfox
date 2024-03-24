@@ -279,7 +279,11 @@ async function createCollections(workspace, collections) {
         let result = null
 
         if (idMap.get(collection._id)) {
-            result = await updateCollection(workspace, collection._id, collection)
+            // we only allow updating sortOrder for existing collections - no other fields
+            // as that is the only use case of this if block
+            result = await updateCollection(workspace, collection._id, {
+                sortOrder: collection.sortOrder,
+            })
 
             if (result === undefined) {
                 result = {

@@ -43,7 +43,7 @@ import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import GenerateCodeModal from './modals/GenerateCodeModal.vue'
 import { mapState } from 'vuex'
-import { flattenTree, exportRestfoxCollection } from '@/helpers'
+import { flattenTree, exportRestfoxCollection, generateNewIdsForTree } from '@/helpers'
 import { generateCode } from '@/utils/generate-code'
 
 export default {
@@ -300,9 +300,19 @@ export default {
             }
 
             if(clickedSidebarItem === 'Export') {
-                const collectionItemToExport = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                let collectionItemToExport = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
                 collectionItemToExport.parentId = null
-                const collection = flattenTree([collectionItemToExport])
+
+                collectionItemToExport = [collectionItemToExport]
+
+                // if the workspace is a file workspace, we need to generate new ids for the collection
+                // as ids are just file paths in the case of file workspaces
+                // we don't want to leak the file paths in the exported collection
+                if (this.$store.state.activeWorkspace._type === 'file') {
+                    generateNewIdsForTree(collectionItemToExport)
+                }
+
+                const collection = flattenTree(collectionItemToExport)
                 for(const item of collection) {
                     item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
                 }

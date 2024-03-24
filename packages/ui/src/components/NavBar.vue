@@ -58,7 +58,7 @@ import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import BackupAndRestoreModal from './modals/BackupAndRestoreModal.vue'
-import { exportRestfoxCollection, applyTheme } from '@/helpers'
+import { exportRestfoxCollection, applyTheme, generateNewIdsForTree, toTree } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
 
@@ -145,10 +145,20 @@ export default {
     },
     methods: {
         async exportCollection() {
-            const { collection } = await getCollectionForWorkspace(this.activeWorkspace._id)
+            let { collection } = await getCollectionForWorkspace(this.activeWorkspace._id)
             for(const item of collection) {
                 item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
             }
+
+            // if the workspace is a file workspace, we need to generate new ids for the collection
+            // as ids are just file paths in the case of file workspaces
+            // we don't want to leak the file paths in the exported collection
+            if(this.activeWorkspace._type === 'file') {
+                const collectionTree = toTree(collection)
+                generateNewIdsForTree(collectionTree)
+                collection = collectionTree
+            }
+
             exportRestfoxCollection(collection, this.activeWorkspace.environments)
         },
         setActiveWorkspace(workspace) {
