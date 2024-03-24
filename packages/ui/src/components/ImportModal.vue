@@ -218,6 +218,7 @@ export default {
 
                 this.urlToImport = ''
                 this.filesToImport = []
+                this.importing = false
                 this.showImportModal = false
 
                 if(this.importFrom.endsWith(' URL')) {
