@@ -3,7 +3,7 @@
         <modal title="Import" v-model="showImportModal">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Import From</div>
-                <select class="full-width-input" v-model="importFrom">
+                <select class="full-width-input" v-model="importFrom" :disabled="importing">
                     <option>Restfox</option>
                     <option>Postman</option>
                     <option>Postman URL</option>
@@ -15,17 +15,17 @@
 
             <div style="margin-top: 1rem">
                 <template v-if="importFrom.endsWith(' URL') === false">
-                    <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip, .yml, .yaml" multiple required>
+                    <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip, .yml, .yaml" multiple required :disabled="importing">
                 </template>
                 <template v-else>
-                    <input type="url" v-model="urlToImport" required :placeholder="importUrlPlaceholder" class="full-width-input">
+                    <input type="url" v-model="urlToImport" required :placeholder="importUrlPlaceholder" class="full-width-input" :disabled="importing">
                 </template>
             </div>
 
             <div style="margin-top: 1.5rem">
                 <label>
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Import Into</div>
-                    <select class="full-width-input" v-model="selectedRequestGroupId">
+                    <select class="full-width-input" v-model="selectedRequestGroupId" :disabled="importing">
                         <option :value="null">Root of the workspace</option>
                         <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
                     </select>
@@ -33,7 +33,8 @@
             </div>
 
             <template #footer>
-                <button class="button">Import</button>
+                <button class="button" v-if="!importing">Import</button>
+                <button class="button" disabled v-else>Importing...</button>
             </template>
         </modal>
     </form>
@@ -64,7 +65,8 @@ export default {
             activeWorkspaceFolders: [],
             filesToImport: [],
             urlToImport: '',
-            importFrom: 'Restfox'
+            importFrom: 'Restfox',
+            importing: false,
         }
     },
     computed: {
@@ -73,6 +75,9 @@ export default {
                 return this.$store.state.showImportModal
             },
             set(value) {
+                if(this.importing) {
+                    return
+                }
                 this.$store.commit('showImportModal', value)
             }
         },
@@ -120,6 +125,8 @@ export default {
             this.selectedRequestGroupId = null
         },
         async importFile() {
+            this.importing = true
+
             let fileBeingImported = ''
 
             try {
@@ -229,6 +236,8 @@ export default {
                 } else {
                     this.$toast.error(`Invalid import file given: ${fileBeingImported}`)
                 }
+            } finally {
+                this.importing = false
             }
         }
     },
