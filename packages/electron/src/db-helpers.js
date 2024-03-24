@@ -51,31 +51,35 @@ async function getCollectionItem(fsLog, workspace, fullPath) {
             console.error(`${path.join(fullPath, constants.FILES.FOLDER_CONFIG)} not found, so skipping adding it to the collection`)
         }
     } else {
-        let collectionItem = JSON.parse(await fs.readFile(fullPath, 'utf8'))
+        try {
+            let collectionItem = JSON.parse(await fs.readFile(fullPath, 'utf8'))
 
-        if (collectionItem._type === 'socket') {
-            const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
-            if (await fileUtils.pathExists(messagesPath)) {
-                const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
-                collectionItem.clients.forEach((client) => {
-                    client.messages = clientMessages[client.id]
-                })
+            if (collectionItem._type === 'socket') {
+                const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
+                if (await fileUtils.pathExists(messagesPath)) {
+                    const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
+                    collectionItem.clients.forEach((client) => {
+                        client.messages = clientMessages[client.id]
+                    })
+                }
             }
+
+            deserializeRequestFiles(collectionItem)
+
+            const collectionName = fileOrFolderName.replace('.json', '')
+
+            collectionItem = {
+                ...collectionItem,
+                _id: fullPath,
+                parentId: dir === workspace.location ? null : dir,
+                name: fileUtils.decodeFilename(collectionName),
+                workspaceId: workspace._id,
+            }
+
+            return collectionItem
+        } catch (err) {
+            console.error(`Error reading collection item: ${fullPath}`, err)
         }
-
-        deserializeRequestFiles(collectionItem)
-
-        const collectionName = fileOrFolderName.replace('.json', '')
-
-        collectionItem = {
-            ...collectionItem,
-            _id: fullPath,
-            parentId: dir === workspace.location ? null : dir,
-            name: fileUtils.decodeFilename(collectionName),
-            workspaceId: workspace._id,
-        }
-
-        return collectionItem
     }
 }
 
@@ -117,7 +121,10 @@ async function getCollection(idMap, fsLog, workspace, dir = workspace.location) 
                 }
             } else {
                 const collectionItem = await getCollectionItem(fsLog, workspace, fullPath)
-                items.push(collectionItem)
+
+                if(collectionItem) {
+                    items.push(collectionItem)
+                }
             }
             idMap.set(fullPath, fullPath)
         }
