@@ -290,11 +290,24 @@ async function createCollections(workspace, collections) {
             }
         } else {
             result = await createCollection(workspace, collection)
-            collections.forEach(item => {
-                if (item.parentId !== null && item.parentId === collection._id) {
-                    item.parentId = result.newCollectionId
+
+            if(result.error) {
+                let i = 2
+                const collectionName = collection.name
+                while(result.error && result.error.includes('as it already exists')) {
+                    collection.name = `${collectionName} (${i})`
+                    result = await createCollection(workspace, collection)
+                    i++
                 }
-            })
+            }
+
+            if(!result.error) {
+                collections.forEach(item => {
+                    if (item.parentId !== null && item.parentId === collection._id) {
+                        item.parentId = result.newCollectionId
+                    }
+                })
+            }
         }
 
         if (result && result.error) {
