@@ -5,6 +5,7 @@ import { Server as SocketIOv4Server } from 'socket.io-v4'
 import { WebSocketServer } from 'ws'
 import { readFileSync, writeFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
+import * as Diff from 'diff'
 
 const app = express()
 
@@ -91,6 +92,21 @@ app.get('/user-agent', (req, res) => {
 
 app.get('/cookie', (req, res) => {
     res.send(req.headers['cookie'])
+})
+
+// http://localhost:5605/query-params-test?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIAYE2V3DV5A12345%2F20240325%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20240325T064424Z&X-Amz-Expires=900&X-Amz-Security-Token=FwoGZXIvYXdzEID%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDKXdeWCdVYhzCVfZGyLIAbht8OXhYxpM7tw1YfxFLNCM7BNW6vikhVKdOZ7PvimKLmVtuuw812DrdiBSDWUH50OQF6gh1vJZrzGWedDR4uRMlehK8k16dJaxG0PRAZvXcfMPZ2ewNZfJRId05SxLjWEV1k9GewWGA3huwkoOnxtvY9lnMg5cNKvCFiRq83tv83fcRr908dKe96gUqej93Ky1EVmuvr1ZfltmYF2hCBOgdZ0LXnWCdw4wRXpTbw3dl0kzPS0XO9wuxGspw%2F%2F2cCYAo2VzTqtCKMi6hLAGMi03bfMF68F6cS3uZHq5zDv7X19yp1C4kvKMyxl7AaF2I1DYjNYFvnotwDesDbY%3D&X-Amz-Signature=30bff23d306ff517abfe2ad3b34883164c6e296ed1462de3575a5864cc077514&X-Amz-SignedHeaders=host%3Bx-amz-acl&x-amz-acl=public-read
+app.get('/query-params-test', (req, res) => {
+    const expected = `?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIAYE2V3DV5A12345%2F20240325%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20240325T064424Z&X-Amz-Expires=900&X-Amz-Security-Token=FwoGZXIvYXdzEID%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDKXdeWCdVYhzCVfZGyLIAbht8OXhYxpM7tw1YfxFLNCM7BNW6vikhVKdOZ7PvimKLmVtuuw812DrdiBSDWUH50OQF6gh1vJZrzGWedDR4uRMlehK8k16dJaxG0PRAZvXcfMPZ2ewNZfJRId05SxLjWEV1k9GewWGA3huwkoOnxtvY9lnMg5cNKvCFiRq83tv83fcRr908dKe96gUqej93Ky1EVmuvr1ZfltmYF2hCBOgdZ0LXnWCdw4wRXpTbw3dl0kzPS0XO9wuxGspw%2F%2F2cCYAo2VzTqtCKMi6hLAGMi03bfMF68F6cS3uZHq5zDv7X19yp1C4kvKMyxl7AaF2I1DYjNYFvnotwDesDbY%3D&X-Amz-Signature=30bff23d306ff517abfe2ad3b34883164c6e296ed1462de3575a5864cc077514&X-Amz-SignedHeaders=host%3Bx-amz-acl&x-amz-acl=public-read`
+    const received = new URL(`http://localhost:5605/${req.originalUrl}`).search
+
+    res.status(received === expected ? 200 : 400)
+
+    res.send({
+        match: received === expected,
+        diff: Diff.diffChars(expected, received),
+        expected,
+        received,
+    })
 })
 
 const server = createServer(app)

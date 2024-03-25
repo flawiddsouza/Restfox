@@ -115,7 +115,7 @@ export default {
                                 urlSearchParams.set(param.name, param.value)
                             }
                         })
-                        urlParamsSplit[1] = [...urlSearchParams.entries()].map(entry => `${entry[0]}=${entry[1]}`).join('&')
+                        urlParamsSplit[1] = urlSearchParams.toString()
                         this.activeTab.url = urlParamsSplit.join('?')
                     }
                 }
