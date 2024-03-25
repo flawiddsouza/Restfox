@@ -5,6 +5,7 @@ const ipcFunctions = [
     'cancelRequest',
     'getWorkspaceAtLocation',
     'updateWorkspace',
+    'ensureEmptyFolderOrEmptyWorkspace',
     'getCollectionForWorkspace',
     'getCollectionById',
     'createCollection',

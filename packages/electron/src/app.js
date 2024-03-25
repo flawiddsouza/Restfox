@@ -96,6 +96,10 @@ app.whenReady().then(async() => {
         return operationQueue.enqueue(() => db.updateWorkspace(...args))
     })
 
+    ipcMain.handle('ensureEmptyFolderOrEmptyWorkspace', (_, ...args) => {
+        return operationQueue.enqueue(() => db.ensureEmptyFolderOrEmptyWorkspace(...args))
+    })
+
     ipcMain.handle('getCollectionForWorkspace', (_, ...args) => {
         return operationQueue.enqueue(() => db.getCollectionForWorkspace(...args))
     })

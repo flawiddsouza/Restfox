@@ -1067,16 +1067,41 @@ const store = createStore<State>({
             }
             await updateCollection(context.state.activeWorkspace._id, payload._id, { collapsed: payload.collapsed })
         },
-        async duplicateWorkspace(context, workspace) {
-            const newWorkspaceId = await context.dispatch('createWorkspace', {
-                name: workspace.name
-            })
-            const { collection: workspaceCollectionItems } = await getCollectionForWorkspace(workspace.sourceWorkspaceId)
+        async duplicateWorkspace(context, { sourceWorkspaceId, name, type, location }) {
+            let newWorkspaceId: string | null = null
+
+            if(type === 'file') {
+                newWorkspaceId = await context.dispatch('createWorkspace', {
+                    name,
+                    _type: type,
+                    location,
+                })
+            } else {
+                newWorkspaceId = await context.dispatch('createWorkspace', {
+                    name
+                })
+            }
+
+            if(newWorkspaceId === null) {
+                throw new Error('newWorkspaceId is null')
+            }
+
+            const { collection: workspaceCollectionItems } = await getCollectionForWorkspace(sourceWorkspaceId)
+
             workspaceCollectionItems.forEach(collectionItem => {
-                collectionItem.workspaceId = newWorkspaceId
+                collectionItem.workspaceId = newWorkspaceId as string
             })
+
             const collectionTree = toTree(workspaceCollectionItems)
+
             generateNewIdsForTree(collectionTree)
+
+            if (type === 'file') {
+                // this will call ensureRestfoxCollection to create restfox workspace if it doesn't exist
+                // this method will return 0 records
+                await getCollectionForWorkspace(newWorkspaceId)
+            }
+
             await createCollections(newWorkspaceId, flattenTree(collectionTree))
         },
         async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }: { collectionTree: CollectionItem[], parentId: string | null, plugins: Plugin[] }) {

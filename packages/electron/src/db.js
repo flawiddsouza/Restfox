@@ -87,6 +87,44 @@ async function updateWorkspace(workspace, updatedFields) {
     console.log(`Updated workspace: ${path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG)}`)
 }
 
+async function ensureEmptyFolderOrEmptyWorkspace(location) {
+    const pathExists = await fileUtils.pathExists(location)
+
+    if (!pathExists) {
+        return {
+            error: `Given folder path does not exist: ${location}`,
+        }
+    }
+
+    const workspaceConfigPath = path.join(location, constants.FILES.WORKSPACE_CONFIG)
+    const workspaceConfigExists = await fileUtils.pathExists(workspaceConfigPath)
+
+    let ls = await fs.readdir(location).catch(() => [])
+    ls = ls.filter(filename => !filename.startsWith('.'))
+
+    if (workspaceConfigExists) {
+        if (ls.length === 1 && ls[0] === constants.FILES.WORKSPACE_CONFIG) {
+            return {
+                error: null,
+            }
+        } else {
+            return {
+                error: `Given folder path is not an empty Restfox workspace: ${location}`,
+            }
+        }
+    }
+
+    if (ls.length === 0) {
+        return {
+            error: null,
+        }
+    } else {
+        return {
+            error: `Given folder path is not empty: ${location}`,
+        }
+    }
+}
+
 /** @type{chokidar.FSWatcher} */
 let workspaceWatcher = null
 
@@ -1065,6 +1103,7 @@ async function createPlugins(workspace, plugins) {
 module.exports = {
     getWorkspaceAtLocation,
     updateWorkspace,
+    ensureEmptyFolderOrEmptyWorkspace,
     getCollectionForWorkspace,
     getCollectionById,
     createCollection,
