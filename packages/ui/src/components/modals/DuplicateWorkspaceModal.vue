@@ -110,7 +110,7 @@ export default {
             this.duplicating = true
 
             await this.$store.dispatch('duplicateWorkspace', {
-                sourceWorkspaceId: this.workspaceToDuplicate._id,
+                sourceWorkspace: JSON.parse(JSON.stringify(this.workspaceToDuplicate)),
                 name: this.newName,
                 type: this.workspaceType,
                 location: this.workspaceLocation,

@@ -1025,7 +1025,7 @@ const store = createStore<State>({
 
             return newWorkspaceId
         },
-        async updateWorkspace(context, payload) {
+        async updateWorkspace(context, payload: { _id: string; updatedFields: Partial<Workspace> }) {
             const workspace = context.state.workspaces.find(item => item._id === payload._id)
 
             if(!workspace) {
@@ -1033,14 +1033,15 @@ const store = createStore<State>({
             }
 
             const updatedAt = new Date().getTime()
-            await updateWorkspace(payload._id, {
-                name: payload.name,
-                location: payload.location,
-                updatedAt
+
+            payload.updatedFields.updatedAt = updatedAt
+
+            await updateWorkspace(payload._id, payload.updatedFields)
+
+            Object.keys(payload.updatedFields).forEach(updatedField => {
+                (workspace as any)[updatedField] = payload.updatedFields[updatedField as keyof Workspace]
             })
-            workspace.name = payload.name
-            workspace.location = payload.location
-            workspace.updatedAt = updatedAt
+
             context.state.workspaces.sort((a, b) => b.updatedAt - a.updatedAt)
         },
         async deleteWorkspace(context, workspaceId) {
@@ -1103,7 +1104,7 @@ const store = createStore<State>({
             }
             await updateCollection(context.state.activeWorkspace._id, payload._id, { collapsed: payload.collapsed })
         },
-        async duplicateWorkspace(context, { sourceWorkspaceId, name, type, location }) {
+        async duplicateWorkspace(context, { sourceWorkspace, name, type, location } : { sourceWorkspace: Workspace, name: string, type: string, location: string }) {
             let newWorkspaceId: string | null = null
 
             if(type === 'file') {
@@ -1122,7 +1123,7 @@ const store = createStore<State>({
                 throw new Error('newWorkspaceId is null')
             }
 
-            const { collection: workspaceCollectionItems } = await getCollectionForWorkspace(sourceWorkspaceId)
+            const { collection: workspaceCollectionItems, workspace } = await getCollectionForWorkspace(sourceWorkspace._id)
 
             workspaceCollectionItems.forEach(collectionItem => {
                 collectionItem.workspaceId = newWorkspaceId as string
@@ -1145,6 +1146,8 @@ const store = createStore<State>({
                 return result
             }
 
+            // duplicate workspace plugins
+
             const idMap = new Map<string, string>()
 
             result.results.forEach((collectionItemResult) => {
@@ -1153,7 +1156,7 @@ const store = createStore<State>({
                 }
             })
 
-            const plugins: Plugin[] = await getWorkspacePlugins(sourceWorkspaceId)
+            const plugins: Plugin[] = await getWorkspacePlugins(sourceWorkspace._id)
 
             const newPlugins: Plugin[] = []
 
@@ -1182,6 +1185,35 @@ const store = createStore<State>({
             })
 
             await createPlugins(newPlugins, newWorkspaceId)
+
+            // duplicate workspace environments
+
+            let updateWorkspaceObject: Partial<Workspace> | null = null
+
+            // is not null if file workspace
+            if(workspace) {
+                if(workspace.environment) {
+                    updateWorkspaceObject = {
+                        environment: workspace.environment,
+                        environments: workspace.environments,
+                        currentEnvironment: workspace.currentEnvironment,
+                    }
+                }
+            } else {
+                // get workspace environment for non-file workspaces
+                updateWorkspaceObject = {
+                    environment: sourceWorkspace.environment,
+                    environments: sourceWorkspace.environments,
+                    currentEnvironment: sourceWorkspace.currentEnvironment,
+                }
+            }
+
+            if(updateWorkspaceObject && Object.keys(updateWorkspaceObject).length > 0) {
+                context.dispatch('updateWorkspace', {
+                    _id: newWorkspaceId,
+                    updatedFields: updateWorkspaceObject
+                })
+            }
         },
         async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }: { collectionTree: CollectionItem[], parentId: string | null, plugins: Plugin[] }) {
             if(context.state.activeWorkspace === null) {

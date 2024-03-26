@@ -64,7 +64,13 @@ export async function updateWorkspace(workspaceId: string, updatedFields: Partia
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             // this will used for updating workspace name, environments & currentEnvironment
-            await window.electronIPC.updateWorkspace(workspace, updatedFields)
+            try {
+                await window.electronIPC.updateWorkspace(workspace, updatedFields)
+            } catch (e) {
+                // This will error out if updatedFields.location was incorrect in the previous update
+                // so the user will not be able to fix the location if we don't catch this error
+                console.warn('Error updating file workspace', e)
+            }
             // we don't want to update these fields into indexedDB if file workspace
             delete updatedFields.currentEnvironment
             delete updatedFields.environment

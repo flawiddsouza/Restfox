@@ -132,13 +132,17 @@ export default {
                 if (this.workspaceType === 'file') {
                     this.$store.dispatch('updateWorkspace', {
                         _id: this.workspace._id,
-                        name: this.workspaceName,
-                        location: this.workspaceLocation
+                        updatedFields: {
+                            name: this.workspaceName,
+                            location: this.workspaceLocation
+                        }
                     })
                 } else {
                     this.$store.dispatch('updateWorkspace', {
                         _id: this.workspace._id,
-                        name: this.workspaceName
+                        updatedFields: {
+                            name: this.workspaceName
+                        }
                     })
                 }
             }
