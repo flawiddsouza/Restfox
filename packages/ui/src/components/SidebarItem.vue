@@ -37,6 +37,7 @@
                 @keydown.esc="cancelSidebarItemNameRename()"
                 @blur="saveSidebarItemName(sidebarItem)"
                 @dblclick.stop
+                ref="updateSidebarItemNameInput"
                 v-focus
                 v-else
             >
@@ -124,6 +125,12 @@ export default {
         },
         async saveSidebarItemName(sidebarItem) {
             if(!this.showInputToRenameRequest) {
+                return
+            }
+
+            if(this.newSidebarItemName.trim() === '') {
+                this.$toast.error('Name cannot be empty')
+                this.$refs.updateSidebarItemNameInput.focus()
                 return
             }
 
