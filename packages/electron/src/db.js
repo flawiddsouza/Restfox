@@ -331,14 +331,14 @@ async function createCollections(workspace, collections) {
                 }
             }
         } else {
-            result = await createCollection(workspace, collection)
+            result = await createCollection(workspace, structuredClone(collection))
 
             if(result.error) {
                 let i = 2
                 const collectionName = collection.name
                 while(result.error && result.error.includes('as it already exists')) {
                     collection.name = `${collectionName} (${i})`
-                    result = await createCollection(workspace, collection)
+                    result = await createCollection(workspace, structuredClone(collection))
                     i++
                 }
             }
