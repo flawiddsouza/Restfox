@@ -28,6 +28,12 @@
                 </div>
             </template>
 
+            <div style="margin-top: 1.5rem">
+                <label style="display: flex">
+                    <input type="checkbox" v-model="includeResponseHistory" :disabled="duplicating"> <div style="margin-left: 0.5rem">Include Response History</div>
+                </label>
+            </div>
+
             <template #footer>
                 <button class="button" v-if="!duplicating">Duplicate</button>
                 <button class="button" disabled v-else>Duplicating...</button>
@@ -69,6 +75,7 @@ export default {
                 { label: 'In Application', value: 'local' }
             ],
             duplicating: false,
+            includeResponseHistory: true,
         }
     },
     computed: {
@@ -114,6 +121,7 @@ export default {
                 name: this.newName,
                 type: this.workspaceType,
                 location: this.workspaceLocation,
+                includeResponseHistory: this.includeResponseHistory,
             })
 
             this.duplicating = false

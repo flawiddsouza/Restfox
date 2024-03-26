@@ -311,7 +311,7 @@ export async function deleteCollectionsByIds(workspaceId: string, collectionIds:
 
 // Responses
 
-export async function getResponsesByCollectionId(workspaceId: string, collectionId: string) {
+export async function getResponsesByCollectionId(workspaceId: string, collectionId: string): Promise<RequestFinalResponse[]> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {

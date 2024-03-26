@@ -57,6 +57,7 @@ import {
     State,
     WorkspaceCache,
     Workspace,
+    RequestFinalResponse,
 } from './global'
 
 async function loadResponses(state: State, tabId: string) {
@@ -1104,7 +1105,7 @@ const store = createStore<State>({
             }
             await updateCollection(context.state.activeWorkspace._id, payload._id, { collapsed: payload.collapsed })
         },
-        async duplicateWorkspace(context, { sourceWorkspace, name, type, location } : { sourceWorkspace: Workspace, name: string, type: string, location: string }) {
+        async duplicateWorkspace(context, { sourceWorkspace, name, type, location, includeResponseHistory } : { sourceWorkspace: Workspace, name: string, type: string, location: string, includeResponseHistory: boolean }) {
             let newWorkspaceId: string | null = null
 
             if(type === 'file') {
@@ -1213,6 +1214,33 @@ const store = createStore<State>({
                     _id: newWorkspaceId,
                     updatedFields: updateWorkspaceObject
                 })
+            }
+
+            // duplicate response history
+
+            if(includeResponseHistory) {
+                console.log('Duplicating response history')
+
+                const responses: RequestFinalResponse[] = []
+
+                for(const oldCollectionId of Object.keys(oldNewIdMapping)) {
+                    const responsesForCollectionId = await getResponsesByCollectionId(sourceWorkspace._id, oldCollectionId)
+                    responsesForCollectionId.forEach(response => {
+                        response._id = nanoid()
+                        let newCollectionId = oldNewIdMapping[oldCollectionId]
+                        if(idMap.size > 0 && idMap.has(newCollectionId)) {
+                            newCollectionId = idMap.get(newCollectionId) as string
+                        }
+                        response.collectionId = newCollectionId
+                    })
+                    responses.push(...responsesForCollectionId)
+                }
+
+                console.log('responses', responses)
+
+                for(const newResponse of responses) {
+                    await createResponse(newWorkspaceId, newResponse)
+                }
             }
         },
         async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }: { collectionTree: CollectionItem[], parentId: string | null, plugins: Plugin[] }) {
