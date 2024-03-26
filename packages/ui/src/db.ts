@@ -471,6 +471,11 @@ export async function deletePluginsByCollectionIds(workspaceId: string, collecti
 
 // used for import
 export async function createPlugins(plugins: Plugin[], workspaceId: string | null = null) {
+    console.log('createPlugins', {
+        plugins,
+        workspaceId,
+    })
+
     if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {

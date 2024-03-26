@@ -667,10 +667,15 @@ const store = createStore<State>({
         },
         async duplicateCollectionItem(context, collectionItem) {
             const newCollectionItem = JSON.parse(JSON.stringify(collectionItem))
-            newCollectionItem._id = nanoid()
+
+            const oldNewIdMapping: Record<string, string> = {}
+
+            const newCollectionItemId = nanoid()
+            oldNewIdMapping[collectionItem._id] = newCollectionItemId
+            newCollectionItem._id = newCollectionItemId
 
             if(collectionItem._type === 'request_group') {
-                generateNewIdsForTreeItemChildren(newCollectionItem)
+                generateNewIdsForTreeItemChildren(newCollectionItem, oldNewIdMapping)
             }
 
             const collectionItemsToSave: CollectionItem[] = flattenTree([newCollectionItem])
@@ -697,10 +702,17 @@ const store = createStore<State>({
                     }
                 })
 
-                newCollectionItem._id = idMap.get(newCollectionItem._id) ?? newCollectionItem._id
-                if(newCollectionItem.parentId) {
-                    newCollectionItem.parentId = idMap.get(newCollectionItem.parentId) ?? newCollectionItem.parentId
+                const recursivelyUpdateIdsAndParentIds = (collectionItem: CollectionItem) => {
+                    collectionItem._id = idMap.get(collectionItem._id) ?? collectionItem._id
+                    if(collectionItem.parentId) {
+                        collectionItem.parentId = idMap.get(collectionItem.parentId) ?? collectionItem.parentId
+                    }
+                    if(collectionItem.children) {
+                        collectionItem.children.forEach(recursivelyUpdateIdsAndParentIds)
+                    }
                 }
+
+                recursivelyUpdateIdsAndParentIds(newCollectionItem)
             }
 
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
@@ -728,6 +740,30 @@ const store = createStore<State>({
                     item.sortOrder = index
                     updateCollection(item.workspaceId, item._id, { sortOrder: index })
                 })
+            }
+
+            const collectionIds = getChildIds(context.state.collection, collectionItem._id)
+
+            const plugins: Plugin[] = []
+
+            context.state.plugins.workspace.forEach(plugin => {
+                if(collectionIds.includes(plugin.collectionId)) {
+                    let newCollectionId = oldNewIdMapping[plugin.collectionId]
+                    if(idMap.size > 0 && idMap.has(newCollectionId)) {
+                        newCollectionId = idMap.get(newCollectionId) as string
+                    }
+                    const newPlugin = JSON.parse(JSON.stringify(plugin))
+                    newPlugin._id = nanoid()
+                    newPlugin.collectionId = newCollectionId
+                    newPlugin.createdAt = new Date().getTime()
+                    newPlugin.updatedAt = new Date().getTime()
+                    plugins.push(newPlugin)
+                }
+            })
+
+            if(plugins.length > 0) {
+                await createPlugins(plugins, collectionItem.workspaceId)
+                context.state.plugins.workspace = context.state.plugins.workspace.concat(plugins)
             }
 
             if(newCollectionItem._type === 'request' || newCollectionItem._type === 'socket') {
