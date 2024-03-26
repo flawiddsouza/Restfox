@@ -4,6 +4,10 @@
         <div style="cursor: pointer; align-self: center; padding-left: 0.5rem; padding-right: 0.5rem;" @click="handleSidebarCreateButton" title="Create New Request / Folder" v-if="collectionFilter === ''">
             <i class="fa fa-plus-circle"></i>
         </div>
+        <div style="cursor: pointer; align-self: center; padding-left: 0.5rem; padding-right: 0.5rem;" @click="collapseFolders" title="Collapse Folders" v-if="collectionFilter === ''">
+            <i class="fa fa-collapse"></i>
+            <i class="fa fa-minus"></i>
+        </div>
     </div>
     <div class="sidebar-list-container" @contextmenu.prevent="handleSidebarEmptyAreaContextMenu">
         <div class="sidebar-list">
@@ -502,6 +506,9 @@ export default {
             }
 
             this.settingsModalShow = false
+        },
+        collapseFolders() {
+            this.$store.dispatch('collapseFolders', this.sidebarItems)
         },
     },
     mounted() {

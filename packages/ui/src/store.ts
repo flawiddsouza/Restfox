@@ -1377,6 +1377,17 @@ const store = createStore<State>({
                 error: null
             }
         },
+        collapseFolders(context, collectionTree: CollectionItem[]) {
+            collectionTree.forEach(collectionItem => {
+                if(collectionItem._type === 'request_group' && collectionItem.collapsed === false) {
+                    collectionItem.collapsed = true
+                    context.dispatch('saveCollectionItemCollapsedState', { _id: collectionItem._id, collapsed: true })
+                }
+                if(collectionItem.children) {
+                    context.dispatch('collapseFolders', collectionItem.children)
+                }
+            })
+        }
     }
 })
 
