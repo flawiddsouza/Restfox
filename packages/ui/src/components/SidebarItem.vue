@@ -5,7 +5,7 @@
         @click="handleSidebarItemClick(sidebarItem)"
         @dblclick="handleSidebarItemDoubleClick(sidebarItem)"
         @contextmenu.prevent="handleContextMenu(sidebarItem, $event)"
-        :draggable="collectionFilter === '' ? true : false"
+        :draggable="collectionFilter === '' && !showInputToRenameRequest ? true : false"
         :data-parent-id="sidebarItem.parentId"
         :data-id="sidebarItem._id"
         :data-type="sidebarItem._type"
