@@ -1130,7 +1130,7 @@ const store = createStore<State>({
 
             const collectionTree = toTree(workspaceCollectionItems)
 
-            generateNewIdsForTree(collectionTree)
+            const oldNewIdMapping = generateNewIdsForTree(collectionTree)
 
             if (type === 'file') {
                 // this will call ensureRestfoxCollection to create restfox workspace if it doesn't exist
@@ -1138,7 +1138,50 @@ const store = createStore<State>({
                 await getCollectionForWorkspace(newWorkspaceId)
             }
 
-            await createCollections(newWorkspaceId, flattenTree(collectionTree))
+            const result = await createCollections(newWorkspaceId, flattenTree(collectionTree))
+
+            if(result.error) {
+                emitter.emit('error', result.error)
+                return result
+            }
+
+            const idMap = new Map<string, string>()
+
+            result.results.forEach((collectionItemResult) => {
+                if(collectionItemResult.oldCollectionId && collectionItemResult.newCollectionId) {
+                    idMap.set(collectionItemResult.oldCollectionId, collectionItemResult.newCollectionId)
+                }
+            })
+
+            const plugins: Plugin[] = await getWorkspacePlugins(sourceWorkspaceId)
+
+            const newPlugins: Plugin[] = []
+
+            plugins.forEach(plugin => {
+                if(plugin.workspaceId) {
+                    const newPlugin = JSON.parse(JSON.stringify(plugin))
+                    newPlugin._id = nanoid()
+                    newPlugin.workspaceId = newWorkspaceId
+                    newPlugin.createdAt = new Date().getTime()
+                    newPlugin.updatedAt = new Date().getTime()
+                    newPlugins.push(newPlugin)
+                }
+
+                if(plugin.collectionId && plugin.collectionId in oldNewIdMapping) {
+                    const newPlugin = JSON.parse(JSON.stringify(plugin))
+                    let newCollectionId = oldNewIdMapping[plugin.collectionId]
+                    if(idMap.size > 0 && idMap.has(newCollectionId)) {
+                        newCollectionId = idMap.get(newCollectionId) as string
+                    }
+                    newPlugin._id = nanoid()
+                    newPlugin.collectionId = newCollectionId
+                    newPlugin.createdAt = new Date().getTime()
+                    newPlugin.updatedAt = new Date().getTime()
+                    newPlugins.push(newPlugin)
+                }
+            })
+
+            await createPlugins(newPlugins, newWorkspaceId)
         },
         async setCollectionTree(context, { collectionTree, parentId = null, plugins = [] }: { collectionTree: CollectionItem[], parentId: string | null, plugins: Plugin[] }) {
             if(context.state.activeWorkspace === null) {
