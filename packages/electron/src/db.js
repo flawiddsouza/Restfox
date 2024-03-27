@@ -716,6 +716,11 @@ async function getResponsesByCollectionId(workspace, collectionId) {
 
     const collectionPath = idMap.get(collectionId)
 
+    // if it's a folder, we don't have responses
+    if (collectionPath.endsWith('.json') === false) {
+        return []
+    }
+
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
     const responsesPathExists = await fileUtils.pathExists(responsesPath)
 
