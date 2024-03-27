@@ -36,6 +36,7 @@
 </template>
 
 <script>
+import { toRaw } from 'vue'
 import SidebarItem from './SidebarItem.vue'
 import ContextMenu from './ContextMenu.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
@@ -299,7 +300,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Duplicate') {
-                this.collectionItemToDuplicate = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.collectionItemToDuplicate = structuredClone(toRaw(this.activeSidebarItemForContextMenu))
                 this.showDuplicateCollectionItemModal = true
             }
 

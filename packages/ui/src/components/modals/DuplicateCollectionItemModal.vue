@@ -14,6 +14,7 @@
 </template>
 
 <script>
+import { toRaw } from 'vue'
 import Modal from '@/components/Modal.vue'
 
 export default {
@@ -86,7 +87,7 @@ export default {
     },
     methods: {
         async duplicateCollectionItem() {
-            const newCollectionItem = JSON.parse(JSON.stringify(this.collectionItemToDuplicate))
+            const newCollectionItem = structuredClone(toRaw(this.collectionItemToDuplicate))
             newCollectionItem.name = this.newName
             const result = await this.$store.dispatch('duplicateCollectionItem', newCollectionItem)
 

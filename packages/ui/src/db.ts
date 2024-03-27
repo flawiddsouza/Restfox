@@ -173,6 +173,7 @@ export async function createCollections(workspaceId: string, collections: Collec
         if(workspace._type === 'file') {
             const collectionsClone = structuredClone(collections)
             await Promise.all(collectionsClone.map(collection => serializeRequestFiles(collection)))
+            console.log('createCollections: serialized', collectionsClone)
             return window.electronIPC.createCollections(workspace, collectionsClone)
         }
     }

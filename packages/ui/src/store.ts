@@ -667,7 +667,7 @@ const store = createStore<State>({
             }
         },
         async duplicateCollectionItem(context, collectionItem) {
-            const newCollectionItem = JSON.parse(JSON.stringify(collectionItem))
+            const newCollectionItem = structuredClone(collectionItem)
 
             const oldNewIdMapping: Record<string, string> = {}
 

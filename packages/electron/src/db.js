@@ -222,6 +222,8 @@ async function createCollection(workspace, collection) {
         collection,
     })
 
+    dbHelpers.serializeRequestFiles(collection)
+
     const oldCollectionId = collection._id
     const collectionName = fileUtils.encodeFilename(collection.name)
 
