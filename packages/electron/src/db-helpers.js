@@ -59,7 +59,7 @@ async function getCollectionItem(fsLog, workspace, fullPath) {
                 if (await fileUtils.pathExists(messagesPath)) {
                     const clientMessages = JSON.parse(await fs.readFile(messagesPath, 'utf8'))
                     collectionItem.clients.forEach((client) => {
-                        client.messages = clientMessages[client.id]
+                        client.messages = clientMessages[client.id] ?? []
                     })
                 }
             }
