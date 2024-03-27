@@ -368,6 +368,11 @@ export async function deleteResponse(workspaceId: string, collectionId: string, 
 }
 
 export async function deleteResponsesByIds(workspaceId: string, collectionId: string, responseIds: string[]) {
+    console.log('deleteResponsesByIds', {
+        collectionId,
+        responseIds,
+    })
+
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {

@@ -738,9 +738,11 @@ async function getResponsesByCollectionId(workspace, collectionId) {
         const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
         responses.forEach((response) => {
             dbHelpers.deserializeRequestResponseFiles(response)
+            // add back the collectionId we removed in createResponse
+            response.collectionId = collectionId
         })
-        // reverse the responses so that the latest response is shown first
-        return responses.reverse()
+        // sort by createdAt desc so that the latest response is shown first
+        return responses.sort((a, b) => b.createdAt - a.createdAt)
     }
 
     return []
@@ -841,7 +843,7 @@ async function deleteResponsesByIds(workspace, collectionId, responseIds) {
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
 
-    const responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
+    let responses = JSON.parse(await fs.readFile(responsesPath, 'utf8'))
 
     responses = responses.filter((response) => !responseIds.includes(response._id))
 
