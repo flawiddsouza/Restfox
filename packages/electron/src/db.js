@@ -446,6 +446,16 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             } catch (err) {
                 console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
             }
+
+            const messagesRenameFrom = renameFrom.replace('.json', constants.FILES.MESSAGES)
+            const messagesRenameTo = renameTo.replace('.json', constants.FILES.MESSAGES)
+
+            try {
+                await fs.access(messagesRenameFrom)
+                await fileUtils.renameFileOrFolder(messagesRenameFrom, messagesRenameTo, fsLog, `Rename messages file`)
+            } catch (err) {
+                console.log(`Skipping renaming messages file: ${messagesRenameFrom} as it does not exist`)
+            }
         } else {
             // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
             // and will error out when trying to update them
