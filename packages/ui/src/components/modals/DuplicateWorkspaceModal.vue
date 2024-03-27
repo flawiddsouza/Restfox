@@ -116,13 +116,21 @@ export default {
 
             this.duplicating = true
 
-            await this.$store.dispatch('duplicateWorkspace', {
-                sourceWorkspace: JSON.parse(JSON.stringify(this.workspaceToDuplicate)),
-                name: this.newName,
-                type: this.workspaceType,
-                location: this.workspaceLocation,
-                includeResponseHistory: this.includeResponseHistory,
-            })
+            try {
+                await this.$store.dispatch('duplicateWorkspace', {
+                    sourceWorkspace: JSON.parse(JSON.stringify(this.workspaceToDuplicate)),
+                    name: this.newName,
+                    type: this.workspaceType,
+                    location: this.workspaceLocation,
+                    includeResponseHistory: this.includeResponseHistory,
+                })
+            } catch (error) {
+                console.error(error)
+                this.duplicating = false
+                this.showModalComp = false
+                this.$toast.error('Failed to duplicate workspace: ' + error.message)
+                return
+            }
 
             this.duplicating = false
             this.showModalComp = false

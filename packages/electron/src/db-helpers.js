@@ -302,11 +302,11 @@ function deserializeRequestFiles(collection) {
 async function serializeRequestResponseFiles(response) {
     response.buffer = Buffer.from(response.buffer).toString('base64')
 
-    if(response.request.body && response.request.body.buffer instanceof ArrayBuffer) {
+    if(response.request && response.request.body && response.request.body.buffer instanceof ArrayBuffer) {
         response.request.body = fileUtils.transformFileObjectToSaveableFileObject(response.request.body)
     }
 
-    if(response.request.original.body) {
+    if(response.request && response.request.original.body) {
         if(response.request.original.body.fileName && response.request.original.body.fileName instanceof ArrayBuffer) {
             response.request.original.body.fileName = fileUtils.transformFileObjectToSaveableFileObject(response.request.original.body.fileName)
         }

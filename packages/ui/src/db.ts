@@ -171,7 +171,9 @@ export async function createCollections(workspaceId: string, collections: Collec
     if(import.meta.env.MODE === 'desktop-electron') {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            return window.electronIPC.createCollections(workspace, collections)
+            const collectionsClone = structuredClone(collections)
+            await Promise.all(collectionsClone.map(collection => serializeRequestFiles(collection)))
+            return window.electronIPC.createCollections(workspace, collectionsClone)
         }
     }
 
@@ -203,6 +205,8 @@ async function serializeRequestFiles(collection: Partial<CollectionItem>) {
     if(collection.body && collection.body.params) {
         for(const param of collection.body.params) {
             if(param.files) {
+                // filter out non-file objects
+                param.files = (param.files as any[]).filter(file => file instanceof File)
                 param.files = await Promise.all(param.files.map(async file => await transformFileToFileObject(file as File)))
             }
         }
@@ -224,11 +228,11 @@ function deserializeRequestFiles(collection: Partial<CollectionItem>) {
 }
 
 async function serializeRequestResponseFiles(response: RequestFinalResponse) {
-    if(response.request.body instanceof File) {
+    if(response.request && response.request.body instanceof File) {
         response.request.body = await transformFileToFileObject(response.request.body)
     }
 
-    if(response.request.original.body) {
+    if(response.request && response.request.original.body) {
         if(response.request.original.body.fileName && response.request.original.body.fileName instanceof File) {
             response.request.original.body.fileName = await transformFileToFileObject(response.request.original.body.fileName)
         }
@@ -236,6 +240,8 @@ async function serializeRequestResponseFiles(response: RequestFinalResponse) {
         if(response.request.original.body.params) {
             for(const param of response.request.original.body.params) {
                 if(param.files) {
+                    // filter out non-file objects
+                    param.files = (param.files as any[]).filter(file => file instanceof File)
                     param.files = await Promise.all(param.files.map(file => transformFileToFileObject(file as File)))
                 }
             }
