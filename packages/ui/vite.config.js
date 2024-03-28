@@ -10,7 +10,7 @@ import checker from 'vite-plugin-checker'
 export default defineConfig(({ mode }) => {
     const config = {
         plugins: [
-            process.env.VITEST ? null : ViteRevisionPlugin(),
+            process.env.VITEST ? null : ViteRevisionPlugin(mode),
             vue({
                 template: {
                     compilerOptions: {
@@ -65,7 +65,11 @@ export default defineConfig(({ mode }) => {
         },
         base: '',
         test: {
-            reporters: 'verbose'
+            reporters: 'verbose',
+            exclude: [
+                'node_modules',
+                'tests',
+            ],
         },
         esbuild: {
             minifyIdentifiers: false,
