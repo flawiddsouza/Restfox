@@ -14,3 +14,12 @@ export async function creatRequest(page: Page, requestName: string) {
     await page.getByPlaceholder('My Request').fill(requestName)
     await page.getByRole('button', { name: 'Create' }).click()
 }
+
+export async function typeInRequestPanelAddressBar(page: Page, url: string, clear: boolean) {
+    await page.getByTestId('request-panel-address-bar').click()
+    if(clear) {
+        await page.keyboard.press('Control+A')
+        await page.keyboard.press('Backspace')
+    }
+    await page.keyboard.type(url)
+}

@@ -16,6 +16,7 @@ import { getCollectionForWorkspace } from './db'
 import constants from './constants'
 import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme, debounce } from './helpers'
 import { emitter } from './event-bus'
+import * as queryParamsSync from '@/utils/query-params-sync'
 import './web-components/alert-confirm-prompt'
 
 export default {
@@ -49,76 +50,12 @@ export default {
     },
     watch: {
         // sync query params in url with query params in request
-        'activeTab.url'(newValue, previousValue) {
-            if (!newValue || !previousValue) {
-                return
-            }
-
-            const previousParams = new URLSearchParams(previousValue.split('?')[1] || '')
-            const newParams = new URLSearchParams(newValue.split('?')[1] || '')
-
-            // no change in url query params
-            if(previousParams.toString() === newParams.toString()) {
-                return
-            }
-
-            const paramMap = new Map()
-
-            // Add all parameters from the new URL to paramMap, overriding any existing ones
-            newParams.forEach((value, key) => paramMap.set(key, value))
-
-            // Detect changed parameters by comparing previous and new values
-            const changedParams = []
-            previousParams.forEach((value, key) => {
-                if (!newParams.has(key)) { // Parameter is removed
-                    changedParams.push(key)
-                }
-            })
-
-            if(this.activeTab.parameters === undefined) {
-                this.activeTab.parameters = []
-            }
-
-            this.activeTab.parameters = this.activeTab.parameters.filter(param => {
-                // Keep all parameters except the ones that have been explicitly changed
-                return !changedParams.includes(param.name) || paramMap.has(param.name)
-            })
-
-            // Map existing parameters to keep track of which ones have been handled
-            const existingParameters = new Map()
-            this.activeTab.parameters.forEach(param => existingParameters.set(param.name, param))
-
-            // Update the values of parameters or create new ones based on the new URL
-            paramMap.forEach((value, key) => {
-                if (existingParameters.has(key)) {
-                    // Update existing parameter's value
-                    existingParameters.get(key).value = value
-                } else {
-                    // Add new parameter
-                    this.activeTab.parameters.push({
-                        name: key,
-                        value: value,
-                        disabled: false
-                    })
-                }
-            })
+        'activeTab.url'() {
+            queryParamsSync.onUrlChange(this.activeTab)
         },
         'activeTab.parameters': {
             handler() {
-                // sync query params in url with query params in collection if they are the same
-                if(this.activeTab && 'url' in this.activeTab && this.activeTab.url && this.activeTab.parameters) {
-                    let urlParamsSplit = this.activeTab.url.split('?')
-                    if(urlParamsSplit.length > 1) {
-                        const urlSearchParams = new URLSearchParams(urlParamsSplit[1])
-                        this.activeTab.parameters.filter(item => !item.disabled).forEach(param => {
-                            if(urlSearchParams.has(param.name)) {
-                                urlSearchParams.set(param.name, param.value)
-                            }
-                        })
-                        urlParamsSplit[1] = urlSearchParams.toString()
-                        this.activeTab.url = urlParamsSplit.join('?')
-                    }
-                }
+                queryParamsSync.onParametersChange(this.activeTab)
             },
             deep: true
         },
