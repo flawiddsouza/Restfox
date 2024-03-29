@@ -23,10 +23,10 @@ jobs:
         run: |
           npm ci
           npm run build-desktop-electron
-      - name: Install flatpak dependencies
-        run: |
-          sudo apt-get install -y flatpak-builder
-          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+      # - name: Install flatpak dependencies
+      #   run: |
+      #     sudo apt-get install -y flatpak-builder
+      #     flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
       - name: Build deb, rpm, flatpak
         working-directory: ./packages/electron
         run: |
