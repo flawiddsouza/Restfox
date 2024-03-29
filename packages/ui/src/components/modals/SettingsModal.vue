@@ -27,7 +27,7 @@
             </div>
             <div>
                 <label style="padding-top: 1rem; display: flex;">
-                    <input type="checkbox" v-model="disableSandbox"> <div style="margin-left: 0.5rem;">Remove Sandbox Restriction</div> <div style="margin-left: 0.5rem;"></div>
+                    <input type="checkbox" v-model="disableIframeSandbox"> <div style="margin-left: 0.5rem;">Remove Sandbox Restriction</div> <div style="margin-left: 0.5rem;"></div>
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will remove iframe sandbox restrictions. See <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox" target="_blank">this link</a> for more info.</div>
             </div>
@@ -78,7 +78,7 @@ export default {
             disablePageViewAnalyticsTracking: false,
             disableSSLVerification: false,
             electronSwitchToChromiumFetch: false,
-            disableSandbox: false,
+            disableIframeSandbox: false,
         }
     },
     computed: {
@@ -115,9 +115,9 @@ export default {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH, this.electronSwitchToChromiumFetch)
             this.$store.state.flags.electronSwitchToChromiumFetch = this.electronSwitchToChromiumFetch
         },
-        disableSandbox() {
-            localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX, this.disableSandbox)
-            this.$store.state.flags.disableSandbox = this.disableSandbox
+        disableIframeSandbox() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX, this.disableIframeSandbox)
+            this.$store.state.flags.disableIframeSandbox = this.disableIframeSandbox
         }
     },
     methods: {
@@ -138,7 +138,7 @@ export default {
         resetElectronSwitchToChromiumFetch() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
         },
-        resetDisableSandbox() {
+        resetDisableIframeSandbox() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
         },
         resetSettings(target = null) {
@@ -155,7 +155,7 @@ export default {
             this.resetDisablePageViewAnalyticsTracking()
             this.resetDisableSSLVerification()
             this.resetElectronSwitchToChromiumFetch()
-            this.resetDisableSandbox()
+            this.resetDisableIframeSandbox()
 
             document.location.reload()
         },
@@ -166,7 +166,7 @@ export default {
             const savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
             const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
-            const savedDisableSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
+            const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -203,11 +203,11 @@ export default {
                     this.electronSwitchToChromiumFetch = false
                 }
             }
-            if(savedDisableSandbox) {
+            if(savedDisableIframeSandbox) {
                 try {
-                    this.disableSandbox = JSON.parse(savedDisableSandbox)
+                    this.disableIframeSandbox = JSON.parse(savedDisableIframeSandbox)
                 } catch (e) {
-                    this.disableSandbox = false
+                    this.disableIframeSandbox = false
                 }
             }
         }

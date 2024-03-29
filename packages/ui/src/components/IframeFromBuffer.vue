@@ -28,7 +28,7 @@ export default {
     },
     computed: {
         sandboxValues() {
-            return this.$store.state.flags.disableSandbox ? 'allow-same-origin allow-scripts allow-popups allow-forms' : ''
+            return this.$store.state.flags.disableIframeSandbox ? 'allow-same-origin allow-scripts allow-popups allow-forms' : ''
         }
     },
     beforeUnmount() {
