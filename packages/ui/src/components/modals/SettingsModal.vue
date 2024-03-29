@@ -27,7 +27,7 @@
             </div>
             <div>
                 <label style="padding-top: 1rem; display: flex;">
-                    <input type="checkbox" v-model="disableIframeSandbox"> <div style="margin-left: 0.5rem;">Remove Sandbox Restriction</div> <div style="margin-left: 0.5rem;"></div>
+                    <input type="checkbox" v-model="disableIframeSandbox"> <div style="margin-left: 0.5rem;">Remove Iframe Sandbox Restriction</div> <div style="margin-left: 0.5rem;"></div>
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will remove iframe sandbox restrictions. See <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox" target="_blank">this link</a> for more info.</div>
             </div>
