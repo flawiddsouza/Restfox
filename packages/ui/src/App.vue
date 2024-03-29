@@ -16,7 +16,6 @@ import { getCollectionForWorkspace } from './db'
 import constants from './constants'
 import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme, debounce } from './helpers'
 import { emitter } from './event-bus'
-import * as queryParamsSync from '@/utils/query-params-sync'
 import './web-components/alert-confirm-prompt'
 
 export default {
@@ -49,16 +48,6 @@ export default {
         }
     },
     watch: {
-        // sync query params in url with query params in request
-        'activeTab.url'() {
-            queryParamsSync.onUrlChange(this.activeTab)
-        },
-        'activeTab.parameters': {
-            handler() {
-                queryParamsSync.onParametersChange(this.activeTab)
-            },
-            deep: true
-        },
         activeTab: {
             handler(newValue, oldValue) {
                 // don't commit change when activeTab is set for the first time

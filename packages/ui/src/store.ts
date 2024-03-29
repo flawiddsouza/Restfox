@@ -59,6 +59,7 @@ import {
     Workspace,
     RequestFinalResponse,
 } from './global'
+import * as queryParamsSync from '@/utils/query-params-sync'
 
 async function loadResponses(state: State, tabId: string) {
     if(tabId in state.responses) {
@@ -86,8 +87,16 @@ function setActiveTab(state: State, tab: CollectionItem, scrollSidebarItemIntoVi
     if(state.activeTab && state.activeTab._id === tab._id) {
         return
     }
-    // console.log('setActiveTab', tab._id)
+
+    console.log('setActiveTab', tab._id)
+
+    // migrating old unsynced query params to new format
+    if('url' in tab || 'parameters' in tab) {
+        queryParamsSync.migrateOldData(tab)
+    }
+
     state.activeTab = tab
+
     loadResponses(state, tab._id)
     if(scrollSidebarItemIntoView) {
         if(tab.parentId) {

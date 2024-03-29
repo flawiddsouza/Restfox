@@ -5,7 +5,16 @@
                 <option v-for="method in methods">{{ method }}</option>
             </select>
             <div class="code-mirror-input-container">
-                <CodeMirrorSingleLine v-model="activeTab.url" placeholder="Enter request URL" :key="'address-bar-' + activeTab._id" @keydown="handleAddressBarKeyDown" :paste-handler="handleAddressBarPaste" :env-variables="activeTabEnvironmentResolved" data-testid="request-panel-address-bar" />
+                <CodeMirrorSingleLine
+                    v-model="activeTab.url"
+                    placeholder="Enter request URL"
+                    :key="'address-bar-' + activeTab._id"
+                    @keydown="handleAddressBarKeyDown"
+                    @update:modelValue="handleUrlChange"
+                    :paste-handler="handleAddressBarPaste"
+                    :env-variables="activeTabEnvironmentResolved"
+                    data-testid="request-panel-address-bar"
+                />
             </div>
             <button @click="sendRequest">Send</button>
         </div>
@@ -206,6 +215,7 @@
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-name-' + index"
+                                @update:modelValue="handleQueryParametersChange()"
                             />
                         </td>
                         <td>
@@ -216,17 +226,18 @@
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-value-' + index"
+                                @update:modelValue="handleQueryParametersChange()"
                             />
                         </td>
                         <td>
-                            <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true">
+                            <input type="checkbox" :checked="param.disabled === undefined || param.disabled === false" @change="param.disabled = $event.target.checked ? false : true; handleQueryParametersChange();">
                         </td>
-                        <td @click="activeTab.parameters.splice(index, 1)">
+                        <td @click="activeTab.parameters.splice(index, 1); handleQueryParametersChange();">
                             <i class="fa fa-trash"></i>
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab, 'parameters', { name: '', value: '' })">
+                        <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab, 'parameters', { name: '', value: '' }); handleQueryParametersChange();">
                             + Add Item
                         </td>
                     </tr>
@@ -405,6 +416,7 @@ import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection } from '@/helpers'
+import * as queryParamsSync from '@/utils/query-params-sync'
 
 export default {
     components: {
@@ -651,7 +663,13 @@ export default {
                     this.rootElementResizeObserver = null
                 }
             }
-        }
+        },
+        handleUrlChange() {
+            queryParamsSync.onUrlChange(this.activeTab)
+        },
+        handleQueryParametersChange() {
+            queryParamsSync.onParametersChange(this.activeTab)
+        },
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
