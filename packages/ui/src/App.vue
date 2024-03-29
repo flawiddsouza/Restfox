@@ -363,6 +363,7 @@ export default {
         let savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
         const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
         const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
+        const savedDisableSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -411,6 +412,14 @@ export default {
                 this.$store.state.flags.electronSwitchToChromiumFetch = JSON.parse(savedElectronSwitchToChromiumFetch)
             } catch(e) {
                 this.$store.state.flags.electronSwitchToChromiumFetch = false
+            }
+        }
+
+        if(savedDisableSandbox) {
+            try {
+                this.$store.state.flags.disableSandbox = JSON.parse(savedDisableSandbox)
+            } catch(e) {
+                this.$store.state.flags.disableSandbox = false
             }
         }
 

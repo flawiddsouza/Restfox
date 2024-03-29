@@ -25,6 +25,12 @@
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will prevent the application from sending page view event to the <a href="https://umami.is" target="_blank">analytics server</a> when the application is opened. Please note that we do not track any other actions or the requests you make in the application. Click <a href="https://umami.is/docs/tracker-functions#:~:text=Pageviews,Website%20ID%20(required)" target="_blank">here</a> to see what data gets collected.</div>
             </div>
+            <div>
+                <label style="padding-top: 1rem; display: flex;">
+                    <input type="checkbox" v-model="disableSandbox"> <div style="margin-left: 0.5rem;">Remove Sandbox Restriction</div> <div style="margin-left: 0.5rem;"></div>
+                </label>
+                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will remove iframe sandbox restrictions. See <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox" target="_blank">this link</a> for more info.</div>
+            </div>
             <template v-if="flags.isElectron">
                 <div style="padding-top: 1rem"></div>
                 <div>
@@ -72,6 +78,7 @@ export default {
             disablePageViewAnalyticsTracking: false,
             disableSSLVerification: false,
             electronSwitchToChromiumFetch: false,
+            disableSandbox: false,
         }
     },
     computed: {
@@ -107,6 +114,10 @@ export default {
         electronSwitchToChromiumFetch() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH, this.electronSwitchToChromiumFetch)
             this.$store.state.flags.electronSwitchToChromiumFetch = this.electronSwitchToChromiumFetch
+        },
+        disableSandbox() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX, this.disableSandbox)
+            this.$store.state.flags.disableSandbox = this.disableSandbox
         }
     },
     methods: {
@@ -127,6 +138,9 @@ export default {
         resetElectronSwitchToChromiumFetch() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
         },
+        resetDisableSandbox() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -141,6 +155,8 @@ export default {
             this.resetDisablePageViewAnalyticsTracking()
             this.resetDisableSSLVerification()
             this.resetElectronSwitchToChromiumFetch()
+            this.resetDisableSandbox()
+
             document.location.reload()
         },
         fetchSavedSettings() {
@@ -150,6 +166,7 @@ export default {
             const savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
             const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
+            const savedDisableSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -184,6 +201,13 @@ export default {
                     this.electronSwitchToChromiumFetch = JSON.parse(savedElectronSwitchToChromiumFetch)
                 } catch (e) {
                     this.electronSwitchToChromiumFetch = false
+                }
+            }
+            if(savedDisableSandbox) {
+                try {
+                    this.disableSandbox = JSON.parse(savedDisableSandbox)
+                } catch (e) {
+                    this.disableSandbox = false
                 }
             }
         }
