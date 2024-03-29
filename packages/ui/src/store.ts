@@ -300,6 +300,7 @@ const store = createStore<State>({
                 isElectron: false,
                 disableSSLVerification: false,
                 electronSwitchToChromiumFetch: false,
+                disableIframeSandbox : false,
             },
             openContextMenuElement: null,
             sockets: {},
