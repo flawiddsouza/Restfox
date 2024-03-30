@@ -136,7 +136,7 @@ export default {
         },
         plugins() {
             if(this.collectionItem) {
-                return this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === this.collectionItem._id)
+                return this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === this.collectionItem._id && plugin.type !== 'script')
             }
 
             return this.$store.state.plugins.global

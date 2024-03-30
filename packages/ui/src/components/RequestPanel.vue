@@ -400,6 +400,23 @@
                     </table>
                 </div>
             </template>
+            <template v-if="activeRequestPanelTab === 'Script'">
+                <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
+                    <div style="margin-bottom: 0.25rem">Pre Request</div>
+                    <CodeMirrorEditor
+                        v-model="script.pre_request"
+                        lang="javascript"
+                        class="code-editor"
+                    ></CodeMirrorEditor>
+
+                    <div style="margin-top: 1rem; margin-bottom: 0.25rem;">Post Request</div>
+                    <CodeMirrorEditor
+                        v-model="script.post_request"
+                        lang="javascript"
+                        class="code-editor"
+                    ></CodeMirrorEditor>
+                </div>
+            </template>
             <template v-if="activeRequestPanelTab === 'Description'">
                 <div style="height: 100%">
                     <textarea v-model="activeTab.description" style="width: 100%; height: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
@@ -417,6 +434,7 @@ import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection } from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
+import constants from '@/constants'
 
 export default {
     components: {
@@ -440,6 +458,9 @@ export default {
                     name: 'Auth'
                 },
                 {
+                    name: 'Script'
+                },
+                {
                     name: 'Description'
                 }
             ],
@@ -460,7 +481,12 @@ export default {
             disableGraphqlWatch: false,
             refreshCodeMirrorEditors: 1,
             rootElementResizeObserver: null,
-            tabView: 'full'
+            tabView: 'full',
+            script: {
+                pre_request: constants.CODE_EXAMPLE.SCRIPT.PRE_REQUEST,
+                post_request: constants.CODE_EXAMPLE.SCRIPT.POST_REQUEST,
+            },
+            skipScriptUpdate: false,
         }
     },
     computed: {
@@ -472,6 +498,13 @@ export default {
         },
         activeTabEnvironmentResolved() {
             return this.$store.state.activeTabEnvironmentResolved
+        },
+        scriptPlugin() {
+            if(this.activeTab === null) {
+                return undefined
+            }
+
+            return this.$store.state.plugins.workspace.find(plugin => plugin.collectionId === this.activeTab._id && plugin.type === 'script')
         },
     },
     watch: {
@@ -511,7 +544,53 @@ export default {
                 }, null, 4)
             },
             deep: true
-        }
+        },
+        scriptPlugin: {
+            handler() {
+                if(this.scriptPlugin) {
+                    this.skipScriptUpdate = true
+                    this.script.pre_request = this.scriptPlugin.code.pre_request
+                    this.skipScriptUpdate = true
+                    this.script.post_request = this.scriptPlugin.code.post_request
+                } else {
+                    this.skipScriptUpdate = true
+                    this.script.pre_request = constants.CODE_EXAMPLE.SCRIPT.PRE_REQUEST
+                    this.skipScriptUpdate = true
+                    this.script.post_request = constants.CODE_EXAMPLE.SCRIPT.POST_REQUEST
+                }
+            },
+            immediate: true
+        },
+        script: {
+            handler() {
+                if(this.skipScriptUpdate) {
+                    this.skipScriptUpdate = false
+                    return
+                }
+                if(this.scriptPlugin) {
+                    this.$store.commit('updatePlugin', {
+                        _id: this.scriptPlugin._id,
+                        name: null,
+                        code: {
+                            pre_request: this.script.pre_request,
+                            post_request: this.script.post_request,
+                        },
+                    })
+                } else {
+                    this.$store.commit('addPlugin', {
+                        name: null,
+                        code: {
+                            pre_request: this.script.pre_request,
+                            post_request: this.script.post_request,
+                        },
+                        workspaceId: null,
+                        collectionId: this.activeTab._id,
+                        type: 'script',
+                    })
+                }
+            },
+            deep: true
+        },
     },
     methods: {
         sendRequest() {

@@ -300,10 +300,10 @@ export async function createRequestData(state: HandleRequestState, request: Coll
     for(const plugin of plugins) {
         const { context: requestContext, expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
-        state.currentPlugin = plugin.name
+        state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : plugin.name
 
         await usePlugin(requestContext, expose, {
-            code: plugin.code
+            code: typeof plugin.code === 'object' ? plugin.code.pre_request : plugin.code
         })
 
         request = { ...request, headers: requestContext.request.getHeaders(), body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
@@ -525,8 +525,10 @@ export async function handleRequest(request: CollectionItem, environment: any, s
         for(const plugin of plugins) {
             const { context: responseContext, expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults)
 
+            state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : plugin.name
+
             await usePlugin(responseContext, expose, {
-                code: plugin.code
+                code: typeof plugin.code === 'object' ? plugin.code.post_request : plugin.code
             })
 
             responseToSend = { ...responseToSend, buffer: responseContext.response.getBody() }
@@ -559,7 +561,7 @@ export async function handleRequest(request: CollectionItem, environment: any, s
                         lineNumber = lineNumberInfo[1]
                     }
                 }
-                error = `Error: Plugin "${state.currentPlugin}" has an error at line number ${lineNumber}\n\n${e.originalError.name}: ${e.originalError.message}`
+                error = `Error in Plugin "${state.currentPlugin}"${lineNumber !== '' ? ' at line number ' + lineNumber : ''}\n\n${e.originalError.name}: ${e.originalError.message}`
             }
         }
 

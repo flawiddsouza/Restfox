@@ -27,6 +27,7 @@
         "altair-codemirror-graphql": "^4.6.4",
         "chai": "^4.3.10",
         "dayjs": "^1.10.7",
+        "dedent": "^1.5.1",
         "dexie": "^3.2.0",
         "dexie-export-import": "^1.0.3",
         "httpsnippet-browser": "github:flawiddsouza/httpsnippet-browser#ed12aba",

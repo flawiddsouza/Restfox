@@ -6,7 +6,6 @@ import { substituteEnvironmentVariables } from './helpers'
 import {
     CollectionItem,
     RequestParam,
-    Plugin,
     PluginTestResult,
     PluginExpose,
     RequestInitialResponseHeader,
@@ -165,7 +164,7 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
     }
 }
 
-export async function usePlugin(context: any, expose: PluginExpose, plugin: Partial<Plugin>) {
+export async function usePlugin(context: any, expose: PluginExpose, plugin: { code: string }) {
     const vm = (await getQuickJS()).newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 

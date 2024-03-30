@@ -32,48 +32,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
-
-const examplePluginCode =
-`// Available methods:
-// context.request.getMethod()
-// context.request.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
-// context.request.setEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')
-// context.request.getHeader('<HEADER_NAME>')
-// context.request.setHeader('<HEADER_NAME>', '<HEADER_VALUE>') - sets header value
-// context.request.getHeaders()
-// context.request.setHeaders(<HEADER_ARRAY>) - replaces all headers with contents of <HEADER_ARRAY>
-// context.request.getURL()
-// context.request.getBody()
-// context.request.setBody(<REQUEST_BODY_OBJECT>)
-// context.request.getQueryParams()
-// context.request.setQueryParams(<REQUEST_QUERY_PARAMS_ARRAY>)
-// context.response.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
-// context.response.setEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')
-// context.response.getHeader('<HEADER_NAME>')
-// context.response.getHeaders()
-// context.response.getURL()
-// context.response.getBody() - returns ArrayBuffer
-// context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
-// context.response.getBodyText() - returns context.response.getBody() ArrayBuffer as text
-// context.response.setBodyText(<RESPONSE_BODY_TEXT>) - sets given text as context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
-// console.log(...)
-
-function handleRequest() {
-    console.log(context.request.getBody())
-}
-
-function handleResponse() {
-    console.log(context.response.getBody())
-}
-
-if('request' in context) {
-    handleRequest()
-}
-
-if('response' in context) {
-    handleResponse()
-}
-`
+import constants from '@/constants'
 
 export default {
     directives: {
@@ -112,7 +71,7 @@ export default {
     data() {
         return {
             name: '',
-            code: examplePluginCode,
+            code: constants.CODE_EXAMPLE.PLUGIN,
             workspaceId: this.activeWorkspace?._id ?? null
         }
     },
@@ -140,7 +99,7 @@ export default {
     methods: {
         resetPlugin() {
             this.name = ''
-            this.code = examplePluginCode
+            this.code = constants.CODE_EXAMPLE.PLUGIN
             this.workspaceId = this.activeWorkspace?._id ?? null
         },
         savePlugin() {

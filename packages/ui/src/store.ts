@@ -511,6 +511,7 @@ const store = createStore<State>({
         async addPlugin(state, plugin) {
             const newPlugin = {
                 _id: nanoid(),
+                type: plugin.type,
                 name: plugin.name,
                 code: plugin.code,
                 workspaceId: plugin.workspaceId,
