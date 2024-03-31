@@ -50,10 +50,16 @@ html {
     --cm-boolean: #219;
     --cm-null: #708;
     --cm-number: #164;
+    --cm-comment: #940;
+    --cm-keyword: #708;
+    --cm-variable: #00f;
     --modal-cm-string: #a11;
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
     --modal-cm-number: #164;
+    --modal-cm-comment: #940;
+    --modal-cm-keyword: #708;
+    --modal-cm-variable: #00f;
     --drop-target-background-color: #ffc0cb1f;
     --workspace-menu-hover-background-color: #dbedff;
     --method-get: #ab7aff;
@@ -117,10 +123,16 @@ html.theme-dark {
     --cm-boolean: #b0a4ff;
     --cm-null: #f190ff;
     --cm-number: #1cd58b;
+    --cm-comment: #ee8735;
+    --cm-keyword: #ca73d7;
+    --cm-variable: #a7a7ff;
     --modal-cm-string: #a11;
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
     --modal-cm-number: #164;
+    --modal-cm-comment: #940;
+    --modal-cm-keyword: #708;
+    --modal-cm-variable: #00f;
     --drop-target-background-color: #f8889b41;
     --workspace-menu-hover-background-color: #505050;
     --socket-header-background-color: var(--sidebar-item-active-color);
@@ -282,6 +294,18 @@ button.button:hover {
     color: var(--cm-number);
 }
 
+.cm-editor .cm-comment {
+    color: var(--cm-comment);
+}
+
+.cm-editor .cm-keyword {
+    color: var(--cm-keyword);
+}
+
+.cm-editor .cm-variable {
+    color: var(--cm-variable);
+}
+
 .modal .cm-editor .cm-string:not(.cm-property) {
     color: var(--modal-cm-string);
 }
@@ -296,6 +320,18 @@ button.button:hover {
 
 .modal .cm-editor .cm-number {
     color: var(--modal-cm-number);
+}
+
+.modal .cm-editor .cm-comment {
+    color: var(--modal-cm-comment);
+}
+
+.modal .cm-editor .cm-keyword {
+    color: var(--modal-cm-keyword);
+}
+
+.modal .cm-editor .cm-variable {
+    color: var(--modal-cm-variable);
 }
 
 .cm-editor .valid-env-var {

@@ -1422,7 +1422,19 @@ export function codeMirrorSyntaxHighlighting() {
         {
             tag: tags.propertyName,
             class: 'cm-property'
-        }
+        },
+        {
+            tag: tags.comment,
+            class: 'cm-comment'
+        },
+        {
+            tag: tags.keyword,
+            class: 'cm-keyword'
+        },
+        {
+            tag: tags.definition(tags.variableName),
+            class: 'cm-variable'
+        },
     ])
 
     return highlightStyle

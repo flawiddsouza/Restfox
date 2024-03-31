@@ -51,6 +51,7 @@ function getLanguageFuncAndHighlightStyle(language) {
 
     if(language === 'javascript') {
         languageFunc = javascript()
+        highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
     if(language === 'graphql') {
