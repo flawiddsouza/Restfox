@@ -29,6 +29,7 @@ const ipcFunctions = [
     'createPlugins',
     'openFolderSelectionDialog',
     'openFolder',
+    'readFile',
 ]
 
 const electronIPC = ipcFunctions.reduce((acc, funcName) => {

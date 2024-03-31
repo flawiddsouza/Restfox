@@ -1010,7 +1010,7 @@ const store = createStore<State>({
             ]
 
             context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, setEnvironmentVariableWrapper, enabledPlugins, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
+            const response = await handleRequest(activeTab, environment, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'

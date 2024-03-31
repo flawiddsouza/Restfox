@@ -5,6 +5,9 @@ const plugin = {
         // console.log(...)
         // alert(message)
     `,
+    electronGeneralMethods: dedent`
+        // await readFile('<FILE_PATH>') - returns file content as string
+    `,
     generalContextMethods: dedent`
         // rf.getEnvVar('<ENVIRONMENT_VARIABLE_NAME>')
         // rf.setEnvVar('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')
@@ -31,6 +34,10 @@ const plugin = {
         // rf.response.setBodyText(<RESPONSE_BODY_TEXT>) - sets given text as rf.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
         // rf.response.getBodyJSON() - returns rf.response.getBody() ArrayBuffer as a JSON object
     `
+}
+
+if(import.meta.env.MODE === 'desktop-electron') {
+    plugin.generalMethods += `\n${plugin.electronGeneralMethods}`
 }
 
 export default {

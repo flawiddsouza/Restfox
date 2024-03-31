@@ -296,14 +296,16 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     }
 }
 
-export async function createRequestData(state: HandleRequestState, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, plugins: Plugin[]): Promise<CreateRequestDataReturn> {
+export async function createRequestData(state: HandleRequestState, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, plugins: Plugin[], workspaceLocation: string | null): Promise<CreateRequestDataReturn> {
     for(const plugin of plugins) {
         const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
         state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : plugin.name
 
         await usePlugin(expose, {
-            code: typeof plugin.code === 'object' ? plugin.code.pre_request : plugin.code
+            name: state.currentPlugin,
+            code: typeof plugin.code === 'object' ? plugin.code.pre_request : plugin.code,
+            parentPathForReadFile: workspaceLocation,
         })
 
         request = {
@@ -440,7 +442,7 @@ export async function createRequestData(state: HandleRequestState, request: Coll
     }
 }
 
-export async function handleRequest(request: CollectionItem, environment: any, setEnvironmentVariable: (name: string, value: string) => void, plugins: Plugin[], abortControllerSignal: AbortSignal, flags: {
+export async function handleRequest(request: CollectionItem, environment: any, setEnvironmentVariable: (name: string, value: string) => void, plugins: Plugin[], workspaceLocation: string | null, abortControllerSignal: AbortSignal, flags: {
     electronSwitchToChromiumFetch: boolean,
     disableSSLVerification: boolean
 }) {
@@ -450,7 +452,7 @@ export async function handleRequest(request: CollectionItem, environment: any, s
     }
 
     try {
-        const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins)
+        const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins, workspaceLocation)
 
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
@@ -533,7 +535,9 @@ export async function handleRequest(request: CollectionItem, environment: any, s
             state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : plugin.name
 
             await usePlugin(expose, {
-                code: typeof plugin.code === 'object' ? plugin.code.post_request : plugin.code
+                name: state.currentPlugin,
+                code: typeof plugin.code === 'object' ? plugin.code.post_request : plugin.code,
+                parentPathForReadFile: workspaceLocation,
             })
 
             responseToSend = { ...responseToSend, buffer: expose.context.response.getBody() }
@@ -557,16 +561,7 @@ export async function handleRequest(request: CollectionItem, environment: any, s
             }
 
             if(e.message === 'Unable to parse plugin') {
-                let lineNumber = ''
-                if(e.originalError.lineNumber !== null && e.originalError.lineNumber !== undefined) {
-                    lineNumber = e.originalError.lineNumber
-                } else {
-                    const lineNumberInfo = /\(eval\.js:(.*?)\)/.exec(e.originalError.stack)
-                    if(lineNumberInfo) {
-                        lineNumber = lineNumberInfo[1]
-                    }
-                }
-                error = `Error in Plugin "${state.currentPlugin}"${lineNumber !== '' ? ' at line number ' + lineNumber : ''}\n\n${e.originalError.name}: ${e.originalError.message}`
+                error = `Error in Plugin "${state.currentPlugin}"${e.lineNumber !== '' ? ' at line number ' + e.lineNumber : ''}\n\n${e.originalError.name}: ${e.originalError.message}`
             }
         }
 

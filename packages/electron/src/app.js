@@ -188,6 +188,8 @@ app.whenReady().then(async() => {
 
     ipcMain.handle('openFolder', (_, ...args) => helpers.openFolder(...args))
 
+    ipcMain.handle('readFile', (_, ...args) => helpers.readFile(...args))
+
     createWindow()
 })
 

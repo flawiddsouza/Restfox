@@ -16,7 +16,7 @@ export async function generateCode(request: CollectionItem, environment: any, ta
         testResults: []
     }
 
-    const requestData = await createRequestData(state, request, environment, null, [])
+    const requestData = await createRequestData(state, request, environment, null, [], null)
 
     const har = {
         method: request.method,

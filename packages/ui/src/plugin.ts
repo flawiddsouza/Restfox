@@ -1,4 +1,4 @@
-import { QuickJSContext, getQuickJS } from 'quickjs-emscripten'
+import { QuickJSContext, getQuickJS, getQuickJSSync } from 'quickjs-emscripten'
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
@@ -203,11 +203,51 @@ function addAlertMethodToVM(vm: QuickJSContext) {
     alertHandle.dispose()
 }
 
-export async function usePlugin(expose: PluginExpose, plugin: { code: string }) {
-    const vm = (await getQuickJS()).newContext()
+function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | null) {
+    const readFileHandle = vm.newFunction('readFile', (pathHandle) => {
+        const path = vm.getString(pathHandle)
+        console.log('reading file', path)
+        const promise = vm.newPromise()
+        window.electronIPC.readFile(path, parentPathForReadFile).then((result: any) => {
+            if(result.error) {
+                promise.reject(vm.newError(result.error))
+                return
+            } else {
+                const returnString = vm.newString(result.content || '')
+                promise.resolve(returnString)
+                returnString.dispose()
+            }
+        }).catch((error: any) => {
+            console.log('error', error)
+            promise.reject(vm.newError(error))
+        })
+        // IMPORTANT: Once you resolve an async action inside QuickJS,
+        // call runtime.executePendingJobs() to run any code that was
+        // waiting on the promise or callback.
+        promise.settled.then(vm.runtime.executePendingJobs)
+        return promise.handle
+    })
+
+    vm.setProp(vm.global, 'readFile', readFileHandle)
+    readFileHandle.dispose()
+}
+
+// initialize the VM, so we can use getQuickJSSync() later
+getQuickJS()
+
+function checkIfCodeRequiresAsync(code: string) {
+    return code.includes('await') || code.includes('Promise')
+}
+
+export async function usePlugin(expose: PluginExpose, plugin: { name: string, code: string, parentPathForReadFile: string | null }) {
+    const vm = getQuickJSSync().newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 
     addAlertMethodToVM(vm)
+
+    if(import.meta.env.MODE === 'desktop-electron') {
+        addReadFileToVM(vm, plugin.parentPathForReadFile)
+    }
 
     arena.expose({
         console: {
@@ -216,11 +256,63 @@ export async function usePlugin(expose: PluginExpose, plugin: { code: string }) 
         ...expose,
     })
 
+    const requiresAsync = checkIfCodeRequiresAsync(plugin.code)
+
     try {
-        arena.evalCode(plugin.code ?? '')
-    } catch(e) {
+        console.log(`Executing plugin: ${plugin.name}`)
+
+        if(plugin.code.trim() === '') {
+            console.log('Plugin code is empty, skipping execution')
+            return
+        }
+
+        let codeToExecute = plugin.code
+
+        if(requiresAsync) {
+            console.log('Plugin code requires async, wrapping in async function')
+            codeToExecute = `
+                async function main() {
+                    try {
+                        ${codeToExecute}
+                    } catch(e) {
+                        throw e
+                    }
+                }
+
+                main()
+            `
+        }
+
+        const result = arena.evalCode(codeToExecute)
+
+        if(requiresAsync) {
+            arena.executePendingJobs()
+            await result
+        }
+    } catch(e: any) {
         console.log(e)
+        let lineNumber = ''
+        if(e.lineNumber !== null && e.lineNumber !== undefined) {
+            lineNumber = e.lineNumber
+        } else {
+            const lineNumberInfo = /\(eval\.js:(.*?)\)/.exec(e.stack)
+            if(lineNumberInfo) {
+                lineNumber = lineNumberInfo[1]
+            }
+        }
+
+        const parsedLineNumber = Number(lineNumber)
+
+        if(!isNaN(parsedLineNumber)) {
+            if(parsedLineNumber === 0) {
+                lineNumber = '1'
+            } else {
+                lineNumber = (parsedLineNumber - (requiresAsync ? 3 : 0)).toString()
+            }
+        }
+
         const error = new Error('Unable to parse plugin');
+        (error as any).lineNumber = lineNumber;
         (error as any).originalError = e
         throw error
     }
