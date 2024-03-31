@@ -202,7 +202,16 @@ export interface PluginTestResult {
 
 type PluginTestFn = (description: string, callback: () => void) => void
 
+export interface PluginExposeContext {
+    getEnvVar: (objectPath: string) => any
+    setEnvVar: (objectPath: string, value: string) => void
+    request?: any
+    response?: any
+}
+
 export interface PluginExpose {
+    context: PluginExposeContext,
+    rf: PluginExposeContext,
     expect: ExpectStatic
     assert: AssertStatic
     test: PluginTestFn

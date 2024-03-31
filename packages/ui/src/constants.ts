@@ -1,33 +1,34 @@
 import dedent from 'dedent'
 
 const plugin = {
-    availableRequestMethods: dedent`
-        // context.request.getMethod()
-        // context.request.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
-        // context.request.setEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')
-        // context.request.getHeader('<HEADER_NAME>')
-        // context.request.setHeader('<HEADER_NAME>', '<HEADER_VALUE>') - sets header value
-        // context.request.getHeaders()
-        // context.request.setHeaders(<HEADER_ARRAY>) - replaces all headers with contents of <HEADER_ARRAY>
-        // context.request.getURL()
-        // context.request.getBody()
-        // context.request.setBody(<REQUEST_BODY_OBJECT>)
-        // context.request.getQueryParams()
-        // context.request.setQueryParams(<REQUEST_QUERY_PARAMS_ARRAY>)
-    `,
-    availableResponseMethods: dedent`
-        // context.response.getEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>')
-        // context.response.setEnvironmentVariable('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')
-        // context.response.getHeader('<HEADER_NAME>')
-        // context.response.getHeaders()
-        // context.response.getURL()
-        // context.response.getBody() - returns ArrayBuffer
-        // context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
-        // context.response.getBodyText() - returns context.response.getBody() ArrayBuffer as text
-        // context.response.setBodyText(<RESPONSE_BODY_TEXT>) - sets given text as context.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
-    `,
     generalMethods: dedent`
         // console.log(...)
+    `,
+    generalContextMethods: dedent`
+        // rf.getEnvVar('<ENVIRONMENT_VARIABLE_NAME>')
+        // rf.setEnvVar('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')
+    `,
+    availableRequestMethods: dedent`
+        // rf.request.getMethod()
+        // rf.request.getURL()
+        // rf.request.getHeader('<HEADER_NAME>')
+        // rf.request.setHeader('<HEADER_NAME>', '<HEADER_VALUE>') - sets header value
+        // rf.request.getHeaders()
+        // rf.request.setHeaders(<HEADER_ARRAY>) - replaces all headers with contents of <HEADER_ARRAY>
+        // rf.request.getBody()
+        // rf.request.setBody(<REQUEST_BODY_OBJECT>)
+        // rf.request.getQueryParams()
+        // rf.request.setQueryParams(<REQUEST_QUERY_PARAMS_ARRAY>)
+    `,
+    availableResponseMethods: dedent`
+        // rf.response.getURL()
+        // rf.response.getHeader('<HEADER_NAME>')
+        // rf.response.getHeaders()
+        // rf.response.getBody() - returns ArrayBuffer
+        // rf.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
+        // rf.response.getBodyText() - returns rf.response.getBody() ArrayBuffer as text
+        // rf.response.setBodyText(<RESPONSE_BODY_TEXT>) - sets given text as rf.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)
+        // rf.response.getBodyJSON() - returns rf.response.getBody() ArrayBuffer as a JSON object
     `
 }
 
@@ -62,36 +63,39 @@ export default {
     CODE_EXAMPLE: {
         PLUGIN: dedent`
             // Available methods:
+            ${plugin.generalMethods}
+            ${plugin.generalContextMethods}
             ${plugin.availableRequestMethods}
             ${plugin.availableResponseMethods}
-            ${plugin.generalMethods}
 
-            function handleRequest() {
-                console.log(context.request.getBody())
+            function preRequest() {
+                console.log(rf.request.getBody())
             }
 
-            function handleResponse() {
-                console.log(context.response.getBody())
+            function postRequest() {
+                console.log(rf.response.getBody())
             }
 
-            if('request' in context) {
-                handleRequest()
+            if('request' in rf) {
+                preRequest()
             }
 
-            if('response' in context) {
-                handleResponse()
+            if('response' in rf) {
+                postRequest()
             }
         ` + '\n',
         SCRIPT: {
             PRE_REQUEST: dedent`
                 // Available methods:
-                ${plugin.availableRequestMethods}
                 ${plugin.generalMethods}
+                ${plugin.generalContextMethods}
+                ${plugin.availableRequestMethods}
             ` + '\n\n',
             POST_REQUEST: dedent`
                 // Available methods:
-                ${plugin.availableResponseMethods}
                 ${plugin.generalMethods}
+                ${plugin.generalContextMethods}
+                ${plugin.availableResponseMethods}
             ` + '\n\n',
         }
     },

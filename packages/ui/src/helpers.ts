@@ -298,15 +298,20 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
 export async function createRequestData(state: HandleRequestState, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, plugins: Plugin[]): Promise<CreateRequestDataReturn> {
     for(const plugin of plugins) {
-        const { context: requestContext, expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
+        const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
         state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : plugin.name
 
-        await usePlugin(requestContext, expose, {
+        await usePlugin(expose, {
             code: typeof plugin.code === 'object' ? plugin.code.pre_request : plugin.code
         })
 
-        request = { ...request, headers: requestContext.request.getHeaders(), body: requestContext.request.getBody(), parameters: requestContext.request.getQueryParams() }
+        request = {
+            ...request,
+            headers: expose.context.request.getHeaders(),
+            body: expose.context.request.getBody(),
+            parameters: expose.context.request.getQueryParams(),
+        }
     }
 
     let body: any = null
@@ -523,15 +528,15 @@ export async function handleRequest(request: CollectionItem, environment: any, s
         }
 
         for(const plugin of plugins) {
-            const { context: responseContext, expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults)
+            const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults)
 
             state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : plugin.name
 
-            await usePlugin(responseContext, expose, {
+            await usePlugin(expose, {
                 code: typeof plugin.code === 'object' ? plugin.code.post_request : plugin.code
             })
 
-            responseToSend = { ...responseToSend, buffer: responseContext.response.getBody() }
+            responseToSend = { ...responseToSend, buffer: expose.context.response.getBody() }
         }
 
         responseToSend.testResults = state.testResults
