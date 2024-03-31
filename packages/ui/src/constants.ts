@@ -3,6 +3,7 @@ import dedent from 'dedent'
 const plugin = {
     generalMethods: dedent`
         // console.log(...)
+        // alert(message)
     `,
     generalContextMethods: dedent`
         // rf.getEnvVar('<ENVIRONMENT_VARIABLE_NAME>')

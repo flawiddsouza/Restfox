@@ -1,4 +1,4 @@
-import { getQuickJS } from 'quickjs-emscripten'
+import { QuickJSContext, getQuickJS } from 'quickjs-emscripten'
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
@@ -194,9 +194,20 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
     }
 }
 
+function addAlertMethodToVM(vm: QuickJSContext) {
+    const alertHandle = vm.newFunction('alert', (message) => {
+        const messageString = vm.getString(message)
+        window.createAlert(messageString)
+    })
+    vm.setProp(vm.global, 'alert', alertHandle)
+    alertHandle.dispose()
+}
+
 export async function usePlugin(expose: PluginExpose, plugin: { code: string }) {
     const vm = (await getQuickJS()).newContext()
     const arena = new Arena(vm, { isMarshalable: true })
+
+    addAlertMethodToVM(vm)
 
     arena.expose({
         console: {
