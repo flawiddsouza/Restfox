@@ -35,6 +35,7 @@
         "jszip": "^3.7.1",
         "lodash.get": "^4.4.2",
         "lodash.set": "^4.3.2",
+        "marked": "^12.0.1",
         "mitt": "^3.0.0",
         "nanoid": "^3.1.30",
         "quickjs-emscripten": "^0.23.0",

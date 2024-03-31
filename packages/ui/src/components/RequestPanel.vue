@@ -417,11 +417,20 @@
                     ></CodeMirrorEditor>
                 </div>
             </template>
-            <template v-if="activeRequestPanelTab === 'Description'">
-                <div style="height: 100%">
+            <div style="height: 100%; display: grid; grid-template-rows: auto 1fr; overflow: auto;" v-if="activeRequestPanelTab === 'Docs'">
+                <template v-if="editDescription">
+                    <div>
+                        <button class="button" @click="editDescription = false" style="margin-bottom: 1rem">Preview</button>
+                    </div>
                     <textarea v-model="activeTab.description" style="width: 100%; height: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
-                </div>
-            </template>
+                </template>
+                <template v-else>
+                    <div>
+                        <button class="button" @click="editDescription = true" style="margin-bottom: 1rem">Edit</button>
+                    </div>
+                    <div v-html="renderMarkdown(activeTab.description)" style="overflow: auto;"></div>
+                </template>
+            </div>
         </div>
     </template>
 </template>
@@ -435,6 +444,18 @@ import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection } from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
+import { marked } from 'marked'
+
+const renderer = new marked.Renderer()
+
+renderer.link = (...args) => {
+    const link = marked.Renderer.prototype.link.apply(this, args)
+    return link.replace('<a', `<a target="_blank" rel="noopener noreferrer"`)
+}
+
+marked.setOptions({
+    renderer: renderer
+})
 
 export default {
     components: {
@@ -461,7 +482,7 @@ export default {
                     name: 'Script'
                 },
                 {
-                    name: 'Description'
+                    name: 'Docs'
                 }
             ],
             activeRequestPanelTab: 'Body',
@@ -487,6 +508,7 @@ export default {
                 post_request: constants.CODE_EXAMPLE.SCRIPT.POST_REQUEST,
             },
             skipScriptUpdate: false,
+            editDescription: false,
         }
     },
     computed: {
@@ -748,6 +770,9 @@ export default {
         },
         handleQueryParametersChange() {
             queryParamsSync.onParametersChange(this.activeTab)
+        },
+        renderMarkdown(markdown) {
+            return marked.parse(markdown)
         },
     },
     mounted() {
