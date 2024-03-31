@@ -428,7 +428,7 @@
                     <div>
                         <button class="button" @click="editDescription = true" style="margin-bottom: 1rem">Edit</button>
                     </div>
-                    <div v-html="renderMarkdown(activeTab.description)" style="overflow: auto;"></div>
+                    <div v-html="renderMarkdown(activeTab.description ?? '')" style="overflow: auto;"></div>
                 </template>
             </div>
         </div>
