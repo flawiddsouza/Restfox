@@ -107,4 +107,124 @@ export default {
             ` + '\n\n',
         }
     },
+    AUTOCOMPLETIONS: {
+        PLUGIN: {
+            GENERAL_METHODS: [
+                {
+                    label: 'console.log(message)',
+                    type: 'function',
+                    info: 'Logs information to the console'
+                },
+                {
+                    label: 'alert(message)',
+                    type: 'function',
+                    info: 'Displays an alert dialog box with a specified message and an OK button'
+                },
+                {
+                    label: `rf.getEnvVar('<ENVIRONMENT_VARIABLE_NAME>')`,
+                    type: 'function',
+                    info: 'Gets the value of an environment variable'
+                },
+                {
+                    label: `rf.setEnvVar('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')`,
+                    type: 'function',
+                    info: 'Sets the value of an environment variable'
+                },
+            ],
+            REQUEST_METHODS: [
+                {
+                    label: 'rf.request.getMethod()',
+                    type: 'function',
+                    info: 'Gets the HTTP request method'
+                },
+                {
+                    label: 'rf.request.getURL()',
+                    type: 'function',
+                    info: 'Gets the URL of the request'
+                },
+                {
+                    label: `rf.request.getHeader('<HEADER_NAME>')`,
+                    type: 'function',
+                    info: 'Gets a specific header from the request'
+                },
+                {
+                    label: `rf.request.setHeader('<HEADER_NAME>', '<HEADER_VALUE>')`,
+                    type: 'function',
+                    info: 'Sets a specific header value for the request'
+                },
+                {
+                    label: 'rf.request.getHeaders()',
+                    type: 'function',
+                    info: 'Gets all the headers from the request'
+                },
+                {
+                    label: 'rf.request.setHeaders(<HEADER_ARRAY>)',
+                    type: 'function',
+                    info: 'Replaces all headers with the contents of the provided array'
+                },
+                {
+                    label: 'rf.request.getBody()',
+                    type: 'function',
+                    info: 'Gets the body of the request'
+                },
+                {
+                    label: 'rf.request.setBody(<REQUEST_BODY_OBJECT>)',
+                    type: 'function',
+                    info: 'Sets the body of the request'
+                },
+                {
+                    label: 'rf.request.getQueryParams()',
+                    type: 'function',
+                    info: 'Gets the query parameters of the request'
+                },
+                {
+                    label: 'rf.request.setQueryParams(<REQUEST_QUERY_PARAMS_ARRAY>)',
+                    type: 'function',
+                    info: 'Sets the query parameters of the request'
+                }
+            ],
+            RESPONSE_METHODS: [
+                {
+                    label: 'rf.response.getURL()',
+                    type: 'function',
+                    info: 'Gets the URL of the response'
+                },
+                {
+                    label: `rf.response.getHeader('<HEADER_NAME>')`,
+                    type: 'function',
+                    info: 'Gets a specific header from the response'
+                },
+                {
+                    label: 'rf.response.getHeaders()',
+                    type: 'function',
+                    info: 'Gets all the headers from the response'
+                },
+                {
+                    label: 'rf.response.getBody()',
+                    type: 'function',
+                    info: 'Gets the body of the response as an ArrayBuffer'
+                },
+                {
+                    label: `rf.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)`,
+                    type: 'function',
+                    info: 'Sets the body of the response with an ArrayBuffer'
+                },
+                {
+                    label: 'rf.response.getBodyText()',
+                    type: 'function',
+                    info: 'Returns the response body as text'
+                },
+                {
+                    label: `rf.response.setBodyText(<RESPONSE_BODY_TEXT>)`,
+                    type: 'function',
+                    info: 'Sets the given text as the body of the response'
+                },
+                {
+                    label: 'rf.response.getBodyJSON()',
+                    type: 'function',
+                    info: 'Returns the response body as a parsed JSON object'
+                }
+            ],
+        }
+    }
 }

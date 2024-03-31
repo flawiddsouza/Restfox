@@ -2,13 +2,13 @@
     <div class="code-mirror-editor"></div>
 </template>
 
-<script>
+<script lang="ts">
 import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript } from '@codemirror/lang-javascript'
 import { graphqlLanguage } from 'altair-codemirror-graphql'
-import { closeBrackets } from '@codemirror/autocomplete'
+import { closeBrackets, completeFromList, autocompletion } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selectLineBoundaryForward } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
@@ -71,8 +71,16 @@ function getExtensions(vueInstance, language) {
         languageFunc
     ].filter(Boolean)
 
+
+    const autocompletionsArray = [
+        vueInstance.autocompletions.length > 0 ? autocompletion({
+            override: [completeFromList(vueInstance.autocompletions)],
+        }) : null,
+    ].filter(Boolean)
+
     return [
         ...languageArray,
+        ...autocompletionsArray,
         syntaxHighlighting(highlightStyle, { fallback: true }),
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -129,6 +137,10 @@ export default {
         envVariables: {
             type: Object,
             default: () => ({})
+        },
+        autocompletions: {
+            type: Array,
+            default: () => []
         },
     },
     data() {

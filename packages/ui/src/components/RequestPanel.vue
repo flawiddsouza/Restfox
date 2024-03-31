@@ -407,6 +407,7 @@
                         v-model="script.pre_request"
                         lang="javascript"
                         class="code-editor"
+                        :autocompletions="preRequestAutocompletions"
                     ></CodeMirrorEditor>
 
                     <div style="margin-top: 1rem; margin-bottom: 0.25rem;">Post Request</div>
@@ -414,6 +415,7 @@
                         v-model="script.post_request"
                         lang="javascript"
                         class="code-editor"
+                        :autocompletions="postRequestAutocompletions"
                     ></CodeMirrorEditor>
                 </div>
             </template>
@@ -527,6 +529,18 @@ export default {
             }
 
             return this.$store.state.plugins.workspace.find(plugin => plugin.collectionId === this.activeTab._id && plugin.type === 'script')
+        },
+        preRequestAutocompletions() {
+            return [
+                ...constants.AUTOCOMPLETIONS.PLUGIN.GENERAL_METHODS,
+                ...constants.AUTOCOMPLETIONS.PLUGIN.REQUEST_METHODS
+            ]
+        },
+        postRequestAutocompletions() {
+            return [
+                ...constants.AUTOCOMPLETIONS.PLUGIN.GENERAL_METHODS,
+                ...constants.AUTOCOMPLETIONS.PLUGIN.RESPONSE_METHODS
+            ]
         },
     },
     watch: {

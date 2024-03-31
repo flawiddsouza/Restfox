@@ -19,7 +19,12 @@
                 <div style="padding-bottom: 1rem"></div>
                 <label style="overflow: auto;">
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Code</div>
-                    <CodeMirrorEditor v-model="code" lang="javascript" class="code-editor"></CodeMirrorEditor>
+                    <CodeMirrorEditor
+                        v-model="code"
+                        lang="javascript"
+                        :autocompletions="autocompletions"
+                        class="code-editor"
+                    ></CodeMirrorEditor>
                 </label>
             </div>
             <template #footer>
@@ -83,7 +88,14 @@ export default {
             set(value) {
                 this.$emit('update:showModal', value)
             }
-        }
+        },
+        autocompletions() {
+            return [
+                ...constants.AUTOCOMPLETIONS.PLUGIN.GENERAL_METHODS,
+                ...constants.AUTOCOMPLETIONS.PLUGIN.REQUEST_METHODS,
+                ...constants.AUTOCOMPLETIONS.PLUGIN.RESPONSE_METHODS
+            ]
+        },
     },
     watch: {
         plugin() {
