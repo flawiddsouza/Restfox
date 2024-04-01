@@ -1,4 +1,5 @@
 import dedent from 'dedent'
+import { snippet } from '@codemirror/autocomplete'
 
 const plugin = {
     generalMethods: dedent`
@@ -113,22 +114,26 @@ export default {
                 {
                     label: 'console.log(message)',
                     type: 'function',
-                    info: 'Logs information to the console'
+                    info: 'Logs information to the console',
+                    apply: snippet('console.log(${message})')
                 },
                 {
                     label: 'alert(message)',
                     type: 'function',
-                    info: 'Displays an alert dialog box with a specified message and an OK button'
+                    info: 'Displays an alert dialog box with a specified message and an OK button',
+                    apply: snippet('alert(${message})')
                 },
                 {
                     label: `rf.getEnvVar('<ENVIRONMENT_VARIABLE_NAME>')`,
                     type: 'function',
-                    info: 'Gets the value of an environment variable'
+                    info: 'Gets the value of an environment variable',
+                    apply: snippet(`rf.getEnvVar('$\{ENVIRONMENT_VARIABLE_NAME}')`)
                 },
                 {
                     label: `rf.setEnvVar('<ENVIRONMENT_VARIABLE_NAME>', '<ENVIRONMENT_VARIABLE_VALUE>')`,
                     type: 'function',
-                    info: 'Sets the value of an environment variable'
+                    info: 'Sets the value of an environment variable',
+                    apply: snippet(`rf.setEnvVar('$\{ENVIRONMENT_VARIABLE_NAME}', '\${ENVIRONMENT_VARIABLE_VALUE}')`)
                 },
             ],
             REQUEST_METHODS: [
@@ -145,12 +150,14 @@ export default {
                 {
                     label: `rf.request.getHeader('<HEADER_NAME>')`,
                     type: 'function',
-                    info: 'Gets a specific header from the request'
+                    info: 'Gets a specific header from the request',
+                    apply: snippet(`rf.request.getHeader('$\{headerName}')`)
                 },
                 {
                     label: `rf.request.setHeader('<HEADER_NAME>', '<HEADER_VALUE>')`,
                     type: 'function',
-                    info: 'Sets a specific header value for the request'
+                    info: 'Sets a specific header value for the request',
+                    apply: snippet(`rf.request.setHeader('$\{headerName}', '\${headerValue}')`)
                 },
                 {
                     label: 'rf.request.getHeaders()',
@@ -160,7 +167,8 @@ export default {
                 {
                     label: 'rf.request.setHeaders(<HEADER_ARRAY>)',
                     type: 'function',
-                    info: 'Replaces all headers with the contents of the provided array'
+                    info: 'Replaces all headers with the contents of the provided array',
+                    apply: snippet('rf.request.setHeaders(${headers})')
                 },
                 {
                     label: 'rf.request.getBody()',
@@ -170,7 +178,8 @@ export default {
                 {
                     label: 'rf.request.setBody(<REQUEST_BODY_OBJECT>)',
                     type: 'function',
-                    info: 'Sets the body of the request'
+                    info: 'Sets the body of the request',
+                    apply: snippet('rf.request.setBody(${body})')
                 },
                 {
                     label: 'rf.request.getQueryParams()',
@@ -180,7 +189,8 @@ export default {
                 {
                     label: 'rf.request.setQueryParams(<REQUEST_QUERY_PARAMS_ARRAY>)',
                     type: 'function',
-                    info: 'Sets the query parameters of the request'
+                    info: 'Sets the query parameters of the request',
+                    apply: snippet('rf.request.setQueryParams(${queryParams})')
                 }
             ],
             RESPONSE_METHODS: [
@@ -192,7 +202,8 @@ export default {
                 {
                     label: `rf.response.getHeader('<HEADER_NAME>')`,
                     type: 'function',
-                    info: 'Gets a specific header from the response'
+                    info: 'Gets a specific header from the response',
+                    apply: snippet(`rf.response.getHeader('$\{headerName}')`)
                 },
                 {
                     label: 'rf.response.getHeaders()',
@@ -207,7 +218,8 @@ export default {
                 {
                     label: `rf.response.setBody(<RESPONSE_BODY_ARRAY_BUFFER>)`,
                     type: 'function',
-                    info: 'Sets the body of the response with an ArrayBuffer'
+                    info: 'Sets the body of the response with an ArrayBuffer',
+                    apply: snippet('rf.response.setBody(${body})')
                 },
                 {
                     label: 'rf.response.getBodyText()',
@@ -217,7 +229,8 @@ export default {
                 {
                     label: `rf.response.setBodyText(<RESPONSE_BODY_TEXT>)`,
                     type: 'function',
-                    info: 'Sets the given text as the body of the response'
+                    info: 'Sets the given text as the body of the response',
+                    apply: snippet('rf.response.setBodyText(${bodyText})')
                 },
                 {
                     label: 'rf.response.getBodyJSON()',
