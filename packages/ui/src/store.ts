@@ -15,7 +15,8 @@ import {
     isFirstIdIndirectOrDirectParentOfSecondIdInTree,
     generateNewIdsForTree,
     substituteEnvironmentVariables,
-    setEnvironmentVariable
+    setEnvironmentVariable,
+    setObjectPathValue,
 } from './helpers'
 import {
     getResponsesByCollectionId,
@@ -977,6 +978,7 @@ const store = createStore<State>({
 
             const setEnvironmentVariableWrapper = (objectPath: string, value: string) => {
                 setEnvironmentVariable(context, objectPath, value)
+                setObjectPathValue(environment, objectPath, value)
             }
 
             const globalPlugins: Plugin[] = []
