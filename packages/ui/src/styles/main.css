@@ -53,6 +53,7 @@ html {
     --cm-comment: #940;
     --cm-keyword: #708;
     --cm-variable: #00f;
+    --cm-tooltip-background-color: #f5f5f5;
     --modal-cm-string: #a11;
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
@@ -60,6 +61,7 @@ html {
     --modal-cm-comment: #940;
     --modal-cm-keyword: #708;
     --modal-cm-variable: #00f;
+    --modal-cm-tooltip-background-color: #f5f5f5;
     --drop-target-background-color: #ffc0cb1f;
     --workspace-menu-hover-background-color: #dbedff;
     --method-get: #ab7aff;
@@ -126,6 +128,7 @@ html.theme-dark {
     --cm-comment: #ee8735;
     --cm-keyword: #ca73d7;
     --cm-variable: #a7a7ff;
+    --cm-tooltip-background-color: var(--background-color);
     --modal-cm-string: #a11;
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
@@ -133,6 +136,7 @@ html.theme-dark {
     --modal-cm-comment: #940;
     --modal-cm-keyword: #708;
     --modal-cm-variable: #00f;
+    --modal-cm-tooltip-background-color: #f5f5f5;
     --drop-target-background-color: #f8889b41;
     --workspace-menu-hover-background-color: #505050;
     --socket-header-background-color: var(--sidebar-item-active-color);
@@ -306,6 +310,10 @@ button.button:hover {
     color: var(--cm-variable);
 }
 
+.cm-editor .cm-tooltip {
+    background-color: var(--cm-tooltip-background-color);
+}
+
 .modal .cm-editor .cm-string:not(.cm-property) {
     color: var(--modal-cm-string);
 }
@@ -332,6 +340,10 @@ button.button:hover {
 
 .modal .cm-editor .cm-variable {
     color: var(--modal-cm-variable);
+}
+
+.modal .cm-editor .cm-tooltip {
+    background-color: var(--modal-cm-tooltip-background-color);
 }
 
 .cm-editor .valid-env-var {
