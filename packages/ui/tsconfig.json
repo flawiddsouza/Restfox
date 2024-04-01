@@ -15,7 +15,7 @@
             "DOM",
             "DOM.Iterable",
         ],
-        "target": "ES6",
+        "target": "es2022",
         "noEmit": true
     },
     "include": ["src"],

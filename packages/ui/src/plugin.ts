@@ -1,4 +1,7 @@
-import { QuickJSContext, QuickJSHandle, getQuickJS, getQuickJSSync } from 'quickjs-emscripten'
+import variant from '@jitl/quickjs-singlefile-browser-release-sync'
+import { newQuickJSWASMModuleFromVariant, QuickJSContext, QuickJSHandle } from 'quickjs-emscripten-core'
+const QuickJS = await newQuickJSWASMModuleFromVariant(variant)
+
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
@@ -238,9 +241,6 @@ function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | nul
     readFileHandle.dispose()
 }
 
-// initialize the VM, so we can use getQuickJSSync() later
-getQuickJS()
-
 function checkIfCodeRequiresAsync(code: string) {
     const singleLineCommentPattern = /\/\/.*$/gm
     const multiLineCommentPattern = /\/\*[\s\S]*?\*\//gm
@@ -262,7 +262,7 @@ function checkIfCodeRequiresAsync(code: string) {
 }
 
 export async function usePlugin(expose: PluginExpose, plugin: { name: string, code: string, parentPathForReadFile: string | null }) {
-    const vm = getQuickJSSync().newContext()
+    const vm = QuickJS.newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 
     addAlertMethodToVM(vm)
