@@ -620,6 +620,7 @@ export default {
 
 .response-panel-tabs-context .content-box {
     padding: 1rem;
+    word-break: break-all;
 }
 
 .response-panel-tabs-context table {
