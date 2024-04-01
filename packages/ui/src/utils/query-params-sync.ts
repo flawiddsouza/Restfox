@@ -6,7 +6,7 @@ export function splitAtFirstMatch(str: string, delimiter: string) {
 }
 
 function updateJsonWithNewText(sourceJson: any, newText: string) {
-    const newJson: any[] = (newText ?? '').split('&').filter(Boolean).map(part => part.split('=')).map(([name, value]) => ({ name, value }))
+    const newJson: any[] = (newText ?? '').split('&').filter(Boolean).map(part => splitAtFirstMatch(part, '=')).map(([name, value]) => ({ name, value }))
 
     newJson.forEach((newParam: any) => {
         const existingParam = sourceJson.find((param: any) => param.name === newParam.name && param.value === newParam.value && param.disabled !== true && param.checked !== true)

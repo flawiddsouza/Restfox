@@ -311,3 +311,24 @@ test('Migrate Old Data 2', () => {
         }
     ])
 })
+
+test('Multiple equal signs test', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: 'cat?cat===1',
+        parameters: []
+    }
+
+    assert.equal(onUrlChange(activeTab), true)
+    assert.equal(onParametersChange(activeTab), true)
+
+    const expectedParameters = [
+        { name: 'cat', value: '==1' },
+    ]
+
+    assert.deepEqual(activeTab.parameters, expectedParameters)
+})
