@@ -1,4 +1,4 @@
-import { QuickJSContext, getQuickJS, getQuickJSSync } from 'quickjs-emscripten'
+import { QuickJSContext, QuickJSHandle, getQuickJS, getQuickJSSync } from 'quickjs-emscripten'
 import { Arena } from 'quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
@@ -203,6 +203,8 @@ function addAlertMethodToVM(vm: QuickJSContext) {
     alertHandle.dispose()
 }
 
+const freeHandles = new Set<QuickJSHandle>()
+
 function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | null) {
     const readFileHandle = vm.newFunction('readFile', (pathHandle) => {
         const path = vm.getString(pathHandle)
@@ -210,8 +212,9 @@ function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | nul
         const promise = vm.newPromise()
         window.electronIPC.readFile(path, parentPathForReadFile).then((result: any) => {
             if(result.error) {
-                promise.reject(vm.newError(result.error))
-                return
+                const returnError = vm.newError(result.error)
+                promise.reject(returnError)
+                returnError.dispose()
             } else {
                 const returnString = vm.newString(result.content || '')
                 promise.resolve(returnString)
@@ -219,12 +222,15 @@ function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | nul
             }
         }).catch((error: any) => {
             console.log('error', error)
-            promise.reject(vm.newError(error))
+            const returnError = vm.newError(error)
+            promise.reject(returnError)
+            returnError.dispose()
         })
         // IMPORTANT: Once you resolve an async action inside QuickJS,
         // call runtime.executePendingJobs() to run any code that was
         // waiting on the promise or callback.
         promise.settled.then(vm.runtime.executePendingJobs)
+        freeHandles.add(promise.handle)
         return promise.handle
     })
 
@@ -236,7 +242,23 @@ function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | nul
 getQuickJS()
 
 function checkIfCodeRequiresAsync(code: string) {
-    return code.includes('await') || code.includes('Promise')
+    const singleLineCommentPattern = /\/\/.*$/gm
+    const multiLineCommentPattern = /\/\*[\s\S]*?\*\//gm
+
+    const codeWithoutComments = code
+        .replace(singleLineCommentPattern, '')
+        .replace(multiLineCommentPattern, '')
+        .trim()
+
+    const asyncPattern = /\basync\b/
+    const awaitPattern = /\bawait\b/
+    const readFilePattern = /\breadFile\b/
+
+    const hasAsync = asyncPattern.test(codeWithoutComments)
+    const hasAwait = awaitPattern.test(codeWithoutComments)
+    const usesReadFile = readFilePattern.test(codeWithoutComments)
+
+    return hasAsync || hasAwait || usesReadFile
 }
 
 export async function usePlugin(expose: PluginExpose, plugin: { name: string, code: string, parentPathForReadFile: string | null }) {
@@ -317,6 +339,15 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
         throw error
     }
 
-    arena.dispose()
-    vm.dispose()
+    // dispose the VM after 5 seconds, to avoid error QuickJSUseAfterFree: Lifetime not alive
+    setTimeout(() => {
+        freeHandles.forEach((handle) => {
+            if(handle.alive) {
+                handle.dispose()
+            }
+        })
+        arena.dispose()
+        vm.dispose()
+        console.log(`Plugin ${plugin.name}: 5 seconds elapsed, clean up completed`)
+    }, 5000)
 }
