@@ -408,7 +408,7 @@ export async function createRequestData(
     const headers: Record<string, string> = {}
 
     Object.keys(parentHeaders).forEach(header => {
-        headers[header.toLowerCase()] = parentHeaders[header]
+        headers[substituteEnvironmentVariables(environment, header.toLowerCase())] = substituteEnvironmentVariables(environment, parentHeaders[header])
     })
 
     if('GLOBAL_HEADERS' in environment) {
