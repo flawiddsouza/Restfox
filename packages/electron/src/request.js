@@ -86,7 +86,7 @@ async function handleSendRequest(data) {
                                 throw new Error('No reachable address found')
                             }
 
-                            callback(null, address.address, address.family)
+                            callback(null, [address])
                         } catch(err) {
                             callback(err)
                         }
