@@ -296,7 +296,16 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     }
 }
 
-export async function createRequestData(state: HandleRequestState, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, plugins: Plugin[], workspaceLocation: string | null): Promise<CreateRequestDataReturn> {
+export async function createRequestData(
+    state: HandleRequestState,
+    request: CollectionItem,
+    environment: any,
+    parentHeaders: Record<string, string>,
+    parentAuthentication: RequestAuthentication | undefined,
+    setEnvironmentVariable: ((name: string, value: string) => void) | null,
+    plugins: Plugin[],
+    workspaceLocation: string | null
+): Promise<CreateRequestDataReturn> {
     for(const plugin of plugins) {
         const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
@@ -398,6 +407,10 @@ export async function createRequestData(state: HandleRequestState, request: Coll
 
     const headers: Record<string, string> = {}
 
+    Object.keys(parentHeaders).forEach(header => {
+        headers[header.toLowerCase()] = parentHeaders[header]
+    })
+
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
             headers[header.toLowerCase()] = environment.GLOBAL_HEADERS[header]
@@ -420,19 +433,27 @@ export async function createRequestData(state: HandleRequestState, request: Coll
         }
     }
 
-    if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
-        if(request.authentication.type === 'basic') {
+    const setAuthentication = (authentication: RequestAuthentication) => {
+        if(authentication.type === 'basic') {
             headers['Authorization'] = generateBasicAuthString(
-                substituteEnvironmentVariables(environment, request.authentication.username ?? ''),
-                substituteEnvironmentVariables(environment, request.authentication.password ?? '')
+                substituteEnvironmentVariables(environment, authentication.username ?? ''),
+                substituteEnvironmentVariables(environment, authentication.password ?? '')
             )
         }
 
-        if(request.authentication.type === 'bearer') {
-            const authenticationBearerPrefix = request.authentication.prefix !== undefined && request.authentication.prefix !== '' ? request.authentication.prefix : 'Bearer'
-            const authenticationBearerToken = request.authentication.token !== undefined ? request.authentication.token : ''
+        if(authentication.type === 'bearer') {
+            const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
+            const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
             headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
         }
+    }
+
+    if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
+        setAuthentication(request.authentication)
+    }
+
+    if(parentAuthentication && parentAuthentication.type !== 'No Auth' && !parentAuthentication.disabled && (request.authentication === undefined || request.authentication.type === 'No Auth')) {
+        setAuthentication(parentAuthentication)
     }
 
     return {
@@ -442,17 +463,27 @@ export async function createRequestData(state: HandleRequestState, request: Coll
     }
 }
 
-export async function handleRequest(request: CollectionItem, environment: any, setEnvironmentVariable: (name: string, value: string) => void, plugins: Plugin[], workspaceLocation: string | null, abortControllerSignal: AbortSignal, flags: {
-    electronSwitchToChromiumFetch: boolean,
-    disableSSLVerification: boolean
-}) {
+export async function handleRequest(
+    request: CollectionItem,
+    environment: any,
+    parentHeaders: Record<string, string>,
+    parentAuthentication: RequestAuthentication | undefined,
+    setEnvironmentVariable: (name: string, value: string) => void,
+    plugins: Plugin[],
+    workspaceLocation: string | null,
+    abortControllerSignal: AbortSignal,
+    flags: {
+        electronSwitchToChromiumFetch: boolean,
+        disableSSLVerification: boolean
+    }
+) {
     const state: HandleRequestState = {
         currentPlugin: null,
         testResults: [],
     }
 
     try {
-        const { url, headers, body } = await createRequestData(state, request, environment, setEnvironmentVariable, plugins, workspaceLocation)
+        const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation)
 
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 

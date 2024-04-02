@@ -326,9 +326,9 @@ export default {
 
             if(clickedSidebarItem === 'Copy as Curl') {
                 const request = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
-                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
+                const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', request)
                 try {
-                    const curlCommand = await generateCode(request, environment, 'shell', 'curl')
+                    const curlCommand = await generateCode(request, environment, parentHeaders, parentAuthentication, 'shell', 'curl')
                     await navigator.clipboard.writeText(curlCommand)
                     this.$toast.success('Copied to clipboard')
                 } catch (e) {
@@ -496,10 +496,12 @@ export default {
             }
         },
         async updateCollectionItem(collectionItem) {
-            const result = await this.$store.dispatch('updateCollectionItemNameAndParentId', {
+            const result = await this.$store.dispatch('updateCollectionItem', {
                 collectionId: collectionItem._id,
                 name: collectionItem.name,
                 parentId: collectionItem.parentId,
+                headers: toRaw(collectionItem.headers),
+                authentication: toRaw(collectionItem.authentication),
             })
 
             if(result.error) {

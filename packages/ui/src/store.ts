@@ -59,6 +59,7 @@ import {
     WorkspaceCache,
     Workspace,
     RequestFinalResponse,
+    RequestAuthentication,
 } from './global'
 import * as queryParamsSync from '@/utils/query-params-sync'
 
@@ -147,6 +148,9 @@ async function getAllParents(workspaceId: string, parentArray: CollectionItem[],
 async function getEnvironmentForRequest(requestWorkspace: Workspace, requestParentArray: CollectionItem[]) {
     const environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
+    const headers: Record<string, string> = {}
+    let authentication: RequestAuthentication | undefined = undefined
+
     for(const parent of requestParentArray) {
         if(parent.environment) {
             let tempEnvironment = JSON.stringify(parent.environment)
@@ -154,9 +158,21 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
             tempEnvironment = JSON.parse(tempEnvironment)
             Object.assign(environment, tempEnvironment)
         }
+
+        if(parent.authentication && parent.authentication.type !== 'No Auth' && !parent.authentication.disabled) {
+            authentication = parent.authentication
+        }
+
+        if(parent.headers) {
+            const parentHeadersObject: Record<string, string> = {}
+            parent.headers.forEach(header => {
+                parentHeadersObject[header.name] = header.value
+            })
+            Object.assign(headers, parentHeadersObject)
+        }
     }
 
-    return environment
+    return { environment, parentHeaders: headers, parentAuthentication: authentication }
 }
 
 const workspaceCache: WorkspaceCache = {
@@ -954,7 +970,12 @@ const store = createStore<State>({
         async loadGlobalPlugins(context) {
             context.state.plugins.global = await getGlobalPlugins()
         },
-        async getEnvironmentForRequest(context, request): Promise<{ environment: any, requestParentArray: CollectionItem[] }> {
+        async getEnvironmentForRequest(context, request): Promise<{
+            environment: any,
+            parentHeaders: Record<string, string>,
+            parentAuthentication?: RequestAuthentication,
+            requestParentArray: CollectionItem[]
+        }> {
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
@@ -963,9 +984,9 @@ const store = createStore<State>({
             await getAllParents(context.state.activeWorkspace._id, requestParentArray, request)
             requestParentArray = requestParentArray.reverse()
 
-            const environment = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
+            const { environment, parentHeaders, parentAuthentication } = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
 
-            return { environment, requestParentArray }
+            return { environment, parentHeaders, parentAuthentication, requestParentArray }
         },
         async sendRequest(context, activeTab) {
             if(context.state.activeWorkspace === null) {
@@ -974,7 +995,12 @@ const store = createStore<State>({
 
             context.state.requestResponseStatus[activeTab._id] = 'loading'
 
-            const { environment, requestParentArray }: { environment: any, requestParentArray: CollectionItem[] } = await context.dispatch('getEnvironmentForRequest', activeTab)
+            const { environment, parentHeaders, parentAuthentication, requestParentArray }: {
+                environment: any,
+                parentHeaders: Record<string, string>,
+                parentAuthentication: RequestAuthentication | undefined,
+                requestParentArray: CollectionItem[]
+            } = await context.dispatch('getEnvironmentForRequest', activeTab)
 
             const setEnvironmentVariableWrapper = (objectPath: string, value: string) => {
                 setEnvironmentVariable(context, objectPath, value)
@@ -1012,7 +1038,7 @@ const store = createStore<State>({
             ]
 
             context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
+            const response = await handleRequest(activeTab, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
             context.commit('saveResponse', response)
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
@@ -1380,39 +1406,89 @@ const store = createStore<State>({
 
             return result
         },
-        async updateCollectionItemNameAndParentId(context, { collectionId, name, parentId }) {
+        async updateCollectionItem(context, { collectionId, name, parentId, headers, authentication }) {
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
 
-            if(context.state.activeWorkspace._type === 'file') {
-                // we split the operations, as the file workspace does not support updating name & parentId together
-                const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
-                    name
-                })
-
-                if(result.error) {
-                    emitter.emit('error', result.error)
-                    return result
-                }
-
-                await updateCollection(context.state.activeWorkspace._id, collectionId, {
-                    parentId
-                })
-            } else {
-                await updateCollection(context.state.activeWorkspace._id, collectionId, {
-                    name,
-                    parentId
-                })
-            }
-
             const collectionItem = context.state.collection.find(item => item._id === collectionId)
 
-            if(collectionItem?._type === 'request_group') {
-                emitter.emit('request_group', 'renamed')
+            if(collectionItem === undefined) {
+                throw new Error('Collection item not found')
             }
 
-            await context.dispatch('refreshWorkspace')
+            const propertiesToUpdate: Partial<CollectionItem> = {}
+
+            if(collectionItem.name !== name) {
+                propertiesToUpdate.name = name
+            }
+
+            if(collectionItem.parentId !== parentId) {
+                propertiesToUpdate.parentId = parentId
+            }
+
+            if(JSON.stringify(collectionItem.headers) !== JSON.stringify(headers)) {
+                propertiesToUpdate.headers = headers
+            }
+
+            if(JSON.stringify(collectionItem.authentication) !== JSON.stringify(authentication)) {
+                propertiesToUpdate.authentication = authentication
+            }
+
+            if(Object.keys(propertiesToUpdate).length === 0) {
+                console.log('Skipping updateCollectionItem as there are no changes in properties')
+                return {
+                    error: null
+                }
+            }
+
+            console.log('updateCollectionItem: propertiesToUpdate', propertiesToUpdate)
+
+            if(context.state.activeWorkspace._type === 'file') {
+                // we split the operations, as the file workspace does not support updating name, parentId, headers & authentication together
+
+                if('name' in propertiesToUpdate) {
+                    const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                        name
+                    })
+
+                    if(result.error) {
+                        emitter.emit('error', result.error)
+                        return result
+                    }
+                }
+
+                if('parentId' in propertiesToUpdate) {
+                    await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                        parentId
+                    })
+                }
+
+                if('headers' in propertiesToUpdate) {
+                    await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                        headers
+                    })
+                }
+
+                if('authentication' in propertiesToUpdate) {
+                    await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                        authentication
+                    })
+                }
+            } else {
+                await updateCollection(context.state.activeWorkspace._id, collectionId, propertiesToUpdate)
+            }
+
+            if('name' in propertiesToUpdate || 'parentId' in propertiesToUpdate) {
+                if(collectionItem._type === 'request_group') {
+                    emitter.emit('request_group', 'renamed')
+                }
+
+                await context.dispatch('refreshWorkspace')
+            } else {
+                collectionItem.headers = headers
+                collectionItem.authentication = authentication
+            }
 
             return {
                 error: null

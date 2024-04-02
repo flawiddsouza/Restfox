@@ -1,6 +1,7 @@
 import {
     CollectionItem,
     HandleRequestState,
+    RequestAuthentication,
     RequestParam,
 } from '@/global'
 import { createRequestData, substituteEnvironmentVariables } from '@/helpers'
@@ -10,13 +11,20 @@ export function getAvailableTargets() {
     return availableTargets()
 }
 
-export async function generateCode(request: CollectionItem, environment: any, target: 'shell', clientId: 'curl') {
+export async function generateCode(
+    request: CollectionItem,
+    environment: any,
+    parentHeaders: Record<string, string>,
+    parentAuthentication: RequestAuthentication | undefined,
+    target: 'shell',
+    clientId: 'curl'
+) {
     const state: HandleRequestState = {
         currentPlugin: null,
         testResults: []
     }
 
-    const requestData = await createRequestData(state, request, environment, null, [], null)
+    const requestData = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, null, [], null)
 
     const har = {
         method: request.method,

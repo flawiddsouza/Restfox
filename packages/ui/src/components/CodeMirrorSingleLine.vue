@@ -182,6 +182,11 @@ export default {
     color: var(--input-disabled-color);
 }
 
+.modal .code-mirror-single-line .cm-content[contenteditable="false"] {
+    background-color: var(--modal-input-disabled-background-color);
+    color: var(--modal-input-disabled-color);
+}
+
 /* when editor transitions from empty to filled when you type something, the editor messes */
 /* with the size of the div container, causing a small layout shift - this fixes that */
 /* img.cm-widgetBuffers seems appear inside editor only when the editor is empty */

@@ -528,7 +528,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         }
     }
 
-    if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields)) {
+    if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields || 'headers' in updatedFields || 'authentication' in updatedFields)) {
         if(updatedFields.environments) {
             const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
             await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)

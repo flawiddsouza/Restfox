@@ -1,6 +1,6 @@
 <template>
     <form @submit.prevent="showModalComp = false" v-if="showModalComp">
-        <modal :title="title" v-model="showModalComp">
+        <modal :title="title" v-model="showModalComp" width="600px">
             <label>
                 <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
                 <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" required v-focus>
@@ -18,6 +18,28 @@
                 </label>
             </div>
 
+            <div v-if="collectionItem._type === 'request_group'">
+                <div style="padding-bottom: 1rem"></div>
+                <hr style="border: none; height: 1px; background-color: var(--default-border-color);">
+                <div style="padding-bottom: 1rem"></div>
+                <div class="request-panel-tabs-context">
+                    <div style="font-weight: 500; margin-bottom: 0.25rem">Headers</div>
+                    <div>
+                        <RequestPanelHeaders :collectionItem="collectionItem" :collectionItemEnvironmentResolved="{}"></RequestPanelHeaders>
+                    </div>
+                    <div style="margin-top: 0.5rem; color: #7b7a7a; font-weight: normal; font-style: italic;">These will be applied to all requests in this folder and its subfolders</div>
+                </div>
+
+                <div style="padding-bottom: 1rem"></div>
+                <div class="request-panel-tabs-context">
+                    <div style="font-weight: 500; margin-bottom: 0.25rem">Auth</div>
+                    <div>
+                        <RequestPanelAuth :collectionItem="collectionItem" :collectionItemEnvironmentResolved="{}"></RequestPanelAuth>
+                    </div>
+                    <div style="margin-top: 0.5rem; color: #7b7a7a; font-weight: normal; font-style: italic;">This will be applied to all requests in this folder and its subfolders</div>
+                </div>
+            </div>
+
             <div style="padding-bottom: 1rem"></div>
 
             <template #footer>
@@ -31,6 +53,8 @@
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '@/helpers'
+import RequestPanelHeaders from '../RequestPanelHeaders.vue'
+import RequestPanelAuth from '../RequestPanelAuth.vue'
 
 export default {
     directives: {
@@ -45,7 +69,9 @@ export default {
         collectionItem: Object
     },
     components: {
-        Modal
+        Modal,
+        RequestPanelHeaders,
+        RequestPanelAuth,
     },
     data() {
         return {

@@ -12,6 +12,7 @@ html {
     --font-default: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light',
         'Ubuntu', 'Droid Sans', sans-serif;
     --default-border-color: lightgrey;
+    --default-border-color-modal: var(--default-border-color);
     --border-color-lighter: #f1f1f1;
     --border-color-lighter-darkened: #f1f1f147;
     --base-color-success: #047857;
@@ -87,6 +88,7 @@ html {
 
 html.theme-dark {
     --default-border-color: #484848;
+    --default-border-color-modal: lightgrey;
     --border-color-lighter: #484848;
     --border-color-lighter-darkened: #48484847;
     --base-color-success: #0bb27e;
@@ -101,6 +103,8 @@ html.theme-dark {
     --link-color: #d9c9ff;
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
     --input-disabled-color: rgb(170, 170, 170);
+    --modal-input-disabled-background-color: rgba(239, 239, 239, 0.3);
+    --modal-input-disabled-color: rgb(84, 84, 84);
     --button-background-color: #292929;
     --button-hover-background-color: #595858;
     --button-text-color: #e0e0e0;
@@ -231,6 +235,11 @@ input, textarea, select {
 select option {
     background-color: var(--background-color);
     color: var(--text-color);
+}
+
+.modal select option {
+    background-color: var(--modal-background-color);
+    color: var(--modal-text-color);
 }
 
 input:disabled {
@@ -432,4 +441,8 @@ a {
 
 .request-panel-tabs-context table .disabled {
     opacity: 0.5;
+}
+
+.modal {
+    --default-border-color: var(--default-border-color-modal);
 }

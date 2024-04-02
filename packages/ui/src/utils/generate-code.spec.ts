@@ -38,7 +38,7 @@ describe(`${generateCode.name}`, () => {
             API_URL: 'http://clicks-inges-abc-xyz.ap-south-1.elb.amazonaws.com'
         }
 
-        const input = await generateCode(request, environment, 'shell', 'curl')
+        const input = await generateCode(request, environment, {}, undefined, 'shell', 'curl')
         const expectedOutput = `curl --request POST \\
     --url 'http://clicks-inges-abc-xyz.ap-south-1.elb.amazonaws.com/collect?appId=demo_app2' \\
     --header 'content-type: application/json; charset=utf-8' \\
