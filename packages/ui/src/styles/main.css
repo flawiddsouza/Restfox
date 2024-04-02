@@ -389,3 +389,47 @@ button.button:hover {
 a {
     color: var(--link-color);
 }
+
+.request-panel-tabs-context select {
+    border: 1px solid var(--default-border-color);
+    outline: 0;
+    padding: 0.3rem;
+    background: inherit;
+}
+
+.request-panel-tabs-context table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.request-panel-tabs-context table th, .request-panel-tabs-context table td {
+    border: 1px solid var(--default-border-color);
+    padding: 0.5rem;
+}
+
+.request-panel-tabs-context table:not(.auth) td:nth-last-child(-n+2) {
+    width: 29px;
+}
+
+.request-panel-tabs-context table.auth td:nth-last-child(-n+2) {
+    width: 96px;
+}
+
+.request-panel-tabs-context table input {
+    border: 0;
+    outline: 0;
+    width: 100%;
+}
+
+.request-panel-tabs-context table input[type="checkbox"] {
+    width: auto;
+    vertical-align: middle;
+}
+
+.request-panel-tabs-context table input:disabled {
+    opacity: 0.5;
+}
+
+.request-panel-tabs-context table .disabled {
+    opacity: 0.5;
+}

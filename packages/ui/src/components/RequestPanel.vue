@@ -285,120 +285,10 @@
                 </table>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
-                <table style="table-layout: fixed;">
-                    <tr v-for="(header, index) in activeTab.headers">
-                        <td>
-                            <CodeMirrorSingleLine
-                                v-model="header.name"
-                                placeholder="name"
-                                :env-variables="activeTabEnvironmentResolved"
-                                :input-text-compatible="true"
-                                :disabled="header.disabled"
-                                :key="'header-name-' + index"
-                            />
-                        </td>
-                        <td>
-                            <CodeMirrorSingleLine
-                                v-model="header.value"
-                                placeholder="value"
-                                :env-variables="activeTabEnvironmentResolved"
-                                :input-text-compatible="true"
-                                :disabled="header.disabled"
-                                :key="'header-value-' + index"
-                            />
-                        </td>
-                        <td>
-                            <input type="checkbox" :checked="header.disabled === undefined || header.disabled === false" @change="header.disabled = $event.target.checked ? false : true">
-                        </td>
-                        <td @click="activeTab.headers.splice(index, 1)">
-                            <i class="fa fa-trash"></i>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(activeTab, 'headers', { name: '', value: '' })">
-                            + Add Item
-                        </td>
-                    </tr>
-                </table>
+                <RequestPanelHeaders :collection-item="activeTab" :collection-item-environment-resolved="activeTabEnvironmentResolved"></RequestPanelHeaders>
             </template>
             <template v-if="activeRequestPanelTab === 'Auth'">
-                <select :value="activeTab.authentication?.type ?? 'No Auth'" @change="handleActiveTabAuthenticationTypeChange" style="margin-bottom: 0.5rem">
-                    <option value="No Auth">No Auth</option>
-                    <option value="basic">Basic Auth</option>
-                    <option value="bearer">Bearer Token</option>
-                </select>
-                <div v-if="activeTab.authentication && activeTab.authentication.type !== 'No Auth'">
-                    <table class="auth" style="table-layout: fixed;">
-                        <tr>
-                            <td style="min-width: 6rem; user-select: none;">
-                                <label for="basic-auth-enabled">Enabled</label>
-                            </td>
-                            <td style="width: 100%">
-                                <input type="checkbox" :checked="activeTab.authentication.disabled === undefined || activeTab.authentication.disabled === false" @change="activeTab.authentication.disabled = $event.target.checked ? false : true" id="basic-auth-enabled">
-                            </td>
-                        </tr>
-                        <template v-if="activeTab.authentication.type === 'basic'">
-                            <tr>
-                                <td style="user-select: none;">
-                                    <label for="basic-auth-username" :class="{ disabled: activeTab.authentication.disabled }">Username</label>
-                                </td>
-                                <td style="width: 100%">
-                                    <CodeMirrorSingleLine
-                                        v-model="activeTab.authentication.username"
-                                        :env-variables="activeTabEnvironmentResolved"
-                                        :input-text-compatible="true"
-                                        :disabled="activeTab.authentication.disabled"
-                                        :key="'basic-auth-username'"
-                                    />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="user-select: none;">
-                                    <label for="basic-auth-password" :class="{ disabled: activeTab.authentication.disabled }">Password</label>
-                                </td>
-                                <td style="width: 100%">
-                                    <CodeMirrorSingleLine
-                                        v-model="activeTab.authentication.password"
-                                        :env-variables="activeTabEnvironmentResolved"
-                                        :input-text-compatible="true"
-                                        :disabled="activeTab.authentication.disabled"
-                                        :key="'basic-auth-password'"
-                                    />
-                                </td>
-                            </tr>
-                        </template>
-                        <template v-if="activeTab.authentication.type === 'bearer'">
-                            <tr>
-                                <td style="user-select: none;">
-                                    <label for="bearer-auth-token" :class="{ disabled: activeTab.authentication.disabled }">Token</label>
-                                </td>
-                                <td style="width: 100%">
-                                    <CodeMirrorSingleLine
-                                        v-model="activeTab.authentication.token"
-                                        :env-variables="activeTabEnvironmentResolved"
-                                        :input-text-compatible="true"
-                                        :disabled="activeTab.authentication.disabled"
-                                        :key="'bearer-auth-token'"
-                                    />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="user-select: none;">
-                                    <label for="basic-auth-prefix" :class="{ disabled: activeTab.authentication.disabled }">Prefix</label>
-                                </td>
-                                <td style="width: 100%">
-                                    <CodeMirrorSingleLine
-                                        v-model="activeTab.authentication.prefix"
-                                        :env-variables="activeTabEnvironmentResolved"
-                                        :input-text-compatible="true"
-                                        :disabled="activeTab.authentication.disabled"
-                                        :key="'bearer-auth-prefix'"
-                                    />
-                                </td>
-                            </tr>
-                        </template>
-                    </table>
-                </div>
+                <RequestPanelAuth :collection-item="activeTab" :collection-item-environment-resolved="activeTabEnvironmentResolved"></RequestPanelAuth>
             </template>
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
@@ -441,6 +331,8 @@
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
+import RequestPanelHeaders from '@/components/RequestPanelHeaders.vue'
+import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection } from '@/helpers'
@@ -463,7 +355,9 @@ export default {
     components: {
         CodeMirrorSingleLine,
         CodeMirrorEditor,
-        RequestPanelTabTitle
+        RequestPanelTabTitle,
+        RequestPanelHeaders,
+        RequestPanelAuth,
     },
     data() {
         return {
@@ -650,13 +544,6 @@ export default {
                 const formattedJSON = jsonPrettify(this.graphql.variables, '    ')
                 this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
-        },
-        handleActiveTabAuthenticationTypeChange(event) {
-            if('authentication' in this.activeTab === false) {
-                this.activeTab.authentication = {}
-            }
-
-            this.activeTab.authentication.type = event.target.value
         },
         bodyMimeTypeChanged(newMimeType) {
             let mimeType = null
@@ -873,50 +760,6 @@ export default {
 .request-panel-tabs-context {
     padding: 1rem;
     overflow-y: auto;
-}
-
-.request-panel-tabs-context select {
-    border: 1px solid var(--default-border-color);
-    outline: 0;
-    padding: 0.3rem;
-    background: inherit;
-}
-
-.request-panel-tabs-context table {
-    border-collapse: collapse;
-    width: 100%;
-}
-
-.request-panel-tabs-context table th, .request-panel-tabs-context table td {
-    border: 1px solid var(--default-border-color);
-    padding: 0.5rem;
-}
-
-.request-panel-tabs-context table:not(.auth) td:nth-last-child(-n+2) {
-    width: 29px;
-}
-
-.request-panel-tabs-context table.auth td:nth-last-child(-n+2) {
-    width: 96px;
-}
-
-.request-panel-tabs-context table input {
-    border: 0;
-    outline: 0;
-    width: 100%;
-}
-
-.request-panel-tabs-context table input[type="checkbox"] {
-    width: auto;
-    vertical-align: middle;
-}
-
-.request-panel-tabs-context table input:disabled {
-    opacity: 0.5;
-}
-
-.request-panel-tabs-context table .disabled {
-    opacity: 0.5;
 }
 
 .request-panel-tabs-context textarea {

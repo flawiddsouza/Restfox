@@ -40,7 +40,7 @@ export interface CollectionItem {
 }
 
 export interface RequestAuthentication {
-    type: string
+    type?: string
     token?: string
     prefix?: string
     username?: string

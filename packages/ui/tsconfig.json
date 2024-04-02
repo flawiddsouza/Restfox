@@ -18,7 +18,10 @@
         "target": "es2022",
         "noEmit": true
     },
-    "include": ["src"],
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.vue",
+    ],
     "exclude": [
         "node_modules",
     ]
