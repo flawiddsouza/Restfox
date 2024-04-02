@@ -165,7 +165,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
 
         if(parent.headers) {
             const parentHeadersObject: Record<string, string> = {}
-            parent.headers.forEach(header => {
+            parent.headers.filter(header => !header.disabled).forEach(header => {
                 parentHeadersObject[header.name] = header.value
             })
             Object.assign(headers, parentHeadersObject)
