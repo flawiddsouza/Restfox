@@ -25,7 +25,7 @@
                 <div class="request-panel-tabs-context">
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Headers</div>
                     <div>
-                        <RequestPanelHeaders :collectionItem="collectionItem" :collectionItemEnvironmentResolved="envVariables"></RequestPanelHeaders>
+                        <RequestPanelHeaders :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelHeaders>
                     </div>
                     <div style="margin-top: 0.5rem; color: #7b7a7a; font-weight: normal; font-style: italic;">These will be applied to all requests in this folder and its subfolders</div>
                 </div>
@@ -34,7 +34,7 @@
                 <div class="request-panel-tabs-context">
                     <div style="font-weight: 500; margin-bottom: 0.25rem">Auth</div>
                     <div>
-                        <RequestPanelAuth :collectionItem="collectionItem" :collectionItemEnvironmentResolved="envVariables"></RequestPanelAuth>
+                        <RequestPanelAuth :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelAuth>
                     </div>
                     <div style="margin-top: 0.5rem; color: #7b7a7a; font-weight: normal; font-style: italic;">This will be applied to all requests in this folder and its subfolders</div>
                 </div>

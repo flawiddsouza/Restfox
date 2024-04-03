@@ -7,7 +7,7 @@
                 'minHeight': requestResponseLayoutTopBottom ? '100px' : null
             }"
         >
-            <RequestPanel />
+            <RequestPanel :active-tab="collectionItem" />
         </section>
 
         <section class="resizer" data-resizer></section>
@@ -19,29 +19,34 @@
                 'minHeight': requestResponseLayoutTopBottom ? '100px' : null
             }"
         >
-            <ResponsePanel />
+            <ResponsePanel :active-tab="collectionItem" />
         </section>
     </section>
 
     <section class="request-response-panels" v-if="collectionItem && collectionItem._type === 'socket'">
-        <SocketPanel :key="collectionItem._id" />
+        <SocketPanel :key="collectionItem._id" :active-tab="collectionItem" />
     </section>
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
 import { CollectionItem } from '@/globals'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
 import SocketPanel from '@/components/SocketPanel.vue'
 import { vResizable } from '@/directives/vResizable'
 
-defineProps<{
+const props = defineProps<{
     collectionItem: CollectionItem | null;
     requestResponseLayoutTopBottom: boolean;
     requestPanelRatio?: string;
     responsePanelRatio?: string;
     requestPanelResized: (width: number) => void;
-}>();
+}>()
+
+watch(() => props.collectionItem, () => {
+    // persist collection item
+})
 </script>
 
 <style scoped>

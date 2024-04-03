@@ -29,6 +29,14 @@ export default {
             return [
                 {
                     'type': 'option',
+                    'label': 'Move to New Window',
+                    'value': 'Move to New Window'
+                },
+                {
+                    'type': 'separator'
+                },
+                {
+                    'type': 'option',
                     'label': 'Close',
                     'value': 'Close'
                 },
@@ -42,7 +50,7 @@ export default {
                     'type': 'option',
                     'label': 'Close All',
                     'value': 'Close All'
-                }
+                },
             ]
         }
     },
@@ -119,6 +127,11 @@ export default {
             this.showTabContextMenu = true
         },
         handleTabContextMenuItemClick(clickedContextMenuitem) {
+            if(clickedContextMenuitem === 'Move to New Window') {
+                this.$store.commit('detachTab', this.tabContextMenuTab)
+                this.closeTab(this.tabContextMenuTab, true)
+            }
+
             if(clickedContextMenuitem === 'Close') {
                 this.closeTab(this.tabContextMenuTab)
             }

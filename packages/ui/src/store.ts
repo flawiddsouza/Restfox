@@ -288,6 +288,7 @@ const store = createStore<State>({
             collection: [],
             collectionTree: [],
             tabs: [],
+            detachedTabs: [],
             activeTab: null,
             requestResponseStatus: {},
             requestResponses: {},
@@ -345,6 +346,9 @@ const store = createStore<State>({
             const existingTab = state.tabs.find(tabItem => tabItem._id === id)
 
             if(!existingTab) {
+                // remove from detached tabs if it exists there
+                state.detachedTabs = state.detachedTabs.filter(detachedTab => detachedTab._id !== id)
+
                 const tabCopy = JSON.parse(JSON.stringify(tab))
 
                 if('body' in tab) {
@@ -606,16 +610,16 @@ const store = createStore<State>({
                 state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
             }
         },
-        async saveResponse(state, response) {
+        async saveResponse(state, { workspaceId, collectionId, response }) {
             if(response._id) {
                 const responseToSave = structuredClone(toRaw(response))
-                state.responses[state.activeTab._id].unshift(responseToSave)
-                if(state.responses[state.activeTab._id].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
-                    const responsesToDelete = state.responses[state.activeTab._id].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
+                state.responses[collectionId].unshift(responseToSave)
+                if(state.responses[collectionId].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
+                    const responsesToDelete = state.responses[collectionId].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
                     const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
-                    await deleteResponsesByIds(state.activeTab.workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
+                    await deleteResponsesByIds(workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
                 }
-                await createResponse(state.activeTab.workspaceId, structuredClone(responseToSave))
+                await createResponse(workspaceId, structuredClone(responseToSave))
             }
         },
         async clearResponseHistory(state) {
@@ -653,6 +657,9 @@ const store = createStore<State>({
         },
         async updateWorkspaceNameInIndexedDB(_state, { workspaceId, name }) {
             await updateWorkspace(workspaceId, { name }, true)
+        },
+        detachTab(state, tab) {
+            state.detachedTabs.push(tab)
         },
     },
     actions: {
@@ -988,7 +995,7 @@ const store = createStore<State>({
 
             return { environment, parentHeaders, parentAuthentication, requestParentArray }
         },
-        async sendRequest(context, activeTab) {
+        async sendRequest(context, activeTab: CollectionItem) {
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
@@ -1039,7 +1046,11 @@ const store = createStore<State>({
 
             context.state.requestAbortController[activeTab._id] = new AbortController()
             const response = await handleRequest(activeTab, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
-            context.commit('saveResponse', response)
+            context.commit('saveResponse', {
+                workspaceId: activeTab.workspaceId,
+                collectionId: activeTab._id,
+                response
+            })
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
         },

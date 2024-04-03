@@ -2,6 +2,7 @@
 import NavBar from '@/components/NavBar.vue'
 import TabBar from '@/components/TabBar.vue'
 import Sidebar from '@/components/Sidebar.vue'
+import WindowPortal from '@/components/WindowPortal.vue'
 import Tab from '@/components/Tab.vue'
 import ImportModal from '@/components/ImportModal.vue'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
@@ -11,6 +12,7 @@ import constants from '../constants'
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
+const detachedTabs = computed(() => store.state.detachedTabs)
 const requestPanelRatio = ref(undefined)
 const responsePanelRatio = ref(undefined)
 
@@ -95,6 +97,18 @@ onBeforeUnmount(() => {
             :response-panel-ratio="responsePanelRatio"
             :request-panel-resized="requestPanelResized"
         />
+
+        <template v-for="detachedTab in detachedTabs" :key="'detached-tab' + detachedTab._id">
+            <WindowPortal :open="true">
+                <Tab
+                    :collection-item="detachedTab"
+                    :request-response-layout-top-bottom="requestResponseLayoutTopBottom"
+                    :request-panel-ratio="requestPanelRatio"
+                    :response-panel-ratio="responsePanelRatio"
+                    :request-panel-resized="requestPanelResized"
+                />
+            </WindowPortal>
+        </template>
 
         <ImportModal />
     </div>

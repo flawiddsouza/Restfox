@@ -359,6 +359,9 @@ export default {
         RequestPanelHeaders,
         RequestPanelAuth,
     },
+    props: {
+        activeTab: Object,
+    },
     data() {
         return {
             requestPanelTabs: [
@@ -408,9 +411,6 @@ export default {
         }
     },
     computed: {
-        activeTab() {
-            return this.$store.state.activeTab
-        },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
         },

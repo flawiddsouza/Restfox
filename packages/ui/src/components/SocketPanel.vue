@@ -250,6 +250,12 @@ import { io as ioV4 } from 'socket.io-client-v4'
 import { useStore } from 'vuex'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 
+// Props
+const props = defineProps<{
+    activeTab: any
+}>()
+
+
 // Data Variables
 
 const messageContainerRefs: any = reactive({})
@@ -265,7 +271,7 @@ function handleMessageContainerRef(ref: any, clientId: string) {
 // Computed
 const store = useStore()
 const activeWorkspace = computed(() => store.state.activeWorkspace)
-const activeTab = computed(() => store.state.activeTab)
+const activeTab = computed(() => props.activeTab)
 const activeTabEnvironmentResolved = computed(() => store.state.activeTabEnvironmentResolved)
 const sockets = store.state.sockets
 const $toast: { success: (message: string) => void, error: (message: string) => void } = inject('$toast')

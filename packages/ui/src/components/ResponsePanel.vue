@@ -152,6 +152,9 @@ export default {
         ImageFromBuffer,
         IframeFromBuffer,
     },
+    props: {
+        activeTab: Object
+    },
     data() {
         return {
             activeResponsePanelTab: 'Preview',
@@ -194,9 +197,6 @@ export default {
             }
 
             return tabs
-        },
-        activeTab() {
-            return this.$store.state.activeTab
         },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
