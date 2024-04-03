@@ -57,7 +57,11 @@
             "icon": "ui/favicon.png"
         },
         "win": {
-            "icon": "ui/favicon.png"
+            "icon": "ui/favicon.png",
+            "target": [
+                "portable",
+                "nsis"
+            ]
         },
         "appx": {
             "identityName": "57520Artelin.RestfoxApp",
