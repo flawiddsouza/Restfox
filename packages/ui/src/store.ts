@@ -283,6 +283,7 @@ async function persistActiveWorkspaceTabs(state: State) {
 }
 
 const store = createStore<State>({
+    devtools: true,
     state() {
         return {
             collection: [],
@@ -565,7 +566,39 @@ const store = createStore<State>({
 
             const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
 
-            if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
+            const previousWorkspaceId = foundPlugin.workspaceId
+            const newWorkspaceId = plugin.workspaceId
+
+            foundPlugin.name = updatePluginData.name
+            foundPlugin.code = updatePluginData.code
+            foundPlugin.workspaceId = updatePluginData.workspaceId
+            foundPlugin.updatedAt = updatePluginData.updatedAt
+
+            // plugin scoped changed from global to workspace
+            if(previousWorkspaceId === null && newWorkspaceId !== null) {
+                state.plugins.global = state.plugins.global.filter(item => item._id !== foundPlugin._id)
+                state.plugins.workspace.push(foundPlugin)
+
+                if(state.activeWorkspace?._type === 'file') {
+                    await deletePlugin(plugin._id)
+                    await createPlugin(toRaw(foundPlugin), state.activeWorkspace._id)
+                    return
+                }
+            }
+
+            // plugin scoped changed from workspace to global
+            if(previousWorkspaceId !== null && newWorkspaceId === null) {
+                state.plugins.workspace = state.plugins.workspace.filter(item => item._id !== foundPlugin._id)
+                state.plugins.global.push(foundPlugin)
+
+                if(state.activeWorkspace?._type === 'file') {
+                    await deletePlugin(plugin._id, state.activeWorkspace._id)
+                    await createPlugin(toRaw(foundPlugin))
+                    return
+                }
+            }
+
+            if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
                 await updatePlugin(plugin._id, updatePluginData)
             } else {
                 if(state.activeWorkspace === null) {
@@ -574,16 +607,11 @@ const store = createStore<State>({
 
                 await updatePlugin(plugin._id, updatePluginData, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
             }
-
-            foundPlugin.name = updatePluginData.name
-            foundPlugin.code = updatePluginData.code
-            foundPlugin.workspaceId = updatePluginData.workspaceId
-            foundPlugin.updatedAt = updatePluginData.updatedAt
         },
         async updatePluginStatus(state, plugin) {
             const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
 
-            if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
+            if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
                 await updatePlugin(plugin._id, { enabled: plugin.enabled })
             } else {
                 if(state.activeWorkspace === null) {
@@ -598,7 +626,7 @@ const store = createStore<State>({
         async deletePlugin(state, pluginId) {
             const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === pluginId)
 
-            if(foundPlugin.workspaceId === null && foundPlugin.collectionId === null) {
+            if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
                 await deletePlugin(pluginId)
                 state.plugins.global = state.plugins.global.filter(plugin => plugin._id !== pluginId)
             } else {

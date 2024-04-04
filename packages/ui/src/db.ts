@@ -433,6 +433,11 @@ export async function getWorkspacePlugins(workspaceId: string) {
 }
 
 export async function createPlugin(plugin: Plugin, workspaceId: string | null = null) {
+    console.log('createPlugin', {
+        plugin,
+        workspaceId,
+    })
+
     if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
@@ -444,6 +449,13 @@ export async function createPlugin(plugin: Plugin, workspaceId: string | null = 
 }
 
 export async function updatePlugin(pluginId: string, updatedFields: Partial<Plugin>, workspaceId: string | null = null, collectionId: string | null = null) {
+    console.log('updatePlugin', {
+        pluginId,
+        updatedFields,
+        workspaceId,
+        collectionId,
+    })
+
     if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
@@ -455,6 +467,12 @@ export async function updatePlugin(pluginId: string, updatedFields: Partial<Plug
 }
 
 export async function deletePlugin(pluginId: string, workspaceId: string | null = null, collectionId: string | null = null) {
+    console.log('deletePlugin', {
+        pluginId,
+        workspaceId,
+        collectionId,
+    })
+
     if(import.meta.env.MODE === 'desktop-electron' && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
