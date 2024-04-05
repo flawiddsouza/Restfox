@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
         />
 
         <template v-for="detachedTab in detachedTabs" :key="'detached-tab' + detachedTab._id">
-            <WindowPortal :open="true">
+            <WindowPortal :open="true" :title="(detachedTab._type === 'socket' ? 'SOCK' : detachedTab.method) + ' ' + detachedTab.name + ' — Restfox'">
                 <Tab
                     :collection-item="detachedTab"
                     :request-response-layout-top-bottom="requestResponseLayoutTopBottom"

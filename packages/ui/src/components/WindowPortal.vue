@@ -38,6 +38,10 @@ export default {
         open: {
             type: Boolean,
             default: false,
+        },
+        title: {
+            type: String,
+            default: '',
         }
     },
     data() {
@@ -52,11 +56,17 @@ export default {
             } else {
                 this.closePortal()
             }
+        },
+        title(newTitle) {
+            if(this.windowRef) {
+                this.windowRef.document.title = newTitle
+            }
         }
     },
     methods: {
         openPortal() {
             this.windowRef = window.open('', '', `width=${screen.width},height=${screen.height}`)
+            this.windowRef.document.title = this.title
             this.windowRef.document.body.appendChild(this.$el)
             copyStyles(window.document, this.windowRef.document)
             // close portal when the child window is closed
