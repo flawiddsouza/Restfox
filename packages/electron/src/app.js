@@ -48,6 +48,9 @@ function createWindow() {
 
     // open links with target="_blank" in an external browser instead of in the app
     win.webContents.setWindowOpenHandler(({ url }) => {
+        if (url === 'about:blank') {
+            return { action: 'allow' }
+        }
         shell.openExternal(url)
         return { action: 'deny' }
     })
