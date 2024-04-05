@@ -56,7 +56,7 @@ export default {
     },
     methods: {
         setActiveTab(tab) {
-            this.$store.commit('setActiveTab', tab)
+            this.$store.dispatch('setActiveTab', tab)
         },
         closeTab(tab, persist = true) {
             this.$store.commit('closeTab', tab._id)

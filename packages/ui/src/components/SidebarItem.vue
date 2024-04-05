@@ -98,7 +98,7 @@ export default {
         },
         handleSidebarItemClick(sidebarItem) {
             if(sidebarItem._type === 'request' || sidebarItem._type === 'socket') {
-                this.$store.commit('addTab', sidebarItem)
+                this.$store.dispatch('addTab', sidebarItem)
             }
 
             if(sidebarItem._type === 'request_group') {

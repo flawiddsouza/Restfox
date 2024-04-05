@@ -140,7 +140,7 @@ export interface State {
     }
     openContextMenuElement: HTMLElement | null
     sockets: { [key: string]: WebSocket | null }
-    activeTabEnvironmentResolved: any
+    tabEnvironmentResolved: any
     idMap: Map<string, string> | null
     skipPersistingActiveTab: boolean
 }

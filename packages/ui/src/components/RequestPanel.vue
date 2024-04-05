@@ -12,7 +12,7 @@
                     @keydown="handleAddressBarKeyDown"
                     @update:modelValue="handleUrlChange"
                     :paste-handler="handleAddressBarPaste"
-                    :env-variables="activeTabEnvironmentResolved"
+                    :env-variables="collectionItemEnvironmentResolved"
                     data-testid="request-panel-address-bar"
                 />
             </div>
@@ -51,7 +51,7 @@
                                 <CodeMirrorSingleLine
                                     v-model="param.name"
                                     placeholder="name"
-                                    :env-variables="activeTabEnvironmentResolved"
+                                    :env-variables="collectionItemEnvironmentResolved"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-name-' + index"
@@ -61,7 +61,7 @@
                                 <CodeMirrorSingleLine
                                     v-model="param.value"
                                     placeholder="value"
-                                    :env-variables="activeTabEnvironmentResolved"
+                                    :env-variables="collectionItemEnvironmentResolved"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-value-' + index"
@@ -88,7 +88,7 @@
                                 <CodeMirrorSingleLine
                                     v-model="param.name"
                                     placeholder="name"
-                                    :env-variables="activeTabEnvironmentResolved"
+                                    :env-variables="collectionItemEnvironmentResolved"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-name-' + index"
@@ -100,7 +100,7 @@
                                         <CodeMirrorSingleLine
                                             v-model="param.value"
                                             placeholder="value"
-                                            :env-variables="activeTabEnvironmentResolved"
+                                            :env-variables="collectionItemEnvironmentResolved"
                                             :input-text-compatible="true"
                                             :disabled="param.disabled"
                                             :key="'body-param-value-' + index"
@@ -144,7 +144,7 @@
                     <CodeMirrorEditor
                         v-model="activeTab.body.text"
                         lang="text"
-                        :env-variables="activeTabEnvironmentResolved"
+                        :env-variables="collectionItemEnvironmentResolved"
                         class="code-editor"
                         :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                     ></CodeMirrorEditor>
@@ -153,7 +153,7 @@
                     <CodeMirrorEditor
                         v-model="activeTab.body.text"
                         lang="json"
-                        :env-variables="activeTabEnvironmentResolved"
+                        :env-variables="collectionItemEnvironmentResolved"
                         class="code-editor"
                         :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                         ref="jsonEditor"
@@ -167,7 +167,7 @@
                         <CodeMirrorEditor
                             v-model="graphql.query"
                             lang="graphql"
-                            :env-variables="activeTabEnvironmentResolved"
+                            :env-variables="collectionItemEnvironmentResolved"
                             class="code-editor"
                             :key="'code-mirror-editor1-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                             ref="graphqlEditor"
@@ -179,7 +179,7 @@
                             <CodeMirrorEditor
                                 v-model="graphql.variables"
                                 lang="json"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 class="code-editor"
                                 :key="'code-mirror-editor2-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                                 ref="jsonEditor"
@@ -211,7 +211,7 @@
                             <CodeMirrorSingleLine
                                 v-model="param.name"
                                 placeholder="name"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-name-' + index"
@@ -222,7 +222,7 @@
                             <CodeMirrorSingleLine
                                 v-model="param.value"
                                 placeholder="value"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-value-' + index"
@@ -254,7 +254,7 @@
                             <CodeMirrorSingleLine
                                 v-model="param.name"
                                 placeholder="name"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'path-param-name-' + index"
@@ -264,7 +264,7 @@
                             <CodeMirrorSingleLine
                                 v-model="param.value"
                                 placeholder="value"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'path-param-value-' + index"
@@ -285,10 +285,10 @@
                 </table>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
-                <RequestPanelHeaders :collection-item="activeTab" :collection-item-environment-resolved="activeTabEnvironmentResolved"></RequestPanelHeaders>
+                <RequestPanelHeaders :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelHeaders>
             </template>
             <template v-if="activeRequestPanelTab === 'Auth'">
-                <RequestPanelAuth :collection-item="activeTab" :collection-item-environment-resolved="activeTabEnvironmentResolved"></RequestPanelAuth>
+                <RequestPanelAuth :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelAuth>
             </template>
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
@@ -414,8 +414,8 @@ export default {
         activeWorkspace() {
             return this.$store.state.activeWorkspace
         },
-        activeTabEnvironmentResolved() {
-            return this.$store.state.activeTabEnvironmentResolved
+        collectionItemEnvironmentResolved() {
+            return this.$store.state.tabEnvironmentResolved[this.activeTab._id]
         },
         scriptPlugin() {
             if(this.activeTab === null) {

@@ -1,5 +1,5 @@
 import { toRaw } from 'vue'
-import { createStore } from 'vuex'
+import { ActionContext, createStore } from 'vuex'
 import { nanoid } from 'nanoid'
 import {
     toTree,
@@ -180,7 +180,9 @@ const workspaceCache: WorkspaceCache = {
     activeTab: {}
 }
 
-async function loadWorkspaceTabs(state: State) {
+async function loadWorkspaceTabs(context: ActionContext<State, State>) {
+    const state = context.state
+
     if(state.activeWorkspace === null) {
         throw new Error('activeWorkspace is null')
     }
@@ -201,6 +203,7 @@ async function loadWorkspaceTabs(state: State) {
         } else {
             state.activeTab = null
         }
+        context.dispatch('reloadTabEnvironmentResolved')
         return
     }
 
@@ -248,6 +251,8 @@ async function loadWorkspaceTabs(state: State) {
     if(workspaceCache.activeTab[workspaceId]) {
         setActiveTab(state, workspaceCache.activeTab[workspaceId] as CollectionItem, true, false)
     }
+
+    context.dispatch('reloadTabEnvironmentResolved')
 }
 
 // Called when
@@ -323,7 +328,7 @@ const store = createStore<State>({
             },
             openContextMenuElement: null,
             sockets: {},
-            activeTabEnvironmentResolved: {},
+            tabEnvironmentResolved: {},
             idMap: null,
             skipPersistingActiveTab: false,
         }
@@ -341,48 +346,6 @@ const store = createStore<State>({
         }
     },
     mutations: {
-        addTab(state, tab) {
-            const id = tab._id
-
-            const existingTab = state.tabs.find(tabItem => tabItem._id === id)
-
-            if(!existingTab) {
-                // remove from detached tabs if it exists there
-                state.detachedTabs = state.detachedTabs.filter(detachedTab => detachedTab._id !== id)
-
-                const tabCopy = JSON.parse(JSON.stringify(tab))
-
-                if('body' in tab) {
-                    if('params' in tab.body) {
-                        const params: RequestParam[] = []
-                        for(const param of tab.body.params) {
-                            const paramExtracted = {...param}
-                            if('files' in paramExtracted) {
-                                paramExtracted.files = [...paramExtracted.files]
-                            }
-                            params.push(paramExtracted)
-                        }
-                        tabCopy.body.params = params
-                    }
-
-                    if('fileName' in tab.body) {
-                        tabCopy.body.fileName = tab.body.fileName
-                    }
-                }
-                state.tabs.push(tabCopy)
-                setActiveTab(state, tabCopy)
-            } else {
-                setActiveTab(state, existingTab)
-            }
-
-            nextTick(() => {
-                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${id}"]`)
-                activeTabElement?.scrollIntoView()
-            })
-        },
-        setActiveTab(state, tab) {
-            setActiveTab(state, tab, true)
-        },
         closeTab(state, collectionItemId) {
             const tabIndex = state.tabs.findIndex(tabItem => tabItem._id === collectionItemId)
 
@@ -427,37 +390,37 @@ const store = createStore<State>({
         setCollectionFilter(state, filter) {
             state.collectionFilter = filter
         },
-        persistActiveTab(state) {
-            if(state.activeTab) {
+        persistCollectionItem(state, collectionItem) {
+            if(state.activeTab && state.activeTab._id === collectionItem._id) {
                 if(state.skipPersistingActiveTab) {
-                    console.log('persistActiveTab: skipPersistingActiveTab is true, so skipping')
+                    console.log('persistCollectionItem: skipPersistingActiveTab is true, so skipping')
                     state.skipPersistingActiveTab = false
                     return
                 }
-
-                console.log('persistActiveTab: skipPersistingActiveTab is false, so persisting')
-
-                const activeTabToSaveJSON = JSON.stringify(state.activeTab)
-                const activeTabToSave = JSON.parse(activeTabToSaveJSON)
-
-                if('body' in state.activeTab && 'params' in state.activeTab.body) {
-                    const params: RequestParam[] = []
-                    for(const param of state.activeTab.body.params) {
-                        const paramExtracted = {...param}
-                        if('files' in paramExtracted) {
-                            paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
-                        }
-                        params.push(paramExtracted)
-                    }
-                    activeTabToSave.body.params = params
-                }
-
-                if('body' in state.activeTab && 'fileName' in state.activeTab.body) {
-                    activeTabToSave.body.fileName = toRaw(state.activeTab.body.fileName)
-                }
-
-                updateCollection(state.activeTab.workspaceId, state.activeTab._id, activeTabToSave)
             }
+
+            console.log('persistCollectionItem', collectionItem._id)
+
+            const collectionItemToSaveJSON = JSON.stringify(collectionItem)
+            const collectionItemToSave = JSON.parse(collectionItemToSaveJSON)
+
+            if('body' in collectionItem && 'params' in collectionItem.body) {
+                const params: RequestParam[] = []
+                for(const param of collectionItem.body.params) {
+                    const paramExtracted = {...param}
+                    if('files' in paramExtracted) {
+                        paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
+                    }
+                    params.push(paramExtracted)
+                }
+                collectionItemToSave.body.params = params
+            }
+
+            if('body' in collectionItem && 'fileName' in collectionItem.body) {
+                collectionItemToSave.body.fileName = toRaw(collectionItem.body.fileName)
+            }
+
+            updateCollection(collectionItem.workspaceId, collectionItem._id, collectionItemToSave)
         },
         setActiveSidebarItemForContextMenu(state, payload) {
             state.activeSidebarItemForContextMenu = payload.sidebarItem
@@ -676,13 +639,6 @@ const store = createStore<State>({
         persistActiveWorkspaceTabs(state) {
             persistActiveWorkspaceTabs(state)
         },
-        loadWorkspaceTabs(state) {
-            if(state.activeWorkspace === null) {
-                throw new Error('activeWorkspace is null')
-            }
-
-            loadWorkspaceTabs(state)
-        },
         async updateWorkspaceNameInIndexedDB(_state, { workspaceId, name }) {
             await updateWorkspace(workspaceId, { name }, true)
         },
@@ -691,6 +647,51 @@ const store = createStore<State>({
         },
     },
     actions: {
+        addTab(context, tab) {
+            const id = tab._id
+
+            const existingTab = context.state.tabs.find(tabItem => tabItem._id === id)
+
+            if(!existingTab) {
+                // remove from detached tabs if it exists there
+                context.state.detachedTabs = context.state.detachedTabs.filter(detachedTab => detachedTab._id !== id)
+
+                const tabCopy = JSON.parse(JSON.stringify(tab))
+
+                if('body' in tab) {
+                    if('params' in tab.body) {
+                        const params: RequestParam[] = []
+                        for(const param of tab.body.params) {
+                            const paramExtracted = {...param}
+                            if('files' in paramExtracted) {
+                                paramExtracted.files = [...paramExtracted.files]
+                            }
+                            params.push(paramExtracted)
+                        }
+                        tabCopy.body.params = params
+                    }
+
+                    if('fileName' in tab.body) {
+                        tabCopy.body.fileName = tab.body.fileName
+                    }
+                }
+                context.state.tabs.push(tabCopy)
+                setActiveTab(context.state, tabCopy)
+            } else {
+                setActiveTab(context.state, existingTab)
+            }
+
+            nextTick(() => {
+                const activeTabElement = document.querySelector(`.tabs-container > div[data-id="${id}"]`)
+                activeTabElement?.scrollIntoView()
+            })
+
+            context.dispatch('reloadTabEnvironmentResolved')
+        },
+        setActiveTab(context, tab) {
+            setActiveTab(context.state, tab, true)
+            context.dispatch('reloadTabEnvironmentResolved')
+        },
         async deleteCollectionItem(context, collectionItem) {
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
@@ -831,7 +832,7 @@ const store = createStore<State>({
             }
 
             if(newCollectionItem._type === 'request' || newCollectionItem._type === 'socket') {
-                context.commit('addTab', newCollectionItem)
+                context.dispatch('addTab', newCollectionItem)
             }
 
             if(newCollectionItem._type === 'request_group') {
@@ -923,7 +924,7 @@ const store = createStore<State>({
             }
 
             if(payload.type === 'request' || payload.type === 'socket') {
-                context.commit('addTab', newCollectionItem)
+                context.dispatch('addTab', newCollectionItem)
             }
 
             if(payload.type === 'request_group') {
@@ -1378,13 +1379,15 @@ const store = createStore<State>({
 
             return result
         },
-        async updateActiveTabEnvironmentResolved(context) {
-            if(!context.state.activeTab) {
-                // console.warn('updateActiveTabEnvironmentResolved called without an active tab')
-                return
-            }
-            const { environment } = await context.dispatch('getEnvironmentForRequest', context.state.activeTab)
-            context.state.activeTabEnvironmentResolved = environment
+        async reloadTabEnvironmentResolved(context) {
+            console.log('reloadTabEnvironmentResolved')
+
+            const tabs = [...context.state.tabs, ...context.state.detachedTabs]
+            // we use forEach instead of for of to run the await in parallel
+            tabs.forEach(async tab => {
+                const { environment } = await context.dispatch('getEnvironmentForRequest', tab)
+                context.state.tabEnvironmentResolved[tab._id] = environment
+            })
         },
         async refreshWorkspaceCollection(context) {
             console.log('refreshWorkspaceCollection')
@@ -1415,7 +1418,7 @@ const store = createStore<State>({
             }
 
             context.state.skipPersistingActiveTab = true
-            loadWorkspaceTabs(context.state)
+            loadWorkspaceTabs(context)
 
             context.commit('persistActiveWorkspaceTabs')
         },
@@ -1543,7 +1546,14 @@ const store = createStore<State>({
                     context.dispatch('collapseFolders', collectionItem.children)
                 }
             })
-        }
+        },
+        loadWorkspaceTabs(context) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            loadWorkspaceTabs(context)
+        },
     }
 })
 

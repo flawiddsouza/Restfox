@@ -35,6 +35,9 @@ import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
 import SocketPanel from '@/components/SocketPanel.vue'
 import { vResizable } from '@/directives/vResizable'
+import { Store, useStore } from 'vuex'
+import { findItemInTreeById } from '@/helpers'
+import { State } from '@/global'
 
 const props = defineProps<{
     collectionItem: CollectionItem | null;
@@ -44,8 +47,32 @@ const props = defineProps<{
     requestPanelResized: (width: number) => void;
 }>()
 
-watch(() => props.collectionItem, () => {
-    // persist collection item
+// computed
+const store: Store<State> = useStore()
+
+// watch
+watch(() => props.collectionItem, (newValue, oldValue) => {
+    // don't commit change when collectionItem is set for the first time
+    // and when collectionItem is changed from one tab to another,
+    // having same id in oldValue & newValue means same object
+    // has changed, so we need to save the object
+    if(oldValue && newValue && oldValue._id === newValue._id) {
+        store.commit('persistCollectionItem', newValue)
+
+        // keep sidebarItem properties in sync with collectionItem
+        const sidebarItem = findItemInTreeById(store.state.collectionTree, props.collectionItem._id)
+        if(sidebarItem) {
+            Object.assign(sidebarItem, props.collectionItem)
+        }
+
+        // keep tab properties in tabs in sync with collectionItem
+        const tab = store.state.tabs.find(tab => tab._id === props.collectionItem._id)
+        if(tab) {
+            Object.assign(tab, props.collectionItem)
+        }
+    }
+}, {
+    deep: true
 })
 </script>
 

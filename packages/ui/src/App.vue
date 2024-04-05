@@ -14,7 +14,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 <script>
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
-import { checkHotkeyAgainstKeyEvent, findItemInTreeById, applyTheme, debounce } from './helpers'
+import { checkHotkeyAgainstKeyEvent, applyTheme, debounce } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
 
@@ -48,34 +48,6 @@ export default {
         }
     },
     watch: {
-        activeTab: {
-            handler(newValue, oldValue) {
-                // don't commit change when activeTab is set for the first time
-                // and when activeTab is changed from one tab to another,
-                // having same id in oldValue & newValue means same object
-                // has changed, so we need to save the object
-                if(oldValue && newValue && oldValue._id === newValue._id) {
-                    this.$store.commit('persistActiveTab')
-
-                    // keep sidebarItem properties in sync with activeTab
-                    const sidebarItem = findItemInTreeById(this.$store.state.collectionTree, this.activeTab._id)
-                    if(sidebarItem) {
-                        Object.assign(sidebarItem, this.activeTab)
-                    }
-
-                    // keep tab properties in tabs in sync with activeTab
-                    const tab = this.$store.state.tabs.find(tab => tab._id === this.activeTab._id)
-                    if(tab) {
-                        Object.assign(tab, this.activeTab)
-                    }
-                }
-
-                if(newValue !== null) {
-                    this.$store.dispatch('updateActiveTabEnvironmentResolved')
-                }
-            },
-            deep: true
-        },
         async activeWorkspace() {
             if(this.activeWorkspace) {
                 localStorage.setItem(constants.LOCAL_STORAGE_KEY.ACTIVE_WORKSPACE_ID, this.activeWorkspace._id)
@@ -136,7 +108,7 @@ export default {
                 this.$store.commit('setCollection', collections)
             }
 
-            this.$store.commit('loadWorkspaceTabs')
+            this.$store.dispatch('loadWorkspaceTabs')
         },
         handleGlobalKeydown(event) {
             if(this.openContextMenuElement) {
@@ -209,7 +181,7 @@ export default {
                 const nextTab = nextTabIndex <= this.tabs.length - 1 ? this.tabs[nextTabIndex] : this.tabs[0]
 
                 if(nextTab) {
-                    this.$store.commit('setActiveTab', nextTab)
+                    this.$store.dispatch('setActiveTab', nextTab)
                 }
 
                 return
@@ -226,7 +198,7 @@ export default {
                 const previousTab = previousTabIndex >= 0 ? this.tabs[previousTabIndex] : this.tabs[this.tabs.length - 1]
 
                 if(previousTab) {
-                    this.$store.commit('setActiveTab', previousTab)
+                    this.$store.dispatch('setActiveTab', previousTab)
                 }
 
                 return

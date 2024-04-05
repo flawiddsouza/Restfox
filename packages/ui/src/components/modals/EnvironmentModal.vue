@@ -301,7 +301,7 @@ export default {
                 this.$store.commit('updateWorkspaceEnvironments',  { workspaceId: this.workspace._id, environments: this.environments })
             }
 
-            this.$store.dispatch('updateActiveTabEnvironmentResolved')
+            this.$store.dispatch('reloadTabEnvironmentResolved')
         },
         saveCurrentEnvironment() {
             if(this.collectionItem) {

@@ -42,7 +42,7 @@
                             <CodeMirrorSingleLine
                                 v-model="client.url"
                                 :placeholder="`${client.type === undefined ? 'WebSocket URL' : 'Socket.IO URL'}`"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :disabled="isClientConnected(client)"
                                 class="input ml-0_5rem w-100p o-a"
@@ -107,7 +107,7 @@
                                 v-model="client.message"
                                 @update:modelValue="updateCurrentPayload(client, 'payload', $event)"
                                 :placeholder="`Payload`"
-                                :env-variables="activeTabEnvironmentResolved"
+                                :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :allow-multiple-lines="true"
                                 class="w-100p mt-0_5rem input o-a"
@@ -272,7 +272,7 @@ function handleMessageContainerRef(ref: any, clientId: string) {
 const store = useStore()
 const activeWorkspace = computed(() => store.state.activeWorkspace)
 const activeTab = computed(() => props.activeTab)
-const activeTabEnvironmentResolved = computed(() => store.state.activeTabEnvironmentResolved)
+const collectionItemEnvironmentResolved = computed(() => store.state.tabEnvironmentResolved[activeTab.value._id])
 const sockets = store.state.sockets
 const $toast: { success: (message: string) => void, error: (message: string) => void } = inject('$toast')
 
