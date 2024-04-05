@@ -1,5 +1,5 @@
 <template>
-    <table style="table-layout: fixed; font-size: inherit;">
+    <table style="table-layout: fixed">
         <tr v-for="(header, index) in collectionItem.headers">
             <td>
                 <CodeMirrorSingleLine

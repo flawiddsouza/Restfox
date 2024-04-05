@@ -45,7 +45,7 @@
                     <option value="application/octet-stream">Binary File</option>
                 </select>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
-                    <table style="table-layout: fixed; font-size: inherit;">
+                    <table style="table-layout: fixed">
                         <tr v-for="(param, index) in activeTab.body.params">
                             <td>
                                 <CodeMirrorSingleLine
@@ -82,7 +82,7 @@
                     </table>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'multipart/form-data'">
-                    <table style="table-layout: fixed; font-size: inherit;">
+                    <table style="table-layout: fixed">
                         <tr v-for="(param, index) in activeTab.body.params">
                             <td>
                                 <CodeMirrorSingleLine
@@ -205,7 +205,7 @@
                 </div>
             </div>
             <template v-if="activeRequestPanelTab === 'Query'">
-                <table style="table-layout: fixed; font-size: inherit;">
+                <table style="table-layout: fixed">
                     <tr v-for="(param, index) in activeTab.parameters">
                         <td>
                             <CodeMirrorSingleLine
@@ -248,7 +248,7 @@
                         <span> ({{ activeTab.pathParameters.filter(item => item.disabled === undefined || item.disabled === false).length }})</span>
                     </template>
                 </div>
-                <table style="table-layout: fixed; font-size: inherit;">
+                <table style="table-layout: fixed">
                     <tr v-for="(param, index) in activeTab.pathParameters">
                         <td>
                             <CodeMirrorSingleLine

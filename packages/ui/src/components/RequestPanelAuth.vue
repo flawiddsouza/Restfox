@@ -5,7 +5,7 @@
         <option value="bearer">Bearer Token</option>
     </select>
     <div v-if="collectionItem.authentication && collectionItem.authentication.type !== 'No Auth'">
-        <table class="auth" style="table-layout: fixed; font-size: inherit;">
+        <table class="auth" style="table-layout: fixed">
             <tr>
                 <td style="min-width: 6rem; user-select: none;">
                     <label for="basic-auth-enabled">Enabled</label>
