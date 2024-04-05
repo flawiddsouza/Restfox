@@ -25,9 +25,11 @@ if (process.platform === 'linux' && process.env.SNAP) {
 }
 
 function createWindow() {
+    const autoHideMenuBar = true
+
     const win = new BrowserWindow({
         show: false,
-        autoHideMenuBar: true,
+        autoHideMenuBar,
         webPreferences: {
             preload: resolve(__dirname, './preload.js'),
             nodeIntegration: false,
@@ -49,7 +51,12 @@ function createWindow() {
     // open links with target="_blank" in an external browser instead of in the app
     win.webContents.setWindowOpenHandler(({ url }) => {
         if (url === 'about:blank') {
-            return { action: 'allow' }
+            return {
+                action: 'allow',
+                overrideBrowserWindowOptions: {
+                    autoHideMenuBar,
+                },
+            }
         }
         shell.openExternal(url)
         return { action: 'deny' }
