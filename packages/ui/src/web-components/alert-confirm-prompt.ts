@@ -54,9 +54,9 @@ class AlertConfirmPrompt extends HTMLElement {
             }
 
             const closeModal = () => {
-                document.removeEventListener('click', eventHandler)
-                document.removeEventListener('keyup', eventHandler)
-                document.removeEventListener('keydown', eventHandler)
+                shadowRoot.removeEventListener('click', eventHandler)
+                shadowRoot.removeEventListener('keyup', eventHandler)
+                shadowRoot.removeEventListener('keydown', eventHandler)
                 shadowRoot.querySelector('#root')?.removeChild(div)
             }
 
@@ -123,9 +123,9 @@ class AlertConfirmPrompt extends HTMLElement {
                 }
             }
 
-            document.addEventListener('click', eventHandler)
-            document.addEventListener('keyup', eventHandler)
-            document.addEventListener('keydown', eventHandler)
+            shadowRoot.addEventListener('click', eventHandler)
+            shadowRoot.addEventListener('keyup', eventHandler)
+            shadowRoot.addEventListener('keydown', eventHandler)
         })
     }
 

@@ -1,6 +1,7 @@
 <template>
     <div v-if="open" style="height: 100%">
         <slot v-if="renderSlot" />
+        <alert-confirm-prompt />
     </div>
 </template>
 

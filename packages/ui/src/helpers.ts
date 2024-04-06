@@ -1552,3 +1552,7 @@ export function debounce<T extends(...args: any[]) => any>(
         timer = setTimeout(() => func(...args), timeout)
     }
 }
+
+export function getWindowContext(vueInstance: any) {
+    return (vueInstance.$el.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt')
+}
