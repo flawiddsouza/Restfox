@@ -1,5 +1,11 @@
+const obtainWindowContext = (element) => {
+    return element.ownerDocument?.defaultView || window
+}
+
 const vResizable = {
     mounted(element, binding) {
+        const window = obtainWindowContext(element)
+
         let topBottom = false
 
         topBottom = 'top-bottom' in binding.modifiers && binding.modifiers['top-bottom'] && binding.value

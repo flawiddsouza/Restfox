@@ -42,8 +42,8 @@ import { State } from '@/global'
 const props = defineProps<{
     collectionItem: CollectionItem | null;
     requestResponseLayoutTopBottom: boolean;
-    requestPanelRatio?: string;
-    responsePanelRatio?: string;
+    requestPanelRatio?: string | number;
+    responsePanelRatio?: string | number;
     requestPanelResized: (width: number) => void;
 }>()
 
