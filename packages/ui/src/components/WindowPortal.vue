@@ -68,8 +68,6 @@ export default {
             this.windowRef.document.body.appendChild(this.$el)
             this.renderSlot = true
             copyStyles(window.document, this.windowRef.document)
-            // close portal when the child window is closed
-            this.windowRef.addEventListener('beforeunload', this.closePortal)
             // close portal when the child window is reloaded
             this.windowRef.addEventListener('unload', this.closePortal)
             // close portal when the parent window is closed
@@ -78,8 +76,11 @@ export default {
         closePortal() {
             if(this.windowRef) {
                 this.windowRef.close()
-                this.windowRef = null
-                this.$emit('close')
+                if(this.windowRef.closed) {
+                    this.windowRef = null
+                    this.renderSlot = false
+                    this.$emit('close')
+                }
             }
             window.removeEventListener('unload', this.closePortal)
         },
