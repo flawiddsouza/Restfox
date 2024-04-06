@@ -1417,13 +1417,13 @@ export function setObjectPathValue(object: any, path: string, value: string) {
     setObjectPathValueLodash(object, path, value)
 }
 
-export function applyTheme(themeName: 'light' | 'dark') {
+export function applyTheme(themeName: 'light' | 'dark', doc: Document = document) {
     if(themeName === 'light') {
-        document.documentElement.className = `theme-${themeName}`
+        doc.documentElement.className = `theme-${themeName}`
     }
 
     if(themeName === 'dark') {
-        document.documentElement.className = `theme-${themeName}`
+        doc.documentElement.className = `theme-${themeName}`
     }
 }
 

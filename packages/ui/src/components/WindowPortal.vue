@@ -5,6 +5,8 @@
 </template>
 
 <script>
+import { applyTheme } from '@/helpers'
+
 function copyStyles(sourceDoc, targetDoc) {
     for (const el of sourceDoc.head.querySelectorAll('style, link[rel=stylesheet]')) {
         const clone = el.cloneNode(true)
@@ -33,6 +35,11 @@ export default {
             windowRef: null,
         }
     },
+    computed: {
+        theme() {
+            return this.$store.state.theme
+        }
+    },
     watch: {
         open(newOpen) {
             if(newOpen) {
@@ -45,12 +52,18 @@ export default {
             if(this.windowRef) {
                 this.windowRef.document.title = newTitle
             }
-        }
+        },
+        theme(newTheme) {
+            if(this.windowRef) {
+                applyTheme(newTheme, this.windowRef.document)
+            }
+        },
     },
     methods: {
         openPortal() {
             this.windowRef = window.open('', '', `width=${screen.width},height=${screen.height}`)
             this.windowRef.document.title = this.title
+            applyTheme(this.theme, this.windowRef.document)
             this.windowRef.document.body.appendChild(this.$el)
             copyStyles(window.document, this.windowRef.document)
             // close portal when the child window is closed
