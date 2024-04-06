@@ -12,7 +12,14 @@ import constants from '../constants'
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
-const detachedTabs = computed(() => store.state.detachedTabs)
+const detachedTabs = computed({
+    get() {
+        return store.state.detachedTabs
+    },
+    set(value) {
+        store.state.detachedTabs = value
+    }
+})
 const requestPanelRatio = ref(undefined)
 const responsePanelRatio = ref(undefined)
 
@@ -41,6 +48,10 @@ function requestPanelResized(e) {
     localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO, e.detail.leftPanel)
     responsePanelRatio.value = e.detail.rightPanel
     localStorage.setItem(constants.LOCAL_STORAGE_KEY.RESPONSE_PANEL_RATIO, e.detail.rightPanel)
+}
+
+function handePortalClose(detachedTab) {
+    detachedTabs.value = detachedTabs.value.filter(tab => tab._id !== detachedTab._id)
 }
 
 let resizeObserverSidebar
@@ -99,7 +110,7 @@ onBeforeUnmount(() => {
         />
 
         <template v-for="detachedTab in detachedTabs" :key="'detached-tab' + detachedTab._id">
-            <WindowPortal :open="true" :title="(detachedTab._type === 'socket' ? 'SOCK' : detachedTab.method) + ' ' + detachedTab.name + ' — Restfox'">
+            <WindowPortal :open="true" :title="(detachedTab._type === 'socket' ? 'SOCK' : detachedTab.method) + ' ' + detachedTab.name + ' — Restfox'" @close="handePortalClose(detachedTab)">
                 <Tab
                     :collection-item="detachedTab"
                     :request-response-layout-top-bottom="requestResponseLayoutTopBottom"
