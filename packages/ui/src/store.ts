@@ -196,6 +196,12 @@ async function loadWorkspaceTabs(context: ActionContext<State, State>) {
         delete workspaceCache.tabs[workspaceId]
     }
 
+    const reloadDetachedTabs = (detachedTabIds = state.detachedTabs.map(detachedTab => detachedTab._id)) => {
+        const detachedTabs = state.collection.filter(collectionItem => detachedTabIds.includes(collectionItem._id))
+        detachedTabs.sort((a, b) => detachedTabIds.indexOf(a._id) - detachedTabIds.indexOf(b._id))
+        state.detachedTabs = detachedTabs
+    }
+
     if(workspaceId in workspaceCache.tabs) {
         state.tabs = workspaceCache.tabs[workspaceId]
         if(workspaceCache.activeTab[workspaceId]) {
@@ -203,12 +209,17 @@ async function loadWorkspaceTabs(context: ActionContext<State, State>) {
         } else {
             state.activeTab = null
         }
+
+        reloadDetachedTabs()
+
         context.dispatch('reloadTabEnvironmentResolved')
         return
     }
 
     const originalTabIds = state.activeWorkspace.tabIds ?? []
+    const detachedTabIds = state.detachedTabs.map(detachedTab => detachedTab._id)
     const tabIds: string[] = []
+    const newDetachedTabIds: string[] = []
 
     const idMap = state.idMap
     let activeTabId: string | null = null
@@ -220,11 +231,18 @@ async function loadWorkspaceTabs(context: ActionContext<State, State>) {
                 tabIds.push(retrievedTabId)
             }
         })
+        detachedTabIds.forEach(tabId => {
+            const retrievedTabId = idMap.get(tabId)
+            if(retrievedTabId) {
+                newDetachedTabIds.push(retrievedTabId)
+            }
+        })
         if(state.activeWorkspace.activeTabId) {
             activeTabId = idMap.get(state.activeWorkspace.activeTabId) ?? null
         }
     } else {
         tabIds.push(...originalTabIds)
+        newDetachedTabIds.push(...detachedTabIds)
         activeTabId = state.activeWorkspace.activeTabId ?? null
     }
 
@@ -251,6 +269,8 @@ async function loadWorkspaceTabs(context: ActionContext<State, State>) {
     if(workspaceCache.activeTab[workspaceId]) {
         setActiveTab(state, workspaceCache.activeTab[workspaceId] as CollectionItem, true, false)
     }
+
+    reloadDetachedTabs(newDetachedTabIds)
 
     context.dispatch('reloadTabEnvironmentResolved')
 }
@@ -713,6 +733,7 @@ const store = createStore<State>({
 
             childIds.forEach(childId => {
                 context.commit('closeTab', childId)
+                context.state.detachedTabs = context.state.detachedTabs.filter(detachedTab => detachedTab._id !== childId)
                 // clear unneeded response cache
                 if(childId in context.state.responses) {
                     delete context.state.responses[childId]
