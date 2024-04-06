@@ -1,6 +1,6 @@
 <template>
     <div v-if="open">
-        <slot />
+        <slot v-if="renderSlot" />
     </div>
 </template>
 
@@ -33,6 +33,7 @@ export default {
     data() {
         return {
             windowRef: null,
+            renderSlot: false,
         }
     },
     computed: {
@@ -65,6 +66,7 @@ export default {
             this.windowRef.document.title = this.title
             applyTheme(this.theme, this.windowRef.document)
             this.windowRef.document.body.appendChild(this.$el)
+            this.renderSlot = true
             copyStyles(window.document, this.windowRef.document)
             // close portal when the child window is closed
             this.windowRef.addEventListener('beforeunload', this.closePortal)
