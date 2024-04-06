@@ -1,18 +1,11 @@
 <template>
-    <div v-if="open">
+    <div v-if="open" style="height: 100%">
         <slot v-if="renderSlot" />
     </div>
 </template>
 
 <script>
 import { applyTheme } from '@/helpers'
-
-function copyStyles(sourceDoc, targetDoc) {
-    for (const el of sourceDoc.head.querySelectorAll('style, link[rel=stylesheet]')) {
-        const clone = el.cloneNode(true)
-        targetDoc.head.appendChild(clone)
-    }
-}
 
 export default {
     name: 'WindowPortal',
@@ -63,11 +56,13 @@ export default {
     methods: {
         openPortal() {
             this.windowRef = window.open('', '', `width=${screen.width},height=${screen.height}`)
+            this.windowRef.document.write('<!DOCTYPE html>') // this is essential, otherwise the document will be in quirks mode
+            this.windowRef.document.close()
+            this.windowRef.document.head.innerHTML = window.document.head.innerHTML
             this.windowRef.document.title = this.title
             applyTheme(this.theme, this.windowRef.document)
             this.windowRef.document.body.appendChild(this.$el)
             this.renderSlot = true
-            copyStyles(window.document, this.windowRef.document)
             // close portal when the child window is reloaded
             this.windowRef.addEventListener('unload', this.closePortal)
             // close portal when the parent window is closed

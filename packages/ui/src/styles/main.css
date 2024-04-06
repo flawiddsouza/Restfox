@@ -446,7 +446,3 @@ a {
 .modal {
     --default-border-color: var(--default-border-color-modal);
 }
-
-table {
-    font-size: inherit;
-}
