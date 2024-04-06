@@ -63,10 +63,10 @@ export default {
             applyTheme(this.theme, this.windowRef.document)
             this.windowRef.document.body.appendChild(this.$el)
             this.renderSlot = true
-            // close portal when the child window is reloaded
-            this.windowRef.addEventListener('unload', this.closePortal)
+            // close portal when the child window is closed or reloaded
+            this.windowRef.addEventListener('pagehide', this.closePortal)
             // close portal when the parent window is closed
-            window.addEventListener('unload', this.closePortal)
+            window.addEventListener('pagehide', this.closePortal)
         },
         closePortal() {
             if(this.windowRef) {
@@ -77,7 +77,7 @@ export default {
                     this.$emit('close')
                 }
             }
-            window.removeEventListener('unload', this.closePortal)
+            window.removeEventListener('pagehide', this.closePortal)
         },
     },
     mounted() {
