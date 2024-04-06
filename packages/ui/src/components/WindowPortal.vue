@@ -55,7 +55,9 @@ export default {
     },
     methods: {
         openPortal() {
-            this.windowRef = window.open('', '', `width=${screen.width},height=${screen.height}`)
+            const width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth
+            const height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight
+            this.windowRef = window.open('', '', `width=${width},height=${height},left=0,top=0`)
             this.windowRef.document.write('<!DOCTYPE html>') // this is essential, otherwise the document will be in quirks mode
             this.windowRef.document.close()
             this.windowRef.document.head.innerHTML = window.document.head.innerHTML
