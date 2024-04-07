@@ -222,9 +222,11 @@ class AlertConfirmPrompt extends HTMLElement {
         </style>
         `
 
-        window.createPrompt = this.createPrompt
-        window.createConfirm = this.createConfirm
-        window.createAlert = this.createAlert
+        if (this.getAttribute('attach-to-window') === 'true') {
+            window.createPrompt = this.createPrompt
+            window.createConfirm = this.createConfirm
+            window.createAlert = this.createAlert
+        }
     }
 }
 

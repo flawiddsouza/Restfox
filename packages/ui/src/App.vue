@@ -8,7 +8,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
     <WorkspacesFrame v-if="appLoaded && !activeWorkspaceLoaded" />
     <Frame v-if="appLoaded && activeWorkspaceLoaded" />
     <ReloadPrompt />
-    <alert-confirm-prompt />
+    <alert-confirm-prompt attach-to-window="true" />
 </template>
 
 <script>
