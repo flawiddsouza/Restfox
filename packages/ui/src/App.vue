@@ -96,6 +96,7 @@ export default {
                     this.activeWorkspace.environment = workspace.environment
                     this.activeWorkspace.environments = workspace.environments
                     this.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+                    this.activeWorkspace.dotEnv = workspace.dotEnv
                 }
             }
 

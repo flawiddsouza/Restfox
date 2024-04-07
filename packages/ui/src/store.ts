@@ -148,6 +148,9 @@ async function getAllParents(workspaceId: string, parentArray: CollectionItem[],
 async function getEnvironmentForRequest(requestWorkspace: Workspace, requestParentArray: CollectionItem[]) {
     const environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
+    environment['process'] = {}
+    environment['process']['env'] = requestWorkspace._type === 'file' ? requestWorkspace.dotEnv : {}
+
     const headers: Record<string, string> = {}
     let authentication: RequestAuthentication | undefined = undefined
 
@@ -1428,6 +1431,8 @@ const store = createStore<State>({
                     context.state.activeWorkspace.environment = workspace.environment
                     context.state.activeWorkspace.environments = workspace.environments
                     context.state.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+                    context.state.activeWorkspace.dotEnv = workspace.dotEnv
+                    emitter.emit('dotenv', 'reloaded')
                 }
             }
         },

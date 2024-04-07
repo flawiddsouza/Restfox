@@ -179,6 +179,7 @@ export interface Workspace {
     environment?: any
     environments?: any[]
     currentEnvironment?: string
+    dotEnv?: Record<string, string> // only available in File Workspace, not persisted to indexedDB
     activeTabId?: string
     tabIds?: string[]
     _type?: string
@@ -193,6 +194,7 @@ export interface FileWorkspace {
     environment?: any
     environments?: any[]
     currentEnvironment?: string
+    dotEnv?: Record<string, string>
 }
 
 export interface PluginTestResult {

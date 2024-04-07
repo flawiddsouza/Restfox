@@ -42,6 +42,7 @@
     },
     "dependencies": {
         "chokidar": "^3.6.0",
+        "dotenv": "^16.4.5",
         "electron-context-menu": "^3.6.1",
         "electron-log": "^5.1.2",
         "electron-squirrel-startup": "^1.0.0",

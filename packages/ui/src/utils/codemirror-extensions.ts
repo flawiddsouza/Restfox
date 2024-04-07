@@ -1,6 +1,8 @@
 import { ViewPlugin, Decoration, EditorView, ViewUpdate } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
 
+export const variableMatchingRegex = /{{ ([.|\w]*?) }}|{{([.|\w]*?)}}/g
+
 export function envVarDecoration(envVariables: any) {
     return ViewPlugin.fromClass(class {
         decorations
@@ -17,14 +19,13 @@ export function envVarDecoration(envVariables: any) {
 
         highlightEnvVariables(view: EditorView, envVariables: any) {
             const builder = new RangeSetBuilder()
-            const re = /{{\s*(\w+)\s*}}/g
             for (const { from, to } of view.visibleRanges) {
                 const range = view.state.doc.sliceString(from, to)
                 let match
-                while ((match = re.exec(range))) {
+                while ((match = variableMatchingRegex.exec(range))) {
                     const start = from + match.index
                     const end = start + match[0].length
-                    const varName = match[1]
+                    const varName = match[1] || match[2]
                     const isInEnv = varName in envVariables
                     const className = isInEnv ? 'valid-env-var' : 'invalid-env-var'
                     const titleText = isInEnv ? envVariables[varName] : 'Environment variable not found'
