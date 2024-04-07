@@ -8,6 +8,7 @@ import { toRaw } from 'vue'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { convert as curlConvert } from './parsers/curl'
+import yaml from 'js-yaml'
 import {
     CollectionItem,
     RequestBody,
@@ -19,6 +20,7 @@ import {
     CreateRequestDataReturn,
     HandleRequestState,
     State,
+    OpenApiSpecPathParams,
 } from './global'
 import { ActionContext } from 'vuex'
 
@@ -674,6 +676,7 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                     description: parameter.description,
                     disabled: parameter.disabled
                 })) : [],
+                pathParameters: item.pathParameters ?? [],
                 authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
                 description: 'description' in item ? item.description : undefined,
                 parentId,
@@ -681,7 +684,6 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
             })
         }
     })
-
     return toTree(collection)
 }
 
@@ -949,7 +951,6 @@ function importPostmanV2(collections: any[], workspaceId: string) {
 function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
     const collection: CollectionItem[] = []
     const plugins: Plugin[] = []
-
     collections.forEach(item => {
         if(item._type === 'request_group') {
             collection.push({
@@ -1021,10 +1022,52 @@ export function convertRestfoxExportToRestfoxCollection(json: any, workspaceId: 
     throw new Error('Invalid Restfox Export')
 }
 
+export function extractPathParameters(openapiSchema: string) {
+    const apiSchema = yaml.load(openapiSchema) as OpenApiSpecPathParams
+    const pathParams: {
+        [x: string]: {
+            name: string;
+            value: string;
+        }[];
+    } = {}
+    Object.entries(apiSchema.paths).forEach((path) => {
+        Object.entries(path[1]).forEach(method => {
+            method[1]?.parameters?.forEach(param => {
+                if (param.in === 'path') {
+                    if (pathParams[path[0] + '-' + [method[0].toLowerCase()]]?.length > 0) {
+                        pathParams[path[0] + '-' + [method[0].toLowerCase()]].push({
+                            name: param.name,
+                            value: param.schema?.example ?? '',
+                        })
+                    } else {
+                        pathParams[path[0] + '-' + [method[0].toLowerCase()]] = [{
+                            name: param.name,
+                            value:  param.schema?.example ?? '',
+                        }]
+                    }
+                }
+            })
+        })
+    })
+    return pathParams
+}
+
+
 export async function convertOpenAPIExportToRestfoxCollection(exportString: string, workspaceId: string) {
     const { convert: insomniaImporter } = await import('insomnia-importers-browser')
-    const insomniaExport = await insomniaImporter(exportString)
-    return convertInsomniaExportToRestfoxCollection(insomniaExport.data, workspaceId)
+    const initExport = await insomniaImporter(
+        exportString.replace(/\/{([^}]+)}/g, '/:$1:')
+    )
+    const pathParams = extractPathParameters(exportString)
+    initExport.data.resources = initExport.data.resources.map((item:{[x:string]:any}) => { 
+        if (item.url) {
+            item['url'] = item.url.replace(/\/:([^:]+):/g, '/{$1}')
+            item['pathParameters'] = pathParams[item['url'].replace(/{{ base_url }}/, '') + '-' + item['method'].toLowerCase()] ?? []
+        }
+        return item
+    })
+
+    return convertInsomniaExportToRestfoxCollection(initExport.data, workspaceId)
 }
 
 export async function convertCurlCommandToRestfoxCollection(curlCommand: string, workspaceId: string) {
