@@ -1,6 +1,7 @@
 const fs = require('fs').promises
 const path = require('path')
 const chokidar = require('chokidar')
+const dotenv = require('dotenv')
 const dbHelpers = require('./db-helpers')
 const fileUtils = require('./file-utils')
 const constants = require('./constants')
@@ -39,6 +40,14 @@ async function getWorkspaceAtLocation(location, getEnvironments = false) {
             workspaceData.environments = environments
             workspaceData.environment = environment
             workspaceData.currentEnvironment = currentEnvironment
+
+            const dotEnvPath = path.resolve(location, '.env')
+
+            if(await fileUtils.pathExists(dotEnvPath)) {
+                workspaceData.dotEnv = dotenv.parse(await fs.readFile(dotEnvPath))
+            } else {
+                workspaceData.dotEnv = {}
+            }
         }
 
         return workspaceData
@@ -150,7 +159,7 @@ async function getCollectionForWorkspace(workspace, type) {
             await dbHelpers.ensureRestfoxCollection(workspace)
 
             workspaceWatcher = chokidar.watch(workspace.location, {
-                ignored: /(^|[\/\\])\../, // ignore dotfiles
+                ignored: (path) => /(^|[\/\\])\../.test(path) && !/\.env$/.test(path), // ignore dotfiles except .env
                 ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
                 awaitWriteFinish: {
                     stabilityThreshold: 80,

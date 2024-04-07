@@ -1597,3 +1597,11 @@ export function debounce<T extends(...args: any[]) => any>(
         timer = setTimeout(() => func(...args), timeout)
     }
 }
+
+export function getAlertConfirmPromptContainer(componentRootElement: HTMLElement) : {
+    createPrompt: any
+    createConfirm: any
+    createAlert: any
+} {
+    return (componentRootElement.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt') as any
+}

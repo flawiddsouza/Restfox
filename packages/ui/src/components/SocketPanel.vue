@@ -1,5 +1,5 @@
 <template>
-    <div class="client-container">
+    <div class="client-container" ref="componentRoot">
         <div class="client-component">
             <div class="d-f flex-jc-sb mb-0_5rem ml-1rem mr-0_5rem mt-0_5rem">
                 <div>
@@ -239,9 +239,15 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeMount, reactive, computed, inject } from 'vue'
+import { nextTick, onBeforeMount, reactive, computed, inject, ref } from 'vue'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
-import { formatTimestamp, generateId, getObjectPaths, setEnvironmentVariable } from '@/helpers'
+import {
+    formatTimestamp,
+    generateId,
+    getObjectPaths,
+    getAlertConfirmPromptContainer,
+    setEnvironmentVariable,
+} from '@/helpers'
 import getObjectPathValue from 'lodash.get'
 import Tabs from './Tabs.vue'
 import ioV2 from 'socket.io-client-v2'
@@ -257,6 +263,8 @@ const props = defineProps<{
 
 
 // Data Variables
+
+const componentRoot = ref<HTMLElement | null>(null)
 
 const messageContainerRefs: any = reactive({})
 
@@ -299,7 +307,8 @@ function addClient() {
 }
 
 async function removeClient(client: Client) {
-    if (!await (window as any).createConfirm('Are you sure you want to remove this client?')) {
+    const container = getAlertConfirmPromptContainer(componentRoot.value!)
+    if (!await container.createConfirm('Are you sure you want to remove this client?')) {
         return
     }
     sockets[activeTab.value._id + '-' + client.id]?.close()
@@ -628,7 +637,9 @@ async function closePayloadTab(client: Client, event: { tabToClose: ClientPayloa
         return
     }
 
-    if(!await (window as any).createConfirm(`Are you sure you want to remove "${event.tabToClose.name}?"`)) {
+    const container = getAlertConfirmPromptContainer(componentRoot.value!)
+
+    if(!await container.createConfirm(`Are you sure you want to remove "${event.tabToClose.name}?"`)) {
         return
     }
 
@@ -688,7 +699,9 @@ async function setSelectedTextAsEnvironmentVariable() {
     const environment = activeWorkspace.value.environment ?? {}
     const currentlyDefinedEnvironmentVariables = Object.keys(environment)
 
-    const environmentVariableName = await (window as any).createPrompt('Select / Enter environment variable name', '', currentlyDefinedEnvironmentVariables)
+    const container = getAlertConfirmPromptContainer(componentRoot.value!)
+
+    const environmentVariableName = await container.createPrompt('Select / Enter environment variable name', '', currentlyDefinedEnvironmentVariables)
 
     if(environmentVariableName === null || environmentVariableName === '') {
         return

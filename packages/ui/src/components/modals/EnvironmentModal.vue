@@ -168,9 +168,8 @@ export default {
                         inline: 'center'
                     })
                 })
-                if(this.collectionItem) {
-                    this.loadEnvVariables()
-                }
+
+                this.loadEnvVariables()
             }
         }
     },
@@ -448,9 +447,19 @@ export default {
             link.click()
         },
         async loadEnvVariables() {
-            const request = JSON.parse(JSON.stringify(this.collectionItem))
-            const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
-            this.envVariables = environment
+            if(this.collectionItem) {
+                const request = JSON.parse(JSON.stringify(this.collectionItem))
+                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
+                this.envVariables = environment
+            } else if(this.workspace) {
+                this.envVariables = {}
+
+                if(this.workspace._type === 'file') {
+                    Object.keys(this.workspace.dotEnv).forEach(dotEnvKey => {
+                        this.envVariables[`process.env.${dotEnvKey}`] = this.workspace.dotEnv[dotEnvKey]
+                    })
+                }
+            }
         },
         handleCollectionItemEvent(event) {
             // close the modal if the parent is no more
@@ -467,14 +476,21 @@ export default {
                 this.showModalComp = false
             }
         },
+        handleDotEnvEvent(event) {
+            if(event === 'reloaded') {
+                this.loadEnvVariables()
+            }
+        }
     },
     created() {
         emitter.on('collectionItem', this.handleCollectionItemEvent)
         emitter.on('environment', this.handleEnvironmentEvent)
+        emitter.on('dotenv', this.handleDotEnvEvent)
     },
     beforeUnmount() {
-        emitter.on('collectionItem', this.handleCollectionItemEvent)
+        emitter.off('collectionItem', this.handleCollectionItemEvent)
         emitter.off('environment', this.handleEnvironmentEvent)
+        emitter.off('dotenv', this.handleDotEnvEvent)
     }
 }
 </script>
