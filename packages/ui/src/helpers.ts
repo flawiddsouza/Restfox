@@ -952,7 +952,7 @@ function importPostmanV2(collections: any[], workspaceId: string) {
 function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
     const collection: CollectionItem[] = []
     const plugins: Plugin[] = []
-    
+
     collections.forEach(item => {
         if(item._type === 'request_group') {
             collection.push({
