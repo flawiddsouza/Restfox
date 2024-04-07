@@ -1553,6 +1553,10 @@ export function debounce<T extends(...args: any[]) => any>(
     }
 }
 
-export function getWindowContext(vueInstance: any) {
-    return (vueInstance.$el.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt')
+export function getAlertConfirmPromptContainer(componentRootElement: HTMLElement) : {
+    createPrompt: any
+    createConfirm: any
+    createAlert: any
+} {
+    return (componentRootElement.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt') as any
 }

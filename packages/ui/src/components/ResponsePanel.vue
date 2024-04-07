@@ -142,7 +142,7 @@ import {
     humanFriendlySize,
     parseContentDispositionHeaderAndGetFileName,
     setEnvironmentVariable,
-    getWindowContext,
+    getAlertConfirmPromptContainer,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 
@@ -411,8 +411,8 @@ export default {
             URL.revokeObjectURL(url)
         },
         async restoreCurrentResponseRequest() {
-            const windowContext = getWindowContext(this)
-            if(!await windowContext.createConfirm('Are you sure? Restoring a request will reset your existing request and make it the same as the saved response\'s request.')) {
+            const container = getAlertConfirmPromptContainer(this.$el)
+            if(!await container.createConfirm('Are you sure? Restoring a request will reset your existing request and make it the same as the saved response\'s request.')) {
                 return
             }
 
@@ -467,8 +467,8 @@ export default {
             const environment = this.activeWorkspace.environment ?? {}
             const currentlyDefinedEnvironmentVariables = Object.keys(environment)
 
-            const windowContext = getWindowContext(this)
-            const environmentVariableName = await windowContext.createPrompt('Select / Enter environment variable name', '', currentlyDefinedEnvironmentVariables)
+            const container = getAlertConfirmPromptContainer(this.$el)
+            const environmentVariableName = await container.createPrompt('Select / Enter environment variable name', '', currentlyDefinedEnvironmentVariables)
 
             if(environmentVariableName === null || environmentVariableName === '') {
                 return
