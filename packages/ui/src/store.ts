@@ -146,10 +146,16 @@ async function getAllParents(workspaceId: string, parentArray: CollectionItem[],
 }
 
 async function getEnvironmentForRequest(requestWorkspace: Workspace, requestParentArray: CollectionItem[]) {
-    const environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
+    let environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
-    environment['process'] = {}
-    environment['process']['env'] = requestWorkspace._type === 'file' ? requestWorkspace.dotEnv : {}
+    if(requestWorkspace._type === 'file') {
+        const dotEnv = requestWorkspace._type === 'file' ? requestWorkspace.dotEnv as Record<string, string> : {}
+        Object.keys(dotEnv).forEach(key => {
+            environment[`process.env.${key}`] = dotEnv[key]
+        })
+        // substitute process.env variables in workspace environment
+        environment = JSON.parse(substituteEnvironmentVariables(environment, JSON.stringify(environment)))
+    }
 
     const headers: Record<string, string> = {}
     let authentication: RequestAuthentication | undefined = undefined
