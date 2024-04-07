@@ -34,6 +34,7 @@
         "dexie-export-import": "^1.0.3",
         "httpsnippet-browser": "github:flawiddsouza/httpsnippet-browser#ed12aba",
         "insomnia-importers-browser": "github:flawiddsouza/insomnia-importers-browser",
+        "js-yaml": "^4.1.0",
         "jszip": "^3.7.1",
         "lodash.get": "^4.4.2",
         "lodash.set": "^4.3.2",
@@ -53,6 +54,7 @@
     },
     "devDependencies": {
         "@playwright/test": "^1.42.1",
+        "@types/js-yaml": "^4.0.9",
         "@types/lodash.get": "^4.4.9",
         "@types/lodash.set": "^4.3.9",
         "@types/node": "^20.11.30",
