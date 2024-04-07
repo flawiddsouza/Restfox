@@ -219,3 +219,19 @@ export interface PluginExpose {
     assert: AssertStatic
     test: PluginTestFn
 }
+
+export interface OpenApiSpecPathParams {
+    paths: {
+        [x: string]: {
+            [x:string]:{
+                parameters?: {
+                    name: 'string',
+                    in: 'path' | 'else',
+                    schema?: {
+                        example?: string
+                    }
+                }[]
+            }
+        }
+    }
+}
