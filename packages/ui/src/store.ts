@@ -151,7 +151,13 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
     if(requestWorkspace._type === 'file') {
         const dotEnv = requestWorkspace._type === 'file' ? requestWorkspace.dotEnv as Record<string, string> : {}
         Object.keys(dotEnv).forEach(key => {
-            environment[`process.env.${key}`] = dotEnv[key]
+            // this varName array join trick is needed as vite build changes all strings that match process.env to {}
+            const varName = [
+                'process',
+                'env',
+                key
+            ].join('.')
+            environment[varName] = dotEnv[key]
         })
         // substitute process.env variables in workspace environment
         environment = JSON.parse(substituteEnvironmentVariables(environment, JSON.stringify(environment)))
