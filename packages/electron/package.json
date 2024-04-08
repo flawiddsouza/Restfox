@@ -66,6 +66,9 @@
             "publisherDisplayName": "Artelin",
             "applicationId": "Artelin.Restfox"
         },
+        "snap": {
+            "allowNativeWayland": true
+        },
         "files": [
             "**/*",
             "!out"
