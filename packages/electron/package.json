@@ -37,7 +37,7 @@
         "lint-fix": "eslint src/*.ts --fix",
         "make": "electron-forge make",
         "publish": "electron-forge publish",
-        "build-snap": "electron-builder --linux snap --publish never --c.snap.allowNativeWayland true",
+        "build-snap": "electron-builder --linux snap --publish never",
         "build-appx": "electron-builder --windows appx"
     },
     "dependencies": {
@@ -65,6 +65,9 @@
             "publisher": "CN=C01B6C7C-C0E3-4A87-B162-83B3296CA0E6",
             "publisherDisplayName": "Artelin",
             "applicationId": "Artelin.Restfox"
+        },
+        "snap": {
+            "allowNativeWayland": true
         },
         "files": [
             "**/*",
