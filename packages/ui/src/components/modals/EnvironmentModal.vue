@@ -456,7 +456,13 @@ export default {
 
                 if(this.workspace._type === 'file') {
                     Object.keys(this.workspace.dotEnv).forEach(dotEnvKey => {
-                        this.envVariables[`process.env.${dotEnvKey}`] = this.workspace.dotEnv[dotEnvKey]
+                        // this varName array join trick is needed as vite build changes all strings that match process.env to {}
+                        const varName = [
+                            'process',
+                            'env',
+                            dotEnvKey
+                        ].join('.')
+                        this.envVariables[varName] = this.workspace.dotEnv[dotEnvKey]
                     })
                 }
             }
