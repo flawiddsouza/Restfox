@@ -118,7 +118,7 @@ jobs:
       - name: Build and tag docker image
         working-directory: .
         run: |
-          docker build -t flawiddsouza/restfox:${{ env.VERSION }} .
+          docker build -t flawiddsouza/restfox:${{ env.VERSION }} -t flawiddsouza/restfox:latest .
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -126,7 +126,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish docker image
         run: |
-          docker push flawiddsouza/restfox:${{ env.VERSION }}
+          docker push -a flawiddsouza/restfox:${{ env.VERSION }}
   update-release-notes:
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
