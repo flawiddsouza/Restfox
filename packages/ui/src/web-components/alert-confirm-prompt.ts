@@ -169,6 +169,7 @@ class AlertConfirmPrompt extends HTMLElement {
             box-shadow: 1px 1px 42px -16px black;
             border-radius: 4px;
             border: 1px solid #c6c6c6;
+            word-break: break-word;
         }
 
         .dialog-confirm, .dialog-alert {
