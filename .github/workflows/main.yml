@@ -126,7 +126,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish docker image
         run: |
-          docker push -a flawiddsouza/restfox:${{ env.VERSION }}
+          docker push --all-tags flawiddsouza/restfox
   update-release-notes:
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
