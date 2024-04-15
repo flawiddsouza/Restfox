@@ -3,7 +3,7 @@
 </template>
 
 <script lang="ts">
-import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
+import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter, drawSelection } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript } from '@codemirror/lang-javascript'
@@ -14,12 +14,7 @@ import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selec
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
-
-const styleOverrides = EditorView.theme({
-    '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
-        fontSize: '1em !important'
-    }
-})
+import { codeMirrorStyleOverrides } from '@/utils/code-mirror-style-overrides'
 
 /**
  * "Mod-Enter" is "Ctrl-Enter" inside codemirror
@@ -92,6 +87,7 @@ function getExtensions(vueInstance, language) {
         history(),
         highlightSpecialChars(),
         highlightSelectionMatches(),
+        drawSelection(),
         indentUnit.of('    '), // 4 spaces
         EditorView.lineWrapping,
         EditorView.updateListener.of(v => {
@@ -100,7 +96,7 @@ function getExtensions(vueInstance, language) {
                 vueInstance.$emit('update:modelValue', v.state.doc.toString())
             }
         }),
-        styleOverrides,
+        codeMirrorStyleOverrides,
         keymap.of([
             ...defaultKeymap,
             ...historyKeymap,

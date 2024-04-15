@@ -3,18 +3,13 @@
 </template>
 
 <script>
-import { EditorView, lineNumbers, keymap } from '@codemirror/view'
+import { EditorView, lineNumbers, keymap, drawSelection } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { foldGutter, syntaxHighlighting } from '@codemirror/language'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
-
-const styleOverrides = EditorView.theme({
-    '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
-        fontSize: '1em !important'
-    }
-})
+import { codeMirrorStyleOverrides } from '@/utils/code-mirror-style-overrides'
 
 function createState(documentText, vueInstance) {
     const extensions = [
@@ -23,10 +18,11 @@ function createState(documentText, vueInstance) {
         lineNumbers(),
         foldGutter({ openText: '▾', closedText: '▸' }),
         highlightSelectionMatches(),
+        drawSelection(),
         EditorView.lineWrapping,
         EditorView.editable.of(true),
         EditorState.readOnly.of(true),
-        styleOverrides,
+        codeMirrorStyleOverrides,
         keymap.of([
             ...searchKeymap,
         ]),

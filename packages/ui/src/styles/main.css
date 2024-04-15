@@ -55,6 +55,8 @@ html {
     --cm-keyword: #708;
     --cm-variable: #00f;
     --cm-tooltip-background-color: #f5f5f5;
+    --cm-selection-background-color: #00000021;
+    --cm-selection-match-background-color: #99ff7780;
     --modal-cm-string: #a11;
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
@@ -63,6 +65,8 @@ html {
     --modal-cm-keyword: #708;
     --modal-cm-variable: #00f;
     --modal-cm-tooltip-background-color: #f5f5f5;
+    --modal-cm-selection-background-color: #00000021;
+    --modal-cm-selection-match-background-color: #99ff7780;
     --drop-target-background-color: #ffc0cb1f;
     --workspace-menu-hover-background-color: #dbedff;
     --method-get: #ab7aff;
@@ -133,6 +137,8 @@ html.theme-dark {
     --cm-keyword: #ca73d7;
     --cm-variable: #a7a7ff;
     --cm-tooltip-background-color: var(--background-color);
+    --cm-selection-background-color: #ffffff33;
+    --cm-selection-match-background-color: #99ff773d;
     --modal-cm-string: #a11;
     --modal-cm-boolean: #219;
     --modal-cm-null: #708;
@@ -141,6 +147,8 @@ html.theme-dark {
     --modal-cm-keyword: #708;
     --modal-cm-variable: #00f;
     --modal-cm-tooltip-background-color: #f5f5f5;
+    --modal-cm-selection-background-color: #00000021;
+    --modal-cm-selection-match-background-color: #99ff7780;
     --drop-target-background-color: #f8889b41;
     --workspace-menu-hover-background-color: #505050;
     --socket-header-background-color: var(--sidebar-item-active-color);
@@ -291,6 +299,8 @@ button.button:hover {
     background-color: var(--modal-button-hover-background-color);
 }
 
+/* code mirror styles & overrides */
+
 .cm-editor .cm-string:not(.cm-property) {
     color: var(--cm-string);
 }
@@ -377,6 +387,19 @@ button.button:hover {
     color: var(--invalid-env-highlight-color) !important;
 }
 
+.cm-editor :not(.cm-focused) .cm-selectionBackground,
+.cm-editor &.cm-focused .cm-selectionBackground {
+    background-color: var(--cm-selection-background-color);
+}
+
+.cm-editor .cm-cursor, .cm-editor .cm-dropCursor {
+    border-color: var(--caret-color);
+}
+
+.cm-editor .cm-selectionMatch {
+    background-color: var(--cm-selection-match-background-color);
+}
+
 .modal .cm-editor .valid-env-var {
     background-color: var(--modal-valid-env-highlight-background-color);
     color: var(--modal-valid-env-highlight-color);
@@ -394,6 +417,21 @@ button.button:hover {
 .modal .cm-editor .invalid-env-var * {
     color: var(--modal-invalid-env-highlight-color) !important;
 }
+
+.modal .cm-editor :not(.cm-focused) .cm-selectionBackground,
+.modal .cm-editor &.cm-focused .cm-selectionBackground {
+    background-color: var(--modal-cm-selection-background-color);
+}
+
+.modal .cm-editor .cm-cursor, .modal .cm-editor .cm-dropCursor {
+    border-color: var(--modal-caret-color);
+}
+
+.modal .cm-editor .cm-selectionMatch {
+    background-color: var(--modal-cm-selection-match-background-color);
+}
+
+/* end of code mirror styles & overrides */
 
 a {
     color: var(--link-color);
