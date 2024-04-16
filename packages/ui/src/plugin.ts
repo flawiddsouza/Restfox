@@ -206,6 +206,16 @@ function addAlertMethodToVM(vm: QuickJSContext) {
     alertHandle.dispose()
 }
 
+function addAtobMethodToVM(vm: QuickJSContext) {
+    const atobHandle = vm.newFunction('atob', (base64String) => {
+        const base64 = vm.getString(base64String)
+        const decoded = atob(base64)
+        return vm.newString(decoded)
+    })
+    vm.setProp(vm.global, 'atob', atobHandle)
+    atobHandle.dispose()
+}
+
 const freeHandles = new Set<QuickJSHandle>()
 
 function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | null) {
@@ -266,6 +276,7 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
     const arena = new Arena(vm, { isMarshalable: true })
 
     addAlertMethodToVM(vm)
+    addAtobMethodToVM(vm)
 
     if(import.meta.env.MODE === 'desktop-electron') {
         addReadFileToVM(vm, plugin.parentPathForReadFile)
