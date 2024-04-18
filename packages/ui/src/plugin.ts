@@ -293,10 +293,33 @@ const globals = {
     expect: chai.expect,
     assert: chai.assert,
     pako,
+    crypto: window.crypto,
+    Uint32Array(...args: any) {
+        return Reflect.construct(Uint32Array, args)
+    },
 }
 
+const runtime = QuickJS.newRuntime()
+
+let lastModulePath = ''
+
+runtime.setModuleLoader(async(modulePath) => {
+    if(modulePath.startsWith('/') === false) {
+        lastModulePath = ''
+    }
+    console.log('Loading module', modulePath, lastModulePath + modulePath)
+    const response = await fetch(lastModulePath + modulePath)
+    const moduleSource = await response.text()
+    if(modulePath.startsWith('/') === false) {
+        if(modulePath.startsWith('https://esm.sh/')) {
+            lastModulePath = 'https://esm.sh'
+        }
+    }
+    return moduleSource
+})
+
 export async function usePlugin(expose: PluginExpose, plugin: { name: string, code: string, parentPathForReadFile: string | null }) {
-    const vm = QuickJS.newContext()
+    const vm = runtime.newContext()
     const arena = new Arena(vm, { isMarshalable: true })
 
     addAlertMethodToVM(vm)

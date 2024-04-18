@@ -54,6 +54,7 @@
         "vuex": "^4.0.2"
     },
     "devDependencies": {
+        "@edge-runtime/vm": "^3.2.0",
         "@playwright/test": "^1.42.1",
         "@types/js-yaml": "^4.0.9",
         "@types/lodash.get": "^4.4.9",
