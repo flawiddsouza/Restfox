@@ -1,10 +1,11 @@
-import variant from '@jitl/quickjs-singlefile-browser-release-sync'
-import { newQuickJSWASMModuleFromVariant, QuickJSContext, QuickJSHandle } from 'quickjs-emscripten-core'
-const QuickJS = await newQuickJSWASMModuleFromVariant(variant)
+import variant from '@jitl/quickjs-singlefile-browser-release-asyncify'
+import { newQuickJSAsyncWASMModuleFromVariant, QuickJSContext, QuickJSHandle } from 'quickjs-emscripten-core'
+const QuickJS = await newQuickJSAsyncWASMModuleFromVariant(variant)
 
-import { Arena } from 'quickjs-emscripten-sync'
+import { Arena } from '@flawiddsouza/quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
+import pako from 'pako'
 import { substituteEnvironmentVariables } from './helpers'
 import {
     CollectionItem,
@@ -29,6 +30,24 @@ const test = (testResults: PluginTestResult[]) => (description: string, callback
             passed: false,
             error: error.message,
         })
+    }
+}
+
+const generalContextMethodsBase = {
+    base64: {
+        toArrayBuffer(base64: string) {
+            const binaryString = atob(base64)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i)
+            }
+            return bytes.buffer
+        }
+    },
+    arrayBuffer: {
+        toString(buffer: ArrayBuffer) {
+            return new TextDecoder().decode(new Uint8Array(buffer))
+        }
     }
 }
 
@@ -58,10 +77,11 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
     }
 
     const generalContextMethods = {
-        getEnvironmentVariable(objectPath: string) {
+        ...generalContextMethodsBase,
+        getEnvVar(objectPath: string) {
             return getObjectPathValue(environment, objectPath)
         },
-        setEnvironmentVariable(objectPath: string, value: string) {
+        setEnvVar(objectPath: string, value: string) {
             if(setEnvironmentVariable) {
                 setEnvironmentVariable(objectPath, value)
             }
@@ -69,8 +89,7 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
     }
 
     const context: PluginExposeContext = {
-        getEnvVar: generalContextMethods.getEnvironmentVariable,
-        setEnvVar: generalContextMethods.setEnvironmentVariable,
+        ...generalContextMethods,
         request: {
             getURL() {
                 if (state.url === undefined) {
@@ -118,17 +137,15 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
                 }
             },
             // deprecated but won't be removed
-            getEnvironmentVariable: generalContextMethods.getEnvironmentVariable,
-            setEnvironmentVariable: generalContextMethods.setEnvironmentVariable,
+            getEnvironmentVariable: generalContextMethods.getEnvVar,
+            setEnvironmentVariable: generalContextMethods.setEnvVar,
         }
     }
 
     return {
         expose: {
-            context,
+            context, // deprecated but won't be removed
             rf: context,
-            expect: chai.expect,
-            assert: chai.assert,
             test: test(testResults),
         }
     }
@@ -139,17 +156,17 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
     const headers = response.headers
 
     const generalContextMethods = {
-        getEnvironmentVariable(objectPath: string) {
+        ...generalContextMethodsBase,
+        getEnvVar(objectPath: string) {
             return getObjectPathValue(environment, objectPath)
         },
-        setEnvironmentVariable(objectPath: string, value: string) {
+        setEnvVar(objectPath: string, value: string) {
             setEnvironmentVariable(objectPath, value)
         },
     }
 
     const context: PluginExposeContext = {
-        getEnvVar: generalContextMethods.getEnvironmentVariable,
-        setEnvVar: generalContextMethods.setEnvironmentVariable,
+        ...generalContextMethods,
         response: {
             getBody() {
                 return bufferCopy
@@ -181,8 +198,8 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
                 return header ? header[1] : undefined
             },
             // deprecated but won't be removed
-            getEnvironmentVariable: generalContextMethods.getEnvironmentVariable,
-            setEnvironmentVariable: generalContextMethods.setEnvironmentVariable,
+            getEnvironmentVariable: generalContextMethods.getEnvVar,
+            setEnvironmentVariable: generalContextMethods.setEnvVar,
         }
     }
 
@@ -190,8 +207,6 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
         expose: {
             context, // deprecated but won't be removed
             rf: context,
-            expect: chai.expect,
-            assert: chai.assert,
             test: test(testResults),
         }
     }
@@ -271,6 +286,15 @@ function checkIfCodeRequiresAsync(code: string) {
     return hasAsync || hasAwait || usesReadFile
 }
 
+const globals = {
+    console: {
+        log: console.log
+    },
+    expect: chai.expect,
+    assert: chai.assert,
+    pako,
+}
+
 export async function usePlugin(expose: PluginExpose, plugin: { name: string, code: string, parentPathForReadFile: string | null }) {
     const vm = QuickJS.newContext()
     const arena = new Arena(vm, { isMarshalable: true })
@@ -283,9 +307,7 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
     }
 
     arena.expose({
-        console: {
-            log: console.log
-        },
+        ...globals,
         ...expose,
     })
 
@@ -316,11 +338,35 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
             `
         }
 
-        const result = arena.evalCode(codeToExecute)
+        const result = await vm.evalCodeAsync(codeToExecute)
 
         if(requiresAsync) {
-            arena.executePendingJobs()
-            await result
+            const executedPendingJobsCount = arena.executePendingJobs()
+            console.log(`Executed ${executedPendingJobsCount} pending jobs`)
+        }
+
+        if ('value' in result) {
+            const resultHandle = result.value
+            const resultValue = vm.dump(resultHandle)
+            if(resultValue) {
+                if(resultValue.type === 'rejected') {
+                    throw resultValue.error
+                } else {
+                    console.log('Result', resultValue)
+                }
+                if(resultHandle.alive) {
+                    resultHandle.dispose()
+                }
+            }
+        }
+
+        if (result.error) {
+            const errorHandle = result.error
+            const error = vm.dump(errorHandle)
+            if(errorHandle.alive) {
+                errorHandle.dispose()
+            }
+            throw error
         }
     } catch(e: any) {
         console.log(e)

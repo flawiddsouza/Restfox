@@ -215,8 +215,6 @@ export interface PluginExposeContext {
 export interface PluginExpose {
     context: PluginExposeContext,
     rf: PluginExposeContext,
-    expect: ExpectStatic
-    assert: AssertStatic
     test: PluginTestFn
 }
 
