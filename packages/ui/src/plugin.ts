@@ -5,7 +5,6 @@ const QuickJS = await newQuickJSAsyncWASMModuleFromVariant(variant)
 import { Arena } from '@flawiddsouza/quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
-import pako from 'pako'
 import { substituteEnvironmentVariables } from './helpers'
 import {
     CollectionItem,
@@ -224,7 +223,7 @@ function addAlertMethodToVM(vm: QuickJSContext) {
 function addAtobMethodToVM(vm: QuickJSContext) {
     const atobHandle = vm.newFunction('atob', (base64String) => {
         const base64 = vm.getString(base64String)
-        const decoded = atob(base64)
+        const decoded = window.atob(base64)
         return vm.newString(decoded)
     })
     vm.setProp(vm.global, 'atob', atobHandle)
@@ -292,7 +291,7 @@ const globals = {
     },
     expect: chai.expect,
     assert: chai.assert,
-    pako,
+    // crypto-js throws 'Native crypto module could not be used to get secure random number.' if the below two are missing:
     crypto: window.crypto,
     Uint32Array(...args: any) {
         return Reflect.construct(Uint32Array, args)
