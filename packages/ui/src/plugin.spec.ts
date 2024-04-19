@@ -55,17 +55,7 @@ test('import pako from unpkg.com', async() => {
 
     const code = JSON.parse(JSON.stringify(`
         import pako from 'https://unpkg.com/pako@2.1.0/dist/pako.esm.mjs?module'
-        // this doesn't work as intended, because atob returns 1 character instead of 40 - bug in quickjs-emscripten
-        // See: https://stackblitz.com/edit/quickjs-emscripten-newstring-bug?file=main.js&terminal=dev
-        // const buffer = rf.base64.toArrayBuffer('EAAAAB+LCAAAAAAAAAqrVvLMKy5JzEtOLVayio6tBQCx9ZeKEAAAAA==')
-        // temporary alternative, we put the atob converted 40 character string here, do the base64 to buffer conversion ourselves {
-        const binaryString = \`\x10\x00\x00\x00\x1F\x8B\b\x00\x00\x00\x00\x00\x00\n«VòÌ+.IÌKN-V²\x8A\x8E­\x05\x00±õ\x97\x8A\x10\x00\x00\x00\`
-        const bytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
-        }
-        const buffer = bytes.buffer
-        // }
+        const buffer = rf.base64.toUint8Array('EAAAAB+LCAAAAAAAAAqrVvLMKy5JzEtOLVayio6tBQCx9ZeKEAAAAA==')
         const slicedBuffer = buffer.slice(4)
         const decompressedGzip = pako.inflate(slicedBuffer)
         const result = rf.arrayBuffer.toString(decompressedGzip)
