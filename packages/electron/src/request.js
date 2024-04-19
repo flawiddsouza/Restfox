@@ -22,6 +22,12 @@ async function checkReachability(host, port) {
     })
 }
 
+const localhostTds = [
+    'test', // all domain names ending with .test
+    'localhost', // all domain names ending with .localhost
+    'local', // all domain names ending with .local
+]
+
 async function handleSendRequest(data) {
     try {
         const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
@@ -68,7 +74,9 @@ async function handleSendRequest(data) {
                                     address = addresses.shift()
                                     let isReachable = true
                                     const urlPort = urlParsed.port !== '' ? urlParsed.port : (urlParsed.protocol === 'https:' ? 443 : 80)
-                                    if (hostname === 'localhost') {
+                                    const tld = hostname.substring(hostname.lastIndexOf('.') + 1)
+
+                                    if (hostname === 'localhost' || localhostTds.includes(tld)) {
                                         isReachable = await checkReachability(address.address, urlPort)
                                         console.log(`address ${address.address} is ${isReachable ? 'reachable' : 'not reachable'} on port ${urlPort}`)
                                     } else {
