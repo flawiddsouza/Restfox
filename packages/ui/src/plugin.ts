@@ -41,13 +41,23 @@ const generalContextMethodsBase = {
                 bytes[i] = binaryString.charCodeAt(i)
             }
             return bytes
-        }
+        },
+        fromUint8Array(uint8Array: Uint8Array) {
+            let binaryString = ''
+            for (let i = 0; i < uint8Array.byteLength; i++) {
+                binaryString += String.fromCharCode(uint8Array[i])
+            }
+            return btoa(binaryString)
+        },
     },
     arrayBuffer: {
         toString(buffer: ArrayBuffer) {
             return new TextDecoder().decode(new Uint8Array(buffer))
-        }
-    }
+        },
+        fromString(string: string) {
+            return new TextEncoder().encode(string)
+        },
+    },
 }
 
 export function createRequestContextForPlugin(request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, testResults: PluginTestResult[]): { expose: PluginExpose } {
