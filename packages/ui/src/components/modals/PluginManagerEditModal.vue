@@ -17,15 +17,20 @@
                     </label>
                 </template>
                 <div style="padding-bottom: 1rem"></div>
-                <label style="overflow: auto;">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem">Code</div>
+                <div style="overflow: auto; display: grid; grid-template-rows: auto 1fr;">
+                    <div style="font-weight: 500; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>Code</div>
+                        <div>
+                            <ReferencesButton />
+                        </div>
+                    </div>
                     <CodeMirrorEditor
                         v-model="code"
                         lang="javascript"
                         :autocompletions="autocompletions"
                         class="code-editor"
                     ></CodeMirrorEditor>
-                </label>
+                </div>
             </div>
             <template #footer>
                 <button class="button">Save</button>
@@ -37,6 +42,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
+import ReferencesButton from '@/components/ReferencesButton.vue'
 import constants from '@/constants'
 
 export default {
@@ -71,7 +77,8 @@ export default {
     },
     components: {
         Modal,
-        CodeMirrorEditor
+        CodeMirrorEditor,
+        ReferencesButton,
     },
     data() {
         return {
@@ -142,7 +149,6 @@ export default {
 }
 
 .code-editor {
-    height: calc(100% - 1.2rem);
     overflow-y: auto;
     border: 1px solid var(--modal-border-color);
 }

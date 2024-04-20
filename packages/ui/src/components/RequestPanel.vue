@@ -292,7 +292,12 @@
             </template>
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
-                    <div style="margin-bottom: 0.25rem">Pre Request</div>
+                    <div style="margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>Pre Request</div>
+                        <div>
+                            <ReferencesButton />
+                        </div>
+                    </div>
                     <CodeMirrorEditor
                         v-model="script.pre_request"
                         lang="javascript"
@@ -333,6 +338,7 @@ import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
 import RequestPanelHeaders from '@/components/RequestPanelHeaders.vue'
 import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
+import ReferencesButton from '@/components/ReferencesButton.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection } from '@/helpers'
@@ -358,6 +364,7 @@ export default {
         RequestPanelTabTitle,
         RequestPanelHeaders,
         RequestPanelAuth,
+        ReferencesButton,
     },
     props: {
         activeTab: Object,
