@@ -55,6 +55,7 @@ module.exports = {
             'error',
             'never'
         ],
+        'no-trailing-spaces': 'error',
         'space-infix-ops': 'error',
         '@typescript-eslint/no-unused-vars': 'error',
         'vue/require-v-for-key': 'off',

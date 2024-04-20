@@ -311,7 +311,7 @@ export async function createRequestData(
     for(const plugin of plugins) {
         const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
 
-        state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : plugin.name
+        state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : `${plugin.name} (Pre Request)`
 
         await usePlugin(expose, {
             name: state.currentPlugin,
@@ -565,7 +565,7 @@ export async function handleRequest(
         for(const plugin of plugins) {
             const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults)
 
-            state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : plugin.name
+            state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : `${plugin.name} (Post Request)`
 
             await usePlugin(expose, {
                 name: state.currentPlugin,
@@ -1061,7 +1061,7 @@ export async function convertOpenAPIExportToRestfoxCollection(exportString: stri
         exportString.replace(/\/{([^}]+)}/g, '/:$1:')
     )
     const pathParams = extractPathParameters(exportString)
-    initExport.data.resources = initExport.data.resources.map((item:{[x:string]:any}) => { 
+    initExport.data.resources = initExport.data.resources.map((item:{[x:string]:any}) => {
         if (item.url) {
             item['url'] = item.url.replace(/\/:([^:]+):/g, '/{$1}')
             item['pathParameters'] = pathParams[item['url'].replace(/{{ base_url }}/, '') + '-' + item['method'].toLowerCase()] ?? []
