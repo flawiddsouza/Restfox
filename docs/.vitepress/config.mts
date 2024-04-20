@@ -27,6 +27,7 @@ export default defineConfig({
                     { text: 'Decoding a JWT Token', link: '/plugins/decoding-a-jwt-token' },
                     { text: 'Using crypto-js', link: '/plugins/using-crypto-js' },
                     { text: 'GZIP Compressing & Decompressing text', link: '/plugins/gzip-compressing-&-decompressing-text' },
+                    { text: 'Making HTTP Requests', link: '/plugins/making-http-requests' },
                 ]
             }
         ],

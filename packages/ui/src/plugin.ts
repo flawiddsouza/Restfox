@@ -1,11 +1,11 @@
 import variant from '@jitl/quickjs-singlefile-browser-release-asyncify'
-import { newQuickJSAsyncWASMModuleFromVariant, QuickJSContext, QuickJSHandle } from 'quickjs-emscripten-core'
+import { newQuickJSAsyncWASMModuleFromVariant, QuickJSAsyncContext, QuickJSContext, QuickJSHandle } from 'quickjs-emscripten-core'
 const QuickJS = await newQuickJSAsyncWASMModuleFromVariant(variant)
 
 import { Arena } from '@flawiddsouza/quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
-import { substituteEnvironmentVariables } from './helpers'
+import { fetchWrapper, substituteEnvironmentVariables } from './helpers'
 import {
     CollectionItem,
     RequestParam,
@@ -275,6 +275,60 @@ function addReadFileToVM(vm: QuickJSContext, parentPathForReadFile: string | nul
     readFileHandle.dispose()
 }
 
+function addFetchSyncToVM(vm: QuickJSAsyncContext) {
+    const fetchSyncHandle = vm.newAsyncifiedFunction('fetchSync', async(urlHandle, optionsHandle) => {
+        const url = vm.getString(urlHandle)
+        const options: RequestInit = optionsHandle ? vm.dump(optionsHandle) : {}
+
+        const abortController = new AbortController()
+        const flags = {
+            electronSwitchToChromiumFetch: false,
+            disableSSLVerification: false,
+        }
+        const emptyHeaders: Record<string, string> = {}
+        const response = await fetchWrapper(
+            new URL(url),
+            options.method ?? 'GET',
+            options.headers as any ?? emptyHeaders,
+            options.body,
+            abortController.signal,
+            flags
+        )
+
+        const responseBuffer = vm.newArrayBuffer(response.buffer)
+        const responseStatus = vm.newNumber(response.status)
+        const responseStatusText = vm.newString(response.statusText)
+
+        const responseObject = vm.newObject()
+
+        vm.setProp(responseObject, 'status', responseStatus)
+        vm.setProp(responseObject, 'statusText', responseStatusText)
+
+        const responseHeaders = vm.evalCode(`
+            const escapedText = JSON.stringify(${JSON.stringify(response.headers)})
+            const headersArray = JSON.parse(escapedText)
+            const headers = new Headers(headersArray)
+            headers
+        `)
+
+        vm.setProp(responseObject, 'headers', vm.unwrapResult(responseHeaders))
+        vm.setProp(responseObject, 'arrayBuffer', vm.newFunction('arrayBuffer', () => responseBuffer))
+
+        const text = new TextDecoder().decode(response.buffer)
+
+        vm.setProp(responseObject, 'text', vm.newFunction('text', () => vm.newString(text)))
+        vm.setProp(responseObject, 'json', vm.newFunction('json', () => {
+            const escapedText = JSON.stringify(text)
+            const jsonString = `JSON.parse(${escapedText})`
+            return vm.evalCode(jsonString)
+        }))
+
+        return responseObject
+    })
+    vm.setProp(vm.global, 'fetchSync', fetchSyncHandle)
+    fetchSyncHandle.dispose()
+}
+
 function checkIfCodeRequiresAsync(code: string) {
     const singleLineCommentPattern = /\/\/.*$/gm
     const multiLineCommentPattern = /\/\*[\s\S]*?\*\//gm
@@ -305,6 +359,10 @@ const globals = {
     crypto: window.crypto,
     Uint32Array(...args: any) {
         return Reflect.construct(Uint32Array, args)
+    },
+    // Headers is used by fetchSync - we need this as it's not implemented by QuickJS
+    Headers(...args: any) {
+        return Reflect.construct(Headers, args)
     },
 }
 
@@ -337,6 +395,8 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
     if(import.meta.env.MODE === 'desktop-electron') {
         addReadFileToVM(vm, plugin.parentPathForReadFile)
     }
+
+    addFetchSyncToVM(vm)
 
     arena.expose({
         ...globals,
