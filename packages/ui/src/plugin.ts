@@ -329,6 +329,17 @@ function addFetchSyncToVM(vm: QuickJSAsyncContext) {
     fetchSyncHandle.dispose()
 }
 
+function setDeepProperty(vm: QuickJSContext, path: string, value: QuickJSHandle) {
+    const properties = path.split('.')
+    let target: QuickJSHandle = vm.global
+
+    for (let i = 0; i < properties.length - 1; i++) {
+        target = vm.getProp(target, properties[i])
+    }
+
+    vm.setProp(target, properties[properties.length - 1], value)
+}
+
 function checkIfCodeRequiresAsync(code: string) {
     const singleLineCommentPattern = /\/\/.*$/gm
     const multiLineCommentPattern = /\/\*[\s\S]*?\*\//gm
@@ -413,7 +424,7 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
         const string = expose.rf.arrayBuffer.toString(new Uint8Array(Object.values(buffer)))
         return vm.newString(string)
     }).consume(func => {
-        vm.setProp(vm.getProp(vm.getProp(vm.global, 'rf'), 'arrayBuffer'), 'toString', func)
+        setDeepProperty(vm, 'rf.arrayBuffer.toString', func)
     })
 
     vm.newFunction('rf.base64.toUint8Array', (base64Handle) => {
@@ -421,8 +432,27 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
         const uint8Array = expose.rf.base64.toUint8Array(base64)
         return vm.unwrapResult(vm.evalCode(`new Uint8Array(${JSON.stringify(Array.from(uint8Array))})`))
     }).consume(func => {
-        vm.setProp(vm.getProp(vm.getProp(vm.global, 'rf'), 'base64'), 'toUint8Array', func)
+        setDeepProperty(vm, 'rf.base64.toUint8Array', func)
     })
+
+    if(expose.rf.request) {
+        // not required looks like, only setQueryParams needed to be overridden
+        // vm.newFunction('rf.request.getQueryParams', () => {
+        //     console.log('getQueryParams')
+        //     const queryParams = expose.rf.request.getQueryParams()
+        //     const stringifiedQueryParams = JSON.stringify(queryParams)
+        //     return vm.unwrapResult(vm.evalCode(`JSON.parse(\`${stringifiedQueryParams}\`)`))
+        // }).consume(func => {
+        //     setDeepProperty(vm, 'rf.request.getQueryParams', func)
+        // })
+
+        vm.newFunction('rf.request.setQueryParams', (queryParamsHandle) => {
+            const queryParams = vm.dump(queryParamsHandle)
+            expose.rf.request.setQueryParams(queryParams)
+        }).consume(func => {
+            setDeepProperty(vm, 'rf.request.setQueryParams', func)
+        })
+    }
 
     if(expose.rf.response) {
         vm.newFunction('rf.response.getBody', () => {

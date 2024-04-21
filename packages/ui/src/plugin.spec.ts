@@ -2,15 +2,16 @@
 
 import { test, expect } from 'vitest'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
-import { CollectionItem, RequestFinalResponse } from './global'
+import { CollectionItem, RequestFinalResponse, RequestParam } from './global'
 
-function createExpose() {
+function createExpose({ parameters = [] }: { parameters?: RequestParam[] } = {}) {
     const request: CollectionItem = {
         _id: 'test',
         _type: 'request',
         parentId: 'test',
         workspaceId: 'test',
         name: 'test',
+        parameters,
     }
     const environment: any = {}
     const setEnvironmentVariable = (key: string, value: string) => {
@@ -103,41 +104,49 @@ test('import pako from unpkg.com', async() => {
 
 test('Setting query params over existing query params', async() => {
     {
-        const { expose, environment } = createExpose()
+        const parameters: RequestParam[] = [{ name: 'testKey', value: 'testValue' }]
+        const { expose, environment } = createExpose({ parameters })
 
         await usePlugin(expose, {
             name: 'Query Params Plugin',
             code: `
-                const queryParams = context.request.getQueryParams()
-                context.request.setQueryParams([...queryParams, { name: 'cat', value: '3' }])
-                const updatedQueryParams = context.request.getQueryParams()
+                const queryParams = rf.request.getQueryParams()
+                rf.request.setQueryParams([...queryParams, { name: 'cat', value: '3' }])
+                const updatedQueryParams = rf.request.getQueryParams()
                 rf.setEnvVar('updatedQueryParams', JSON.stringify(updatedQueryParams))
             `,
             parentPathForReadFile: null,
         })
 
-        expect(environment.updatedQueryParams).toBe(JSON.stringify([{ name: 'cat', value: '3' }]))
+        expect(environment.updatedQueryParams).toBe(JSON.stringify([
+            ...parameters,
+            { name: 'cat', value: '3' },
+        ]))
     }
 
-    // needs to be fixed, see https://github.com/flawiddsouza/Restfox/issues/110#issue-2218114329
-    // commented expect is what we actually want but it currently does not work
+    // tests for the case mentioned at https://github.com/flawiddsouza/Restfox/issues/110#issue-2218114329, now working:
     {
-        const { expose, environment } = createExpose()
+        const parameters: RequestParam[] = [{ name: 'testKey', value: 'testValue' }]
+        const { expose, environment } = createExpose({ parameters })
 
         await usePlugin(expose, {
             name: 'Query Params Plugin',
             code: `
-                const queryParams = context.request.getQueryParams()
+                const queryParams = rf.request.getQueryParams()
+                queryParams.push({ name: 'cat', value: '2' })
                 queryParams.push({ name: 'cat', value: '3' })
-                context.request.setQueryParams(queryParams)
-                const updatedQueryParams = context.request.getQueryParams()
+                rf.request.setQueryParams(queryParams)
+                const updatedQueryParams = rf.request.getQueryParams()
                 rf.setEnvVar('updatedQueryParams', JSON.stringify(updatedQueryParams))
             `,
             parentPathForReadFile: null,
         })
 
-        // expect(environment.updatedQueryParams).toBe(JSON.stringify([{ name: 'cat', value: '3' }]))
-        expect(environment.updatedQueryParams).toBe(JSON.stringify([]))
+        expect(environment.updatedQueryParams).toBe(JSON.stringify([
+            ...parameters,
+            { name: 'cat', value: '2' },
+            { name: 'cat', value: '3' },
+        ]))
     }
 })
 
