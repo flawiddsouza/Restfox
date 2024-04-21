@@ -403,6 +403,36 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
         ...expose,
     })
 
+    vm.newFunction('rf.arrayBuffer.toString', (arrayBufferHandle) => {
+        // logically, this should work, but it doesn't
+        // const arrayBuffer = vm.getArrayBuffer(arrayBufferHandle)
+        // const string = expose.rf.arrayBuffer.toString(arrayBuffer.value)
+        // return vm.newString(string)
+        // so we do this:
+        const buffer = vm.dump(arrayBufferHandle)
+        const string = expose.rf.arrayBuffer.toString(new Uint8Array(Object.values(buffer)))
+        return vm.newString(string)
+    }).consume(func => {
+        vm.setProp(vm.getProp(vm.getProp(vm.global, 'rf'), 'arrayBuffer'), 'toString', func)
+    })
+
+    vm.newFunction('rf.base64.toUint8Array', (base64Handle) => {
+        const base64 = vm.getString(base64Handle)
+        const uint8Array = expose.rf.base64.toUint8Array(base64)
+        return vm.unwrapResult(vm.evalCode(`new Uint8Array(${JSON.stringify(Array.from(uint8Array))})`))
+    }).consume(func => {
+        vm.setProp(vm.getProp(vm.getProp(vm.global, 'rf'), 'base64'), 'toUint8Array', func)
+    })
+
+    if(expose.rf.response) {
+        vm.newFunction('rf.response.getBody', () => {
+            const originalBody = expose.rf.response.getBody()
+            return vm.newArrayBuffer(originalBody)
+        }).consume(func => {
+            vm.setProp(vm.getProp(vm.getProp(vm.global, 'rf'), 'response'), 'getBody', func)
+        })
+    }
+
     const requiresAsync = checkIfCodeRequiresAsync(plugin.code)
 
     try {

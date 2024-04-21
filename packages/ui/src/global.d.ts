@@ -206,6 +206,14 @@ export interface PluginTestResult {
 type PluginTestFn = (description: string, callback: () => void) => void
 
 export interface PluginExposeContext {
+    base64: {
+        toUint8Array: (base64: string) => Uint8Array
+        fromUint8Array: (uint8Array: Uint8Array) => string
+    },
+    arrayBuffer: {
+        toString: (buffer: ArrayBuffer) => string
+        fromString: (base64: string) => ArrayBuffer
+    },
     getEnvVar: (objectPath: string) => any
     setEnvVar: (objectPath: string, value: string) => void
     request?: any
