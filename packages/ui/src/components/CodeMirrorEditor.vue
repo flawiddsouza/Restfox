@@ -6,7 +6,7 @@
 import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter, drawSelection } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
-import { javascript } from '@codemirror/lang-javascript'
+import { javascript, javascriptLanguage } from '@codemirror/lang-javascript'
 import { graphqlLanguage } from 'altair-codemirror-graphql'
 import { closeBrackets, completeFromList, autocompletion } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
@@ -37,6 +37,7 @@ document.onkeydown = function(evt) {
 
 function getLanguageFuncAndHighlightStyle(language) {
     let languageFunc = null
+    let languageData = null
     let highlightStyle = defaultHighlightStyle
 
     if(language === 'json') {
@@ -46,6 +47,7 @@ function getLanguageFuncAndHighlightStyle(language) {
 
     if(language === 'javascript') {
         languageFunc = javascript()
+        languageData = javascriptLanguage
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
@@ -54,11 +56,11 @@ function getLanguageFuncAndHighlightStyle(language) {
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
-    return { languageFunc, highlightStyle }
+    return { languageFunc, languageData, highlightStyle }
 }
 
 function getExtensions(vueInstance, language) {
-    const { languageFunc, highlightStyle } = getLanguageFuncAndHighlightStyle(language)
+    const { languageFunc, languageData, highlightStyle } = getLanguageFuncAndHighlightStyle(language)
 
     // languageFunc will be null for plain text & unsupported languages,
     // so we filter it out, to prevent errors
@@ -68,14 +70,15 @@ function getExtensions(vueInstance, language) {
 
 
     const autocompletionsArray = [
-        vueInstance.autocompletions.length > 0 ? autocompletion({
-            override: [completeFromList(vueInstance.autocompletions)],
+        vueInstance.autocompletions.length > 0 ? languageData?.data.of({
+            autocomplete: completeFromList(vueInstance.autocompletions)
         }) : null,
     ].filter(Boolean)
 
     return [
         ...languageArray,
         ...autocompletionsArray,
+        autocompletion(),
         syntaxHighlighting(highlightStyle, { fallback: true }),
         lineNumbers(),
         highlightActiveLineGutter(),
