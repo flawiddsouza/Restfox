@@ -3,9 +3,10 @@ FROM node:19.8.1-alpine3.17 AS build
 RUN apk add --no-cache git
 RUN mkdir /app
 ADD .git /app/.git
-ADD ./packages/ui /app/ui/
+ADD ./docs /app/docs
+ADD ./packages/ui /app/packages/ui/
 ADD ./packages/web-standalone /app/web-standalone/
-WORKDIR /app/ui
+WORKDIR /app/packages/ui
 RUN npm ci && npm run build-web-standalone
 WORKDIR /app/web-standalone
 RUN npm ci
@@ -15,5 +16,5 @@ FROM node:19.8.1-alpine3.17
 RUN mkdir -p /app/web-standalone/public
 WORKDIR /app/web-standalone
 COPY --from=build /app/web-standalone /app/web-standalone
-COPY --from=build /app/ui/dist /app/web-standalone/public
+COPY --from=build /app/packages/ui/dist /app/web-standalone/public
 CMD ["npm", "start"]
