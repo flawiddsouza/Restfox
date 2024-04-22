@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const { resolve } = require('path')
 const contextMenu = require('electron-context-menu')
 const log = require('electron-log/main')
+const open = import('open')
 const requests = require('./request')
 const db = require('./db')
 const helpers = require('./helpers')
@@ -58,7 +59,7 @@ function createWindow() {
                 },
             }
         }
-        shell.openExternal(url)
+        open.then(openModule => openModule.default(url))
         return { action: 'deny' }
     })
 
