@@ -48,8 +48,8 @@ export default {
             }
         ` + '\n',
         SCRIPT: {
-            PRE_REQUEST: '\n\n',
-            POST_REQUEST: '\n\n',
+            PRE_REQUEST: '',
+            POST_REQUEST: '',
         }
     },
     AUTOCOMPLETIONS: {
