@@ -389,7 +389,7 @@ button.button:hover {
 
 .cm-editor :not(.cm-focused) .cm-selectionBackground,
 .cm-editor &.cm-focused .cm-selectionBackground {
-    background-color: var(--cm-selection-background-color);
+    background-color: var(--cm-selection-background-color) !important;
 }
 
 .cm-editor .cm-cursor, .cm-editor .cm-dropCursor {

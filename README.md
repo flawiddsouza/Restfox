@@ -87,6 +87,11 @@ npm run build-desktop
 npm run build-web-standalone
 ```
 
+### To upgrade codemirror to latest version
+```bash
+npm i @codemirror/autocomplete@latest @codemirror/commands@latest @codemirror/lang-javascript@latest @codemirror/lang-json@latest @codemirror/language@latest @codemirror/search@latest @codemirror/state@latest @codemirror/view@latest
+```
+
 ## electron
 
 ### To upgrade electron to latest version
