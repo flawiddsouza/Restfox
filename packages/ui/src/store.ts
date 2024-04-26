@@ -204,31 +204,10 @@ async function loadWorkspaceTabs(context: ActionContext<State, State>) {
 
     const workspaceId = state.activeWorkspace._id
 
-    // we always reset the cache for file workspaces
-    // as we don't want to load outdated data for tabs
-    // if the files for the tabs have changed meanwhile
-    if(state.activeWorkspace._type === 'file') {
-        delete workspaceCache.tabs[workspaceId]
-    }
-
     const reloadDetachedTabs = (detachedTabIds = state.detachedTabs.map(detachedTab => detachedTab._id)) => {
         const detachedTabs = state.collection.filter(collectionItem => detachedTabIds.includes(collectionItem._id))
         detachedTabs.sort((a, b) => detachedTabIds.indexOf(a._id) - detachedTabIds.indexOf(b._id))
         state.detachedTabs = detachedTabs
-    }
-
-    if(workspaceId in workspaceCache.tabs) {
-        state.tabs = workspaceCache.tabs[workspaceId]
-        if(workspaceCache.activeTab[workspaceId]) {
-            setActiveTab(state, workspaceCache.activeTab[workspaceId] as CollectionItem, true, false)
-        } else {
-            state.activeTab = null
-        }
-
-        reloadDetachedTabs()
-
-        context.dispatch('reloadTabEnvironmentResolved')
-        return
     }
 
     const originalTabIds = state.activeWorkspace.tabIds ?? []
@@ -267,6 +246,10 @@ async function loadWorkspaceTabs(context: ActionContext<State, State>) {
     tabIds.forEach((tabId, index) => {
         tabIdsOrder[tabId] = index
     })
+
+    // TODO completely remove usages of workspaceCache, as it doesn't seem useful anymore
+    // seems like I'm now just using it as a variable to store some data
+    delete workspaceCache.tabs[workspaceId]
 
     workspaceCache.tabs[workspaceId] = state.collection.filter(collectionItem => tabIds.includes(collectionItem._id)).sort((a, b) => tabIdsOrder[a._id] - tabIdsOrder[b._id])
 
