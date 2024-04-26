@@ -341,7 +341,7 @@ import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import ReferencesButton from '@/components/ReferencesButton.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
-import { convertCurlCommandToRestfoxCollection } from '@/helpers'
+import { convertCurlCommandToRestfoxCollection, debounce } from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
@@ -504,27 +504,7 @@ export default {
                     this.skipScriptUpdate = false
                     return
                 }
-                if(this.scriptPlugin) {
-                    this.$store.commit('updatePlugin', {
-                        _id: this.scriptPlugin._id,
-                        name: null,
-                        code: {
-                            pre_request: this.script.pre_request,
-                            post_request: this.script.post_request,
-                        },
-                    })
-                } else {
-                    this.$store.commit('addPlugin', {
-                        name: null,
-                        code: {
-                            pre_request: this.script.pre_request,
-                            post_request: this.script.post_request,
-                        },
-                        workspaceId: null,
-                        collectionId: this.activeTab._id,
-                        type: 'script',
-                    })
-                }
+                this.handleScriptSave(this)
             },
             deep: true
         },
@@ -682,6 +662,29 @@ export default {
         renderMarkdown(markdown) {
             return marked.parse(markdown)
         },
+        handleScriptSave: debounce((_this) => {
+            if(_this.scriptPlugin) {
+                _this.$store.commit('updatePlugin', {
+                    _id: _this.scriptPlugin._id,
+                    name: null,
+                    code: {
+                        pre_request: _this.script.pre_request,
+                        post_request: _this.script.post_request,
+                    },
+                })
+            } else {
+                _this.$store.commit('addPlugin', {
+                    name: null,
+                    code: {
+                        pre_request: _this.script.pre_request,
+                        post_request: _this.script.post_request,
+                    },
+                    workspaceId: null,
+                    collectionId: _this.activeTab._id,
+                    type: 'script',
+                })
+            }
+        }, 500),
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
