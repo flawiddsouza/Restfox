@@ -573,7 +573,7 @@ const store = createStore<State>({
             foundPlugin.updatedAt = updatePluginData.updatedAt
 
             // plugin scope changed from global to workspace
-            if(previousWorkspaceId === null && newWorkspaceId !== null) {
+            if(!previousWorkspaceId && newWorkspaceId) {
                 state.plugins.global = state.plugins.global.filter(item => item._id !== foundPlugin._id)
                 state.plugins.workspace.push(foundPlugin)
 
@@ -585,7 +585,7 @@ const store = createStore<State>({
             }
 
             // plugin scope changed from workspace to global
-            if(previousWorkspaceId !== null && newWorkspaceId === null) {
+            if(previousWorkspaceId && !newWorkspaceId) {
                 state.plugins.workspace = state.plugins.workspace.filter(item => item._id !== foundPlugin._id)
                 state.plugins.global.push(foundPlugin)
 
