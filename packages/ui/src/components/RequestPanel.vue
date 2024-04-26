@@ -303,6 +303,7 @@
                         lang="javascript"
                         class="code-editor"
                         :autocompletions="preRequestAutocompletions"
+                        :key="`pre-request-script-editor-${activeTab._id}`"
                     ></CodeMirrorEditor>
 
                     <div style="margin-top: 1rem; margin-bottom: 0.25rem;">Post Request</div>
@@ -311,6 +312,7 @@
                         lang="javascript"
                         class="code-editor"
                         :autocompletions="postRequestAutocompletions"
+                        :key="`post-request-script-editor-${activeTab._id}`"
                     ></CodeMirrorEditor>
                 </div>
             </template>
@@ -485,15 +487,25 @@ export default {
         scriptPlugin: {
             handler() {
                 if(this.scriptPlugin) {
-                    this.skipScriptUpdate = true
-                    this.script.pre_request = this.scriptPlugin.code.pre_request
-                    this.skipScriptUpdate = true
-                    this.script.post_request = this.scriptPlugin.code.post_request
+                    if (this.script.pre_request !== this.scriptPlugin.code.pre_request) {
+                        this.skipScriptUpdate = true
+                        this.script.pre_request = this.scriptPlugin.code.pre_request
+                    }
+
+                    if (this.script.post_request !== this.scriptPlugin.code.post_request) {
+                        this.skipScriptUpdate = true
+                        this.script.post_request = this.scriptPlugin.code.post_request
+                    }
                 } else {
-                    this.skipScriptUpdate = true
-                    this.script.pre_request = constants.CODE_EXAMPLE.SCRIPT.PRE_REQUEST
-                    this.skipScriptUpdate = true
-                    this.script.post_request = constants.CODE_EXAMPLE.SCRIPT.POST_REQUEST
+                    if (this.script.pre_request !== constants.CODE_EXAMPLE.SCRIPT.PRE_REQUEST) {
+                        this.skipScriptUpdate = true
+                        this.script.pre_request = constants.CODE_EXAMPLE.SCRIPT.PRE_REQUEST
+                    }
+
+                    if (this.script.post_request !== constants.CODE_EXAMPLE.SCRIPT.POST_REQUEST) {
+                        this.skipScriptUpdate = true
+                        this.script.post_request = constants.CODE_EXAMPLE.SCRIPT.POST_REQUEST
+                    }
                 }
             },
             immediate: true
@@ -684,6 +696,7 @@ export default {
                     type: 'script',
                 })
             }
+            console.log('Script saved')
         }, 500),
     },
     mounted() {
