@@ -19,7 +19,9 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-linux' || github.event.inputs.job-to-run == 'build-electron-snap' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
@@ -43,7 +45,9 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-windows' || github.event.inputs.job-to-run == '' }}
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
@@ -67,7 +71,9 @@ jobs:
         # see https://github.com/actions/runner-images#available-images for more info
         os: [macos-14, macos-13]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
@@ -96,7 +102,9 @@ jobs:
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
@@ -127,7 +135,9 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-docker-image' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Extract version from tag
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
       - name: Build and tag docker image
@@ -147,9 +157,9 @@ jobs:
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history
+          fetch-depth: 0
       - name: Setup Node 20
         uses: actions/setup-node@v3
         with:
