@@ -2,6 +2,11 @@ name: Publish Electron Binaries
 
 on:
   workflow_dispatch:
+    inputs:
+      job-to-run:
+        description: 'Job to run (leave empty to run all)'
+        required: false
+        default: ''
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -11,6 +16,7 @@ env:
 
 jobs:
   build-electron-linux:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-linux' || github.event.inputs.job-to-run == 'build-electron-snap' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -34,6 +40,7 @@ jobs:
           export DEBUG=@malept/flatpak-bundler # required to see flatpak build logs
           npm run publish
   build-electron-windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-windows' || github.event.inputs.job-to-run == '' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
@@ -52,6 +59,7 @@ jobs:
           npm ci
           npm run publish
   build-electron-mac:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-mac' || github.event.inputs.job-to-run == '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -84,6 +92,7 @@ jobs:
           npm ci
           npm run publish
   build-electron-snap:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-snap' || github.event.inputs.job-to-run == '' }}
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
@@ -115,6 +124,7 @@ jobs:
         run: |
           node scripts/upload-file-to-latest-draft-release.js ./packages/electron/dist/${{ env.SNAP_FILE_NAME }}
   build-docker-image:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-docker-image' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -133,6 +143,7 @@ jobs:
         run: |
           docker push --all-tags flawiddsouza/restfox
   update-release-notes:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == '' }}
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
