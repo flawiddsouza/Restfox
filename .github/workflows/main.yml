@@ -52,7 +52,12 @@ jobs:
           npm ci
           npm run publish
   build-electron-mac:
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # macos-14 is arm64, macos-13 is x86_64 (so we get builds for both architectures)
+        # see https://github.com/actions/runner-images#available-images for more info
+        os: [macos-14, macos-13]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Node 20
