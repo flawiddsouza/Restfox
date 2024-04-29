@@ -25,6 +25,7 @@ html {
     --scrollbar: #dfdfdf;
     --scrollbar-background: #f3f2f2;
     --link-color: rgb(0, 0, 238);
+    --modal-link-color: var(--link-color);
     --input-disabled-background-color: rgba(239, 239, 239, 0.3);
     --input-disabled-color: rgb(84, 84, 84);
     --button-background-color: white;
@@ -105,6 +106,7 @@ html.theme-dark {
     --scrollbar: #505050;
     --scrollbar-background: #353535;
     --link-color: #d9c9ff;
+    --modal-link-color: rgb(0, 0, 238);
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
     --input-disabled-color: rgb(170, 170, 170);
     --modal-input-disabled-background-color: rgba(239, 239, 239, 0.3);
@@ -435,6 +437,10 @@ button.button:hover {
 
 a {
     color: var(--link-color);
+}
+
+.modal a {
+    color: var(--modal-link-color);
 }
 
 .request-panel-tabs-context select {
