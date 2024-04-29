@@ -703,6 +703,8 @@ export default {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
 
         this.attachRootElementResizeObserver()
+
+        this.loadGraphql()
     },
     beforeUnmount() {
         emitter.off('response_panel', this.handleResponsePanelEmitter)

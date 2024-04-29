@@ -7,7 +7,7 @@ import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNum
 import { EditorState, StateEffect } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript'
-import { graphqlLanguage } from 'altair-codemirror-graphql'
+import { graphql } from 'cm6-graphql'
 import { closeBrackets, completeFromList, autocompletion } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selectLineBoundaryForward } from '@codemirror/commands'
@@ -52,7 +52,7 @@ function getLanguageFuncAndHighlightStyle(language) {
     }
 
     if(language === 'graphql') {
-        languageFunc = graphqlLanguage
+        languageFunc = graphql()
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
 

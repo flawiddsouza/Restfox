@@ -26,8 +26,8 @@
         "@codemirror/view": "^6.26.3",
         "@flawiddsouza/quickjs-emscripten-sync": "^1.5.2",
         "@jitl/quickjs-singlefile-browser-release-asyncify": "^0.29.1",
-        "altair-codemirror-graphql": "^4.6.4",
         "chai": "^4.3.10",
+        "cm6-graphql": "^0.0.14",
         "dayjs": "^1.10.7",
         "dedent": "^1.5.1",
         "dexie": "^3.2.0",
@@ -69,5 +69,13 @@
         "vite-plugin-checker": "^0.6.4",
         "vite-plugin-pwa": "^0.16.6",
         "vitest": "^0.25.2"
+    },
+    "overrides": {
+        "cm6-graphql": {
+            "@codemirror/autocomplete": "$@codemirror/autocomplete",
+            "@codemirror/language": "$@codemirror/language",
+            "@codemirror/state": "$@codemirror/state",
+            "@codemirror/view": "$@codemirror/view"
+        }
     }
 }
