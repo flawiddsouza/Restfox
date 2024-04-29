@@ -1,0 +1,2 @@
+openssl genrsa -out localhost.key 2048
+openssl req -new -x509 -days 32767 -key localhost.key -out localhost.crt -subj "/CN=localhost"

@@ -15,6 +15,7 @@ import {
     RequestFinalResponse,
     PluginExposeContext,
 } from './global'
+import constants from './constants'
 
 const test = (testResults: PluginTestResult[]) => (description: string, callback: () => void) => {
     try {
@@ -281,9 +282,12 @@ function addFetchSyncToVM(vm: QuickJSAsyncContext) {
         const options: RequestInit = optionsHandle ? vm.dump(optionsHandle) : {}
 
         const abortController = new AbortController()
+
+        const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
+
         const flags = {
             electronSwitchToChromiumFetch: false,
-            disableSSLVerification: false,
+            disableSSLVerification: savedDisableSSLVerification === 'true' ? true : false,
         }
         const emptyHeaders: Record<string, string> = {}
         const response = await fetchWrapper(

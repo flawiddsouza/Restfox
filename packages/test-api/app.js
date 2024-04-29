@@ -1,5 +1,6 @@
 import express from 'express'
 import { createServer } from 'http'
+import { createServer as createHttpsServer } from 'https'
 import { Server as SocketIOv3Server } from 'socket.io-v3'
 import { Server as SocketIOv4Server } from 'socket.io-v4'
 import { WebSocketServer } from 'ws'
@@ -109,7 +110,13 @@ app.get('/query-params-test', (req, res) => {
     })
 })
 
-const server = createServer(app)
+const args = process.argv.slice(2)
+const ENABLE_SSL = args.includes('--ssl')
+
+const server = ENABLE_SSL ? createHttpsServer({
+    key: readFileSync('files/localhost.key'),
+    cert: readFileSync('files/localhost.crt'),
+}, app) : createServer(app)
 
 const ioV3 = new SocketIOv3Server(server, {
     path: '/socket.io-v3',
@@ -165,8 +172,8 @@ webSocketServer.on('connection', (ws) => {
 })
 
 server.listen(5605, () => console.log(`
-HTTP at http://localhost:5605
-Socket.IO v3 at http://localhost:5605/socket.io-v3
-Socket.IO v4 at http://localhost:5605/socket.io-v4
+${ENABLE_SSL ? 'HTTPS' : 'HTTP'} at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605
+Socket.IO v3 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v3
+Socket.IO v4 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v4
 WebSocket at ws://localhost:5605/websocket
 `))

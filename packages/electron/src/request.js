@@ -52,6 +52,10 @@ async function handleSendRequest(data) {
 
         const urlParsed = new URL(url)
 
+        console.log({
+            disableSSLVerification
+        })
+
         const response = await fetch(url, {
             method,
             headers,
