@@ -19,7 +19,7 @@
                 </template>
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
-                    <select v-model="currentEnvironment" style="border: 1px solid var(--default-border-color); outline: 0; background-color: inherit;" title="Change Environment">
+                    <select v-model="currentEnvironment" style="border: 1px solid var(--default-border-color); outline: 0; background-color: inherit; height: 84%; border-radius: var(--default-border-radius)" title="Change Environment">
                         <option v-for="environment in environments">{{ environment.name }}</option>
                     </select>
                 </div>

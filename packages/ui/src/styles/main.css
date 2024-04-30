@@ -11,6 +11,8 @@ html {
         'Droid Sans Fallback';
     --font-default: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light',
         'Ubuntu', 'Droid Sans', sans-serif;
+    --default-border-radius: 3px;
+    /* theme colors */
     --default-border-color: lightgrey;
     --default-border-color-modal: var(--default-border-color);
     --border-color-lighter: #f1f1f1;
@@ -261,9 +263,14 @@ input:disabled {
 input.full-width-input, select.full-width-input {
     width: 100%;
     border: 1px solid var(--modal-border-color);
+    border-radius: var(--default-border-radius);
     outline: 0;
-    padding: 0.3rem;
+    padding: 0.4rem;
     background: inherit;
+}
+
+input.full-width-input {
+    padding: 0.5rem;
 }
 
 select.full-width-input option {
@@ -445,6 +452,7 @@ a {
 
 .request-panel-tabs-context select {
     border: 1px solid var(--default-border-color);
+    border-radius: var(--default-border-radius);
     outline: 0;
     padding: 0.3rem;
     background: inherit;

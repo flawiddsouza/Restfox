@@ -239,4 +239,8 @@ table th, table td {
     padding: 0.5rem;
     text-align: center;
 }
+
+select {
+    border-radius: var(--default-border-radius);
+}
 </style>
