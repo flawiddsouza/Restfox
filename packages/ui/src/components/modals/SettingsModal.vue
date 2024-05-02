@@ -3,19 +3,19 @@
         <modal title="Settings" v-model="showModalComp" width="600px">
             <div>Running: {{ gitTag }} ({{ gitCommitHash }})</div>
             <div style="padding-top: 1rem"></div>
-            <div>
-                Sidebar Width<br>
-                <input type="text" :value="sidebarWidth" class="full-width-input" placeholder="Default" disabled>
-            </div>
-            <div style="padding-top: 1rem"></div>
-            <div>
-                Request Panel Ratio<br>
-                <input type="text" :value="requestPanelRatio" class="full-width-input" placeholder="Default" disabled>
-            </div>
-            <div style="padding-top: 1rem"></div>
-            <div>
-                Response Panel Ratio<br>
-                <input type="text" :value="responsePanelRatio" class="full-width-input" placeholder="Default" disabled>
+            <div style="display: flex; justify-content: space-between;">
+                <div>
+                    Sidebar Width<br>
+                    <input type="text" :value="sidebarWidth" class="full-width-input" placeholder="Default" disabled>
+                </div>
+                <div>
+                    Request Panel Ratio<br>
+                    <input type="text" :value="requestPanelRatio" class="full-width-input" placeholder="Default" disabled>
+                </div>
+                <div>
+                    Response Panel Ratio<br>
+                    <input type="text" :value="responsePanelRatio" class="full-width-input" placeholder="Default" disabled>
+                </div>
             </div>
             <div style="padding-top: 1rem"></div>
             <div style="padding-top: 1rem"></div>
