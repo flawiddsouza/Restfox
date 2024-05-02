@@ -148,6 +148,8 @@ export default {
                 }
 
                 document.location.reload()
+
+                return
             }
 
             this.resetWidths()
