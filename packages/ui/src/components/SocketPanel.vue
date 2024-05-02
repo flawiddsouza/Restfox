@@ -426,7 +426,7 @@ async function connect(client: Client) {
 
         if (client.type === 'Socket.IO-v3' || client.type === 'Socket.IO') {
             socket.onAny(async(event, ...args) => {
-                const receivedMessage = `[${event}] ${args[0]}`
+                const receivedMessage = `[${event}] ${typeof args[0] === 'object' ? JSON.stringify(args[0], null, 4) : args[0]}`
                 clientMessageHandler(client, receivedMessage)
             })
         }
