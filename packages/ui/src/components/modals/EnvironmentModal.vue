@@ -449,7 +449,7 @@ export default {
         async loadEnvVariables() {
             if(this.collectionItem) {
                 const request = JSON.parse(JSON.stringify(this.collectionItem))
-                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
+                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
                 this.envVariables = environment
             } else if(this.workspace) {
                 this.envVariables = {}

@@ -1025,7 +1025,7 @@ const store = createStore<State>({
         async loadGlobalPlugins(context) {
             context.state.plugins.global = await getGlobalPlugins()
         },
-        async getEnvironmentForRequest(context, request): Promise<{
+        async getEnvironmentForRequest(context, { collectionItem, includeSelf = false }): Promise<{
             environment: any,
             parentHeaders: Record<string, string>,
             parentAuthentication?: RequestAuthentication,
@@ -1036,8 +1036,12 @@ const store = createStore<State>({
             }
 
             let requestParentArray: CollectionItem[] = []
-            await getAllParents(context.state.activeWorkspace._id, requestParentArray, request)
+            await getAllParents(context.state.activeWorkspace._id, requestParentArray, collectionItem)
             requestParentArray = requestParentArray.reverse()
+
+            if(collectionItem._type === 'request_group' && includeSelf) {
+                requestParentArray.push(collectionItem)
+            }
 
             const { environment, parentHeaders, parentAuthentication } = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
 
@@ -1055,7 +1059,7 @@ const store = createStore<State>({
                 parentHeaders: Record<string, string>,
                 parentAuthentication: RequestAuthentication | undefined,
                 requestParentArray: CollectionItem[]
-            } = await context.dispatch('getEnvironmentForRequest', activeTab)
+            } = await context.dispatch('getEnvironmentForRequest', { collectionItem: activeTab })
 
             const setEnvironmentVariableWrapper = (objectPath: string, value: string) => {
                 setEnvironmentVariable(context, objectPath, value)
@@ -1404,7 +1408,7 @@ const store = createStore<State>({
             const tabs = [...context.state.tabs, ...context.state.detachedTabs]
             // we use forEach instead of for of to run the await in parallel
             tabs.forEach(async tab => {
-                const { environment } = await context.dispatch('getEnvironmentForRequest', tab)
+                const { environment } = await context.dispatch('getEnvironmentForRequest', { collectionItem: tab })
                 context.state.tabEnvironmentResolved[tab._id] = environment
             })
         },

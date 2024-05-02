@@ -116,7 +116,7 @@ export default {
             if(this.selectedClient) {
                 try {
                     const request = JSON.parse(JSON.stringify(this.collectionItem))
-                    const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', request)
+                    const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
                     const code = await generateCode(request, environment, parentHeaders, parentAuthentication, this.selectedLanguage, this.selectedClient)
                     this.generatedCode = code
                 } catch(e) {

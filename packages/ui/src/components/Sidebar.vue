@@ -326,7 +326,7 @@ export default {
 
             if(clickedSidebarItem === 'Copy as Curl') {
                 const request = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
-                const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', request)
+                const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
                 try {
                     const curlCommand = await generateCode(request, environment, parentHeaders, parentAuthentication, 'shell', 'curl')
                     await navigator.clipboard.writeText(curlCommand)

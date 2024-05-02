@@ -166,7 +166,7 @@ export default {
         },
         async loadEnvVariables() {
             const request = JSON.parse(JSON.stringify(this.collectionItem))
-            const { environment } = await this.$store.dispatch('getEnvironmentForRequest', request)
+            const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request, includeSelf: true })
             this.envVariables = environment
         },
     }

@@ -328,7 +328,7 @@ async function connect(client: Client) {
     }
 
     let clientUrlWithEnvironmentVariablesSubtituted = client.url
-    const { environment } = await store.dispatch('getEnvironmentForRequest', activeTab.value)
+    const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
     const possibleEnvironmentObjectPaths: string[] = getObjectPaths(environment)
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
@@ -490,7 +490,7 @@ async function sendMessage(client: Client) {
 
     let messageToSend = client.message
 
-    const { environment } = await store.dispatch('getEnvironmentForRequest', activeTab.value)
+    const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
     const possibleEnvironmentObjectPaths: string[] = getObjectPaths(environment)
 
     possibleEnvironmentObjectPaths.forEach(objectPath => {
