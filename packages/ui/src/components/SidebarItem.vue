@@ -9,6 +9,7 @@
         :data-parent-id="sidebarItem.parentId"
         :data-id="sidebarItem._id"
         :data-type="sidebarItem._type"
+        :title="!showInputToRenameRequest ? sidebarItem.name : 'Press Enter to save, Esc to cancel'"
     >
         <template v-if="sidebarItem._type === 'request_group'">
             <div style="margin-right: 0.3rem">
