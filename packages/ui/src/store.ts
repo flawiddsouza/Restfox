@@ -1559,7 +1559,7 @@ const store = createStore<State>({
         },
         collapseFolders(context, collectionTree: CollectionItem[]) {
             collectionTree.forEach(collectionItem => {
-                if(collectionItem._type === 'request_group' && collectionItem.collapsed === false) {
+                if(collectionItem._type === 'request_group' && !collectionItem.collapsed) {
                     collectionItem.collapsed = true
                     context.dispatch('saveCollectionItemCollapsedState', { _id: collectionItem._id, collapsed: true })
                 }
