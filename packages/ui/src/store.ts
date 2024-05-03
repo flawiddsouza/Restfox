@@ -1020,6 +1020,8 @@ const store = createStore<State>({
 
             if(context.state.activeWorkspace?._type === 'file') {
                 context.dispatch('refreshWorkspace')
+            } else {
+                context.dispatch('refreshWorkspaceTabs')
             }
         },
         async loadGlobalPlugins(context) {
