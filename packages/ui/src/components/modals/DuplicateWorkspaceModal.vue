@@ -2,14 +2,14 @@
     <form @submit.prevent="duplicateWorkspace" v-if="showModalComp">
         <modal title="Duplicate Workspace" v-model="showModalComp">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name</div>
                 <input type="text" class="full-width-input" v-model="newName" placeholder="Workspace Name" required spellcheck="false" v-focus :disabled="duplicating">
             </label>
 
             <template v-if="isElectron">
                 <div style="margin-top: 1rem">
                     <label>
-                        <div style="font-weight: 500; margin-bottom: 0.25rem">Type</div>
+                        <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Type</div>
                         <select class="full-width-input" v-model="workspaceType" required :disabled="duplicating">
                             <option v-for="workspaceTypeItem in workspaceTypes" :value="workspaceTypeItem.value">{{ workspaceTypeItem.label }}</option>
                         </select>
@@ -18,7 +18,7 @@
 
                 <div style="margin-top: 1rem" v-if="workspaceType === 'file'">
                     <label>
-                        <div style="font-weight: 500; margin-bottom: 0.25rem">Choose a folder</div>
+                        <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Choose a folder</div>
                         <div style="display: flex;">
                             <input type="text" class="full-width-input" v-model="workspaceLocation" placeholder="Folder Path" required spellcheck="false" :disabled="duplicating">
                             <button class="button" type="button" @click="openFolderDialog" :disabled="duplicating">Choose</button>

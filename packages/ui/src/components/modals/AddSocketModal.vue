@@ -2,7 +2,7 @@
     <form @submit.prevent="createSocket" v-if="showModalComp">
         <modal title="New Socket" v-model="showModalComp">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name</div>
                 <input type="text" class="full-width-input" v-model="socketName" placeholder="New Socket" required spellcheck="false" v-focus>
             </label>
 

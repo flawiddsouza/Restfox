@@ -2,7 +2,7 @@
     <form @submit.prevent="importFile" v-if="showImportModal">
         <modal title="Import" v-model="showImportModal">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Import From</div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Import From</div>
                 <select class="full-width-input" v-model="importFrom" :disabled="importing">
                     <option>Restfox</option>
                     <option>Postman</option>
@@ -24,7 +24,7 @@
 
             <div style="margin-top: 1.5rem">
                 <label>
-                    <div style="font-weight: 500; margin-bottom: 0.25rem">Import Into</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Import Into</div>
                     <select class="full-width-input" v-model="selectedRequestGroupId" :disabled="importing">
                         <option :value="null">Root of the workspace</option>
                         <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>

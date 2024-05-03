@@ -2,7 +2,7 @@
     <form @submit.prevent="createRequest" v-if="showModalComp">
         <modal title="New Request" v-model="showModalComp">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name</div>
                 <input type="text" class="full-width-input" v-model="requestName" placeholder="My Request" required spellcheck="false" v-focus>
             </label>
 

@@ -2,7 +2,7 @@
     <form @submit.prevent="showModalComp = false" v-if="showModalComp">
         <modal :title="title" v-model="showModalComp" width="600px">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
                 <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" required v-focus>
             </label>
 
@@ -10,7 +10,7 @@
 
             <div>
                 <label>
-                    <div style="font-weight: 500; margin-bottom: 0.25rem">Folder</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Folder</div>
                     <select class="full-width-input" v-model="collectionItem.parentId" required>
                         <option :value="null">Root of the workspace</option>
                         <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
@@ -23,7 +23,7 @@
                 <hr style="border: none; height: 1px; background-color: var(--default-border-color);">
                 <div style="padding-bottom: 1rem"></div>
                 <div class="request-panel-tabs-context">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem">Headers</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Headers</div>
                     <div>
                         <RequestPanelHeaders :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelHeaders>
                     </div>
@@ -32,7 +32,7 @@
 
                 <div style="padding-bottom: 1rem"></div>
                 <div class="request-panel-tabs-context">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem">Auth</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Auth</div>
                     <div>
                         <RequestPanelAuth :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelAuth>
                     </div>

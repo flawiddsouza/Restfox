@@ -3,13 +3,13 @@
         <modal :title="(type === 'Add' ? 'Add' : 'Edit') + ' Plugin'" v-model="showModalComp" height="70vh" width="55rem" :full-height="true">
             <div class="plugin-manager-edit-modal-container" :class="{ 'plugin-manager-edit-modal-container-collection-item': collectionItem ? true : false }">
                 <label>
-                    <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name</div>
                     <input type="text" class="full-width-input" v-model="name" placeholder="My Plugin" required spellcheck="false" v-focus>
                 </label>
                 <template v-if="!collectionItem">
                     <div style="padding-bottom: 1rem"></div>
                     <label>
-                        <div style="font-weight: 500; margin-bottom: 0.25rem">Scope</div>
+                        <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Scope</div>
                         <select class="full-width-input" v-model="workspaceId" required>
                             <option :value="null">All Workspaces</option>
                             <option :value="activeWorkspace._id" v-if="activeWorkspace">Current Workspace</option>
@@ -18,7 +18,7 @@
                 </template>
                 <div style="padding-bottom: 1rem"></div>
                 <div style="overflow: auto; display: grid; grid-template-rows: auto 1fr;">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: center;">
                         <div>Code</div>
                         <div>
                             <ReferencesButton />

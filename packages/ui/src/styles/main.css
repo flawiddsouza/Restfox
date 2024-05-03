@@ -12,6 +12,7 @@ html {
     --font-default: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light',
         'Ubuntu', 'Droid Sans', sans-serif;
     --default-border-radius: 3px;
+    --label-margin-bottom: 0.25rem;
     /* theme colors */
     --default-border-color: lightgrey;
     --default-border-color-modal: var(--default-border-color);

@@ -3,21 +3,21 @@
         <modal :title="title" v-model="showModalComp" height="70vh" width="55rem">
             <div class="generate-code-modal-container">
                 <label>
-                    <div style="font-weight: 500; margin-bottom: 0.25rem;">Select Language</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom);">Select Language</div>
                     <select v-model="selectedLanguage" @change="selectedLanguageChanged" class="full-width-input">
                         <option value="" disabled>Select language</option>
                         <option v-for="target in availableTargets" :value="target.key">{{ target.title }}</option>
                     </select>
                 </label>
                 <label v-if="selectedLanguage" style="margin-top: 1rem;">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem;">Select Client</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom);">Select Client</div>
                     <select v-model="selectedClient" @change="selectedClientChanged" class="full-width-input">
                         <option value="" disabled>Select client</option>
                         <option v-for="client in selectedLanguageClients" :value="client.key">{{ client.title }}</option>
                     </select>
                 </label>
                 <div v-if="generatedCode" style="margin-top: 1rem; overflow: auto;">
-                    <div style="font-weight: 500; margin-bottom: 0.25rem;">Code</div>
+                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom);">Code</div>
                     <CodeMirrorEditor :model-value="generatedCode" lang="javascript" :readonly="true" class="code-editor" />
                 </div>
             </div>

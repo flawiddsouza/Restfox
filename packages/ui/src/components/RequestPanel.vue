@@ -292,7 +292,7 @@
             </template>
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
-                    <div style="margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
                         <div>Pre Request</div>
                         <div>
                             <ReferencesButton />
@@ -306,7 +306,7 @@
                         :key="`pre-request-script-editor-${activeTab._id}`"
                     ></CodeMirrorEditor>
 
-                    <div style="margin-top: 1rem; margin-bottom: 0.25rem;">Post Request</div>
+                    <div style="margin-top: 1rem; margin-bottom: var(--label-margin-bottom);">Post Request</div>
                     <CodeMirrorEditor
                         v-model="script.post_request"
                         lang="javascript"

@@ -2,7 +2,7 @@
     <form @submit.prevent="duplicateCollectionItem" v-if="showModalComp">
         <modal :title="title" v-model="showModalComp">
             <label>
-                <div style="font-weight: 500; margin-bottom: 0.25rem">Name</div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name</div>
                 <input type="text" class="full-width-input" v-model="newName" :placeholder="placeholder" required spellcheck="false" v-focus>
             </label>
 
