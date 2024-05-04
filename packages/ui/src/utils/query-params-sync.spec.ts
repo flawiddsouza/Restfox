@@ -332,3 +332,169 @@ test('Multiple equal signs test', () => {
 
     assert.deepEqual(activeTab.parameters, expectedParameters)
 })
+
+test('Path Params Sync - In Between Substitution Test', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: 'cat/:cat/:cat3',
+        pathParameters: [
+            { name: 'cat', value: '1' },
+            { name: 'cat3', value: '3' },
+        ]
+    }
+
+    activeTab.url = 'cat/:cat/:cat2/:cat3/'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    const expectedPathParameters = [
+        { name: 'cat', value: '1' },
+        { name: 'cat2', value: '' },
+        { name: 'cat3', value: '3' },
+    ]
+
+    assert.deepEqual(activeTab.pathParameters, expectedPathParameters)
+})
+
+
+test('Path Params Sync - In Between Substitution Test 2', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: 'cat/:cat/:cat3',
+        pathParameters: [
+            { name: 'cat', value: '1' },
+            { name: 'cat3', value: '3' },
+        ]
+    }
+
+    activeTab.url = 'caat/:cat/:cat2:cat3'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    const expectedPathParameters = [
+        { name: 'cat', value: '1' },
+        { name: 'cat2:cat3', value: '' },
+    ]
+
+    assert.deepEqual(activeTab.pathParameters, expectedPathParameters)
+
+    activeTab.url = 'cat/:cat/:cat2/:cat3'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    const expectedPathParameters2 = [
+        { name: 'cat', value: '1' },
+        { name: 'cat2', value: '' },
+        { name: 'cat3', value: '' },
+    ]
+
+    assert.deepEqual(activeTab.pathParameters, expectedPathParameters2)
+})
+
+test('Path Params Sync - Duplicate removal test', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: 'cat/:cat/:cat',
+        pathParameters: [
+            { name: 'cat', value: '1' },
+            { name: 'cat', value: '2' },
+            { name: 'cat', value: '3', disabled: true },
+        ]
+    }
+
+    activeTab.url = 'cat/:cat/:cat/:cat'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    const expectedPathParameters = [
+        { name: 'cat', value: '1' },
+    ]
+
+    assert.deepEqual(activeTab.pathParameters, expectedPathParameters)
+
+    activeTab.url = 'cat/:cat/:bat/:cat/:bat'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    const expectedPathParameters2 = [
+        { name: 'cat', value: '1' },
+        { name: 'bat', value: '' },
+    ]
+
+    assert.deepEqual(activeTab.pathParameters, expectedPathParameters2)
+})
+
+test('Path Params Sync - Protocol:// should be not treated as a path param', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: '',
+        pathParameters: []
+    }
+
+    activeTab.url = 'https://google.com/:cat'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'cat', value: '' },
+    ])
+})
+
+test('Path Params Sync - Two types of path params [ :cat, {cat} ]', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: '',
+        pathParameters: []
+    }
+
+    activeTab.url = 'https://google.com/:cat/{cat2}'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'cat', value: '' },
+        { name: 'cat2', value: '' },
+    ])
+})
+
+
+test('Path Params Sync - env vars should not be treated as {path} type path params', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: '',
+        pathParameters: []
+    }
+
+    activeTab.url = 'https://google.com/{cat}/{{cat2}}/{cat3}/{{ cat4 }}'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'cat', value: '' },
+        { name: 'cat3', value: '' },
+    ])
+})

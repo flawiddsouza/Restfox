@@ -1,13 +1,45 @@
 import { CollectionItem, RequestParam } from '@/global'
 
-export function splitAtFirstMatch(str: string, delimiter: string) {
+function splitAtFirstMatch(str: string, delimiter: string) {
     const index = str.indexOf(delimiter)
     return index === -1 ? [str] : [str.slice(0, index), str.slice(index + 1)]
 }
 
-function updateJsonWithNewText(sourceJson: any, newText: string) {
+function newTextToNewJsonQueryParams(newText: string) {
     const newJson: any[] = (newText ?? '').split('&').filter(Boolean).map(part => splitAtFirstMatch(part, '=')).map(([name, value]) => ({ name, value }))
 
+    return newJson
+}
+
+function newTextToNewJsonPathParams(newText: string, pathParameters: RequestParam[]) {
+    const activeTabPathParameters = pathParameters.filter(param => !param.disabled)
+
+    const urlPathParametersSplit = (newText ?? '').split('/')
+        .map(part => {
+            const param = splitAtFirstMatch(part, ':')
+
+            if(param[1] === undefined || param[1] === '') {
+                const extractedParams = /(?<!{){([^{}]+)}(?!})/.exec(param[0]) ?? ''
+                if(extractedParams) {
+                    param[1] = extractedParams[1]
+                }
+            }
+
+            if(param[1] === undefined || param[1] === '') {
+                return
+            }
+
+            return {
+                name: param[1],
+                value: activeTabPathParameters.find(p => p.name === param[1])?.value ?? '',
+            }
+        })
+        .filter(Boolean)
+
+    return urlPathParametersSplit
+}
+
+function updateJsonWithNewText(sourceJson: any, newJson: any[]) {
     newJson.forEach((newParam: any) => {
         const existingParam = sourceJson.find((param: any) => param.name === newParam.name && param.value === newParam.value && param.disabled !== true && param.checked !== true)
         if(existingParam) {
@@ -62,9 +94,19 @@ export function onUrlChange(activeTab: CollectionItem) {
         activeTab.parameters = []
     }
 
-    const urlParamsSplit = splitAtFirstMatch(activeTab.url ?? '', '?')
+    if(activeTab.pathParameters === undefined) {
+        activeTab.pathParameters = []
+    }
 
-    activeTab.parameters = updateJsonWithNewText(JSON.parse(JSON.stringify(activeTab.parameters)), urlParamsSplit[1])
+    const urlParamsSplit = splitAtFirstMatch(activeTab.url ?? '', '?')
+    const newJsonQueryParams = newTextToNewJsonQueryParams(urlParamsSplit[1])
+    const newJsonPathParams = newTextToNewJsonPathParams(urlParamsSplit[0], activeTab.pathParameters)
+
+    activeTab.parameters = updateJsonWithNewText(JSON.parse(JSON.stringify(activeTab.parameters)), newJsonQueryParams)
+    const newPathParameters = updateJsonWithNewText(JSON.parse(JSON.stringify(activeTab.pathParameters)), newJsonPathParams)
+    const newPathParametersNames = newPathParameters.map(param => param.name)
+    // remove duplicate path parameters before setting
+    activeTab.pathParameters = newPathParameters.filter((param, index) => newPathParametersNames.indexOf(param.name) === index)
 
     return true
 }
