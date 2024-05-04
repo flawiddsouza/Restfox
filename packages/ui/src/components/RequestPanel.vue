@@ -283,6 +283,12 @@
                         </td>
                     </tr>
                 </table>
+                <div style="margin-top: 1rem; margin-bottom: 0.5rem;">
+                    URL Preview
+                </div>
+                <div style="border: 1px solid var(--default-border-color); border-radius: var(--default-border-radius); padding: 0.5rem; overflow-wrap: break-word;">
+                    {{ urlPreview }}
+                </div>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
                 <RequestPanelHeaders :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelHeaders>
@@ -343,7 +349,7 @@ import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import ReferencesButton from '@/components/ReferencesButton.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
-import { convertCurlCommandToRestfoxCollection, debounce } from '@/helpers'
+import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentVariables } from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
@@ -444,6 +450,23 @@ export default {
                 ...constants.AUTOCOMPLETIONS.PLUGIN.GENERAL_METHODS,
                 ...constants.AUTOCOMPLETIONS.PLUGIN.RESPONSE_METHODS
             ]
+        },
+        urlPreview() {
+            let url = this.activeTab.url ?? ''
+
+            url = substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url)
+
+            if(this.activeTab.pathParameters) {
+                this.activeTab.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
+                    url = url.replaceAll(
+                        `:${substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name)}`, substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value)
+                    ).replaceAll(
+                        `{${substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name)}}`, substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value)
+                    )
+                })
+            }
+
+            return url !== '' && url.trim() !== '' ? url : 'No URL'
         },
     },
     watch: {
