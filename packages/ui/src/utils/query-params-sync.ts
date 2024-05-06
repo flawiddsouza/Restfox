@@ -29,6 +29,11 @@ function newTextToNewJsonPathParams(newText: string, pathParameters: RequestPara
                 return
             }
 
+            // if param[1] is all digits, it's most likely a port number and we don't want to treat it as a path parameter
+            if(/^\d+$/.test(param[1])) {
+                return
+            }
+
             return {
                 name: param[1],
                 value: activeTabPathParameters.find(p => p.name === param[1])?.value ?? '',

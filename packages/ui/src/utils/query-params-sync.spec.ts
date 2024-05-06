@@ -498,3 +498,23 @@ test('Path Params Sync - env vars should not be treated as {path} type path para
         { name: 'cat3', value: '' },
     ])
 })
+
+test('Path Params Sync - :port should not be treated as a path param', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: '',
+        pathParameters: []
+    }
+
+    activeTab.url = 'https://localhost:7410/:cat'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'cat', value: '' },
+    ])
+})
