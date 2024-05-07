@@ -225,5 +225,13 @@ export default {
                 }
             ],
         }
+    },
+    MIME_TYPE: {
+        FORM_URL_ENCODED: 'application/x-www-form-urlencoded',
+        FORM_DATA: 'multipart/form-data',
+        TEXT_PLAIN: 'text/plain',
+        JSON: 'application/json',
+        GRAPHQL: 'application/graphql',
+        OCTET_STREAM: 'application/octet-stream'
     }
 }
