@@ -749,6 +749,7 @@ export default {
 
 .request-panel-address-bar > select {
     text-align: center;
+    cursor: pointer;
 }
 
 .request-panel-address-bar > .code-mirror-input-container {
@@ -772,6 +773,7 @@ export default {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
     height: 100%;
+    cursor: pointer;
 }
 
 .request-panel-address-bar button:hover {
@@ -781,6 +783,7 @@ export default {
 .request-panel-tabs {
     display: flex;
     user-select: none;
+    cursor: pointer;
 }
 
 .request-panel-tabs .request-panel-tab {
@@ -822,7 +825,15 @@ export default {
     height: 100%;
 }
 
-.request-panel-tabs-context-container > div > textarea {
+.request-panel-tabs-context-container > select {
+    cursor: pointer;
+}
+
+.request-panel-tabs-context > table > tr > td {
+    cursor: pointer;
+}
+
+.request-panel-tabs-context > div > textarea {
     height: 100%;
 }
 

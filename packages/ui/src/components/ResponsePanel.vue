@@ -570,6 +570,7 @@ export default {
     outline: 0;
     padding-left: 0.5em;
     padding-right: 0.5em;
+    cursor: pointer;
 }
 
 .response-panel-address-bar  .response-panel-address-bar-select-container select:hover {
@@ -587,6 +588,7 @@ export default {
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .response-panel-tabs .response-panel-tab-active {
