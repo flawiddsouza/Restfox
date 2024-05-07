@@ -37,12 +37,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, PropType } from 'vue'
+import { PropType } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
-import { version } from '../../../electron/package.json'
 
-const { collectionItem, collectionItemEnvironmentResolved } = defineProps({
+defineProps({
     collectionItem: {
         type: Object as PropType<CollectionItem>,
         required: true
@@ -52,17 +51,6 @@ const { collectionItem, collectionItemEnvironmentResolved } = defineProps({
         required: true
     }
 })
-
-onMounted(() => {
-    addDefaultHeader()
-})
-
-function addDefaultHeader() {
-    if (!collectionItem.headers) {
-        collectionItem.headers = []
-        collectionItem.headers.push({ name: 'User-Agent', value: `Restfox/${version}`, disabled: false })
-    }
-}
 
 function pushItem(object: any, key: string, itemToPush: any) {
     if(key in object === false) {
