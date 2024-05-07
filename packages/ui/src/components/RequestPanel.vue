@@ -337,7 +337,7 @@
                 </template>
             </div>
             <template v-if="activeRequestPanelTab === 'Logs'">
-                <DevtoolsLogs></DevtoolsLogs>
+                <Logs></Logs>
             </template>
         </div>
     </template>
@@ -356,7 +356,7 @@ import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentV
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
-import DevtoolsLogs from '@/components/Logs.vue'
+import Logs from '@/components/Logs.vue'
 
 const renderer = new marked.Renderer()
 
@@ -371,7 +371,7 @@ marked.setOptions({
 
 export default {
     components: {
-        DevtoolsLogs,
+        Logs,
         CodeMirrorSingleLine,
         CodeMirrorEditor,
         RequestPanelTabTitle,
