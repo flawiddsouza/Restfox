@@ -592,7 +592,7 @@ export default {
 
             if(mimeType === null) {
                 for (let i = 0; i < this.activeTab.headers.length; i++) {
-                    if (!mimeType && this.activeTab.headers[i].name === 'Content-Type') {
+                    if (this.activeTab.headers[i].name === 'Content-Type') {
                         this.activeTab.headers.splice(i, 1)
                     }
                 }
