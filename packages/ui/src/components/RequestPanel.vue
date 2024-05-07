@@ -477,7 +477,7 @@ export default {
             this.loadGraphql()
         },
         'activeTab.body.mimeType'() {
-            if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'multipart/form-data') {
+            if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === constants.MIME_TYPE.FORM_DATA) {
                 if('params' in this.activeTab.body) {
                     // set type to text by default if type does not exist int he params array
                     this.activeTab.body.params.forEach(param => {
@@ -570,27 +570,32 @@ export default {
         bodyMimeTypeChanged(newMimeType) {
             let mimeType = null
 
-            if(newMimeType === 'application/x-www-form-urlencoded') {
-                mimeType = 'application/x-www-form-urlencoded'
+            if(newMimeType === constants.MIME_TYPE.FORM_URL_ENCODED) {
+                mimeType = constants.MIME_TYPE.FORM_URL_ENCODED
             }
 
-            if(newMimeType === 'multipart/form-data') {
-                mimeType = 'multipart/form-data'
+            if(newMimeType === constants.MIME_TYPE.FORM_DATA) {
+                mimeType = constants.MIME_TYPE.FORM_DATA
             }
 
-            if(newMimeType === 'text/plain') {
-                mimeType = 'text/plain'
+            if(newMimeType === constants.MIME_TYPE.TEXT_PLAIN) {
+                mimeType = constants.MIME_TYPE.TEXT_PLAIN
             }
 
-            if(newMimeType === 'application/json' || newMimeType === 'application/graphql') {
-                mimeType = 'application/json'
+            if(newMimeType === constants.MIME_TYPE.JSON || newMimeType === constants.MIME_TYPE.GRAPHQL) {
+                mimeType = constants.MIME_TYPE.JSON
             }
 
-            if(newMimeType === 'application/octet-stream') {
-                mimeType = 'application/octet-stream'
+            if(newMimeType === constants.MIME_TYPE.OCTET_STREAM) {
+                mimeType = constants.MIME_TYPE.OCTET_STREAM
             }
 
             if(mimeType === null) {
+                for (let i = 0; i < this.activeTab.headers.length; i++) {
+                    if (this.activeTab.headers[i].name === 'Content-Type') {
+                        this.activeTab.headers.splice(i, 1)
+                    }
+                }
                 return
             }
 
