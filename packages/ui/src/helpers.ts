@@ -1605,3 +1605,7 @@ export function getAlertConfirmPromptContainer(componentRootElement: HTMLElement
 } {
     return (componentRootElement.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt') as any
 }
+
+export function getCurrentTimestamp(): string {
+    return dayjs().format('HH:mm:ss:SSS')
+}
