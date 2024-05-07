@@ -590,11 +590,12 @@ export default {
                 mimeType = constants.MIME_TYPE.OCTET_STREAM
             }
 
-            if(newMimeType === 'No Body') {
-                mimeType = 'No Body'
-            }
-
             if(mimeType === null) {
+                for (let i = 0; i < this.activeTab.headers.length; i++) {
+                    if (!mimeType && this.activeTab.headers[i].name === 'Content-Type') {
+                        this.activeTab.headers.splice(i, 1)
+                    }
+                }
                 return
             }
 
@@ -602,11 +603,6 @@ export default {
 
             if(contentTypeHeader) {
                 contentTypeHeader.value = mimeType
-                for (let i = 0; i < this.activeTab.headers.length; i++) {
-                    if (this.activeTab.headers[i].value === 'No Body') {
-                        this.activeTab.headers.splice(i, 1)
-                    }
-                }
             } else {
                 if('headers' in this.activeTab == false) {
                     this.activeTab.headers = []
