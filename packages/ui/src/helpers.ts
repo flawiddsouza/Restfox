@@ -23,6 +23,7 @@ import {
     OpenApiSpecPathParams,
 } from './global'
 import { ActionContext } from 'vuex'
+import { version } from '../../electron/package.json'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -486,6 +487,10 @@ export async function handleRequest(
 
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation)
+
+        if (!headers['user-agent']) {
+            headers['user-agent'] = `Restfox/${getVersion()}`
+        }
 
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
@@ -1608,4 +1613,8 @@ export function getAlertConfirmPromptContainer(componentRootElement: HTMLElement
 
 export function getCurrentTimestamp(): string {
     return dayjs().format('HH:mm:ss:SSS')
+}
+
+export function getVersion(): string {
+    return version
 }
