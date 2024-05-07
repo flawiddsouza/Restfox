@@ -788,7 +788,6 @@ export default {
 .request-panel-tabs {
     display: flex;
     user-select: none;
-    cursor: pointer;
 }
 
 .request-panel-tabs .request-panel-tab {
@@ -797,6 +796,7 @@ export default {
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .request-panel-tabs .request-panel-tab-active {
