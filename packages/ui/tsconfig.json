@@ -16,7 +16,8 @@
             "DOM.Iterable",
         ],
         "target": "es2022",
-        "noEmit": true
+        "noEmit": true,
+        "resolveJsonModule": true
     },
     "include": [
         "src/**/*.ts",
