@@ -26,21 +26,21 @@ const resetStyle = 'color: inherit;'
 
 console.log = (...args) => {
     originalConsoleMethods.log(logMessage, timestampStyle, resetStyle, ...args)
-    store.commit('addConsoleLog', { type: 'log', message: `${timestamp} - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'log', message: `${timestamp} - [DEBUG] - ${ args.join(' ')}` })
 }
 
 console.warn = (...args) => {
     originalConsoleMethods.warn(...args)
-    store.commit('addConsoleLog', { type: 'warn', message: `${timestamp} - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'warn', message: `${timestamp} - [WARN] - ${ args.join(' ')}` })
 }
 
 console.error = (...args) => {
     originalConsoleMethods.error(...args)
-    store.commit('addConsoleLog', { type: 'error', message: `${timestamp} - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'error', message: `${timestamp} - [ERROR] - ${ args.join(' ')}` })
 }
 
 console.info = (...args) => {
     originalConsoleMethods.info(...args)
-    store.commit('addConsoleLog', { type: 'info', message: `${timestamp} - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'info', message: `${timestamp} - [INFO] - ${ args.join(' ')}` })
 }
 
