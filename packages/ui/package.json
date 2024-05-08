@@ -13,7 +13,9 @@
         "test2": "playwright test",
         "lint": "eslint src --ext .js,.ts,.vue",
         "lint-fix": "eslint src --ext .js,.ts,.vue --fix",
-        "save-bundle-size": "node scripts/save-bundle-size.mjs"
+        "save-bundle-size": "node scripts/save-bundle-size.mjs",
+        "e2e-test": "cd ./tests && npm i && npx playwright install && npx codeceptjs run --verbose",
+        "ci-test": "start-server-and-test dev http://localhost:5173 e2e-test"
     },
     "dependencies": {
         "@codemirror/autocomplete": "^6.16.0",
@@ -68,7 +70,8 @@
         "vite": "^4.5.0",
         "vite-plugin-checker": "^0.6.4",
         "vite-plugin-pwa": "^0.16.6",
-        "vitest": "^0.25.2"
+        "vitest": "^0.25.2",
+        "start-server-and-test": "1.15.2"
     },
     "overrides": {
         "cm6-graphql": {

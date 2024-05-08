@@ -7,3 +7,6 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+tests/output
+tests/node_modules
+tests/package-lock.json
