@@ -834,7 +834,7 @@ export default {
     height: 100%;
 }
 
-.request-panel-tabs-context > div > textarea {
+.request-panel-tabs-context-container > div > textarea {
     height: 100%;
 }
 
