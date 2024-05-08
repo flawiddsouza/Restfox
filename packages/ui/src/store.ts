@@ -299,10 +299,10 @@ async function persistActiveWorkspaceTabs(state: State) {
         activeTabId
     })
 
-    console.log('persistActiveWorkspaceTabs', {
+    console.log('persistActiveWorkspaceTabs', JSON.stringify({
         tabIds,
         activeTabId
-    })
+    }))
 }
 
 const store = createStore<State>({
