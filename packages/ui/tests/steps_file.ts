@@ -1,7 +1,7 @@
 export = function() {
     return actor({
 
-        creatRequest(requestName: string) {
+        createRequest(requestName: string) {
             this.rightClick('.sidebar')
             this.waitForText('New Request')
             this.click('New Request')
@@ -29,6 +29,5 @@ export = function() {
 
             this.type(url)
         }
-
     })
 }
