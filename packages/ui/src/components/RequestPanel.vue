@@ -754,7 +754,6 @@ export default {
 
 .request-panel-address-bar > select {
     text-align: center;
-    cursor: pointer;
 }
 
 .request-panel-address-bar > .code-mirror-input-container {
@@ -816,10 +815,6 @@ export default {
 .request-panel-tabs-context {
     padding: 1rem;
     overflow-y: auto;
-}
-
-.request-panel-tabs-context > select {
-    cursor: pointer;
 }
 
 .request-panel-tabs-context textarea {
