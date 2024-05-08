@@ -499,3 +499,15 @@ a {
 .modal {
     --default-border-color: var(--default-border-color-modal);
 }
+
+table > tr > td[colspan="4"] {
+    cursor: pointer;
+}
+
+select {
+    cursor: pointer;
+}
+
+.sidebar-item {
+    cursor: pointer;
+}

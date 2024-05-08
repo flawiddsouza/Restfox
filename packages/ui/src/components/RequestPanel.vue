@@ -834,14 +834,6 @@ export default {
     height: 100%;
 }
 
-.request-panel-tabs-context-container > select {
-    cursor: pointer;
-}
-
-.request-panel-tabs-context > table > tr > td[colspan="4"] {
-    cursor: pointer;
-}
-
 .request-panel-tabs-context > div > textarea {
     height: 100%;
 }
