@@ -785,6 +785,7 @@ export default {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
     height: 100%;
+    cursor: pointer;
 }
 
 .request-panel-address-bar button:hover {
@@ -802,6 +803,7 @@ export default {
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .request-panel-tabs .request-panel-tab-active {
