@@ -349,6 +349,7 @@ const store = createStore<State>({
             tabEnvironmentResolved: {},
             idMap: null,
             skipPersistingActiveTab: false,
+            consoleLogs: [],
         }
     },
     getters: {
@@ -662,6 +663,12 @@ const store = createStore<State>({
         },
         detachTab(state, tab) {
             state.detachedTabs.push(tab)
+        },
+        addConsoleLog(state, log: string) {
+            state.consoleLogs.push(log)
+        },
+        clearConsoleLogs(state) {
+            state.consoleLogs = []
         },
     },
     actions: {

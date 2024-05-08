@@ -336,9 +336,6 @@
                     <div v-html="renderMarkdown(activeTab.description ?? '')" style="overflow: auto;"></div>
                 </template>
             </div>
-            <template v-if="activeRequestPanelTab === 'Logs'">
-                <Logs></Logs>
-            </template>
         </div>
     </template>
 </template>
@@ -356,7 +353,6 @@ import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentV
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
-import Logs from '@/components/Logs.vue'
 
 const renderer = new marked.Renderer()
 
@@ -371,7 +367,6 @@ marked.setOptions({
 
 export default {
     components: {
-        Logs,
         CodeMirrorSingleLine,
         CodeMirrorEditor,
         RequestPanelTabTitle,
@@ -402,9 +397,6 @@ export default {
                 },
                 {
                     name: 'Docs'
-                },
-                {
-                    name: 'Logs'
                 },
             ],
             activeRequestPanelTab: 'Body',

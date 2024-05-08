@@ -34,6 +34,7 @@
             </template>
             <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
             <a href="#" @click.prevent="showSettings" class="bl br">Settings</a>
+            <a href="#" @click.prevent="showLogs" class="bl br">Logs</a>
             <span class="spacer"></span>
             <div>
                 <a class="gh-button-container" href="https://github.com/flawiddsouza/Restfox" rel="noopener" target="_blank" title="Star Restfox" aria-label="Star Restfox on GitHub">
@@ -49,6 +50,7 @@
     <PluginManagerModal v-model:showModal="showPluginManagerModal" />
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" />
     <SettingsModal v-model:showModal="showSettingsModal" />
+    <LogsModal v-model:showModal="showLogsModal"></LogsModal>
     <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" />
     <BackupAndRestoreModal />
 </template>
@@ -59,6 +61,7 @@ import AddWorkspaceModal from './modals/AddWorkspaceModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import BackupAndRestoreModal from './modals/BackupAndRestoreModal.vue'
+import LogsModal from './modals/LogsModal.vue'
 import { exportRestfoxCollection, applyTheme, generateNewIdsForTree, toTree } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
@@ -69,7 +72,8 @@ export default {
         AddWorkspaceModal,
         SettingsModal,
         EnvironmentModal,
-        BackupAndRestoreModal
+        BackupAndRestoreModal,
+        LogsModal
     },
     props: {
         nav: String
@@ -79,7 +83,8 @@ export default {
             showSettingsModal: false,
             showPluginManagerModal: false,
             showAddWorkspaceModal: false,
-            environmentModalShow: false
+            environmentModalShow: false,
+            showLogsModal: false,
         }
     },
     computed: {
@@ -167,6 +172,9 @@ export default {
         },
         showSettings() {
             this.showSettingsModal = true
+        },
+        showLogs() {
+            this.showLogsModal = true
         },
         showPluginsManager() {
             this.showPluginManagerModal = true
