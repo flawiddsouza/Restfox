@@ -818,6 +818,10 @@ export default {
     overflow-y: auto;
 }
 
+.request-panel-tabs-context > select {
+    cursor: pointer;
+}
+
 .request-panel-tabs-context textarea {
     border: 1px solid var(--default-border-color);
     outline: 0;
@@ -834,7 +838,7 @@ export default {
     cursor: pointer;
 }
 
-.request-panel-tabs-context > table > tr > td {
+.request-panel-tabs-context > table > tr > td[colspan="4"] {
     cursor: pointer;
 }
 
