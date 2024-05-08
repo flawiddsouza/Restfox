@@ -1,11 +1,13 @@
 <template>
     <div v-if="showModalComp">
         <modal :title="title" v-model="showModalComp">
-            <ul>
-                <li v-for="(log, index) in consoleLogs" :key="index">
-                    {{ log.message }}
-                </li>
-            </ul>
+            <table style="table-layout: fixed">
+                <tr v-for="(log, index) in consoleLogs" :key="index">
+                    <td>
+                        {{ log.message }}
+                    </td>
+                </tr>
+            </table>
         </modal>
     </div>
 </template>
@@ -21,8 +23,7 @@ export default {
     },
     computed: {
         title() {
-            let title = 'Logs'
-            return title
+            return 'Logs'
         },
         showModalComp: {
             get() {
