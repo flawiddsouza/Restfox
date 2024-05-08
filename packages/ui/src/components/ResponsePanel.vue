@@ -570,7 +570,6 @@ export default {
     outline: 0;
     padding-left: 0.5em;
     padding-right: 0.5em;
-    cursor: pointer;
 }
 
 .response-panel-address-bar  .response-panel-address-bar-select-container select:hover {
