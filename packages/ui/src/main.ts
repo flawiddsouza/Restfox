@@ -26,7 +26,7 @@ const resetStyle = 'color: inherit;'
 
 console.log = (...args) => {
     originalConsoleMethods.log(logMessage, timestampStyle, resetStyle, ...args)
-    store.commit('addConsoleLog', { type: 'log', message: `${timestamp} - [DEBUG] - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'log', message: `${timestamp} - [LOG] - ${ args.join(' ')}` })
 }
 
 console.warn = (...args) => {
