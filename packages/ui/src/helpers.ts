@@ -393,9 +393,10 @@ export async function createRequestData(
             const paramValue = substituteEnvironmentVariables(environment, param.value)
 
             // if the parameter with the same name & value is already in the url, then we remove it, to prevent duplicate parameters
-
+            // @ts-expect-error searchParams.has has no 2nd parameter on any browser other than firefox
             if(urlCopy.searchParams.has(paramName, paramValue) && urlCopy.searchParams.getAll(paramName).some(value => value === paramValue)) {
                 // console.log('Removing duplicate parameter', paramName, paramValue)
+                // @ts-expect-error searchParams.has has no 2nd parameter on any browser other than firefox
                 url.searchParams.delete(paramName, paramValue)
             }
 
