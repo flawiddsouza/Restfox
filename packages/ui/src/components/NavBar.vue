@@ -1,6 +1,7 @@
 <template>
     <div class="navbar">
         <div class="heading">
+            <img src="../../public/pwa-192x192.png" width="20" height="20" style="margin-right: 5px;">
             <div v-if="!activeWorkspaceLoaded">Workspaces</div>
             <div v-else>
                 <a href="#" @click.prevent="setActiveWorkspace(null)">Workspaces</a> > <span>{{ activeWorkspace.name }}</span>
