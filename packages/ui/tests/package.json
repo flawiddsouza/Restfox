@@ -5,14 +5,14 @@
       "main": "index.js",
       "scripts": {
             "test": "codeceptjs run",
-                "allure-reports-generate": "allure generate ./output -o ./output/allure --clean"
+            "allure-reports-generate": "allure generate ./output -o ./output/allure --clean"
       },
       "author": "kobenguyent",
       "license": "MIT",
       "dependencies": {
             "codeceptjs": "3.6.2",
             "playwright": "1.44.0",
-                "@codeceptjs/allure-legacy": "1.0.2"
+            "@codeceptjs/allure-legacy": "1.0.2"
       },
       "devDependencies": {
             "@types/node": "20.12.10",
