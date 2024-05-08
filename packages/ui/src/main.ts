@@ -3,7 +3,7 @@ import store from './store'
 import App from './App.vue'
 import VueToast from 'vue-toast-notification'
 import 'vue-toast-notification/dist/theme-default.css'
-import dayjs from 'dayjs'
+import { getCurrentTimestamp } from '@/helpers'
 
 const app = createApp(App)
 
@@ -19,28 +19,33 @@ const originalConsoleMethods = {
     info: console.info
 }
 
-const timestamp = dayjs().format('HH:mm:ss:SSS')
-const timestampStyle = 'color: #4CAF50;'
-const logMessage = `%c${timestamp} %c`
-const resetStyle = 'color: inherit;'
-
 console.log = (...args) => {
+    const timestampStyle = 'color: #4CAF50;'
+    const logMessage = `%c${getCurrentTimestamp()} %c`
+    const resetStyle = 'color: inherit;'
+
     originalConsoleMethods.log(logMessage, timestampStyle, resetStyle, ...args)
-    store.commit('addConsoleLog', { type: 'log', message: `${timestamp} - [LOG] - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'log', message: `${getCurrentTimestamp()} - [LOG] - ${ argsMapping(args) }` })
 }
 
 console.warn = (...args) => {
     originalConsoleMethods.warn(...args)
-    store.commit('addConsoleLog', { type: 'warn', message: `${timestamp} - [WARN] - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'warn', message: `${getCurrentTimestamp()} - [WARN] - ${ argsMapping(args) }` })
 }
 
 console.error = (...args) => {
     originalConsoleMethods.error(...args)
-    store.commit('addConsoleLog', { type: 'error', message: `${timestamp} - [ERROR] - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'error', message: `${getCurrentTimestamp()} - [ERROR] - ${ argsMapping(args) }` })
 }
 
 console.info = (...args) => {
     originalConsoleMethods.info(...args)
-    store.commit('addConsoleLog', { type: 'info', message: `${timestamp} - [INFO] - ${ args.join(' ')}` })
+    store.commit('addConsoleLog', { type: 'info', message: `${getCurrentTimestamp()} - [INFO] - ${ argsMapping(args) }` })
 }
 
+function argsMapping(args: any) :any {
+    if (Array.isArray(args)) {
+        return args.join(' ')
+    }
+    return args.map((arg: any) => typeof arg === 'object' ? JSON.stringify(arg) : arg)
+}
