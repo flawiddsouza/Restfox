@@ -587,6 +587,7 @@ export default {
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .response-panel-tabs .response-panel-tab-active {
