@@ -50,7 +50,7 @@ console.info = interceptConsole('info')
 
 function storeLog(type: LogType, args: any[]): void {
     try {
-        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${argsMapping(args)}` })
+        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${ type === 'error' ? args.join(' ') : argsMapping(args)}` })
     } catch (error) {
         console.error('Failed to store log:', error)
     }
