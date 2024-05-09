@@ -1,22 +1,22 @@
 {
-      "name": "tests",
-      "version": "1.0.0",
-      "description": "e2e tests using codeceptjs",
-      "main": "index.js",
-      "scripts": {
-            "test": "codeceptjs run",
-            "allure-reports-generate": "allure generate ./output -o ./output/allure --clean"
-      },
-      "author": "kobenguyent",
-      "license": "MIT",
-      "dependencies": {
-            "codeceptjs": "3.6.2",
-            "playwright": "1.44.0",
-            "@codeceptjs/allure-legacy": "1.0.2"
-      },
-      "devDependencies": {
-            "@types/node": "20.12.10",
-            "ts-node": "10.9.2",
-            "typescript": "4.9.5"
-      }
+    "name": "tests",
+    "version": "1.0.0",
+    "description": "e2e tests using codeceptjs",
+    "main": "index.js",
+    "scripts": {
+        "test": "codeceptjs run",
+        "allure-reports-generate": "allure generate ./output -o ./output/allure --clean"
+    },
+    "author": "kobenguyent",
+    "license": "MIT",
+    "dependencies": {
+        "codeceptjs": "3.6.2",
+        "playwright": "1.44.0",
+        "@codeceptjs/allure-legacy": "1.0.2"
+    },
+    "devDependencies": {
+        "@types/node": "20.12.10",
+        "ts-node": "10.9.2",
+        "typescript": "4.9.5"
+    }
 }
