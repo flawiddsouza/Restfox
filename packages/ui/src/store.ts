@@ -299,7 +299,7 @@ async function persistActiveWorkspaceTabs(state: State) {
         activeTabId
     })
 
-        console.log('persistActiveWorkspaceTabs', {
+    console.log('persistActiveWorkspaceTabs', {
         tabIds,
         activeTabId
     })
