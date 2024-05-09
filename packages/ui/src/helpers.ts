@@ -396,7 +396,7 @@ export async function createRequestData(
             // @ts-expect-error searchParams.has has no 2nd parameter on any browser other than firefox
             if(urlCopy.searchParams.has(paramName, paramValue) && urlCopy.searchParams.getAll(paramName).some(value => value === paramValue)) {
                 // console.log('Removing duplicate parameter', paramName, paramValue)
-                // @ts-expect-error searchParams.has has no 2nd parameter on any browser other than firefox
+                // @ts-expect-error searchParams.delete has no 2nd parameter on any browser other than firefox
                 url.searchParams.delete(paramName, paramValue)
             }
 
