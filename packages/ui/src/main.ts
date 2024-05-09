@@ -35,7 +35,7 @@ const originalConsoleMethods: OriginalConsoleMethods = {
 function interceptConsole(type: LogType): ConsoleMethod {
     return (...args: any[]) => {
         const timestampStyle = 'color: #4CAF50;'
-        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c${ type === 'error' ? args.join(' ') : argsMapping(args)}`
+        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c${argsMapping(args)}`
         const resetStyle = 'color: inherit;'
 
         originalConsoleMethods[type](logMessage, timestampStyle, resetStyle)
@@ -50,12 +50,20 @@ console.info = interceptConsole('info')
 
 function storeLog(type: LogType, args: any[]): void {
     try {
-        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${ type === 'error' ? args.join(' ') : argsMapping(args)}` })
+        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${argsMapping(args)}` })
     } catch (error) {
         console.error('Failed to store log:', error)
     }
 }
 
 function argsMapping(args: any[]): string {
-    return args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ')
+    return args.map(arg => {
+        if (typeof arg === 'object' && arg !== null && 'message' in arg) {
+            return arg.message;
+        } else if (typeof arg === 'object') {
+            return JSON.stringify(arg, null, 2)
+        } else {
+            return arg
+        }
+    }).join(' ')
 }
