@@ -44,5 +44,6 @@ console.info = (...args) => {
 }
 
 function argsMapping(args: any) :any {
-    return args.map((arg: any) => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ')
+    const result = args.map((arg: any) => typeof arg === 'object' ? JSON.stringify(arg) : arg)
+    return result.join(' ')
 }
