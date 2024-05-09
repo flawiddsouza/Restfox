@@ -35,7 +35,7 @@ console.warn = (...args) => {
 
 console.error = (...args) => {
     originalConsoleMethods.error(...args)
-    store.commit('addConsoleLog', { type: 'error', message: `${getCurrentTimestamp()} - [ERROR] - ${ argsMapping(args) }` })
+    store.commit('addConsoleLog', { type: 'error', message: `${getCurrentTimestamp()} - [ERROR] - ${ args.join(' ') }` })
 }
 
 console.info = (...args) => {
