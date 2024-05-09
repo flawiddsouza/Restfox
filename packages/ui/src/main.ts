@@ -19,31 +19,30 @@ const originalConsoleMethods = {
     info: console.info
 }
 
-console.log = (...args) => {
-    const timestampStyle = 'color: #4CAF50;'
-    const logMessage = `%c${getCurrentTimestamp()} %c`
-    const resetStyle = 'color: inherit;'
+function interceptConsole(type) {
+    return (...args) => {
+        const timestampStyle = 'color: #4CAF50;'
+        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c${ type === 'error' ? args.join(' ') : argsMapping(args)}`
+        const resetStyle = 'color: inherit;'
 
-    originalConsoleMethods.log(logMessage, timestampStyle, resetStyle, ...args)
-    store.commit('addConsoleLog', { type: 'log', message: `${getCurrentTimestamp()} - [LOG] - ${ argsMapping(args) }` })
+        originalConsoleMethods[type](logMessage, timestampStyle, resetStyle)
+        storeLog(type, args)
+    }
 }
 
-console.warn = (...args) => {
-    originalConsoleMethods.warn(...args)
-    store.commit('addConsoleLog', { type: 'warn', message: `${getCurrentTimestamp()} - [WARN] - ${ argsMapping(args) }` })
+console.log = interceptConsole('log')
+console.warn = interceptConsole('warn')
+console.error = interceptConsole('error')
+console.info = interceptConsole('info')
+
+function storeLog(type, args) {
+    try {
+        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${argsMapping(args)}` })
+    } catch (error) {
+        console.error('Failed to store log:', error)
+    }
 }
 
-console.error = (...args) => {
-    originalConsoleMethods.error(...args)
-    store.commit('addConsoleLog', { type: 'error', message: `${getCurrentTimestamp()} - [ERROR] - ${ args.join(' ') }` })
-}
-
-console.info = (...args) => {
-    originalConsoleMethods.info(...args)
-    store.commit('addConsoleLog', { type: 'info', message: `${getCurrentTimestamp()} - [INFO] - ${ argsMapping(args) }` })
-}
-
-function argsMapping(args: any) :any {
-    const result = args.map((arg: any) => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg)
-    return result.join(' ')
+function argsMapping(args) {
+    return args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ')
 }
