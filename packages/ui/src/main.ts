@@ -12,37 +12,50 @@ app.use(VueToast)
 
 app.mount('#app')
 
-const originalConsoleMethods = {
+interface ConsoleMethod {
+    (...args: any[]): void;
+}
+
+interface OriginalConsoleMethods {
+    log: ConsoleMethod;
+    warn: ConsoleMethod;
+    error: ConsoleMethod;
+    info: ConsoleMethod;
+}
+
+type LogType = 'log' | 'warn' | 'error' | 'info';
+
+const originalConsoleMethods: OriginalConsoleMethods = {
     log: console.log,
     warn: console.warn,
     error: console.error,
     info: console.info
 }
 
-function interceptConsole(type) {
-    return (...args) => {
-        const timestampStyle = 'color: #4CAF50;'
-        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c${ type === 'error' ? args.join(' ') : argsMapping(args)}`
-        const resetStyle = 'color: inherit;'
+function interceptConsole(type: LogType): ConsoleMethod {
+    return (...args: any[]) => {
+        const timestampStyle = 'color: #4CAF50;';
+        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c${ type === 'error' ? args.join(' ') : argsMapping(args)}`;
+        const resetStyle = 'color: inherit;';
 
-        originalConsoleMethods[type](logMessage, timestampStyle, resetStyle)
-        storeLog(type, args)
+        originalConsoleMethods[type](logMessage, timestampStyle, resetStyle);
+        storeLog(type, args);
     }
 }
 
-console.log = interceptConsole('log')
-console.warn = interceptConsole('warn')
-console.error = interceptConsole('error')
-console.info = interceptConsole('info')
+console.log = interceptConsole('log');
+console.warn = interceptConsole('warn');
+console.error = interceptConsole('error');
+console.info = interceptConsole('info');
 
-function storeLog(type, args) {
+function storeLog(type: LogType, args: any[]): void {
     try {
-        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${argsMapping(args)}` })
+        store.commit('addConsoleLog', { type, message: `${getCurrentTimestamp()} - [${type.toUpperCase()}] - ${argsMapping(args)}` });
     } catch (error) {
-        console.error('Failed to store log:', error)
+        console.error('Failed to store log:', error);
     }
 }
 
-function argsMapping(args) {
-    return args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ')
+function argsMapping(args: any[]): string {
+    return args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
 }
