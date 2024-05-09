@@ -58,7 +58,7 @@ function storeLog(type: LogType, args: any[]): void {
 
 function argsMapping(args: any[]): string {
     return args.map(arg => {
-        if (typeof arg === 'object' && arg !== null && 'message' in arg) {
+        if (arg instanceof Error) {
             return arg.message
         } else if (typeof arg === 'object') {
             return JSON.stringify(arg, null, 2)
