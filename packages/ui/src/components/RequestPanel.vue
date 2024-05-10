@@ -397,7 +397,7 @@ export default {
                 },
                 {
                     name: 'Docs'
-                }
+                },
             ],
             activeRequestPanelTab: 'Body',
             methods: [
