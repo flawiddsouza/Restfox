@@ -159,7 +159,6 @@ class AlertConfirmPrompt extends HTMLElement {
             left: 0;
             z-index: 9999;
             --border-radius: 3px;
-            --primary-color: #1a73e8;
         }
 
         .dialog {
@@ -183,18 +182,18 @@ class AlertConfirmPrompt extends HTMLElement {
 
         .dialog-primary-button, .dialog-secondary-button {
             padding: 8px 16px;
-            color: var(--button-text-color);
             border-radius: var(--border-radius);
         }
 
         .dialog-primary-button {
-            background: var(--primary-color);
+            background: var(--primary-background-color);
+            color: var(--primary-text-color);
             border: none;
             width: 75px;
         }
 
         .dialog-primary-button:hover {
-            background: rgba(26, 115, 232, 0.5);
+            background: var(--primary-hover-background-color);
         }
 
         .dialog-secondary-button {
@@ -212,7 +211,7 @@ class AlertConfirmPrompt extends HTMLElement {
             padding: 7px;
             width: 25rem;
             border-radius: var(--border-radius);
-            border: 1px solid var(--modal-border-color);
+            border: 1px solid var(--input-border-color);
             caret-color: var(--modal-caret-color);
             background-color: var(--modal-background-color);
             color: var(--text-color);
@@ -223,8 +222,8 @@ class AlertConfirmPrompt extends HTMLElement {
         }
 
         .dialog-input:focus {
-            outline: 0px;
-            border-color: var(--modal-border-color);
+            outline: 1px solid var(--input-highlight-outline-color);
+            border: 1px solid var(--input-highlight-outline-color);
             background-color: var(--modal-background-color);
             color: var(--text-color);
         }

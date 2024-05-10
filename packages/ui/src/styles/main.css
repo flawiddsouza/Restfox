@@ -32,6 +32,9 @@ html {
     --input-disabled-background-color: rgba(239, 239, 239, 0.3);
     --input-disabled-color: rgb(84, 84, 84);
     --input-selection-background-color: #9cc3f5;
+    --input-highlight-outline-color: #1a73e8;
+    --input-border-color: #8c8c8c;
+    --input-disabled-border-color: lightgrey;
     --button-background-color: white;
     --button-hover-background-color: #f8f8f8;
     --button-text-color: black;
@@ -99,6 +102,9 @@ html {
     --box-shadow-color: rgba(0, 0, 0, 0.1);
     --tip-text-color: #7b7a7a;
     --modal-tip-text-color: var(--tip-text-color);
+    --primary-text-color: white;
+    --primary-background-color: #1a73e8;
+    --primary-hover-background-color: rgba(26, 115, 232, 0.5);
 }
 
 html.theme-dark {
@@ -120,6 +126,9 @@ html.theme-dark {
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
     --input-disabled-color: rgb(170, 170, 170);
     --input-selection-background-color: #083ca6;
+    --input-highlight-outline-color: #1a73e899;
+    --input-border-color: #8c8c8c;
+    --input-disabled-border-color: #484848;
     --modal-input-disabled-background-color: var(--input-disabled-background-color);
     --modal-input-disabled-color: var(--input-disabled-color);
     --modal-input-selection-background-color: var(--input-selection-background-color);
@@ -180,6 +189,9 @@ html.theme-dark {
     --box-shadow-color: rgba(255, 255, 255, 0.1);
     --tip-text-color: #b1b1b1;
     --modal-tip-text-color: var(--tip-text-color);
+    --primary-text-color: var(--text-color);
+    --primary-background-color: #1a73e8;
+    --primary-hover-background-color: rgba(26, 115, 232, 0.5);
 }
 
 * {
@@ -270,12 +282,12 @@ select option {
 input:disabled {
     background-color: var(--input-disabled-background-color);
     color: var(--input-disabled-color);
-    border: 1px solid var(--default-border-color);
+    border: 1px solid var(--input-disabled-border-color);
 }
 
 input.full-width-input, select.full-width-input {
     width: 100%;
-    border: 1px solid var(--modal-border-color);
+    border: 1px solid var(--input-border-color);
     border-radius: var(--default-border-radius);
     outline: 0;
     padding: 0.4rem;
@@ -293,6 +305,11 @@ select.full-width-input option {
 
 .full-width-input.slim {
     padding: 0.1rem;
+}
+
+.full-width-input:focus {
+    outline: 1px solid var(--input-highlight-outline-color);
+    border: 1px solid var(--input-highlight-outline-color);
 }
 
 .modal * {
