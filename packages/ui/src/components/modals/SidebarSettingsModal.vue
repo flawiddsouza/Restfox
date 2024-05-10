@@ -2,7 +2,7 @@
     <form @submit.prevent="showModalComp = false" v-if="showModalComp">
         <modal :title="title" v-model="showModalComp" width="600px">
             <label>
-                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name <span style="color: #7b7a7a; font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name <span style="color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
                 <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" required v-focus>
             </label>
 
@@ -27,7 +27,7 @@
                     <div>
                         <RequestPanelHeaders :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelHeaders>
                     </div>
-                    <div style="margin-top: 0.5rem; color: #7b7a7a; font-weight: normal; font-style: italic;">These will be applied to all requests in this folder and its subfolders</div>
+                    <div style="margin-top: 0.5rem; color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;">These will be applied to all requests in this folder and its subfolders</div>
                 </div>
 
                 <div style="padding-bottom: 1rem"></div>
@@ -36,7 +36,7 @@
                     <div>
                         <RequestPanelAuth :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelAuth>
                     </div>
-                    <div style="margin-top: 0.5rem; color: #7b7a7a; font-weight: normal; font-style: italic;">This will be applied to all requests in this folder and its subfolders</div>
+                    <div style="margin-top: 0.5rem; color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;">This will be applied to all requests in this folder and its subfolders</div>
                 </div>
             </div>
 
