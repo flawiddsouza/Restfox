@@ -35,10 +35,10 @@ const originalConsoleMethods: OriginalConsoleMethods = {
 function interceptConsole(type: LogType): ConsoleMethod {
     return (...args: any[]) => {
         const timestampStyle = 'color: #4CAF50;'
-        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c${argsMapping(args)}`
+        const logMessage = `%c${getCurrentTimestamp()} - [${type.toUpperCase()}] - %c}`
         const resetStyle = 'color: inherit;'
 
-        originalConsoleMethods[type](logMessage, timestampStyle, resetStyle)
+        originalConsoleMethods[type](logMessage, timestampStyle, resetStyle, ...args)
         storeLog(type, args)
     }
 }
