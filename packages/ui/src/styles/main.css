@@ -92,6 +92,7 @@ html {
     --modal-valid-env-highlight-background-color: #e8f5e9;
     --modal-invalid-env-highlight-color: #d32f2f;
     --modal-invalid-env-highlight-background-color: #ffebee;
+    --box-shadow-color: rgba(0, 0, 0, 0.1);
 }
 
 html.theme-dark {
@@ -168,6 +169,7 @@ html.theme-dark {
     --modal-valid-env-highlight-background-color: #e8f5e9;
     --modal-invalid-env-highlight-color: #d32f2f;
     --modal-invalid-env-highlight-background-color: #ffebee;
+    --box-shadow-color: rgba(255, 255, 255, 0.1);
 }
 
 * {
