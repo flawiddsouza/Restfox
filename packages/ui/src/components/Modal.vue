@@ -74,7 +74,6 @@ export default {
 <style scoped>
 .modal {
     --gutter: 14px;
-    --soft-color: #fafafa;
     top: 0;
     left: 0;
     width: 100vw;
@@ -138,10 +137,9 @@ export default {
 .modal__container footer {
     height: auto;
     text-align: right;
-    border-top: solid 1px #cccccc;
+    border-top: solid 1px var(--modal-border-color);
     padding: var(--gutter);
-    background-color: #ffffff;
-    background-color: var(--soft-color);
+    background-color: var(--background-color);
 }
 
 .modal__container footer button, .modal__container footer input {
