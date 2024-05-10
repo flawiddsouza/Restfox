@@ -17,11 +17,13 @@
                         <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
                             <div>{{ environment.name }}</div>
                             <div class="environment-sidebar-item-menu" :class="{ 'environment-sidebar-item-menu-disable-hide': environment.name === clickedContextMenuEnvironment.name && showEnvironmentContextMenuPopup === true }" @click.stop="showEnvironmentContextMenu($event, environment)">
-                                <svg viewBox="0 0 24 24" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
+                                <!-- Make this icon display a dark color -->
+                                <!-- <svg viewBox="0 0 24 24" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
                                     <g>
                                         <path d="M12,16.5c0.83,0,1.5,0.67,1.5,1.5s-0.67,1.5-1.5,1.5s-1.5-0.67-1.5-1.5S11.17,16.5,12,16.5z M10.5,12 c0,0.83,0.67,1.5,1.5,1.5s1.5-0.67,1.5-1.5s-0.67-1.5-1.5-1.5S10.5,11.17,10.5,12z M10.5,6c0,0.83,0.67,1.5,1.5,1.5 s1.5-0.67,1.5-1.5S12.83,4.5,12,4.5S10.5,5.17,10.5,6z"></path>
                                     </g>
-                                </svg>
+                                </svg> -->
+                                <i class="fa fa-ellipsis-v"></i>
                             </div>
                         </div>
                     </div>
@@ -532,6 +534,10 @@ export default {
     visibility: hidden;
     border-radius: 10px;
     height: 1.4rem;
+    width: 1.4rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .environment-sidebar-item:hover > .environment-sidebar-item-menu,
