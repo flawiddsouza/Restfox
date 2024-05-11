@@ -532,10 +532,6 @@ export default {
     visibility: hidden;
     border-radius: 10px;
     height: 1.4rem;
-    width: 1.4rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
 .environment-sidebar-item:hover > .environment-sidebar-item-menu,
