@@ -33,8 +33,8 @@ html {
     --input-disabled-color: rgb(84, 84, 84);
     --input-selection-background-color: #9cc3f5;
     --input-highlight-outline-color: #1a73e8;
-    --input-border-color: #8c8c8c;
-    --input-disabled-border-color: lightgrey;
+    --input-border-color: var(--default-border-color);
+    --input-disabled-border-color: var(--input-border-color);
     --button-background-color: white;
     --button-hover-background-color: #f8f8f8;
     --button-text-color: black;
@@ -127,8 +127,8 @@ html.theme-dark {
     --input-disabled-color: rgb(170, 170, 170);
     --input-selection-background-color: #083ca6;
     --input-highlight-outline-color: #1a73e899;
-    --input-border-color: #8c8c8c;
-    --input-disabled-border-color: #484848;
+    --input-border-color: var(--default-border-color);
+    --input-disabled-border-color: var(--input-border-color);
     --modal-input-disabled-background-color: var(--input-disabled-background-color);
     --modal-input-disabled-color: var(--input-disabled-color);
     --modal-input-selection-background-color: var(--input-selection-background-color);
