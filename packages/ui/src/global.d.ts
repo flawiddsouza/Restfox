@@ -104,6 +104,7 @@ export interface RequestFinalResponse {
 }
 
 export interface State {
+    consoleLogs: string[]
     collection: CollectionItem[]
     collectionTree: CollectionItem[]
     tabs: CollectionItem[]

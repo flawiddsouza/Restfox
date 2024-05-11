@@ -585,7 +585,7 @@ export async function handleRequest(
 
         return responseToSend
     } catch(e: any) {
-        console.log(e)
+        console.error(e)
 
         let error = 'Error: Request failed'
 
@@ -1578,8 +1578,8 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
             environments: environmentsToModify
         })
     } catch(e) {
-        console.log('Failed to set environment variable:')
-        console.log(e)
+        console.error('Failed to set environment variable:')
+        console.error(e)
     }
 }
 
@@ -1609,6 +1609,10 @@ export function getAlertConfirmPromptContainer(componentRootElement: HTMLElement
     createAlert: any
 } {
     return (componentRootElement.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt') as any
+}
+
+export function getCurrentTimestamp(): string {
+    return dayjs().format('HH:mm:ss:SSS')
 }
 
 export function getVersion(): string {
