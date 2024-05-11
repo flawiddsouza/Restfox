@@ -138,7 +138,7 @@ export default {
 .context-menu {
     position: fixed;
     z-index: 1;
-    border: 1px solid var(--default-border-color);
+    border: 1px solid var(--menu-border-color);
     box-shadow: 0 0 1rem 0 var(--box-shadow-color);
     border-radius: calc(1rem * 0.3);
     min-width: 15rem;

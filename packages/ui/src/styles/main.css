@@ -105,6 +105,7 @@ html {
     --primary-text-color: white;
     --primary-background-color: #1a73e8;
     --primary-hover-background-color: rgba(26, 115, 232, 0.5);
+    --menu-border-color: #82828240;
 }
 
 html.theme-dark {
@@ -192,6 +193,7 @@ html.theme-dark {
     --primary-text-color: var(--text-color);
     --primary-background-color: #1a73e8;
     --primary-hover-background-color: rgba(26, 115, 232, 0.5);
+    --menu-border-color: #48484880;
 }
 
 * {
