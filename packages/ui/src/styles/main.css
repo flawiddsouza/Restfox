@@ -31,11 +31,16 @@ html {
     --modal-link-color: var(--link-color);
     --input-disabled-background-color: rgba(239, 239, 239, 0.3);
     --input-disabled-color: rgb(84, 84, 84);
+    --input-selection-background-color: #9cc3f5;
+    --input-highlight-outline-color: #1a73e8;
+    --input-border-color: var(--default-border-color);
+    --input-disabled-border-color: var(--input-border-color);
     --button-background-color: white;
     --button-hover-background-color: #f8f8f8;
     --button-text-color: black;
     --button-border-color: #8c8c8c;
     --modal-background-color: white;
+    --modal-footer-background-color: #fafafa;
     --modal-text-color: black;
     --modal-caret-color: black;
     --modal-border-color: lightgrey;
@@ -45,6 +50,9 @@ html {
     --modal-button-hover-background-color: #f8f8f8;
     --modal-button-text-color: black;
     --modal-button-border-color: #8c8c8c;
+    --modal-input-disabled-background-color: var(--input-disabled-background-color);
+    --modal-input-disabled-color: var(--input-disabled-color);
+    --modal-input-selection-background-color: var(--input-selection-background-color);
     --sidebar-item-active-color: #f3f3f3;
     --resizer-background-color: #f1f1f1;
     --response-panel-history-select-hover-color: #f7f7f7;
@@ -92,11 +100,18 @@ html {
     --modal-valid-env-highlight-background-color: #e8f5e9;
     --modal-invalid-env-highlight-color: #d32f2f;
     --modal-invalid-env-highlight-background-color: #ffebee;
+    --box-shadow-color: rgba(0, 0, 0, 0.1);
+    --tip-text-color: #7b7a7a;
+    --modal-tip-text-color: var(--tip-text-color);
+    --primary-text-color: white;
+    --primary-background-color: #1a73e8;
+    --primary-hover-background-color: rgba(26, 115, 232, 0.5);
+    --menu-border-color: #82828240;
 }
 
 html.theme-dark {
     --default-border-color: #484848;
-    --default-border-color-modal: lightgrey;
+    --default-border-color-modal: var(--default-border-color);
     --border-color-lighter: #484848;
     --border-color-lighter-darkened: #48484847;
     --base-color-success: #0bb27e;
@@ -104,30 +119,36 @@ html.theme-dark {
     --base-color-warning: #ffb400;
     --base-color-error: #f06f57;
     --background-color: #292929;
-    --text-color: #e0e0e0;
-    --caret-color: #e0e0e0;
+    --text-color: #d9d9d9;
+    --caret-color: var(--text-color);
     --scrollbar: #505050;
     --scrollbar-background: #353535;
     --link-color: #d9c9ff;
-    --modal-link-color: rgb(0, 0, 238);
+    --modal-link-color: var(--link-color);
     --input-disabled-background-color: rgba(59, 59, 59, 0.3);
     --input-disabled-color: rgb(170, 170, 170);
-    --modal-input-disabled-background-color: rgba(239, 239, 239, 0.3);
-    --modal-input-disabled-color: rgb(84, 84, 84);
+    --input-selection-background-color: #083ca6;
+    --input-highlight-outline-color: #1a73e899;
+    --input-border-color: var(--default-border-color);
+    --input-disabled-border-color: var(--input-border-color);
+    --modal-input-disabled-background-color: var(--input-disabled-background-color);
+    --modal-input-disabled-color: var(--input-disabled-color);
+    --modal-input-selection-background-color: var(--input-selection-background-color);
     --button-background-color: #292929;
     --button-hover-background-color: #595858;
-    --button-text-color: #e0e0e0;
+    --button-text-color: var(--text-color);
     --button-border-color: #8c8c8c;
-    --modal-background-color: white;
-    --modal-text-color: black;
-    --modal-caret-color: black;
-    --modal-border-color: lightgrey;
-    --modal-scrollbar: #dfdfdf;
-    --modal-scrollbar-background: #f3f2f2;
-    --modal-button-background-color: white;
-    --modal-button-hover-background-color: #f8f8f8;
-    --modal-button-text-color: black;
-    --modal-button-border-color: #8c8c8c;
+    --modal-background-color: var(--background-color);
+    --modal-footer-background-color: #232323;
+    --modal-text-color: var(--text-color);
+    --modal-caret-color: var(--caret-color);
+    --modal-border-color: var(--default-border-color-modal);
+    --modal-scrollbar: var(--scrollbar);
+    --modal-scrollbar-background: var(--background-color);
+    --modal-button-background-color: var(--button-background-color);
+    --modal-button-hover-background-color: var(--button-hover-background-color);
+    --modal-button-text-color: var(--button-text-color);
+    --modal-button-border-color: var(--button-border-color);
     --sidebar-item-active-color: #353535;
     --resizer-background-color: #353535;
     --response-panel-history-select-hover-color: #353535;
@@ -144,16 +165,16 @@ html.theme-dark {
     --cm-tooltip-background-color: var(--background-color);
     --cm-selection-background-color: #ffffff33;
     --cm-selection-match-background-color: #99ff773d;
-    --modal-cm-string: #a11;
-    --modal-cm-boolean: #219;
-    --modal-cm-null: #708;
-    --modal-cm-number: #164;
-    --modal-cm-comment: #940;
-    --modal-cm-keyword: #708;
-    --modal-cm-variable: #00f;
-    --modal-cm-tooltip-background-color: #f5f5f5;
-    --modal-cm-selection-background-color: #00000021;
-    --modal-cm-selection-match-background-color: #99ff7780;
+    --modal-cm-string: var(--cm-string);
+    --modal-cm-boolean: var(--cm-boolean);
+    --modal-cm-null: var(--cm-null);
+    --modal-cm-number: var(--cm-number);
+    --modal-cm-comment: var(--cm-comment);
+    --modal-cm-keyword: var(--cm-keyword);
+    --modal-cm-variable: var(--cm-variable);
+    --modal-cm-tooltip-background-color: var(--cm-tooltip-background-color);
+    --modal-cm-selection-background-color: var(--cm-selection-background-color);
+    --modal-cm-selection-match-background-color: var(--cm-selection-match-background-color);
     --drop-target-background-color: #f8889b41;
     --workspace-menu-hover-background-color: #505050;
     --socket-header-background-color: var(--sidebar-item-active-color);
@@ -164,10 +185,17 @@ html.theme-dark {
     --valid-env-highlight-background-color: #1b5e20;
     --invalid-env-highlight-color: #ffcccb;
     --invalid-env-highlight-background-color: #7c0404;
-    --modal-valid-env-highlight-color: #2e7d32;
-    --modal-valid-env-highlight-background-color: #e8f5e9;
-    --modal-invalid-env-highlight-color: #d32f2f;
-    --modal-invalid-env-highlight-background-color: #ffebee;
+    --modal-valid-env-highlight-color: var(--valid-env-highlight-color);
+    --modal-valid-env-highlight-background-color: var(--valid-env-highlight-background-color);
+    --modal-invalid-env-highlight-color: var(--invalid-env-highlight-color);
+    --modal-invalid-env-highlight-background-color: var(--invalid-env-highlight-background-color);
+    --box-shadow-color: rgba(255, 255, 255, 0.1);
+    --tip-text-color: #b1b1b1;
+    --modal-tip-text-color: var(--tip-text-color);
+    --primary-text-color: var(--text-color);
+    --primary-background-color: #1a73e8;
+    --primary-hover-background-color: rgba(26, 115, 232, 0.5);
+    --menu-border-color: #48484880;
 }
 
 * {
@@ -258,12 +286,12 @@ select option {
 input:disabled {
     background-color: var(--input-disabled-background-color);
     color: var(--input-disabled-color);
-    border: 1px solid var(--default-border-color);
+    border: 1px solid var(--input-disabled-border-color);
 }
 
 input.full-width-input, select.full-width-input {
     width: 100%;
-    border: 1px solid var(--modal-border-color);
+    border: 1px solid var(--input-border-color);
     border-radius: var(--default-border-radius);
     outline: 0;
     padding: 0.4rem;
@@ -281,6 +309,11 @@ select.full-width-input option {
 
 .full-width-input.slim {
     padding: 0.1rem;
+}
+
+.full-width-input:focus {
+    outline: 1px solid var(--input-highlight-outline-color);
+    border: 1px solid var(--input-highlight-outline-color);
 }
 
 .modal * {

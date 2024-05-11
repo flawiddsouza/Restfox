@@ -138,13 +138,13 @@ export default {
 .context-menu {
     position: fixed;
     z-index: 1;
-    border: 1px solid #82828240;
-    box-shadow: 0 0 1rem 0 rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--menu-border-color);
+    box-shadow: 0 0 1rem 0 var(--box-shadow-color);
     border-radius: calc(1rem * 0.3);
     min-width: 15rem;
     padding-top: 5px;
     padding-bottom: 5px;
-    background: #ffffff;
+    background: var(--background-color);
     overflow-y: auto;
     left: -9999px;
 }
@@ -152,11 +152,12 @@ export default {
 button.context-menu-item {
     padding: 0.5rem;
     outline: 0;
-    background: #ffffff;
+    background: var(--background-color);
     border: 0;
     display: block;
     width: 100%;
     text-align: left;
+    color: var(--text-color);
 }
 
 button.context-menu-item:not(:active):focus {
