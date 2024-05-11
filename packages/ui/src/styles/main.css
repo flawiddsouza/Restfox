@@ -40,6 +40,7 @@ html {
     --button-text-color: black;
     --button-border-color: #8c8c8c;
     --modal-background-color: white;
+    --modal-footer-background-color: #fafafa;
     --modal-text-color: black;
     --modal-caret-color: black;
     --modal-border-color: lightgrey;
@@ -138,6 +139,7 @@ html.theme-dark {
     --button-text-color: var(--text-color);
     --button-border-color: #8c8c8c;
     --modal-background-color: var(--background-color);
+    --modal-footer-background-color: #232323;
     --modal-text-color: var(--text-color);
     --modal-caret-color: var(--caret-color);
     --modal-border-color: var(--default-border-color-modal);

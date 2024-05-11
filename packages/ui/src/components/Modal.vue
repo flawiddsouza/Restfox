@@ -139,7 +139,7 @@ export default {
     text-align: right;
     border-top: solid 1px var(--modal-border-color);
     padding: var(--gutter);
-    background-color: var(--background-color);
+    background-color: var(--modal-footer-background-color);
 }
 
 .modal__container footer button, .modal__container footer input {
