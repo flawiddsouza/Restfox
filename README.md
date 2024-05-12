@@ -41,17 +41,12 @@ docker run --name Restfox -d -p 4004:4004 flawiddsouza/restfox:0.14.1
 
 Start webapp using docker compose
 ```
-docker-compose -f docker-compose.yml up -d
+docker-compose up -d
 ```
 
 Start webapp using docker compose with custom port
 ```
-docker-compose -f docker-compose.yml -p 5000:4004 up -d
-```
-
-Start webapp using docker compose
-```
-docker-compose -f docker-compose.yml up -d
+docker-compose -p 5000:4004 up -d
 ```
 
 Start webapp using docker compose with different version
