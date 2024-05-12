@@ -159,7 +159,6 @@ class AlertConfirmPrompt extends HTMLElement {
             left: 0;
             z-index: 9999;
             --border-radius: 3px;
-            --primary-color: #1a73e8;
         }
 
         .dialog {
@@ -168,7 +167,7 @@ class AlertConfirmPrompt extends HTMLElement {
             padding: 1rem;
             box-shadow: 1px 1px 42px -16px black;
             border-radius: 4px;
-            border: 1px solid #c6c6c6;
+            border: 1px solid var(--modal-border-color);
             word-break: break-word;
         }
 
@@ -184,41 +183,49 @@ class AlertConfirmPrompt extends HTMLElement {
         .dialog-primary-button, .dialog-secondary-button {
             padding: 8px 16px;
             border-radius: var(--border-radius);
-            border: 1px solid lightgrey;
         }
 
         .dialog-primary-button {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
+            background: var(--primary-background-color);
+            color: var(--primary-text-color);
+            border: none;
             width: 75px;
         }
 
         .dialog-primary-button:hover {
-            background: #2f7de3;
+            background: var(--primary-hover-background-color);
         }
 
         .dialog-secondary-button {
             margin-left: 0.5rem;
-            color: var(--primary-color);
-            background: white;
+            background: var(--button-background-color);
+            color: var(--button-text-color);
+            border: 1px solid var(--button-border-color);
         }
 
         .dialog-secondary-button:hover {
-            background: #ebf3fd;
+            background: var(--button-hover-background-color);
         }
 
         .dialog-input {
             padding: 7px;
             width: 25rem;
             border-radius: var(--border-radius);
-            border: 1px solid lightgrey;
+            border: 1px solid var(--input-border-color);
             caret-color: var(--modal-caret-color);
+            background-color: var(--modal-background-color);
+            color: var(--text-color);
         }
 
-        .dialog-input:focus, .dialog-primary-button:focus, .dialog-secondary-button:focus {
-            outline: 2px solid var(--primary-color);
-            border-color: white;
+        .dialog-input::selection {
+            background-color: var(--modal-input-selection-background-color);
+        }
+
+        .dialog-input:focus {
+            outline: 1px solid var(--input-highlight-outline-color);
+            border: 1px solid var(--input-highlight-outline-color);
+            background-color: var(--modal-background-color);
+            color: var(--text-color);
         }
         </style>
         `

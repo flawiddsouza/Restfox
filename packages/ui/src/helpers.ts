@@ -23,6 +23,7 @@ import {
     OpenApiSpecPathParams,
 } from './global'
 import { ActionContext } from 'vuex'
+import { version } from '../../electron/package.json'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -487,6 +488,10 @@ export async function handleRequest(
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation)
 
+        if (!headers['user-agent']) {
+            headers['user-agent'] = `Restfox/${getVersion()}`
+        }
+
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
@@ -580,7 +585,7 @@ export async function handleRequest(
 
         return responseToSend
     } catch(e: any) {
-        console.log(e)
+        console.error(e)
 
         let error = 'Error: Request failed'
 
@@ -1573,8 +1578,8 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
             environments: environmentsToModify
         })
     } catch(e) {
-        console.log('Failed to set environment variable:')
-        console.log(e)
+        console.error('Failed to set environment variable:')
+        console.error(e)
     }
 }
 
@@ -1604,4 +1609,12 @@ export function getAlertConfirmPromptContainer(componentRootElement: HTMLElement
     createAlert: any
 } {
     return (componentRootElement.ownerDocument?.defaultView ?? window).document.querySelector('alert-confirm-prompt') as any
+}
+
+export function getCurrentTimestamp(): string {
+    return dayjs().format('HH:mm:ss:SSS')
+}
+
+export function getVersion(): string {
+    return version
 }
