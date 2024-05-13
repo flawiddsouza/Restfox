@@ -54,7 +54,7 @@
                         <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
                     </div>
                     <template v-else>
-                        <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
+                        <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                     </template>
                 </template>
                 <div class="content-box" v-else>
@@ -80,6 +80,10 @@
                     <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error === 'Error: Invalid URL'">
                         <div style="line-height: 1rem;">Please make sure the protocol (http/https) is present in the URL</div>
                     </div>
+                </div>
+                <div class="row">
+                    <textarea rows="1" style="width: 100%; height: 100%; padding: 0.5rem;" type="text" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter"></textarea>
+                    <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                 </div>
             </template>
             <template v-if="activeResponsePanelTab === 'Header'">
@@ -128,6 +132,7 @@
         </div>
     </template>
     <ContextMenu :options="responseHistoryContextMenuOptions" :element="responseHistoryContextMenuElement" v-model:show="showResponseHistoryContextMenu" @click="handleResponseHistoryContextMenuItemClick" />
+    <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal"></ResponseFilteringHelpModal>
 </template>
 
 <script>
@@ -145,9 +150,12 @@ import {
     getAlertConfirmPromptContainer,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
+import {JSONPath} from 'jsonpath-plus'
+import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
 
 export default {
     components: {
+        ResponseFilteringHelpModal,
         CodeMirrorResponsePanelPreview,
         ContextMenu,
         ImageFromBuffer,
@@ -162,9 +170,18 @@ export default {
             responseHistoryContextMenuElement: null,
             showResponseHistoryContextMenu: false,
             currentlySelectedText: '',
+            showResponseFilteringHelpModal: false,
         }
     },
     computed: {
+        responseFilter: {
+            get() {
+                return this.$store.state.responseFilter
+            },
+            set(value) {
+                this.$store.commit('setResponseFilter', value)
+            }
+        },
         responsePanelTabs() {
             let tabs = [
                 {
@@ -340,7 +357,7 @@ export default {
             }
 
             return 0
-        },
+        }
     },
     watch: {
         response() {
@@ -350,6 +367,11 @@ export default {
         }
     },
     methods: {
+        filterResponse(buffer, jsonPath) {
+            const responseData = JSON.parse(this.bufferToJSONString(buffer))
+            const filteredData = JSONPath({ json: responseData, path: jsonPath })
+            return JSON.stringify(filteredData, null, 2)
+        },
         cancelRequest() {
             this.requestAbortController.abort()
         },
@@ -477,7 +499,10 @@ export default {
             setEnvironmentVariable(this.$store, environmentVariableName, this.currentlySelectedText)
 
             this.$toast.success(`Environment variable set: ${environmentVariableName}`)
-        }
+        },
+        showResFilteringHelpModal() {
+            this.showResponseFilteringHelpModal = true
+        },
     }
 }
 </script>
@@ -635,5 +660,23 @@ export default {
 .response-panel-tabs-context table th, .response-panel-tabs-context table td {
     border: 1px solid var(--default-border-color);
     padding: 0.5rem;
+}
+.row {
+    display: flex;
+    align-items: center;
+}
+
+textarea {
+    flex: 1;
+    margin-right: 10px;
+    resize: none;
+}
+
+.help-link {
+    text-decoration: none;
+    padding: 6px 10px;
+    background-color: #f0f0f0;
+    color: #333;
+    border-radius: 4px;
 }
 </style>
