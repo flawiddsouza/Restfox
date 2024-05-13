@@ -10,3 +10,4 @@ dist-ssr
 tests/output
 tests/node_modules
 tests/package-lock.json
+.idea

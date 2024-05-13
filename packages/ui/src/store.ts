@@ -322,7 +322,6 @@ const store = createStore<State>({
             showImportModalSelectedRequestGroupId: null,
             showBackupAndRestoreModal: false,
             collectionFilter: '',
-            responseFilter: '',
             activeSidebarItemForContextMenu: '',
             sidebarContextMenuElement: null,
             workspaces: [],
@@ -409,9 +408,6 @@ const store = createStore<State>({
         },
         setCollectionFilter(state, filter) {
             state.collectionFilter = filter
-        },
-        setResponseFilter(state, filter) {
-            state.responseFilter = filter
         },
         persistCollectionItem(state, collectionItem) {
             if(state.activeTab && state.activeTab._id === collectionItem._id) {

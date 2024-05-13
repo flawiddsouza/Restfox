@@ -118,7 +118,6 @@ export interface State {
     showImportModalSelectedRequestGroupId: string | null
     showBackupAndRestoreModal: boolean
     collectionFilter: string
-    responseFilter: string
     activeSidebarItemForContextMenu: string | null
     sidebarContextMenuElement: HTMLElement | null
     workspaces: Workspace[]
