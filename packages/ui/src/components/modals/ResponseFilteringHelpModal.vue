@@ -1,5 +1,5 @@
 <template>
-    <div v-if="showModalComp">
+    <div v-if="showModalComp" class="help-modal">
         <modal :title="title" v-model="showModalComp">
             <p>Use <a href="http://goessner.net/articles/JsonPath/">JSONPath</a> to filter the response body. Here are some examples that you might use on a book store API:</p>
             <table style="table-layout: fixed">
@@ -70,5 +70,8 @@ export default {
     padding: 0.5rem;
     border-radius: 4px;
     font-family: 'Courier New', Courier, monospace;
+}
+.help-modal {
+    z-index: 1001;
 }
 </style>

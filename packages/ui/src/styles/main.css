@@ -300,6 +300,15 @@ input.full-width-input, select.full-width-input {
 
 input.full-width-input {
     padding: 0.5rem;
+    background: var(--modal-background-color);
+}
+
+.row {
+    background: var(--modal-background-color);
+}
+
+.code-block {
+    background-color: var(--modal-background-color);
 }
 
 select.full-width-input option {
