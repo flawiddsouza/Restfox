@@ -336,7 +336,7 @@ export default {
             }
         },
         responseContentType() {
-            if(!this.response) {
+            if(!this.response || this.response.headers === undefined) {
                 return ''
             }
 
