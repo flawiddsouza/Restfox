@@ -43,44 +43,52 @@
         </div>
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
-                <template v-if="response.statusText !== 'Error'">
-                    <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
-                        <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
-                    </div>
-                    <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
-                        <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
-                    </div>
-                    <div class="content-box" style="height: 100%" v-else-if="responseContentType.startsWith('text/html')">
-                        <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
-                    </div>
-                    <template v-else>
-                        <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
-                    </template>
-                </template>
-                <div class="content-box" v-else>
-                    <div style="white-space: pre-line;">{{ response.error }}</div>
-                    <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error !== 'Error: Invalid URL' && response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error in Plugin ') === false">
-                        <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
-                        <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
-                        <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
-                        <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">3) The server for the url has an expired or invalid ssl certificate</div>
-                        <template v-if="flags.isBrowser">
-                            <template v-if="!flags.hideBrowserRelatedResponsePanelErrors">
-                                <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">4) No CORS headers present for the requested url and requested http method</div>
-                                <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">5) On the browser version, only https urls and localhost can be loaded at the moment. So if you're hitting a http url, the request will fail because https doesn't like requesting http urls.</div>
-                            </template>
-                            <div v-show="!flags.browserExtensionEnabled" style="margin-top: 1.5rem; line-height: 1rem;">
-                                Points 4 & 5 can be bypassed using the <a href="https://chrome.google.com/webstore/detail/restfox-cors-helper/pgoncladmcclnmilkbnmmbldcihdgfnf" target="_blank">Chrome</a> or <a href="https://addons.mozilla.org/en-US/firefox/addon/restfox-cors-helper/" target="_blank">Firefox</a> extension for Restfox
-                            </div>
-                            <div v-show="flags.browserExtensionEnabled" style="margin-top: 1.5rem; line-height: 1rem;">
-                                Browser extension is active. CORS will be bypassed and http requests will also work now.
-                            </div>
+                <section>
+                    <template v-if="response.statusText !== 'Error'">
+                        <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
+                            <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
+                        </div>
+                        <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
+                            <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
+                        </div>
+                        <div class="content-box" style="height: 100%" v-else-if="responseContentType.startsWith('text/html')">
+                            <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
+                        </div>
+                        <template v-else>
+                            <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
+                    </template>
+                    <div class="content-box" v-else>
+                        <div style="white-space: pre-line;">{{ response.error }}</div>
+                        <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error !== 'Error: Invalid URL' && response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error in Plugin ') === false">
+                            <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
+                            <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
+                            <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
+                            <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">3) The server for the url has an expired or invalid ssl certificate</div>
+                            <template v-if="flags.isBrowser">
+                                <template v-if="!flags.hideBrowserRelatedResponsePanelErrors">
+                                    <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">4) No CORS headers present for the requested url and requested http method</div>
+                                    <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">5) On the browser version, only https urls and localhost can be loaded at the moment. So if you're hitting a http url, the request will fail because https doesn't like requesting http urls.</div>
+                                </template>
+                                <div v-show="!flags.browserExtensionEnabled" style="margin-top: 1.5rem; line-height: 1rem;">
+                                    Points 4 & 5 can be bypassed using the <a href="https://chrome.google.com/webstore/detail/restfox-cors-helper/pgoncladmcclnmilkbnmmbldcihdgfnf" target="_blank">Chrome</a> or <a href="https://addons.mozilla.org/en-US/firefox/addon/restfox-cors-helper/" target="_blank">Firefox</a> extension for Restfox
+                                </div>
+                                <div v-show="flags.browserExtensionEnabled" style="margin-top: 1.5rem; line-height: 1rem;">
+                                    Browser extension is active. CORS will be bypassed and http requests will also work now.
+                                </div>
+                            </template>
+                        </div>
+                        <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error === 'Error: Invalid URL'">
+                            <div style="line-height: 1rem;">Please make sure the protocol (http/https) is present in the URL</div>
+                        </div>
                     </div>
-                    <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error === 'Error: Invalid URL'">
-                        <div style="line-height: 1rem;">Please make sure the protocol (http/https) is present in the URL</div>
+                </section>
+                <section class="sticky-section">
+                    <div class="row" v-if="responseContentType.startsWith('application/json')">
+                        <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
+                        <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
-                </div>
+                </section>
             </template>
             <template v-if="activeResponsePanelTab === 'Header'">
                 <div class="content-box">
@@ -128,6 +136,7 @@
         </div>
     </template>
     <ContextMenu :options="responseHistoryContextMenuOptions" :element="responseHistoryContextMenuElement" v-model:show="showResponseHistoryContextMenu" @click="handleResponseHistoryContextMenuItemClick" />
+    <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal"></ResponseFilteringHelpModal>
 </template>
 
 <script>
@@ -145,9 +154,12 @@ import {
     getAlertConfirmPromptContainer,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
+import {JSONPath} from 'jsonpath-plus'
+import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
 
 export default {
     components: {
+        ResponseFilteringHelpModal,
         CodeMirrorResponsePanelPreview,
         ContextMenu,
         ImageFromBuffer,
@@ -162,6 +174,8 @@ export default {
             responseHistoryContextMenuElement: null,
             showResponseHistoryContextMenu: false,
             currentlySelectedText: '',
+            showResponseFilteringHelpModal: false,
+            responseFilter: ''
         }
     },
     computed: {
@@ -340,16 +354,28 @@ export default {
             }
 
             return 0
-        },
+        }
     },
     watch: {
         response() {
             if(this.responsePanelTabs.length === 2 && this.activeResponsePanelTab === 'Request') {
                 this.activeResponsePanelTab = 'Preview'
             }
+            this.responseFilter = ''
         }
     },
     methods: {
+        filterResponse(buffer, jsonPath) {
+            try {
+                const responseData = JSON.parse(this.bufferToJSONString(buffer))
+                const filteredData = JSONPath({ json: responseData, path: jsonPath })
+                return JSON.stringify(filteredData, null, 2)
+            } catch (e) {
+                console.log(`Could not filter response due to ${e.message}`)
+                return this.bufferToJSONString(buffer)
+            }
+
+        },
         cancelRequest() {
             this.requestAbortController.abort()
         },
@@ -477,7 +503,10 @@ export default {
             setEnvironmentVariable(this.$store, environmentVariableName, this.currentlySelectedText)
 
             this.$toast.success(`Environment variable set: ${environmentVariableName}`)
-        }
+        },
+        showResFilteringHelpModal() {
+            this.showResponseFilteringHelpModal = true
+        },
     }
 }
 </script>
@@ -637,5 +666,25 @@ export default {
 .response-panel-tabs-context table th, .response-panel-tabs-context table td {
     border: 1px solid var(--default-border-color);
     padding: 0.5rem;
+}
+.row {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    background: var(--background-color);
+}
+
+.help-link {
+    text-decoration: none;
+    margin-left: 5px;
+    padding: 6px 10px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--default-border-color);
+}
+.sticky-section {
+    position: sticky;
+    bottom: 0;
+    background-color: var(--background-color);
 }
 </style>
