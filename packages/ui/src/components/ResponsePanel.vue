@@ -557,7 +557,7 @@ export default {
     padding: 0.2rem 0.6rem;
     white-space: nowrap;
     user-select: none;
-    background: var(--background-color-lighter);
+    background: var(--sidebar-item-active-color);
 }
 
 .response-panel-address-bar .tag .bold {
@@ -609,6 +609,7 @@ export default {
 .response-panel-tabs {
     display: flex;
     user-select: none;
+    background-color: var(--sidebar-item-active-color);
 }
 
 .response-panel-tabs .response-panel-tab {
@@ -623,7 +624,7 @@ export default {
 .response-panel-tabs .response-panel-tab-active {
     border-bottom: 1px solid transparent;
     border-right: 1px solid var(--default-border-color);
-    background: var(--background-color-lighter);
+    background: var(--background-color);
 }
 
 .response-panel-tabs .response-panel-tab-active:not(:first-child) {
