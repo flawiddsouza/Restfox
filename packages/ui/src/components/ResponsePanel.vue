@@ -26,7 +26,7 @@
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
-                    <option v-for="response in responses" :value="response">{{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}</option>
+                    <option v-for="response in responses" :value="response">{{ response.status }}{{ response }} - {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}</option>
                 </select>
             </div>
         </div>

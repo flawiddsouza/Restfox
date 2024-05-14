@@ -1,9 +1,15 @@
 <template>
     <template v-if="activeTab && activeTab._type === 'request'">
         <div class="request-panel-address-bar">
-            <select v-model="activeTab.method">
-                <option v-for="method in methods">{{ method }}</option>
-            </select>
+            <div class="custom-dropdown" @click="toggleDropdown" ref="dropdown">
+                <div class="row">
+                    <div :class="'selected-option request-method--' + activeTab.method">{{ activeTab.method }}</div>
+                    <i class="fa fa-caret-down space-right"></i>
+                </div>
+                <ul v-show="dropdownVisible">
+                    <li v-for="method in methods" :key="method" @click="selectMethod(method)" :class="'request-method--' + method">{{ method }}</li>
+                </ul>
+            </div>
             <div class="code-mirror-input-container">
                 <CodeMirrorSingleLine
                     v-model="activeTab.url"
@@ -423,6 +429,7 @@ export default {
             },
             skipScriptUpdate: false,
             editDescription: false,
+            dropdownVisible: false,
         }
     },
     computed: {
@@ -726,6 +733,12 @@ export default {
             }
             console.log('Script saved')
         }, 500),
+        toggleDropdown() {
+            this.dropdownVisible = !this.dropdownVisible
+        },
+        selectMethod(method) {
+            this.activeTab.method = method
+        },
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
@@ -848,5 +861,19 @@ export default {
     justify-content: flex-end;
     align-items: center;
     margin-top: 0.5rem;
+}
+
+i {
+    cursor: pointer;
+    padding-left: 4px;
+}
+
+li {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+li:hover {
+    background-color: #f0f0f0;
 }
 </style>

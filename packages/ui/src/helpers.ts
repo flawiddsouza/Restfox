@@ -289,6 +289,8 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
     const timeTaken = Number(endTime) - Number(startTime)
 
+    console.log(response)
+
     return {
         status,
         statusText,
