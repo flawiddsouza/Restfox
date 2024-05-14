@@ -1,7 +1,7 @@
 <template>
     <div v-if="showModalComp" class="help-modal">
         <modal :title="title" v-model="showModalComp">
-            <p>Use <a href="http://goessner.net/articles/JsonPath/">JSONPath</a> to filter the response body. Here are some examples that you might use on a book store API:</p>
+            <p>Use <a href="http://goessner.net/articles/JsonPath/" target="_blank">JSONPath</a> to filter the response body. Here are some examples that you might use on a book store API:</p>
             <table style="table-layout: fixed">
                 <tr v-for="(example, index) in jsonPathExamples" :key="index">
                     <td>
@@ -12,7 +12,7 @@
                     </td>
                 </tr>
             </table>
-            <p><i class="fa fa-exclamation-circle"></i> Note: that there's no standard for JSONPath. Restfox uses <a href="https://www.npmjs.com/package/jsonpath-plus">jsonpath-plus</a>.</p>
+            <p>Note that there's no standard for JSONPath. Restfox uses <a href="https://www.npmjs.com/package/jsonpath-plus" target="_blank">jsonpath-plus</a>.</p>
         </modal>
     </div>
 </template>

@@ -84,7 +84,7 @@
                     </div>
                 </section>
                 <section class="sticky-section">
-                    <div class="row" v-if="bufferToJSONString(response.buffer).includes('{')">
+                    <div class="row" v-if="responseContentType.startsWith('application/json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>

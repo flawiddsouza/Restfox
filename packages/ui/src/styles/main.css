@@ -308,7 +308,7 @@ input.full-width-input {
     color: var(--text-color);
     padding: 0.1rem;
     border: 1px solid var(--default-border-color);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: var(--font-monospace);
 }
 
 select.full-width-input option {
