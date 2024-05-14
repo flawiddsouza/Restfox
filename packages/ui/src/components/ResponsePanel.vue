@@ -21,8 +21,8 @@
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText }}
                 </div>
-                <div class="tag plr-0 ml-0_6rem" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
-                <div class="tag plr-0 ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
+                <div class="tag ml-0_6rem" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
+                <div class="tag ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
                 <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
@@ -528,6 +528,7 @@ export default {
     padding: 0.2rem 0.6rem;
     white-space: nowrap;
     user-select: none;
+    background: var(--background-color-lighter);
 }
 
 .response-panel-address-bar .tag .bold {
@@ -593,6 +594,7 @@ export default {
 .response-panel-tabs .response-panel-tab-active {
     border-bottom: 1px solid transparent;
     border-right: 1px solid var(--default-border-color);
+    background: var(--background-color-lighter);
 }
 
 .response-panel-tabs .response-panel-tab-active:not(:first-child) {

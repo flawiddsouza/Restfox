@@ -23,6 +23,7 @@ html {
     --base-color-warning: #ffb400;
     --base-color-error: #b91c1c;
     --background-color: white;
+    --background-color-lighter: #f1f1f1;
     --text-color: black;
     --caret-color: black;
     --scrollbar: #dfdfdf;
@@ -119,6 +120,7 @@ html.theme-dark {
     --base-color-warning: #ffb400;
     --base-color-error: #f06f57;
     --background-color: #292929;
+    --background-color-lighter: rgba(250, 249, 249, 0.09);
     --text-color: #d9d9d9;
     --caret-color: var(--text-color);
     --scrollbar: #505050;
