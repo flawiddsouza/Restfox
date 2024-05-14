@@ -23,6 +23,7 @@ html {
     --base-color-warning: #ffb400;
     --base-color-error: #b91c1c;
     --background-color: white;
+    --background-color-lighter: #f1f1f1;
     --text-color: black;
     --caret-color: black;
     --scrollbar: #dfdfdf;

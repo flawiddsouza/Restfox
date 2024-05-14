@@ -811,6 +811,7 @@ export default {
 .request-panel-tabs {
     display: flex;
     user-select: none;
+    background-color: var(--sidebar-item-active-color);
 }
 
 .request-panel-tabs .request-panel-tab {
@@ -825,6 +826,7 @@ export default {
 .request-panel-tabs .request-panel-tab-active {
     border-bottom: 1px solid transparent;
     border-right: 1px solid var(--default-border-color);
+    background: var(--background-color);
 }
 
 .request-panel-tabs .request-panel-tab-active:not(:first-child) {
