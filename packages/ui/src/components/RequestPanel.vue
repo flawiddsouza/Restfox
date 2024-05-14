@@ -876,28 +876,22 @@ export default {
     margin-top: 0.5rem;
 }
 
-i {
+.custom-dropdown i {
     cursor: pointer;
     padding-left: 4px;
-}
-
-li {
-    padding: 8px 12px;
-    cursor: pointer;
-}
-
-li:hover {
-    background: var(--button-hover-background-color);
-}
-.selected-option {
-    cursor: pointer;
-    background: var(--background-color);
 }
 
 .custom-dropdown {
     padding-left: 0.8rem;
     position: relative;
     background-color: var(--modal-background-color);
+}
+
+.custom-dropdown .row {
+    display: flex;
+    align-items: center;
+    padding-bottom: 1px;
+    padding-right: 5px;
 }
 
 .custom-dropdown ul {
@@ -914,11 +908,17 @@ li:hover {
     left: 0;
 }
 
-.row {
-    display: flex;
-    align-items: center;
-    padding-bottom: 1px;
-    padding-right: 5px;
+.custom-dropdown li {
+    padding: 8px 12px;
+    cursor: pointer;
 }
 
+.custom-dropdown li:hover {
+    background: var(--button-hover-background-color);
+}
+
+.custom-dropdown .selected-option {
+    cursor: pointer;
+    background: var(--background-color);
+}
 </style>
