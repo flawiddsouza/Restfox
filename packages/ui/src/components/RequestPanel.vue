@@ -907,7 +907,7 @@ li:hover {
     z-index: 1;
     border: 1px solid var(--menu-border-color);
     box-shadow: 0 0 1rem 0 var(--box-shadow-color);
-    border-radius: calc(1rem * 0.3);
+    border-radius: var(--default-border-radius);
     background: var(--background-color);
 }
 
