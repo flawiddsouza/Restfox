@@ -735,9 +735,20 @@ export default {
         }, 500),
         toggleDropdown() {
             this.dropdownVisible = !this.dropdownVisible
+            if (this.dropdownVisible) {
+                document.addEventListener('click', this.closeDropdownOnOutsideClick)
+            } else {
+                document.removeEventListener('click', this.closeDropdownOnOutsideClick)
+            }
         },
         selectMethod(method) {
             this.activeTab.method = method
+        },
+        closeDropdownOnOutsideClick(event) {
+            if (!this.$refs.dropdown.contains(event.target)) {
+                this.dropdownVisible = false
+                document.removeEventListener('click', this.closeDropdownOnOutsideClick)
+            }
         },
     },
     mounted() {
@@ -875,5 +886,8 @@ li {
 
 li:hover {
     background-color: #f0f0f0;
+}
+.selected-option {
+    cursor: pointer;
 }
 </style>
