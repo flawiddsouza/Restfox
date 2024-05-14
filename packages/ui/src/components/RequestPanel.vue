@@ -885,9 +885,37 @@ li {
 }
 
 li:hover {
-    background-color: #f0f0f0;
+    background: var(--button-hover-background-color);
 }
 .selected-option {
     cursor: pointer;
+    background: var(--background-color);
 }
+
+.custom-dropdown {
+    padding-left: 0.8rem;
+    position: relative;
+    background-color: var(--modal-background-color);
+}
+
+.custom-dropdown ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    position: absolute;
+    background-color: var(--modal-background-color);
+    z-index: 1;
+    border: 1px solid var(--menu-border-color);
+    box-shadow: 0 0 1rem 0 var(--box-shadow-color);
+    border-radius: calc(1rem * 0.3);
+    background: var(--background-color);
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    padding-bottom: 1px;
+    padding-right: 5px;
+}
+
 </style>
