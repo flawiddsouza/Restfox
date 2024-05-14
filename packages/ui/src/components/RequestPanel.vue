@@ -1,9 +1,15 @@
 <template>
     <template v-if="activeTab && activeTab._type === 'request'">
         <div class="request-panel-address-bar">
-            <select v-model="activeTab.method">
-                <option v-for="method in methods">{{ method }}</option>
-            </select>
+            <div class="custom-dropdown" @click="toggleDropdown" ref="dropdown">
+                <div class="row">
+                    <div :class="'selected-option request-method--' + activeTab.method">{{ activeTab.method }}</div>
+                    <i class="fa fa-caret-down space-right"></i>
+                </div>
+                <ul v-show="dropdownVisible">
+                    <li v-for="method in methods" :key="method" @click="selectMethod(method)" :class="'request-method--' + method">{{ method }}</li>
+                </ul>
+            </div>
             <div class="code-mirror-input-container">
                 <CodeMirrorSingleLine
                     v-model="activeTab.url"
@@ -423,6 +429,7 @@ export default {
             },
             skipScriptUpdate: false,
             editDescription: false,
+            dropdownVisible: false,
         }
     },
     computed: {
@@ -726,6 +733,23 @@ export default {
             }
             console.log('Script saved')
         }, 500),
+        toggleDropdown() {
+            this.dropdownVisible = !this.dropdownVisible
+            if (this.dropdownVisible) {
+                document.addEventListener('click', this.closeDropdownOnOutsideClick)
+            } else {
+                document.removeEventListener('click', this.closeDropdownOnOutsideClick)
+            }
+        },
+        selectMethod(method) {
+            this.activeTab.method = method
+        },
+        closeDropdownOnOutsideClick(event) {
+            if (!this.$refs.dropdown.contains(event.target)) {
+                this.dropdownVisible = false
+                document.removeEventListener('click', this.closeDropdownOnOutsideClick)
+            }
+        },
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
@@ -851,4 +875,50 @@ export default {
     align-items: center;
     margin-top: 0.5rem;
 }
+
+i {
+    cursor: pointer;
+    padding-left: 4px;
+}
+
+li {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+li:hover {
+    background: var(--button-hover-background-color);
+}
+.selected-option {
+    cursor: pointer;
+    background: var(--background-color);
+}
+
+.custom-dropdown {
+    padding-left: 0.8rem;
+    position: relative;
+    background-color: var(--modal-background-color);
+}
+
+.custom-dropdown ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    position: absolute;
+    background-color: var(--modal-background-color);
+    z-index: 1;
+    border: 1px solid var(--menu-border-color);
+    box-shadow: 0 0 1rem 0 var(--box-shadow-color);
+    border-radius: var(--default-border-radius);
+    background: var(--background-color);
+    left: 0;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    padding-bottom: 1px;
+    padding-right: 5px;
+}
+
 </style>
