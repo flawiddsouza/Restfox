@@ -303,12 +303,12 @@ input.full-width-input {
     background: var(--modal-background-color);
 }
 
-.row {
-    background: var(--modal-background-color);
-}
-
 .code-block {
-    background-color: var(--modal-background-color);
+    background-color: var(--background-color);
+    color: var(--text-color);
+    padding: 0.1rem;
+    border: 1px solid var(--default-border-color);
+    font-family: 'Courier New', Courier, monospace;
 }
 
 select.full-width-input option {

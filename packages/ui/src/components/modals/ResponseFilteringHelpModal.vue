@@ -12,7 +12,7 @@
                     </td>
                 </tr>
             </table>
-            <p>Note that there's no standard for JSONPath. Restfox uses <a href="https://www.npmjs.com/package/jsonpath-plus">jsonpath-plus</a>.</p>
+            <p><i class="fa fa-exclamation-circle"></i> Note: that there's no standard for JSONPath. Restfox uses <a href="https://www.npmjs.com/package/jsonpath-plus">jsonpath-plus</a>.</p>
         </modal>
     </div>
 </template>
@@ -64,14 +64,4 @@ export default {
     },
 }
 </script>
-<style>
-.code-block {
-    background-color: #f4f4f4;
-    padding: 0.5rem;
-    border-radius: 4px;
-    font-family: 'Courier New', Courier, monospace;
-}
-.help-modal {
-    z-index: 1001;
-}
-</style>
+

@@ -669,20 +669,20 @@ export default {
     display: flex;
     align-items: center;
     padding: 5px;
+    background: var(--background-color);
 }
 
 .help-link {
     text-decoration: none;
     margin-left: 5px;
     padding: 6px 10px;
-    background-color: #f0f0f0;
-    color: #333;
-    border-radius: 4px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--default-border-color);
 }
 .sticky-section {
     position: sticky;
     bottom: 0;
-    background-color: white;
-    z-index: 1000;
+    background-color: var(--background-color);
 }
 </style>
