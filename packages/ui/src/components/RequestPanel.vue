@@ -909,6 +909,7 @@ li:hover {
     box-shadow: 0 0 1rem 0 var(--box-shadow-color);
     border-radius: var(--default-border-radius);
     background: var(--background-color);
+    left: 0;
 }
 
 .row {
