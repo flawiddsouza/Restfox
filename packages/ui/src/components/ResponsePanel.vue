@@ -54,7 +54,7 @@
                         <div class="content-box" style="height: 100%" v-else-if="responseContentType.startsWith('text/html')">
                             <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
                         </div>
-                        <template v-if="responseContentType.startsWith('application/xml')">
+                        <template v-else-if="responseContentType.startsWith('application/xml')">
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                         <template v-else-if="responseContentType.startsWith('application/json')">
