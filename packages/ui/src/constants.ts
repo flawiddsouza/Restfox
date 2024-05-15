@@ -232,6 +232,7 @@ export default {
         TEXT_PLAIN: 'text/plain',
         JSON: 'application/json',
         GRAPHQL: 'application/graphql',
-        OCTET_STREAM: 'application/octet-stream'
+        OCTET_STREAM: 'application/octet-stream',
+        XML: 'application/xml'
     }
 }

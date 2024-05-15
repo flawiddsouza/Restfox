@@ -54,7 +54,10 @@
                         <div class="content-box" style="height: 100%" v-else-if="responseContentType.startsWith('text/html')">
                             <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
                         </div>
-                        <template v-else>
+                        <template v-if="responseContentType.startsWith('application/xml')">
+                            <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                        </template>
+                        <template v-if="responseContentType.startsWith('application/json')">
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                     </template>
@@ -86,6 +89,10 @@
                 <section class="sticky-section">
                     <div class="row" v-if="responseContentType.startsWith('application/json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
+                        <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
+                    </div>
+                    <div class="row" v-if="responseContentType.startsWith('application/xml')">
+                        <input type="text" class="full-width-input" title="Filter response body" placeholder="/store/books/author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
                 </section>
@@ -136,7 +143,7 @@
         </div>
     </template>
     <ContextMenu :options="responseHistoryContextMenuOptions" :element="responseHistoryContextMenuElement" v-model:show="showResponseHistoryContextMenu" @click="handleResponseHistoryContextMenuItemClick" />
-    <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal"></ResponseFilteringHelpModal>
+    <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal" v-model:is-xml="isXmlResponse"></ResponseFilteringHelpModal>
 </template>
 
 <script>
@@ -156,6 +163,9 @@ import {
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
 import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
+import { DOMParser } from 'xmldom'
+import xpath from 'xpath'
+import constants from '@/constants'
 
 export default {
     components: {
@@ -174,6 +184,7 @@ export default {
             responseHistoryContextMenuElement: null,
             showResponseHistoryContextMenu: false,
             currentlySelectedText: '',
+            isXmlResponse: false,
             showResponseFilteringHelpModal: false,
             responseFilter: ''
         }
@@ -362,6 +373,7 @@ export default {
                 this.activeResponsePanelTab = 'Preview'
             }
             this.responseFilter = ''
+            this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) ? true : false
         }
     },
     methods: {
@@ -375,6 +387,22 @@ export default {
                 return this.bufferToJSONString(buffer)
             }
 
+        },
+        filterXmlResponse(buffer, query) {
+            try {
+                const doc = new DOMParser().parseFromString(this.bufferToString(buffer), 'text/xml')
+                const result = xpath.evaluate(query, doc, null, xpath.XPathResult.ANY_TYPE, null)
+                const nodes = []
+                let node = result.iterateNext()
+                while (node) {
+                    nodes.push(node.toString())
+                    node = result.iterateNext()
+                }
+                return nodes.join('\n')
+            } catch (error) {
+                console.error('Error filtering XML:', error.message)
+                return this.bufferToString(buffer)
+            }
         },
         cancelRequest() {
             this.requestAbortController.abort()
