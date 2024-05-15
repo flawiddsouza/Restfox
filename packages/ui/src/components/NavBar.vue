@@ -11,8 +11,7 @@
             </div>
         </div>
         <div class="right-nav-container">
-            <a href="#" @click.prevent="theme = 'dark'" v-if="theme === 'light'" class="bl">Theme: Light</a>
-            <a href="#" @click.prevent="theme = 'light'" v-else class="bl">Theme: Dark</a>
+            <a href="#" @click.prevent="cycleTheme()" class="bl">Theme: {{ getThemeName(theme) }}</a>
             <div v-if="nav === 'collection'" style="height: 100%;">
                 <template v-if="activeTab && activeTab._type === 'request'">
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl">View: Column</a>
@@ -214,6 +213,20 @@ export default {
                 }
             }
         },
+        getThemeName(theme) {
+            return theme.charAt(0).toUpperCase() + theme.slice(1)
+        },
+        cycleTheme() {
+            const themes = [
+                'light',
+                'dark',
+                'dracula'
+            ]
+
+            const currentIndex = themes.indexOf(this.theme)
+            const nextIndex = (currentIndex + 1) % themes.length
+            this.theme = themes[nextIndex]
+        }
     }
 }
 </script>
