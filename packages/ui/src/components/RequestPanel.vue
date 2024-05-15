@@ -31,8 +31,8 @@
             <div class="request-panel-tab-fill"></div>
         </div>
         <div class="request-panel-tabs" v-show="tabView === 'portable'">
-            <div class="request-panel-tab" style="width: 100%; border-color: transparent; padding-bottom: 0;">
-                <select v-model="activeRequestPanelTab" style="border: 1px solid var(--default-border-color); outline: 0px; padding: 0.3rem;">
+            <div class="request-panel-tab" style="width: 100%; border-color: transparent; cursor: default;">
+                <select v-model="activeRequestPanelTab" style="border: 1px solid var(--default-border-color); outline: 0px; padding: 0.3rem; background-color: var(--background-color);">
                     <option v-for="requestPanelTab in requestPanelTabs" :value="requestPanelTab.name">
                         <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab"></RequestPanelTabTitle>
                     </option>
