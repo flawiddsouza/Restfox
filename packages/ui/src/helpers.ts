@@ -1467,14 +1467,8 @@ export function setObjectPathValue(object: any, path: string, value: string) {
     setObjectPathValueLodash(object, path, value)
 }
 
-export function applyTheme(themeName: 'light' | 'dark', doc: Document = document) {
-    if(themeName === 'light') {
-        doc.documentElement.className = `theme-${themeName}`
-    }
-
-    if(themeName === 'dark') {
-        doc.documentElement.className = `theme-${themeName}`
-    }
+export function applyTheme(themeName: 'light' | 'dark' | 'dracula', doc: Document = document) {
+    doc.documentElement.className = `theme-${themeName}`
 }
 
 export function codeMirrorSyntaxHighlighting() {
