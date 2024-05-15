@@ -559,13 +559,15 @@ export default {
     text-overflow: ellipsis;
     display: flex;
     align-items: center;
-    border-top: 1px solid transparent;
-    border-bottom: 1px solid transparent;
+    border: 1px solid transparent;
     position: relative;
 }
 
 .sidebar .sidebar-item-active {
     background-color: var(--sidebar-item-active-color);
+    border: 1px solid var(--default-border-color);
+    border-right: 0;
+    border-radius: var(--default-border-radius);
 }
 
 .sidebar .sidebar-item:hover {
