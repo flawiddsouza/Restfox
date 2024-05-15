@@ -128,6 +128,9 @@
                     </div>
                 </div>
             </div>
+            <div class="content-box" v-if="activeResponsePanelTab === 'Timeline'">
+                <Timeline></Timeline>
+            </div>
         </div>
     </template>
     <template v-else>
@@ -145,6 +148,7 @@ import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
+import Timeline from './Timeline.vue'
 import {
     dateFormat,
     humanFriendlyTime,
@@ -164,6 +168,7 @@ export default {
         ContextMenu,
         ImageFromBuffer,
         IframeFromBuffer,
+        Timeline
     },
     props: {
         activeTab: Object
@@ -210,6 +215,10 @@ export default {
 
                 tabs.push(tab)
             }
+            tabs.push({
+                name: 'Timeline',
+                label: 'Timeline'
+            })
 
             return tabs
         },
