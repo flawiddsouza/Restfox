@@ -163,7 +163,6 @@ import {
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
 import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
-import { DOMParser } from 'xmldom'
 import xpath from 'xpath'
 import constants from '@/constants'
 
@@ -395,7 +394,7 @@ export default {
                 const nodes = []
                 let node = result.iterateNext()
                 while (node) {
-                    nodes.push(node.toString())
+                    nodes.push(new XMLSerializer().serializeToString(node))
                     node = result.iterateNext()
                 }
                 return nodes.join('\n')

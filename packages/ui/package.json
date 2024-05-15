@@ -53,7 +53,6 @@
         "vue": "^3.2.41",
         "vue-toast-notification": "^3.0.0",
         "vuex": "^4.0.2",
-        "xmldom": "^0.6.0",
         "xpath": "^0.0.34"
     },
     "devDependencies": {
