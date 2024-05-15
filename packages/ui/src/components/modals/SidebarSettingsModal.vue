@@ -43,7 +43,7 @@
             <div style="padding-bottom: 1rem"></div>
 
             <template #footer>
-                <button>Done</button>
+                <button class="button">Done</button>
             </template>
         </modal>
     </form>
