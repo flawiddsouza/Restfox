@@ -57,8 +57,11 @@
                         <template v-if="responseContentType.startsWith('application/xml')">
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
-                        <template v-if="responseContentType.startsWith('application/json')">
+                        <template v-else-if="responseContentType.startsWith('application/json')">
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                        </template>
+                        <template v-else>
+                            <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                     </template>
                     <div class="content-box" v-else>
@@ -91,7 +94,7 @@
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
-                    <div class="row" v-if="responseContentType.startsWith('application/xml')">
+                    <div class="row" v-else-if="responseContentType.startsWith('application/xml')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="/store/books/author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
