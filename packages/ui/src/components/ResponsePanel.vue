@@ -19,7 +19,7 @@
                     }"
                 >
                     <span class="bold">{{ response.status }}</span>
-                    {{ response.statusText }}
+                    {{ response.statusText === '' ? getStatusText(response.status) : response.statusText }}
                 </div>
                 <div class="tag ml-0_6rem" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
                 <div class="tag ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
@@ -537,6 +537,9 @@ export default {
         showResFilteringHelpModal() {
             this.showResponseFilteringHelpModal = true
         },
+        getStatusText(statusCode) {
+            return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
+        }
     }
 }
 </script>
