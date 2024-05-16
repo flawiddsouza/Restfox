@@ -137,7 +137,7 @@ export function onParametersChange(activeTab: CollectionItem) {
 
 export function migrateOldData(tab: CollectionItem) {
     const urlParamsSplit = splitAtFirstMatch(tab.url ?? '', '?')
-    const paramsInUrl: any[] = (urlParamsSplit[1] ?? '').split('&').filter(Boolean).map(part => part.split('=')).map(([name, value]) => ({ name, value }))
+    const paramsInUrl: any[] = (urlParamsSplit[1] ?? '').split('&').filter(Boolean).map(part => splitAtFirstMatch(part, '=')).map(([name, value]) => ({ name, value }))
 
     const parameters: RequestParam[] = tab.parameters ? JSON.parse(JSON.stringify(tab.parameters)) : []
 
