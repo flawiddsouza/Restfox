@@ -36,7 +36,7 @@ There are also precompiled binaries in the [releases](https://github.com/flawidd
 
 ### [Docker](https://hub.docker.com/r/flawiddsouza/restfox)
 ```
-docker run --name Restfox -d -p 4004:4004 flawiddsouza/restfox:0.14.1
+docker run --name Restfox -d -p 4004:4004 flawiddsouza/restfox:0.15.0
 ```
 
 Start webapp using docker compose
