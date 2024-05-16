@@ -4,6 +4,8 @@ RUN apk add --no-cache git
 RUN mkdir /app
 ADD .git /app/.git
 ADD ./docs /app/docs
+# To fix: Could not resolve "../../electron/package.json" from "src/helpers.ts", we need to include this:
+ADD ./packages/electron/package.json /app/packages/electron/package.json
 ADD ./packages/ui /app/packages/ui/
 ADD ./packages/web-standalone /app/web-standalone/
 WORKDIR /app/packages/ui
