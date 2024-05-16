@@ -34,9 +34,11 @@ export default {
                 }
             }
 
-            let responseInfo = `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
+            if(response.request.body) {
+                requestInfo += `\n${this.addPipeToEachLine(response.request.body)}\n`
+            }
 
-            responseInfo += `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
+            let responseInfo = `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
             responseInfo += `< Date: ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
 
             for (const [key, value] of Object.entries(response.headers)) {
