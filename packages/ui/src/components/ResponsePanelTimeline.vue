@@ -47,10 +47,10 @@ export default {
                 }
             }
 
-            responseInfo += `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
+            responseInfo += `\n${this.addPipeToEachLine(bufferToString(response.buffer))}\n`
 
             try {
-                return `${preparationInfo}\n${requestInfo}\n${responseInfo}\n\n* Received ${humanFriendlySize(response.buffer.byteLength)}`
+                return `${preparationInfo}\n${requestInfo}\n${responseInfo}\n* Received ${humanFriendlySize(response.buffer.byteLength)}`
             } catch (error) {
                 console.error('Error fetching timeline data:', error)
             }
