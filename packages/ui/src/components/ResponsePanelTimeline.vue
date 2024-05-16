@@ -13,7 +13,7 @@ import { bufferToString, dateFormat, getStatusText, humanFriendlySize, uriParse 
 export default {
     components: { CodeMirrorResponsePanelPreview },
     props: {
-        response: Response,
+        response: Object,
     },
     data() {
         return {
