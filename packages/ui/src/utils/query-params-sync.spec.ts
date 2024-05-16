@@ -518,3 +518,21 @@ test('Path Params Sync - :port should not be treated as a path param', () => {
         { name: 'cat', value: '' },
     ])
 })
+
+test('Path Params Sync - mac:addresses:should:not:be:treated as a path param', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: '',
+        pathParameters: []
+    }
+
+    activeTab.url = 'testing-domain/backend/device/aa:bb:cc:dd:ee:ff/data'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    assert.deepEqual(activeTab.pathParameters, [])
+})

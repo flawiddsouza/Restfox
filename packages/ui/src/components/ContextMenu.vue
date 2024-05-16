@@ -4,7 +4,7 @@
         <div class="context-menu" :style="contextMenuStyle">
             <div v-for="option in options">
                 <template v-if="option.type === 'option'">
-                    <button type="button" class="context-menu-item" :disabled="option.disabled" @click.stop="$emit('click', option.value); $emit('update:show', false);">
+                    <button type="button" class="context-menu-item" :class="`${option.class ? option.class : ''}`" :disabled="option.disabled" @click.stop="$emit('click', option.value); $emit('update:show', false);">
                         <i :class="option.icon" v-if="option.icon"></i> {{ option.label }}
                     </button>
                 </template>

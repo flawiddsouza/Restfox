@@ -1,14 +1,17 @@
 <template>
     <template v-if="activeTab && activeTab._type === 'request'">
         <div class="request-panel-address-bar">
-            <div class="custom-dropdown" @click="toggleDropdown" ref="dropdown">
-                <div class="row">
-                    <div :class="'selected-option request-method--' + activeTab.method">{{ activeTab.method }}</div>
-                    <i class="fa fa-caret-down space-right"></i>
-                </div>
-                <ul v-show="dropdownVisible">
-                    <li v-for="method in methods" :key="method" @click="selectMethod(method)" :class="'request-method--' + method">{{ method }}</li>
-                </ul>
+            <div class="custom-dropdown" @click="toggleMethodSelectorDropdown">
+                <div :class="'request-method--' + activeTab.method">{{ activeTab.method }}</div>
+                <i class="fa fa-caret-down space-right"></i>
+                <ContextMenu
+                    :options="methods"
+                    :element="methodSelectorElement"
+                    :x="methodSelectorContextMenuX"
+                    :y="methodSelectorContextMenuY"
+                    v-model:show="methodSelectorDropdownVisible"
+                    @click="selectMethod"
+                />
             </div>
             <div class="code-mirror-input-container">
                 <CodeMirrorSingleLine
@@ -353,6 +356,7 @@ import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
 import RequestPanelHeaders from '@/components/RequestPanelHeaders.vue'
 import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import ReferencesButton from '@/components/ReferencesButton.vue'
+import ContextMenu from '@/components/ContextMenu.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentVariables } from '@/helpers'
@@ -373,6 +377,7 @@ marked.setOptions({
 
 export default {
     components: {
+        ContextMenu,
         CodeMirrorSingleLine,
         CodeMirrorEditor,
         RequestPanelTabTitle,
@@ -414,7 +419,14 @@ export default {
                 'DELETE',
                 'OPTIONS',
                 'HEAD'
-            ],
+            ].map(method => {
+                return {
+                    type: 'option',
+                    label: method,
+                    value: method,
+                    class: 'request-method--' + method,
+                }
+            }),
             graphql: {
                 query: '',
                 variables: '{}'
@@ -429,7 +441,10 @@ export default {
             },
             skipScriptUpdate: false,
             editDescription: false,
-            dropdownVisible: false,
+            methodSelectorDropdownVisible: false,
+            methodSelectorElement: null,
+            methodSelectorContextMenuX: null,
+            methodSelectorContextMenuY: null,
         }
     },
     computed: {
@@ -733,22 +748,19 @@ export default {
             }
             console.log('Script saved')
         }, 500),
-        toggleDropdown() {
-            this.dropdownVisible = !this.dropdownVisible
-            if (this.dropdownVisible) {
-                document.addEventListener('click', this.closeDropdownOnOutsideClick)
+        toggleMethodSelectorDropdown(event) {
+            this.methodSelectorDropdownVisible = !this.methodSelectorDropdownVisible
+            if (this.methodSelectorDropdownVisible) {
+                const containerElement = event.target.closest('.custom-dropdown')
+                this.methodSelectorContextMenuX = containerElement.getBoundingClientRect().left
+                this.methodSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.methodSelectorElement = containerElement
             } else {
-                document.removeEventListener('click', this.closeDropdownOnOutsideClick)
+                this.methodSelectorElement = null
             }
         },
         selectMethod(method) {
             this.activeTab.method = method
-        },
-        closeDropdownOnOutsideClick(event) {
-            if (!this.$refs.dropdown.contains(event.target)) {
-                this.dropdownVisible = false
-                document.removeEventListener('click', this.closeDropdownOnOutsideClick)
-            }
         },
     },
     mounted() {
@@ -876,49 +888,16 @@ export default {
     margin-top: 0.5rem;
 }
 
-.custom-dropdown i {
-    cursor: pointer;
-    padding-left: 4px;
-}
-
 .custom-dropdown {
+    cursor: pointer;
     padding-left: 0.8rem;
-    position: relative;
-    background-color: var(--modal-background-color);
-}
-
-.custom-dropdown .row {
     display: flex;
     align-items: center;
-    padding-bottom: 1px;
-    padding-right: 5px;
+    user-select: none;
+    height: 100%;
 }
 
-.custom-dropdown ul {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-    position: absolute;
-    background-color: var(--modal-background-color);
-    z-index: 1;
-    border: 1px solid var(--menu-border-color);
-    box-shadow: 0 0 1rem 0 var(--box-shadow-color);
-    border-radius: var(--default-border-radius);
-    background: var(--background-color);
-    left: 0;
-}
-
-.custom-dropdown li {
-    padding: 8px 12px;
-    cursor: pointer;
-}
-
-.custom-dropdown li:hover {
-    background: var(--button-hover-background-color);
-}
-
-.custom-dropdown .selected-option {
-    cursor: pointer;
-    background: var(--background-color);
+.custom-dropdown i {
+    padding-left: 4px;
 }
 </style>

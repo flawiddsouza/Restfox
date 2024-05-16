@@ -16,12 +16,14 @@ function newTextToNewJsonPathParams(newText: string, pathParameters: RequestPara
 
     const urlPathParametersSplit = (newText ?? '').split('/')
         .map(part => {
+            let paramType = 'default'
             const param = splitAtFirstMatch(part, ':')
 
             if(param[1] === undefined || param[1] === '') {
                 const extractedParams = /(?<!{){([^{}]+)}(?!})/.exec(param[0]) ?? ''
                 if(extractedParams) {
                     param[1] = extractedParams[1]
+                    paramType = 'openapi'
                 }
             }
 
@@ -29,8 +31,9 @@ function newTextToNewJsonPathParams(newText: string, pathParameters: RequestPara
                 return
             }
 
-            // if param[1] is all digits, it's most likely a port number and we don't want to treat it as a path parameter
-            if(/^\d+$/.test(param[1])) {
+            // if split path item paramType default, it should start with ':' to be treated as a path parameter
+            // this will avoid accidentally matching ports or mac addresses in path as path parameters
+            if(paramType === 'default' && part.startsWith(':') === false) {
                 return
             }
 
