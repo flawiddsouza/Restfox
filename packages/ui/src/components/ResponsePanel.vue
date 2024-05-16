@@ -51,8 +51,8 @@
                         <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
                             <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
                         </div>
-                        <div class="content-box" style="height: 100%" v-else-if="responseContentType.startsWith('text/html')">
-                            <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none;" />
+                        <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
+                            <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
                         </div>
                         <template v-else-if="responseContentType.startsWith('application/xml')">
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
