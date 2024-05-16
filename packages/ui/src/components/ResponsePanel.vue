@@ -231,10 +231,12 @@ export default {
                 tabs.push(tab)
             }
 
-            tabs.push({
-                name: 'Timeline',
-                label: 'Timeline'
-            })
+            if(this.response && 'request' in this.response) {
+                tabs.push({
+                    name: 'Timeline',
+                    label: 'Timeline'
+                })
+            }
 
             return tabs
         },
@@ -383,9 +385,14 @@ export default {
     },
     watch: {
         response() {
-            if(this.responsePanelTabs.length === 2 && this.activeResponsePanelTab === 'Request') {
+            if(this.responsePanelTabs.length === 2 && (this.activeResponsePanelTab === 'Request' || this.activeResponsePanelTab === 'Tests' || this.activeResponsePanelTab === 'Timeline')) {
                 this.activeResponsePanelTab = 'Preview'
             }
+
+            if(this.response && this.response.statusText === 'Error') {
+                this.activeResponsePanelTab = 'Preview'
+            }
+
             this.responseFilter = ''
             this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) ? true : false
         }
