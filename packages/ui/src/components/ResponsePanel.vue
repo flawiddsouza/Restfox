@@ -139,7 +139,7 @@
                 </div>
             </div>
             <div class="content-box" v-if="activeResponsePanelTab === 'Timeline'">
-                <Timeline v-model:response="response"></Timeline>
+                <ResponsePanelTimeline v-model:response="response"></ResponsePanelTimeline>
             </div>
         </div>
     </template>
@@ -158,14 +158,16 @@ import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
-import Timeline from './Timeline.vue'
+import ResponsePanelTimeline from './ResponsePanelTimeline.vue'
 import {
     dateFormat,
     humanFriendlyTime,
     humanFriendlySize,
     parseContentDispositionHeaderAndGetFileName,
     setEnvironmentVariable,
-    getAlertConfirmPromptContainer, getStatusText, bufferToString,
+    getAlertConfirmPromptContainer,
+    getStatusText,
+    bufferToString
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
@@ -180,7 +182,7 @@ export default {
         ContextMenu,
         ImageFromBuffer,
         IframeFromBuffer,
-        Timeline
+        ResponsePanelTimeline
     },
     props: {
         activeTab: Object

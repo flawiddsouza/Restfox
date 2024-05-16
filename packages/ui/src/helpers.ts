@@ -24,7 +24,6 @@ import {
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
-import * as url from 'url'
 import constants from '@/constants'
 
 // From: https://stackoverflow.com/a/67802481/4932305
@@ -1620,12 +1619,10 @@ export function uriParse(urlString: string): {
     host: string | null;
     port: string | null;
     pathname: string | null;
-    query: string | null;
     hash: string | null;
 } {
-    const { protocol, host, port, pathname, query, hash}  = url.parse(urlString, true)
-
-    return { protocol, host, port, pathname, query: query ? query.toString() : null, hash}
+    const { protocol, host, port, pathname, hash}  = new URL(urlString)
+    return { protocol, host, port, pathname, hash }
 }
 
 export function getStatusText(statusCode: number): string {
