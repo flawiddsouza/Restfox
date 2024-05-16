@@ -38,9 +38,7 @@ export default {
                 requestInfo += `\n${this.addPipeToEachLine(response.request.body)}\n`
             }
 
-            let responseInfo = `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
-
-            responseInfo += `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
+            let responseInfo = `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
             responseInfo += `< Date: ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
 
             for (const [key, value] of Object.entries(response.headers)) {
@@ -48,6 +46,8 @@ export default {
                     responseInfo += `< ${value.toString().split(',').join(': ')}\n`
                 }
             }
+
+            responseInfo += `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
 
             try {
                 return `${preparationInfo}\n${requestInfo}\n${responseInfo}\n\n* Received ${humanFriendlySize(response.buffer.byteLength)}`
