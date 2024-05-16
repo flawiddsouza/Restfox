@@ -139,7 +139,7 @@
                 </div>
             </div>
             <div class="content-box" v-if="activeResponsePanelTab === 'Timeline'">
-                <Timeline></Timeline>
+                <Timeline v-model:response="response"></Timeline>
             </div>
         </div>
     </template>
@@ -165,7 +165,7 @@ import {
     humanFriendlySize,
     parseContentDispositionHeaderAndGetFileName,
     setEnvironmentVariable,
-    getAlertConfirmPromptContainer,
+    getAlertConfirmPromptContainer, getStatusText, bufferToString,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
@@ -418,10 +418,7 @@ export default {
         cancelRequest() {
             this.requestAbortController.abort()
         },
-        bufferToString(buffer) {
-            const textDecoder = new TextDecoder('utf-8')
-            return textDecoder.decode(buffer)
-        },
+        bufferToString,
         bufferToJSONString(buffer) {
             const responseText = this.bufferToString(buffer)
             try {
@@ -546,9 +543,7 @@ export default {
         showResFilteringHelpModal() {
             this.showResponseFilteringHelpModal = true
         },
-        getStatusText(statusCode) {
-            return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
-        }
+        getStatusText
     }
 }
 </script>

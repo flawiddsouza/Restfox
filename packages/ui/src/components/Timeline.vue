@@ -1,24 +1,20 @@
 <template>
     <div>
-        <button @click="fetchTimelineData">Fetch Timeline Data</button>
-
-        <div v-if="isLoading">Loading...</div>
-        <div v-else-if="timelineData.length > 0">
-            <h2>Timeline</h2>
-            <ul>
-                <li v-for="event in timelineData" :key="event.id">
-                    <strong>{{ event.timestamp }}</strong>: {{ event.description }}
-                </li>
-            </ul>
-        </div>
-        <div v-else>
-            <p>No timeline data available</p>
+        <div>
+            <CodeMirrorResponsePanelPreview :model-value="timelineViewer(response)"></CodeMirrorResponsePanelPreview>
         </div>
     </div>
 </template>
 
 <script>
+import CodeMirrorResponsePanelPreview from '@/components/CodeMirrorResponsePanelPreview.vue'
+import {bufferToString, dateFormat, getStatusText, humanFriendlySize, uriParse} from '@/helpers'
+
 export default {
+    components: {CodeMirrorResponsePanelPreview},
+    props: {
+        response: Response,
+    },
     data() {
         return {
             isLoading: false,
@@ -26,24 +22,42 @@ export default {
         }
     },
     methods: {
-        async fetchTimelineData() {
-            this.isLoading = true
-            try {
-                // Make fetch request to fetch timeline data
-                const response = await fetch('https://httpbin.org/get')
-                if (!response.ok) {
-                    throw new Error('Failed to fetch timeline data')
+        timelineViewer(response) {
+            const preparationInfo = `* Preparing request to ${response.url}\n* Current time is ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
+            const uriInfo = uriParse(response.url)
+
+            let requestInfo = `> ${response.request.method} ${uriInfo.pathname}\n> Host: ${uriInfo.host}\n`
+
+            for (const [key, value] of Object.entries(response.request.headers)) {
+                if (key && value) {
+                    requestInfo += `> ${key}: ${value}\n`
                 }
-                const data = await response.json()
-                console.log(data)
-                this.timelineData = data // Assuming data is an array of timeline events
+            }
+
+            let responseInfo = `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
+
+            responseInfo += `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
+            responseInfo += `< Date: ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
+
+            for (const [key, value] of Object.entries(response.headers)) {
+                if (key && value) {
+                    responseInfo += `< ${value.toString().split(',').join(': ')}\n`
+                }
+            }
+
+            try {
+                return `${preparationInfo}\n${requestInfo}\n${responseInfo}\n\n* Received ${humanFriendlySize(response.buffer.byteLength)}`
             } catch (error) {
                 console.error('Error fetching timeline data:', error)
-                // Handle error
-            } finally {
-                this.isLoading = false
             }
         },
-    },
+        dateFormat,
+        addPipeToEachLine(inputString) {
+            const lines = inputString.trim().split('\n')
+            const linesWithPipe = lines.map(line => '|' + line)
+            const resultString = linesWithPipe.join('\n')
+            return resultString
+        }
+    }
 }
 </script>
