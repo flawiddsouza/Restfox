@@ -86,7 +86,7 @@ html {
     --method-post: #9ed06c;
     --method-put: #e17611;
     --method-delete: #d02141;
-    --method-patch: #fcca25;
+    --method-patch: #c49804;
     --method-options: #2bc2f0;
     --method-head: #267aba;
     --socket-header-background-color: #edf2f7;
@@ -178,6 +178,13 @@ html.theme-dark {
     --modal-cm-selection-match-background-color: var(--cm-selection-match-background-color);
     --drop-target-background-color: #f8889b41;
     --workspace-menu-hover-background-color: #505050;
+    --method-get: #ab7aff;
+    --method-post: #9ed06c;
+    --method-put: #e17611;
+    --method-delete: #d02141;
+    --method-patch: #fcca25;
+    --method-options: #2bc2f0;
+    --method-head: #267aba;
     --socket-header-background-color: var(--sidebar-item-active-color);
     --socket-button-background-color: #2c3f40;
     --socket-input-disabled-background-color: #2d2d2d;
