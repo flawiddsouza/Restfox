@@ -11,7 +11,7 @@ import CodeMirrorResponsePanelPreview from '@/components/CodeMirrorResponsePanel
 import { bufferToString, dateFormat, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
 
 export default {
-    components: {CodeMirrorResponsePanelPreview},
+    components: { CodeMirrorResponsePanelPreview },
     props: {
         response: Response,
     },

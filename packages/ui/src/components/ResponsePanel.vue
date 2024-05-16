@@ -167,7 +167,7 @@ import {
     setEnvironmentVariable,
     getAlertConfirmPromptContainer,
     getStatusText,
-    bufferToString
+    bufferToString,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
@@ -182,7 +182,7 @@ export default {
         ContextMenu,
         ImageFromBuffer,
         IframeFromBuffer,
-        ResponsePanelTimeline
+        ResponsePanelTimeline,
     },
     props: {
         activeTab: Object
@@ -230,6 +230,7 @@ export default {
 
                 tabs.push(tab)
             }
+
             tabs.push({
                 name: 'Timeline',
                 label: 'Timeline'
@@ -545,7 +546,7 @@ export default {
         showResFilteringHelpModal() {
             this.showResponseFilteringHelpModal = true
         },
-        getStatusText
+        getStatusText,
     }
 }
 </script>
