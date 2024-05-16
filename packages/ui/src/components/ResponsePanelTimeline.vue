@@ -8,7 +8,7 @@
 
 <script>
 import CodeMirrorResponsePanelPreview from '@/components/CodeMirrorResponsePanelPreview.vue'
-import { dateFormat, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
+import { bufferToString, dateFormat, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
 
 export default {
     components: { CodeMirrorResponsePanelPreview },
@@ -38,7 +38,9 @@ export default {
                 requestInfo += `\n${this.addPipeToEachLine(response.request.body)}\n`
             }
 
-            let responseInfo = `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
+            let responseInfo = `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
+
+            responseInfo += `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
             responseInfo += `< Date: ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
 
             for (const [key, value] of Object.entries(response.headers)) {
