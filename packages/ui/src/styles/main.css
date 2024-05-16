@@ -322,31 +322,31 @@ body {
 }
 
 .request-method--GET, .request-method--SOCK {
-    color: var(--method-get);
+    color: var(--method-get) !important;
 }
 
 .request-method--POST {
-    color: var(--method-post);
+    color: var(--method-post) !important;
 }
 
 .request-method--PUT {
-    color: var(--method-put);
+    color: var(--method-put) !important;
 }
 
 .request-method--PATCH {
-    color: var(--method-patch);
+    color: var(--method-patch) !important;
 }
 
 .request-method--DELETE {
-    color: var(--method-delete);
+    color: var(--method-delete) !important;
 }
 
 .request-method--OPTIONS {
-    color: var(--method-options);
+    color: var(--method-options) !important;
 }
 
 .request-method--HEAD {
-    color: var(--method-head);
+    color: var(--method-head) !important;
 }
 
 /* firefox fixes */
