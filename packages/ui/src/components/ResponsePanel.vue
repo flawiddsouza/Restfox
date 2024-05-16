@@ -138,6 +138,9 @@
                     </div>
                 </div>
             </div>
+            <div class="content-box" v-if="activeResponsePanelTab === 'Timeline'">
+                <ResponsePanelTimeline v-model:response="response"></ResponsePanelTimeline>
+            </div>
         </div>
     </template>
     <template v-else>
@@ -155,6 +158,7 @@ import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
+import ResponsePanelTimeline from './ResponsePanelTimeline.vue'
 import {
     dateFormat,
     humanFriendlyTime,
@@ -162,6 +166,8 @@ import {
     parseContentDispositionHeaderAndGetFileName,
     setEnvironmentVariable,
     getAlertConfirmPromptContainer,
+    getStatusText,
+    bufferToString,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
@@ -176,6 +182,7 @@ export default {
         ContextMenu,
         ImageFromBuffer,
         IframeFromBuffer,
+        ResponsePanelTimeline,
     },
     props: {
         activeTab: Object
@@ -223,6 +230,11 @@ export default {
 
                 tabs.push(tab)
             }
+
+            tabs.push({
+                name: 'Timeline',
+                label: 'Timeline'
+            })
 
             return tabs
         },
@@ -409,10 +421,7 @@ export default {
         cancelRequest() {
             this.requestAbortController.abort()
         },
-        bufferToString(buffer) {
-            const textDecoder = new TextDecoder('utf-8')
-            return textDecoder.decode(buffer)
-        },
+        bufferToString,
         bufferToJSONString(buffer) {
             const responseText = this.bufferToString(buffer)
             try {
@@ -537,9 +546,7 @@ export default {
         showResFilteringHelpModal() {
             this.showResponseFilteringHelpModal = true
         },
-        getStatusText(statusCode) {
-            return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
-        }
+        getStatusText,
     }
 }
 </script>

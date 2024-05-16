@@ -24,6 +24,7 @@ import {
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
+import constants from '@/constants'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -1611,4 +1612,26 @@ export function getCurrentTimestamp(): string {
 
 export function getVersion(): string {
     return version
+}
+
+export function uriParse(urlString: string): {
+    protocol: string | null;
+    host: string | null;
+    port: string | null;
+    pathname: string | null;
+    hash: string | null;
+} {
+    const { protocol, host, port, pathname, hash}  = new URL(urlString)
+    return { protocol, host, port, pathname, hash }
+}
+
+export function getStatusText(statusCode: number): string {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
+}
+
+export function bufferToString(buffer: BufferSource) {
+    const textDecoder = new TextDecoder('utf-8')
+    return textDecoder.decode(buffer)
 }
