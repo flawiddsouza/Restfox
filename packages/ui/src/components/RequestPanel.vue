@@ -452,7 +452,7 @@ export default {
             return this.$store.state.activeWorkspace
         },
         collectionItemEnvironmentResolved() {
-            return this.$store.state.tabEnvironmentResolved[this.activeTab._id]
+            return this.$store.state.tabEnvironmentResolved[this.activeTab._id] ?? {}
         },
         scriptPlugin() {
             if(this.activeTab === null) {
