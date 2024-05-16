@@ -43,7 +43,7 @@
         </div>
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
-                <section>
+                <section style="height: 100%; overflow: auto;">
                     <template v-if="response.statusText !== 'Error'">
                         <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
                             <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
@@ -691,6 +691,8 @@ export default {
 
 .response-panel-tabs-context {
     overflow-y: auto;
+    display: grid;
+    grid-template-rows: 1fr auto;
 }
 
 .response-panel-tabs-context .content-box {
