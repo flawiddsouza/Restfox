@@ -1,7 +1,7 @@
 <template>
     <div>
         <div>
-            <CodeMirrorResponsePanelPreview :model-value="timelineViewer(response)"></CodeMirrorResponsePanelPreview>
+            <CodeMirrorResponsePanelPreview :model-value="timelineViewer(response)" data-testid="response-panel-tab-Timeline__preview"></CodeMirrorResponsePanelPreview>
         </div>
     </div>
 </template>
@@ -13,7 +13,7 @@ import { bufferToString, dateFormat, getStatusText, humanFriendlySize, uriParse 
 export default {
     components: { CodeMirrorResponsePanelPreview },
     props: {
-        response: Response,
+        response: Object,
     },
     data() {
         return {
@@ -23,10 +23,10 @@ export default {
     },
     methods: {
         timelineViewer(response) {
-            const preparationInfo = `* Preparing request to ${response.url}\n* Current time is ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
-            const uriInfo = uriParse(response.url)
+            const preparationInfo = `* Preparing request to ${response.request.original.url}\n* Current time is ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
+            const uriInfo = uriParse(response.request.original.url)
 
-            let requestInfo = `> ${response.request.method} ${uriInfo.pathname}\n> Host: ${uriInfo.host}\n`
+            let requestInfo = `> ${response.request.method} ${uriInfo.search !== '' ? uriInfo.pathname + uriInfo.search : uriInfo.pathname}\n> Host: ${uriInfo.host}\n`
 
             for (const [key, value] of Object.entries(response.request.headers)) {
                 if (key && value) {
@@ -34,9 +34,11 @@ export default {
                 }
             }
 
-            let responseInfo = `${this.addPipeToEachLine(bufferToString(response.buffer))}\n\n`
+            if(response.request.body) {
+                requestInfo += `\n${this.addPipeToEachLine(response.request.body)}\n`
+            }
 
-            responseInfo += `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
+            let responseInfo = `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
             responseInfo += `< Date: ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
 
             for (const [key, value] of Object.entries(response.headers)) {
@@ -45,8 +47,10 @@ export default {
                 }
             }
 
+            responseInfo += `\n${this.addPipeToEachLine(bufferToString(response.buffer))}\n`
+
             try {
-                return `${preparationInfo}\n${requestInfo}\n${responseInfo}\n\n* Received ${humanFriendlySize(response.buffer.byteLength)}`
+                return `${preparationInfo}\n${requestInfo}\n${responseInfo}\n* Received ${humanFriendlySize(response.buffer.byteLength)}`
             } catch (error) {
                 console.error('Error fetching timeline data:', error)
             }
