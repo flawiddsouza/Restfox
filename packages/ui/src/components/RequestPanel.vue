@@ -25,7 +25,7 @@
                     data-testid="request-panel-address-bar"
                 />
             </div>
-            <button @click="sendRequest">Send</button>
+            <button @click="sendRequest" data-testid="request-panel-address-bar__send-button">Send</button>
         </div>
         <div class="request-panel-tabs" v-show="tabView === 'full'">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs" :data-testid="`request-panel-tab-${requestPanelTab.name}`">

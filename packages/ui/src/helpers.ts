@@ -1620,9 +1620,10 @@ export function uriParse(urlString: string): {
     port: string | null;
     pathname: string | null;
     hash: string | null;
+    search: string | null;
 } {
-    const { protocol, host, port, pathname, hash}  = new URL(urlString)
-    return { protocol, host, port, pathname, hash }
+    const { protocol, host, port, pathname, hash, search}  = new URL(urlString)
+    return { protocol, host, port, pathname, hash, search }
 }
 
 export function getStatusText(statusCode: number): string {

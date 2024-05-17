@@ -53,3 +53,17 @@ Scenario('type url with query params', async() => {
     text = await I.grabTextFrom(queryTab)
     I.expectEqual(text.trim(), 'Query')
 })
+
+Scenario('Send GET request', async() => {
+    const host = 'https://httpbin.org'
+    const path = '/get'
+    const queryString = '?hello=there'
+
+    I.createRequest('Request 1')
+    I.typeInRequestPanelAddressBar(`${host}${path}${queryString}`)
+    I.click('[data-testid="request-panel-address-bar__send-button"]')
+    I.click('//*[@class="response-panel-tab"][text() = "Timeline"]')
+    const text = await I.grabTextFrom('[data-testid="response-panel-tab-Timeline__preview"]')
+    I.expectContain(text, `* Preparing request to ${host}${path}${queryString}`)
+    I.expectContain(text, `GET ${path}${queryString}`)
+})
