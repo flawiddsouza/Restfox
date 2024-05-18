@@ -260,8 +260,8 @@ html.theme-dracula {
     --cm-keyword: #ff79c6;
     --cm-variable: #50fa7b;
     --cm-tooltip-background-color: var(--background-color);
-    --cm-selection-background-color: #44475a4D;
-    --cm-selection-match-background-color: #6272a43f;
+    --cm-selection-background-color: #6272a4;
+    --cm-selection-match-background-color: #99ff7780;
     --modal-cm-string: var(--cm-string);
     --modal-cm-boolean: var(--cm-boolean);
     --modal-cm-null: var(--cm-null);
