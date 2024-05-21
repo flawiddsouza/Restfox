@@ -343,21 +343,28 @@ async function connect(client: Client) {
         } else if (client.type.startsWith('Socket.IO')) {
             const parsedUrl = new URL(clientUrlWithEnvironmentVariablesSubtituted)
 
+            let mainUrl = parsedUrl.origin
+
+            if(parsedUrl.search) {
+                mainUrl += parsedUrl.search
+            }
+
+
             if (client.type === 'Socket.IO-v2') {
-                sockets[activeTab.value._id + '-' + client.id] = ioV2(parsedUrl.origin, {
+                sockets[activeTab.value._id + '-' + client.id] = ioV2(mainUrl, {
                     path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
                 })
             }
 
             if (client.type === 'Socket.IO-v3') {
-                sockets[activeTab.value._id + '-' + client.id] = ioV3(parsedUrl.origin, {
+                sockets[activeTab.value._id + '-' + client.id] = ioV3(mainUrl, {
                     path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
                     reconnection: false,
                 })
             }
 
             if (client.type === 'Socket.IO') {
-                sockets[activeTab.value._id + '-' + client.id] = ioV4(parsedUrl.origin, {
+                sockets[activeTab.value._id + '-' + client.id] = ioV4(mainUrl, {
                     path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
                     reconnection: false,
                 })
