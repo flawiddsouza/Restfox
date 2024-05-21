@@ -276,6 +276,8 @@ function handleMessageContainerRef(ref: any, clientId: string) {
     messageContainerRefs[clientId] = ref
 }
 
+const disconnectTriggered: { [key: string]: boolean } = reactive({})
+
 // Computed
 const store = useStore()
 const activeWorkspace = computed(() => store.state.activeWorkspace)
@@ -439,16 +441,11 @@ async function connect(client: Client) {
         }
 
         socket.on('disconnect', async() => {
-            if(socket.disconnected) {
+            if (disconnectTriggered[client.id]) {
                 return
             }
-            disconnect(client)
 
-            addClientMessage(client, {
-                timestamp: new Date().getTime(),
-                message: `Disconnected from ${clientUrlWithEnvironmentVariablesSubtituted}`,
-                type: 'INFO'
-            })
+            disconnect(client)
         })
     }
 }
@@ -536,9 +533,11 @@ function clearMessages(client: Client) {
 function disconnect(client: Client) {
     const socket = sockets[activeTab.value._id + '-' + client.id]
 
-    if(socket === undefined || socket === null) {
+    if(socket === undefined || socket === null || disconnectTriggered[client.id]) {
         return false
     }
+
+    disconnectTriggered[client.id] = true
 
     if(socket instanceof WebSocket) {
         socket.close()
@@ -547,7 +546,6 @@ function disconnect(client: Client) {
     if(socket.constructor.name.startsWith('Socket')) {
         socket.disconnect()
 
-        // because socket.io doesn't seem to trigger the disconnect event
         addClientMessage(client, {
             timestamp: new Date().getTime(),
             message: `Disconnected from ${client.url}`,
@@ -556,6 +554,10 @@ function disconnect(client: Client) {
     }
 
     sockets[activeTab.value._id + '-' + client.id] = null
+
+    nextTick(() => {
+        disconnectTriggered[client.id] = false
+    })
 }
 
 function parseAndFormatMessage(message: string) {
