@@ -68,7 +68,6 @@ function getExtensions(vueInstance, language) {
         languageFunc
     ].filter(Boolean)
 
-
     const autocompletionsArray = [
         vueInstance.autocompletions.length > 0 ? languageData?.data.of({
             autocomplete: completeFromList(vueInstance.autocompletions)

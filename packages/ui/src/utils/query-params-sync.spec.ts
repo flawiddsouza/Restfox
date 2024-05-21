@@ -360,7 +360,6 @@ test('Path Params Sync - In Between Substitution Test', () => {
     assert.deepEqual(activeTab.pathParameters, expectedPathParameters)
 })
 
-
 test('Path Params Sync - In Between Substitution Test 2', () => {
     const activeTab: CollectionItem = {
         _id: 'test',
@@ -476,7 +475,6 @@ test('Path Params Sync - Two types of path params [ :cat, {cat} ]', () => {
         { name: 'cat2', value: '' },
     ])
 })
-
 
 test('Path Params Sync - env vars should not be treated as {path} type path params', () => {
     const activeTab: CollectionItem = {

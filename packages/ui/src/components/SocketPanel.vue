@@ -261,7 +261,6 @@ const props = defineProps<{
     activeTab: any
 }>()
 
-
 // Data Variables
 
 const componentRoot = ref<HTMLElement | null>(null)
@@ -350,7 +349,6 @@ async function connect(client: Client) {
             if(parsedUrl.search) {
                 mainUrl += parsedUrl.search
             }
-
 
             if (client.type === 'Socket.IO-v2') {
                 sockets[activeTab.value._id + '-' + client.id] = ioV2(mainUrl, {

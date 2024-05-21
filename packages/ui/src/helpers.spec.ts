@@ -4,7 +4,6 @@ import {
     parseContentDispositionHeaderAndGetFileName,
 } from './helpers'
 
-
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
     // build environment vars
@@ -32,7 +31,6 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
     const extremelyMessyKey = 'extremelyMESSY-K_E_Y ~!@#$%^&*()_+12 34567980{{} :>}notReplaced::{{  num }}::notReplaced"?<, . shouldReplaceThisInFuture::{{  num   }}::replaced /;\'[ ]'
     env[ extremelyMessyKey ] = 'Very messy key :)'
-
 
     test('Positive Case', () => {
         const input = `{

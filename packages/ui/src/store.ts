@@ -525,7 +525,6 @@ const store = createStore<State>({
                 updatedAt: new Date().getTime()
             }
 
-
             if(newPlugin.workspaceId === null && newPlugin.collectionId === null) {
                 await createPlugin(newPlugin)
                 state.plugins.global.push(newPlugin)

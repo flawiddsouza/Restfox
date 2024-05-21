@@ -891,7 +891,6 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             })
         })
 
-
         let url = ''
 
         if('url' in request.request) {
@@ -1059,7 +1058,6 @@ export function extractPathParameters(openapiSchema: string) {
     })
     return pathParams
 }
-
 
 export async function convertOpenAPIExportToRestfoxCollection(exportString: string, workspaceId: string) {
     const { convert: insomniaImporter } = await import('insomnia-importers-browser')
