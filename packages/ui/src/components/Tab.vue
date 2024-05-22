@@ -7,7 +7,12 @@
                 'minHeight': requestResponseLayoutTopBottom ? '100px' : null
             }"
         >
-            <RequestPanel :active-tab="collectionItem" />
+            <KeepAlive>
+                <RequestPanel
+                    :active-tab="collectionItem"
+                    :key="'request-panel-' + collectionItem?._id"
+                />
+            </KeepAlive>
         </section>
 
         <section class="resizer" data-resizer></section>
@@ -19,7 +24,12 @@
                 'minHeight': requestResponseLayoutTopBottom ? '100px' : null
             }"
         >
-            <ResponsePanel :active-tab="collectionItem" />
+            <KeepAlive>
+                <ResponsePanel
+                    :active-tab="collectionItem"
+                    :key="'response-panel-' + collectionItem?._id"
+                />
+            </KeepAlive>
         </section>
     </section>
 
