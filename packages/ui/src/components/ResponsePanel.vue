@@ -43,7 +43,7 @@
         </div>
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
-                <section style="height: 100%; overflow: auto;">
+                <section style="height: 100%; overflow: auto;" ref="scrollableArea">
                     <template v-if="response.statusText !== 'Error'">
                         <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
                             <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
@@ -153,7 +153,7 @@
 </template>
 
 <script>
-import { toRaw } from 'vue'
+import { nextTick, toRaw } from 'vue'
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
@@ -195,7 +195,9 @@ export default {
             currentlySelectedText: '',
             isXmlResponse: false,
             showResponseFilteringHelpModal: false,
-            responseFilter: ''
+            responseFilter: '',
+            scrollableAreaEventListenerAttached: false,
+            scrollableAreaScrollTop: null,
         }
     },
     computed: {
@@ -395,6 +397,17 @@ export default {
 
             this.responseFilter = ''
             this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) ? true : false
+
+            if(this.$refs.scrollableArea) {
+                this.$refs.scrollableArea.scrollTop = 0
+            }
+
+            if(!this.scrollableAreaEventListenerAttached) {
+                nextTick(() => {
+                    this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
+                    this.scrollableAreaEventListenerAttached = true
+                })
+            }
         }
     },
     methods: {
@@ -554,7 +567,21 @@ export default {
             this.showResponseFilteringHelpModal = true
         },
         getStatusText,
-    }
+        scrollableAreaOnScroll(event) {
+            this.scrollableAreaScrollTop = event.target.scrollTop
+        },
+    },
+    activated() {
+        if(this.response && this.scrollableAreaEventListenerAttached && this.scrollableAreaScrollTop !== null) {
+            nextTick(() => {
+                this.$refs.scrollableArea.scrollTop = this.scrollableAreaScrollTop
+            })
+        }
+    },
+    beforeUnmount() {
+        this.$refs.scrollableArea.removeEventListener('scroll', this.scrollableAreaOnScroll)
+        this.scrollableAreaEventListenerAttached = false
+    },
 }
 </script>
 
