@@ -277,6 +277,8 @@ function handleMessageContainerRef(ref: any, clientId: string) {
 
 const disconnectTriggered: { [key: string]: boolean } = reactive({})
 
+const clientUrlsEnvSubstituted: { [key: string]: string } = reactive({})
+
 // Computed
 const store = useStore()
 const activeWorkspace = computed(() => store.state.activeWorkspace)
@@ -337,6 +339,8 @@ async function connect(client: Client) {
         clientUrlWithEnvironmentVariablesSubtituted = clientUrlWithEnvironmentVariablesSubtituted.replace(`{{ _.${objectPath} }}`, objectPathValue)
         clientUrlWithEnvironmentVariablesSubtituted = clientUrlWithEnvironmentVariablesSubtituted.replace(`{{${objectPath}}}`, objectPathValue)
     })
+
+    clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
 
     try {
         if (client.type === undefined) {
@@ -546,7 +550,7 @@ function disconnect(client: Client) {
 
         addClientMessage(client, {
             timestamp: new Date().getTime(),
-            message: `Disconnected from ${client.url}`,
+            message: `Disconnected from ${clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id]}`,
             type: 'INFO'
         })
     }
