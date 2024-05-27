@@ -579,7 +579,7 @@ export default {
         }
     },
     beforeUnmount() {
-        this.$refs.scrollableArea.removeEventListener('scroll', this.scrollableAreaOnScroll)
+        this.$refs.scrollableArea?.removeEventListener('scroll', this.scrollableAreaOnScroll)
         this.scrollableAreaEventListenerAttached = false
     },
 }
