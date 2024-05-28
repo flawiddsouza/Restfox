@@ -24,9 +24,6 @@ export default {
     methods: {
         timelineViewer(response) {
             try {
-                if (response.request.original.url.includes('{{')) {
-                    response.request.original.url = response.request.original.url.replace('{{', '').replace('}}', '')
-                }
                 const uri = response.request.query ? response.url + response.request.query : response.url
                 const preparationInfo = `* Preparing request to ${ uri }\n* Current time is ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
                 const uriInfo = uriParse(uri)
