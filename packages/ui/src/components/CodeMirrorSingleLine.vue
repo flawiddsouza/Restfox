@@ -6,29 +6,35 @@
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { history, historyKeymap } from '@codemirror/commands'
+import { autocompletion } from '@codemirror/autocomplete'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 function getExtensions(vueInstance) {
     const singleLineEnforcers = []
     const multiLineEnforcers = []
 
-    if(!vueInstance.allowMultipleLines) {
+    if (!vueInstance.allowMultipleLines) {
         // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
         [
-            EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
+            EditorState.transactionFilter.of((tr) =>
+                tr.newDoc.lines > 1 ? [] : tr
+            ),
             EditorView.domEventHandlers({
                 paste: async(event, view) => {
                     const content = event.clipboardData.getData('text/plain')
 
                     // if pasteHandler exists & pasteHandler returns true, it means it handled the paste event
-                    if(vueInstance.pasteHandler && await vueInstance.pasteHandler(content)) {
+                    if (
+                        vueInstance.pasteHandler &&
+                        (await vueInstance.pasteHandler(content))
+                    ) {
                         console.log('pasteHandler returned true, so not handling paste event')
                         return
                     }
 
                     console.log('pasteHandler not defined or returned false, so handling paste event')
 
-                    if(content.includes('\n')) {
+                    if (content.includes('\n')) {
                         const contentWithoutNewLines = content.replace(/[\n\r]/g, '')
                         const transaction = view.state.replaceSelection(contentWithoutNewLines)
                         const update = view.state.update(transaction)
@@ -41,32 +47,46 @@ function getExtensions(vueInstance) {
 
                     return true
                 }
-            }),
-        ].forEach(enforcer => singleLineEnforcers.push(enforcer))
+            })
+        ].forEach((enforcer) => singleLineEnforcers.push(enforcer))
     } else {
-        [
-            EditorView.lineWrapping,
-        ].forEach(enforcer => multiLineEnforcers.push(enforcer))
+        [EditorView.lineWrapping].forEach((enforcer) => multiLineEnforcers.push(enforcer))
     }
 
     const extensions = [
         history(),
-        EditorView.updateListener.of(v => {
-            if(v.docChanged) {
+        EditorView.updateListener.of((v) => {
+            if (v.docChanged) {
                 vueInstance.emitted = true
                 vueInstance.$emit('update:modelValue', v.state.doc.toString())
             }
         }),
         ...singleLineEnforcers,
         ...multiLineEnforcers,
-        keymap.of([
-            ...historyKeymap
-        ]),
+        keymap.of([...historyKeymap]),
         placeholder(vueInstance.placeholder),
         envVarDecoration(vueInstance.envVariables),
+        autocompletion({
+            override: [
+                context => {
+                    let word = context.matchBefore(/\w*/)
+                    if (!word) {
+                        return null
+                    }
+                    if (word.from == word.to && !context.explicit) {
+                        return null
+                    }
+                    return {
+                        from: word.from,
+                        options: vueInstance.getSuggestions(word.text),
+                        validFor: /^\w*$/
+                    }
+                }
+            ]
+        })
     ]
 
-    if(vueInstance.disabled) {
+    if (vueInstance.disabled) {
         extensions.push(EditorView.editable.of(false))
     }
 
@@ -109,17 +129,28 @@ export default {
         disabled: {
             type: Boolean,
             default: false
-        },
+        }
     },
     data() {
         return {
             emitted: false,
+            query: '',
+            filteredSuggestions: [],
+            showSuggestions: false
         }
     },
     editor: null,
+    methods: {
+        getSuggestions(word) {
+            const allSuggestions = Object.keys(this.envVariables)
+            return allSuggestions.filter((suggestion) =>
+                suggestion.toLowerCase().startsWith(word.toLowerCase())
+            ).map(suggestion => ({ label: suggestion, type: 'variable' }))
+        }
+    },
     watch: {
         modelValue() {
-            if(!this.emitted) {
+            if (!this.emitted) {
                 this.editor.setState(createState(this))
             } else {
                 this.emitted = false
@@ -194,5 +225,22 @@ export default {
 /* request panel inputs of the auth tab, when moving from empty to filled */
 .code-mirror-single-line .cm-widgetBuffer {
     vertical-align: inherit;
+}
+
+.cm-tooltip-autocomplete ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.cm-tooltip-autocomplete li {
+    padding: 8px 12px;
+    background-color: var(--background-color);
+    cursor: pointer;
+}
+
+.cm-tooltip-autocomplete li:hover,
+.cm-tooltip-autocomplete li.cm-completion-selected {
+    background-color: var(--default-border-color-modal);
 }
 </style>
