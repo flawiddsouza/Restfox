@@ -89,7 +89,16 @@ function getExtensions(vueInstance) {
                     }
                     return {
                         from: word.from,
-                        options: vueInstance.getSuggestions(word.text),
+                        options: vueInstance.getSuggestions(word.text).map(suggestion => ({
+                            label: suggestion.label,
+                            type: suggestion.type,
+                            apply: (view, completion, from, to) => {
+                                const wrapped = `{{ ${completion.label} }}`
+                                view.dispatch({
+                                    changes: { from, to, insert: wrapped }
+                                })
+                            }
+                        })),
                         validFor: /^\w*$/
                     }
                 }
