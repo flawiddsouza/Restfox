@@ -66,7 +66,7 @@ function getExtensions(vueInstance) {
                 key: 'Enter',
                 run: (view) => {
                     const completionActive = view.state.field(autocompletion.currentCompletion)
-                    if (completionActive) {
+                    if(completionActive) {
                         return true
                     }
                     return false
@@ -83,10 +83,10 @@ function getExtensions(vueInstance) {
             override: [
                 context => {
                     let word = context.matchBefore(/\w*/)
-                    if (!word) {
+                    if(!word) {
                         return null
                     }
-                    if (word.from == word.to && !context.explicit) {
+                    if(word.from == word.to && !context.explicit) {
                         return null
                     }
                     return {
