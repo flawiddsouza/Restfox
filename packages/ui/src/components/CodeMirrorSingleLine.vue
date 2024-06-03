@@ -41,6 +41,9 @@ function getExtensions(vueInstance) {
                     }
 
                     return true
+                },
+                keydown: (event) => {
+                    vueInstance.$emit('keydown', event)
                 }
             }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
@@ -95,7 +98,7 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const wrapped = `{{ ${completion.label} }}`
+                                const wrapped = `${completion.label} }}`
                                 view.dispatch({
                                     changes: { from, to, insert: wrapped }
                                 })
