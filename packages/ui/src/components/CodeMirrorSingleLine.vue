@@ -6,6 +6,7 @@
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { history, historyKeymap } from '@codemirror/commands'
+import { autocompletion, closeCompletion } from '@codemirror/autocomplete'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 function getExtensions(vueInstance) {
@@ -40,6 +41,9 @@ function getExtensions(vueInstance) {
                     }
 
                     return true
+                },
+                keydown: (event) => {
+                    vueInstance.$emit('keydown', event)
                 }
             }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
@@ -60,10 +64,51 @@ function getExtensions(vueInstance) {
         ...singleLineEnforcers,
         ...multiLineEnforcers,
         keymap.of([
-            ...historyKeymap
+            ...historyKeymap,
+            {
+                key: 'Enter',
+                run: (view) => {
+                    const completionActive = view.state.field(autocompletion.currentCompletion)
+                    if(completionActive) {
+                        return true
+                    }
+                    return false
+                }
+            },
+            {
+                key: 'Escape',
+                run: closeCompletion
+            }
         ]),
         placeholder(vueInstance.placeholder),
         envVarDecoration(vueInstance.envVariables),
+        autocompletion({
+            override: [
+                context => {
+                    let word = context.matchBefore(/\w*/)
+                    if(!word) {
+                        return null
+                    }
+                    if(word.from == word.to && !context.explicit) {
+                        return null
+                    }
+                    return {
+                        from: word.from,
+                        options: vueInstance.getSuggestions(word.text).map(suggestion => ({
+                            label: suggestion.label,
+                            type: suggestion.type,
+                            apply: (view, completion, from, to) => {
+                                const wrapped = `${completion.label} }}`
+                                view.dispatch({
+                                    changes: { from, to, insert: wrapped }
+                                })
+                            }
+                        })),
+                        validFor: /^\w*$/
+                    }
+                }
+            ]
+        })
     ]
 
     if(vueInstance.disabled) {
@@ -114,9 +159,20 @@ export default {
     data() {
         return {
             emitted: false,
+            query: '',
+            filteredSuggestions: [],
+            showSuggestions: false
         }
     },
     editor: null,
+    methods: {
+        getSuggestions(word) {
+            const allSuggestions = Object.keys(this.envVariables)
+            return allSuggestions.filter((suggestion) =>
+                suggestion.toLowerCase().startsWith(word.toLowerCase())
+            ).map(suggestion => ({ label: suggestion, type: 'variable' }))
+        }
+    },
     watch: {
         modelValue() {
             if(!this.emitted) {
@@ -194,5 +250,22 @@ export default {
 /* request panel inputs of the auth tab, when moving from empty to filled */
 .code-mirror-single-line .cm-widgetBuffer {
     vertical-align: inherit;
+}
+
+.cm-tooltip-autocomplete ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.cm-tooltip-autocomplete li {
+    padding: 8px 12px;
+    background-color: var(--background-color);
+    cursor: pointer;
+}
+
+.cm-tooltip-autocomplete li:hover,
+.cm-tooltip-autocomplete li.cm-completion-selected {
+    background-color: var(--default-border-color-modal);
 }
 </style>
