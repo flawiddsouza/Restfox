@@ -637,8 +637,7 @@ export default {
             }
         },
         handleAddressBarKeyDown(e) {
-            if(e.ctrlKey === false && e.key === 'Enter') {
-                e.preventDefault()
+            if(!e.defaultPrevented && e.ctrlKey === false && e.key === 'Enter') {
                 if(this.activeTab.url === '') {
                     return
                 }

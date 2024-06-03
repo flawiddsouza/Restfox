@@ -6,7 +6,7 @@
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { history, historyKeymap } from '@codemirror/commands'
-import { autocompletion, closeCompletion } from '@codemirror/autocomplete'
+import { autocompletion } from '@codemirror/autocomplete'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 
 function getExtensions(vueInstance) {
@@ -42,9 +42,6 @@ function getExtensions(vueInstance) {
 
                     return true
                 },
-                keydown: (event) => {
-                    vueInstance.$emit('keydown', event)
-                }
             }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
     } else {
@@ -64,21 +61,7 @@ function getExtensions(vueInstance) {
         ...singleLineEnforcers,
         ...multiLineEnforcers,
         keymap.of([
-            ...historyKeymap,
-            {
-                key: 'Enter',
-                run: (view) => {
-                    const completionActive = view.state.field(autocompletion.currentCompletion)
-                    if(completionActive) {
-                        return true
-                    }
-                    return false
-                }
-            },
-            {
-                key: 'Escape',
-                run: closeCompletion
-            }
+            ...historyKeymap
         ]),
         placeholder(vueInstance.placeholder),
         envVarDecoration(vueInstance.envVariables),
