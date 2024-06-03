@@ -42,10 +42,12 @@ function getExtensions(vueInstance) {
 
                     return true
                 }
-            })
+            }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
     } else {
-        [EditorView.lineWrapping].forEach((enforcer) => multiLineEnforcers.push(enforcer))
+        [
+            EditorView.lineWrapping,
+        ].forEach(enforcer => multiLineEnforcers.push(enforcer))
     }
 
     const extensions = [
