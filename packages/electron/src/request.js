@@ -28,6 +28,63 @@ const localhostTds = [
     'local', // all domain names ending with .local
 ]
 
+const agents = new Map()
+
+function getAgentForRequest(urlParsed, disableSSLVerification) {
+    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}`
+
+    if(!agents.has(key)) {
+        const agent = new Agent({
+            connect: {
+                rejectUnauthorized: disableSSLVerification ? false : true,
+                lookup: async(hostname, _opts, callback) => {
+                    try {
+                        console.log('lookup', hostname)
+                        const addresses = await dnsPromises.lookup(hostname, { all: true })
+
+                        let address = null
+
+                        if (addresses.length > 1) {
+                            console.log('addresses found', addresses)
+
+                            while(addresses.length > 0) {
+                                address = addresses.shift()
+                                let isReachable = true
+                                const urlPort = urlParsed.port !== '' ? urlParsed.port : (urlParsed.protocol === 'https:' ? 443 : 80)
+                                const tld = hostname.substring(hostname.lastIndexOf('.') + 1)
+
+                                if (hostname === 'localhost' || localhostTds.includes(tld)) {
+                                    isReachable = await checkReachability(address.address, urlPort)
+                                    console.log(`address ${address.address} is ${isReachable ? 'reachable' : 'not reachable'} on port ${urlPort}`)
+                                } else {
+                                    console.log(`reachability test skipped for non-localhost address ${address.address} and picked as the address to use for the request`)
+                                }
+                                if(isReachable) {
+                                    break
+                                }
+                            }
+                        } else {
+                            address = addresses[0]
+                        }
+
+                        if(!address) {
+                            throw new Error('No reachable address found')
+                        }
+
+                        callback(null, [address])
+                    } catch(err) {
+                        callback(err)
+                    }
+                },
+            },
+        })
+
+        agents.set(key, agent)
+    }
+
+    return agents.get(key)
+}
+
 async function handleSendRequest(data) {
     try {
         const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
@@ -61,50 +118,7 @@ async function handleSendRequest(data) {
             headers,
             body: method !== 'GET' ? body : undefined,
             signal: abortController.signal,
-            dispatcher: new Agent({
-                connect: {
-                    rejectUnauthorized: disableSSLVerification ? false : true,
-                    lookup: async(hostname, _opts, callback) => {
-                        try {
-                            console.log('lookup', hostname)
-                            const addresses = await dnsPromises.lookup(hostname, { all: true })
-
-                            let address = null
-
-                            if (addresses.length > 1) {
-                                console.log('addresses found', addresses)
-
-                                while(addresses.length > 0) {
-                                    address = addresses.shift()
-                                    let isReachable = true
-                                    const urlPort = urlParsed.port !== '' ? urlParsed.port : (urlParsed.protocol === 'https:' ? 443 : 80)
-                                    const tld = hostname.substring(hostname.lastIndexOf('.') + 1)
-
-                                    if (hostname === 'localhost' || localhostTds.includes(tld)) {
-                                        isReachable = await checkReachability(address.address, urlPort)
-                                        console.log(`address ${address.address} is ${isReachable ? 'reachable' : 'not reachable'} on port ${urlPort}`)
-                                    } else {
-                                        console.log(`reachability test skipped for non-localhost address ${address.address} and picked as the address to use for the request`)
-                                    }
-                                    if(isReachable) {
-                                        break
-                                    }
-                                }
-                            } else {
-                                address = addresses[0]
-                            }
-
-                            if(!address) {
-                                throw new Error('No reachable address found')
-                            }
-
-                            callback(null, [address])
-                        } catch(err) {
-                            callback(err)
-                        }
-                    }
-                },
-            }),
+            dispatcher: getAgentForRequest(urlParsed, disableSSLVerification),
         })
 
         const endTime = new Date()
