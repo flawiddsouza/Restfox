@@ -77,6 +77,7 @@ function getAgentForRequest(urlParsed, disableSSLVerification) {
                     }
                 },
             },
+            allowH2: true,
         })
 
         agents.set(key, agent)
