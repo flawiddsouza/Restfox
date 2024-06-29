@@ -81,9 +81,16 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const wrapped = `${JSON.stringify(word)} ${completion.label} }}`
+                                const wrapped = `${completion.label} }}`
                                 view.dispatch({
                                     changes: { from, to, insert: wrapped }
+                                })
+                                                                 // Calculate the new cursor position
+                                const cursorPos = from + wrapped.length
+
+                                const newText = view.state.doc.sliceString(0, cursorPos).replaceAll('{{', '{{ ')
+                                view.dispatch({
+                                    changes: { from: 0, to: view.state.doc.length, insert: newText }
                                 })
                             }
                         })),
