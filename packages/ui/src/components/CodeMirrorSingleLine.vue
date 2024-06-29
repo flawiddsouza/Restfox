@@ -81,16 +81,25 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const wrapped = `${completion.label} }}`
-                                view.dispatch({
-                                    changes: { from, to, insert: wrapped }
-                                })
-                                                                 
-                                const cursorPos = from + wrapped.length
+                                                                const beforeText = view.state.doc.sliceString(0, from)
+                                const afterText = view.state.doc.sliceString(to)
+                                let wrapped
 
-                                const newText = view.state.doc.sliceString(0, cursorPos).replaceAll(' ', '')
+                                if (beforeText.trim().endsWith('{{') && afterText.trim().startsWith('}}')) {
+                                    // Case: {{M -> {{MyAutoCompletedVar}}
+                                    wrapped = `${completion.label}`
+                                } else if (beforeText.trim().endsWith('{{') || afterText.trim().startsWith('}}')) {
+                                    // Case: {{ M or M -> {{ MyAutoCompletedVar }}
+                                    const prefix = beforeText.endsWith('{{') ? '' : '{{ '
+                                    const suffix = afterText.startsWith('}}') ? '' : ' }}'
+                                    wrapped = `${prefix}${completion.label}${suffix}`
+                                } else {
+                                    // Case: Plain text M -> {{MyAutoCompletedVar}}
+                                    wrapped = `{{${completion.label}}}`
+                                }
+
                                 view.dispatch({
-                                    changes: { from: 0, to: view.state.doc.length, insert: newText }
+                                    changes: { from: word.from - (beforeText.endsWith('{{') ? 2 : 0), to: word.to + (afterText.startsWith('}}') ? 2 : 0), insert: wrapped }
                                 })
                             }
                         })),
