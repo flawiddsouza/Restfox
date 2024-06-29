@@ -10,8 +10,8 @@
     "author": "kobenguyent",
     "license": "MIT",
     "dependencies": {
-        "codeceptjs": "3.6.2",
-        "playwright": "1.44.0",
+        "codeceptjs": "3.6.4",
+        "playwright": "1.42.1",
         "@codeceptjs/allure-legacy": "1.0.2"
     },
     "devDependencies": {
