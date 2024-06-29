@@ -91,7 +91,7 @@ function getExtensions(vueInstance) {
                                 } else if (beforeText.trim().endsWith('{{') || afterText.trim().startsWith('}}')) {
                                     // Case: {{ M or M -> {{ MyAutoCompletedVar }}
                                     const prefix = beforeText.endsWith('{{') ? '{{ ' : '{{ '
-                                    const suffix = afterText.startsWith('}}') ? '' : ' }}'
+                                    const suffix = afterText.startsWith('}}') ? '' : '}}'
                                     wrapped = `${prefix}${completion.label}${suffix}`
                                 } else {
                                     // Case: Plain text M -> {{MyAutoCompletedVar}}
