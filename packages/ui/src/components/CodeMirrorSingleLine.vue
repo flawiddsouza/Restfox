@@ -92,7 +92,7 @@ function getExtensions(vueInstance) {
                                     // Case: {{ M or M -> {{ MyAutoCompletedVar }}
                                     const prefix = beforeText.endsWith('{{') ? '{{ ' : '{{ '
                                     const suffix = afterText.startsWith('}}') ? '' : ' }}'
-                                    wrapped = `${prefix}${completion.label} ${suffix}`
+                                    wrapped = `${prefix} ${completion.label} ${suffix}`
                                 } else {
                                     // Case: Plain text M -> {{MyAutoCompletedVar}}
                                     wrapped = `{{${completion.label}}}`
