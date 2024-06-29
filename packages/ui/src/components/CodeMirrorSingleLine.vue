@@ -13,21 +13,23 @@ function getExtensions(vueInstance) {
     const singleLineEnforcers = []
     const multiLineEnforcers = []
 
-    if (!vueInstance.allowMultipleLines) {
+    if(!vueInstance.allowMultipleLines) {
+        // From: https://discuss.codemirror.net/t/codemirror-6-single-line-and-or-avoid-carriage-return/2979/2
         [
             EditorState.transactionFilter.of(tr => tr.newDoc.lines > 1 ? [] : tr),
             EditorView.domEventHandlers({
-                paste: async (event, view) => {
+                paste: async(event, view) => {
                     const content = event.clipboardData.getData('text/plain')
 
-                    if (vueInstance.pasteHandler && await vueInstance.pasteHandler(content)) {
+                    // if pasteHandler exists & pasteHandler returns true, it means it handled the paste event
+                    if(vueInstance.pasteHandler && await vueInstance.pasteHandler(content)) {
                         console.log('pasteHandler returned true, so not handling paste event')
                         return
                     }
 
                     console.log('pasteHandler not defined or returned false, so handling paste event')
 
-                    if (content.includes('\n')) {
+                    if(content.includes('\n')) {
                         const contentWithoutNewLines = content.replace(/[\n\r]/g, '')
                         const transaction = view.state.replaceSelection(contentWithoutNewLines)
                         const update = view.state.update(transaction)
@@ -43,27 +45,34 @@ function getExtensions(vueInstance) {
             }),
         ].forEach(enforcer => singleLineEnforcers.push(enforcer))
     } else {
-        [EditorView.lineWrapping].forEach(enforcer => multiLineEnforcers.push(enforcer))
+        [
+            EditorView.lineWrapping,
+        ].forEach(enforcer => multiLineEnforcers.push(enforcer))
     }
 
     const extensions = [
         history(),
         EditorView.updateListener.of(v => {
-            if (v.docChanged) {
+            if(v.docChanged) {
                 vueInstance.emitted = true
                 vueInstance.$emit('update:modelValue', v.state.doc.toString())
             }
         }),
         ...singleLineEnforcers,
         ...multiLineEnforcers,
-        keymap.of([...historyKeymap]),
+        keymap.of([
+            ...historyKeymap
+        ]),
         placeholder(vueInstance.placeholder),
         envVarDecoration(vueInstance.envVariables),
         autocompletion({
             override: [
                 context => {
                     let word = context.matchBefore(/\w*/)
-                    if (!word || (word.from === word.to && !context.explicit)) {
+                    if(!word) {
+                        return null
+                    }
+                    if(word.from == word.to && !context.explicit) {
                         return null
                     }
                     return {
@@ -72,7 +81,7 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const wrapped = `{{ ${completion.label} }}`
+                                const wrapped = word.from.includes(' ') ?`${completion.label} }}` : `${completion.label}}}`
                                 view.dispatch({
                                     changes: { from, to, insert: wrapped }
                                 })
@@ -85,7 +94,7 @@ function getExtensions(vueInstance) {
         })
     ]
 
-    if (vueInstance.disabled) {
+    if(vueInstance.disabled) {
         extensions.push(EditorView.editable.of(false))
     }
 
@@ -149,7 +158,7 @@ export default {
     },
     watch: {
         modelValue() {
-            if (!this.emitted) {
+            if(!this.emitted) {
                 this.editor.setState(createState(this))
             } else {
                 this.emitted = false
@@ -217,6 +226,11 @@ export default {
     color: var(--modal-input-disabled-color);
 }
 
+/* when editor transitions from empty to filled when you type something, the editor messes */
+/* with the size of the div container, causing a small layout shift - this fixes that */
+/* img.cm-widgetBuffers seems appear inside editor only when the editor is empty */
+/* without this fix, the ui jump can be seen in the socket panel address bar & the */
+/* request panel inputs of the auth tab, when moving from empty to filled */
 .code-mirror-single-line .cm-widgetBuffer {
     vertical-align: inherit;
 }
