@@ -91,8 +91,8 @@ function getExtensions(vueInstance) {
                                 } else if (beforeText.trim().endsWith('{{') || afterText.trim().startsWith('}}')) {
                                     // Case: {{ M or M -> {{ MyAutoCompletedVar }}
                                     const prefix = beforeText.endsWith('{{') ? '{{ ' : '{{ '
-                                    const suffix = afterText.startsWith('}}') ? '' : '}}'
-                                    wrapped = `${prefix}${completion.label}${suffix}`
+                                    const suffix = afterText.startsWith('}}') ? '' : ' }}'
+                                    wrapped = `${prefix}${completion.label} ${suffix}`
                                 } else {
                                     // Case: Plain text M -> {{MyAutoCompletedVar}}
                                     wrapped = `{{${completion.label}}}`
@@ -104,7 +104,7 @@ function getExtensions(vueInstance) {
 
                                 const cursorPos = from + wrapped.length
 
-                                const newText = view.state.doc.sliceString(0, cursorPos).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ')
+                                const newText = view.state.doc.sliceString(0, cursorPos).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ').replaceAll('  }}', ' }}')
                                 view.dispatch({
                                     changes: { from: 0, to: view.state.doc.length, insert: newText }
                                 })
