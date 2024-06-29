@@ -81,7 +81,7 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                                                const beforeText = view.state.doc.sliceString(0, from)
+                                const beforeText = view.state.doc.sliceString(0, from)
                                 const afterText = view.state.doc.sliceString(to)
                                 let wrapped
 
