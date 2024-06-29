@@ -81,7 +81,7 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const wrapped = word.from.includes(' ') ? `${completion.label} }}` : `${completion.label}}}`
+                                const wrapped = word.from.includes(' ') ? `${completion.label} }}` : `${completion.label}` + '}}'
                                 view.dispatch({
                                     changes: { from, to, insert: wrapped }
                                 })
