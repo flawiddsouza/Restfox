@@ -99,10 +99,10 @@ function getExtensions(vueInstance) {
                                 }
 
                                 view.dispatch({
-                                    changes: { from: word.from - (beforeText.endsWith('{{') ? 2 : 0), to: word.to + (afterText.startsWith('}}') ? 2 : 0), insert: wrapped }
+                                    changes: { from: word.from - (beforeText.endsWith('{{') ? 2 : 0), to: word.to + (afterText.startsWith('}}') ? 0 : 0), insert: wrapped }
                                 })
 
-                                const cursorPos = from + wrapped.split('}}')[0] + '}}'.length
+                                const cursorPos = from + wrapped.length
 
                                 const newText = view.state.doc.sliceString(0, cursorPos).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ')
                                 view.dispatch({
