@@ -99,7 +99,7 @@ function getExtensions(vueInstance) {
                                 }
 
                                 view.dispatch({
-                                    changes: { from: word.from - (beforeText.endsWith('{{') ? 2 : 0), to: word.to + (afterText.startsWith('}}') ? 0 : 0), insert: wrapped }
+                                    changes: { from: word.from - (beforeText.endsWith('{{') ? 0 : 0), to: word.to + (afterText.startsWith('}}') ? 0 : 0), insert: wrapped }
                                 })
 
                                 const cursorPos = from + wrapped.length
