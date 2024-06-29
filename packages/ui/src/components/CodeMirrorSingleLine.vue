@@ -104,7 +104,7 @@ function getExtensions(vueInstance) {
 
                                 const cursorPos = from + wrapped.length
 
-                                const newText = view.state.doc.sliceString(0, cursorPos).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{ ')
+                                const newText = view.state.doc.sliceString(0, cursorPos).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{')
                                 view.dispatch({
                                     changes: { from: 0, to: view.state.doc.length, insert: newText }
                                 })
