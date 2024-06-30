@@ -96,13 +96,13 @@ const text = view.state.doc.toString()
         changes: { from, to, insert: completionText }
     })
 
-    let newText = view.state.doc.sliceString(0).replaceAll(' ', '').replaceAll('{{{', '{{').replaceAll('}}}', '}}')
+    let newText = view.state.doc.sliceString(0).replaceAll(' ', '').replaceAll('{{{', '{{').replaceAll('}}}', '}}').replaceAll('{{{{', '{{').replaceAll('}}}}', '}}')
     if(withSpace) {
         newText = newText.replaceAll('{{', '{{ ').replaceAll('}}', ' }}')
     }
 
                                 view.dispatch({
-                                    changes: { from: 0, to: view.state.doc.length, insert: newText }
+                                    changes: { from, to, insert: newText }
                                 })
                             }
                         })),
