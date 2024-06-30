@@ -90,6 +90,7 @@ const text = view.state.doc.toString()
 
     const condition1 = before.endsWith('{{')
     const condition2 = before.endsWith('{{ ')
+    const condition3 = before.endsWitt('{ ')
 
     if(condition1) {
         completionText = completionText + '}}'
@@ -97,6 +98,10 @@ const text = view.state.doc.toString()
 
     if(condition2) {
         completionText = completionText + ' }}'
+    }
+
+    if(condition3) {
+        completionText = '{{' + completionText + ' }}'
     }
 
     if(!condition1 && !condition2) {
