@@ -81,26 +81,31 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const beforeText = view.state.doc.sliceString(0, from)
-                                const afterText = view.state.doc.sliceString(to)
-                                let wrapped
+const text = view.state.doc.toString()
 
-                                if (beforeText.trim().endsWith('{{') && afterText.trim().startsWith('}}')) {
-                                    // Case: {{M -> {{MyAutoCompletedVar}}
-                                    wrapped = `${completion.label}`
-                                } else if (beforeText.trim().endsWith('{{') || afterText.trim().startsWith('}}')) {
-                                    // Case: {{ M or M -> {{ MyAutoCompletedVar }}
-                                    const prefix = beforeText.endsWith('{{') ? '{{ ' : '{{ '
-                                    const suffix = afterText.startsWith('}}') ? '' : ' }}'
-                                    wrapped = `${prefix} ${completion.label} ${suffix}`
-                                } else {
-                                    // Case: Plain text M -> {{MyAutoCompletedVar}}
-                                    wrapped = `{{${completion.label}}}`
-                                }
+    // get 3 characters before from or all characters before from if from < 3
+    const before = text.slice(from - (from < 3 ? from : 3), from)
 
-                                view.dispatch({
-                                    changes: { from: word.from - (beforeText.endsWith('{{') ? 2 : 0), to: word.to + (afterText.startsWith('}}') ? 2 : 0), insert: wrapped }
-                                })
+    let completionText = completion.label
+
+    const condition1 = before.endsWith('{{')
+    const condition2 = before.endsWith('{{ ')
+
+    if(condition1) {
+        completionText = completionText + '}}'
+    }
+
+    if(condition2) {
+        completionText = completionText + ' }}'
+    }
+
+    if(!condition1 && !condition2) {
+        completionText = '{{' + completionText + '}}'
+    }
+
+    view.dispatch({
+        changes: { from, to, insert: completionText }
+    })
 
                                 const newText = view.state.doc.sliceString(0).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ').replaceAll('  }}', ' }}')
                                 view.dispatch({
