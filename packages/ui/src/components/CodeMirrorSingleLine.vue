@@ -81,9 +81,30 @@ function getExtensions(vueInstance) {
                             label: suggestion.label,
                             type: suggestion.type,
                             apply: (view, completion, from, to) => {
-                                const wrapped = `${completion.label} }}`
+                                const text = view.state.doc.toString()
+
+                                // get 3 characters before from or all characters before from if from < 3
+                                const before = text.slice(from - (from < 3 ? from : 3), from)
+
+                                let completionText = completion.label
+
+                                const condition1 = before.endsWith('{{')
+                                const condition2 = before.endsWith('{{ ')
+
+                                if(condition1) {
+                                    completionText = completionText + '}}'
+                                }
+
+                                if(condition2) {
+                                    completionText = completionText + ' }}'
+                                }
+
+                                if(!condition1 && !condition2) {
+                                    completionText = '{{' + completionText + '}}'
+                                }
+
                                 view.dispatch({
-                                    changes: { from, to, insert: wrapped }
+                                    changes: { from, to, insert: completionText }
                                 })
                             }
                         })),
