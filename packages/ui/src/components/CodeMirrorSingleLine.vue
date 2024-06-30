@@ -112,7 +112,7 @@ const text = view.state.doc.toString()
         changes: { from, to, insert: completionText }
     })
 
-                                const newText = view.state.doc.sliceString(0).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ').replaceAll('  }}', ' }}')
+                                const newText = view.state.doc.sliceString(0).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ').replaceAll('  }}', ' }}').replaceAll('   }}}}', ' }}').replaceAll('{{ {', '{{ ')
                                 view.dispatch({
                                     changes: { from: 0, to: view.state.doc.length, insert: newText }
                                 })
