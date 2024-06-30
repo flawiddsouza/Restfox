@@ -88,31 +88,19 @@ const text = view.state.doc.toString()
 
     let completionText = completion.label
 
-    const condition1 = before.endsWith('{{')
-    const condition2 = before.endsWith('{{ ')
-    const condition3 = before.endsWith('{ ')
+    const withSpace = before.endsWith('{{ ')
 
-    if(condition1) {
-        completionText = completionText + '}}'
-    }
-
-    if(condition2) {
-        completionText = completionText + ' }}'
-    }
-
-    if(condition3) {
-        completionText = '{{' + completionText + ' }}'
-    }
-
-    if(!condition1 && !condition2) {
-        completionText = '{{' + completionText + '}}'
-    }
+    completionText = '{{' + completionText + '}}'
 
     view.dispatch({
         changes: { from, to, insert: completionText }
     })
 
-                                const newText = view.state.doc.sliceString(0).replaceAll('{{{', '{{').replaceAll('{ {{', '{{ ').replaceAll('{{{{', '{{').replaceAll('{{ {{', '{{ ').replaceAll('{{{ ', '{{').replaceAll('{{  ', '{{ ').replaceAll('  }}', ' }}').replaceAll('   }}}}', ' }}').replaceAll('{{ {', '{{ ').replaceAll(' }} }}', '}}').replaceAll(' }}}}', '}}')
+    let newText = view.state.doc.sliceString(0).replaceAll(' ', '').replaceAll('{{{', '{{').replaceAll('}}}', '}}')
+    if(withSpace) {
+        newText = newText.replaceAll('{{', '{{ ').replaceAll('}}', ' }}')
+    }
+
                                 view.dispatch({
                                     changes: { from: 0, to: view.state.doc.length, insert: newText }
                                 })
