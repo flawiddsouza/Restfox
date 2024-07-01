@@ -16,20 +16,16 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+    runs-on: macos-latest
     defaults:
       run:
         working-directory: ./packages/ui
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 18.19
-    - name: Install dependencies
-      run: npm i
-    - name: Run Playwright tests
-      run: npm run ci-test
-      env:
-        HOME: /root
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18.19
+      - name: Install dependencies
+        run: npm i
+      - name: Run Playwright tests
+        run: npm run ci-test
