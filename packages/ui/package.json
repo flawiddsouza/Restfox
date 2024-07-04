@@ -2,7 +2,7 @@
     "name": "restfox-ui",
     "version": "0.0.0",
     "scripts": {
-        "dev": "vite",
+        "dev": "vite --host",
         "dev-desktop-electron": "vite --mode desktop-electron",
         "build": "vite build",
         "build-desktop": "vite build --mode desktop",
