@@ -7,7 +7,7 @@ const requests = require('./request')
 const db = require('./db')
 const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
-require('update-electron-app')()
+const updateElectronApp = require('update-electron-app')
 
 Object.assign(console, log.functions)
 
@@ -200,6 +200,11 @@ app.whenReady().then(async() => {
     ipcMain.handle('openFolder', (_, ...args) => helpers.openFolder(...args))
 
     ipcMain.handle('readFile', (_, ...args) => helpers.readFile(...args))
+
+    ipcMain.handle('updateElectronApp', (_) => {
+        console.log("ipcMain: updateElectronApp")
+        updateElectronApp()
+    })
 
     createWindow()
 })

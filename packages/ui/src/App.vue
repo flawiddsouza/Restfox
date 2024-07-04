@@ -326,6 +326,7 @@ export default {
         const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
         const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
         const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
+        let savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -385,9 +386,22 @@ export default {
             }
         }
 
+        if(savedDisableAutoUpdate) {
+            try {
+                savedDisableAutoUpdate = JSON.parse(savedDisableAutoUpdate)
+            } catch(e) {
+                savedDisableAutoUpdate = false
+            }
+        }
+        this.$store.state.flags.disableAutoUpdate = savedDisableAutoUpdate
+
         emitter.on('error', this.handleError)
 
         if(import.meta.env.MODE === 'desktop-electron') {
+            if (!savedDisableAutoUpdate) {
+                console.log("invoke updateElectronApp")
+                window.electronIPC.updateElectronApp()
+            }
             const refreshWorkspace = debounce(() => {
                 this.$store.dispatch('refreshWorkspace')
                 this.$store.commit('loadWorkspacePlugins')
