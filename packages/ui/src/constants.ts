@@ -24,6 +24,7 @@ export default {
         DISABLE_PAGE_VIEW_ANALYTICS_TRACKING: 'Restfox-DisablePageViewAnalyticsTracking',
         DISABLE_SSL_VERIFICATION: 'Restfox-DisableSSLVerification',
         DISABLE_IFRAME_SANDBOX: 'Restfox-DisableIframeSandbox',
+        DISABLE_AUTO_UPDATE: 'Restfox-DisableAutoUpdate',
         ELECTRON_SWITCH_TO_CHROMIUM_FETCH: 'Restfox-ElectronSwitchToChromiumFetch',
         GENERATE_CODE_LANGUAGE: 'Restfox-GenerateCodeLanguage',
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',

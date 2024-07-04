@@ -42,6 +42,13 @@
                 <div style="padding-top: 1rem"></div>
                 <div>
                     <label style="display: flex;">
+                        <input type="checkbox" v-model="disableAutoUpdate"> <div style="margin-left: 0.5rem;">Disable Automatic Updates</div> <div style="margin-left: 0.5rem;"></div>
+                    </label>
+                    <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will disable automatic updates</div>
+                </div>
+                <div style="padding-top: 1rem"></div>
+                <div>
+                    <label style="display: flex;">
                         <input type="checkbox" v-model="electronSwitchToChromiumFetch"> <div style="margin-left: 0.5rem;">Switch to Chromium Fetch</div> <div style="margin-left: 0.5rem;"></div>
                     </label>
                     <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Tick this if you're not able to make any requests despite the server being reachable. This is not recommended for most people and is only provided to temporarily alleviate issues with firewalls and vpns. See <a href="https://github.com/flawiddsouza/Restfox/issues/86" target="_blank">this link</a> for more info.</div>
@@ -79,6 +86,7 @@ export default {
             disableSSLVerification: false,
             electronSwitchToChromiumFetch: false,
             disableIframeSandbox: false,
+            disableAutoUpdate: false,
         }
     },
     computed: {
@@ -118,6 +126,10 @@ export default {
         disableIframeSandbox() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX, this.disableIframeSandbox)
             this.$store.state.flags.disableIframeSandbox = this.disableIframeSandbox
+        },
+        disableAutoUpdate() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE, this.disableAutoUpdate)
+            this.$store.state.flags.disableAutoUpdate = this.disableAutoUpdate
         }
     },
     methods: {
@@ -141,6 +153,9 @@ export default {
         resetDisableIframeSandbox() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
         },
+        resetDisableAutoUpdate() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -158,6 +173,7 @@ export default {
             this.resetDisableSSLVerification()
             this.resetElectronSwitchToChromiumFetch()
             this.resetDisableIframeSandbox()
+            this.resetDisableAutoUpdate()
 
             document.location.reload()
         },
@@ -169,6 +185,7 @@ export default {
             const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
+            const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -210,6 +227,13 @@ export default {
                     this.disableIframeSandbox = JSON.parse(savedDisableIframeSandbox)
                 } catch (e) {
                     this.disableIframeSandbox = false
+                }
+            }
+            if(savedDisableAutoUpdate) {
+                try {
+                    this.disableAutoUpdate = JSON.parse(savedDisableAutoUpdate)
+                } catch (e) {
+                    this.disableAutoUpdate = false
                 }
             }
         }
