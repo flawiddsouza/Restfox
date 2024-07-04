@@ -202,7 +202,7 @@ app.whenReady().then(async() => {
     ipcMain.handle('readFile', (_, ...args) => helpers.readFile(...args))
 
     ipcMain.handle('updateElectronApp', (_) => {
-        console.log("ipcMain: updateElectronApp")
+        console.log('ipcMain: updateElectronApp')
         updateElectronApp()
     })
 

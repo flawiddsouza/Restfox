@@ -388,18 +388,17 @@ export default {
 
         if(savedDisableAutoUpdate) {
             try {
-                savedDisableAutoUpdate = JSON.parse(savedDisableAutoUpdate)
+                this.$store.state.flags.disableAutoUpdate = JSON.parse(savedDisableAutoUpdate)
             } catch(e) {
-                savedDisableAutoUpdate = false
+                this.$store.state.flags.disableAutoUpdate = false
             }
         }
-        this.$store.state.flags.disableAutoUpdate = savedDisableAutoUpdate
 
         emitter.on('error', this.handleError)
 
         if(import.meta.env.MODE === 'desktop-electron') {
-            if (!savedDisableAutoUpdate) {
-                console.log("invoke updateElectronApp")
+            if (!this.$store.state.flags.disableAutoUpdate) {
+                console.log('invoke updateElectronApp')
                 window.electronIPC.updateElectronApp()
             }
             const refreshWorkspace = debounce(() => {
