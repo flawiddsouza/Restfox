@@ -12,6 +12,7 @@ on:
     paths:
       - packages/ui/src/**
       - packages/ui/tests/**
+      - packages/ui/package.json
 
 jobs:
   test:

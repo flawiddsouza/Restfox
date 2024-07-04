@@ -2,7 +2,7 @@
     "name": "restfox-ui",
     "version": "0.0.0",
     "scripts": {
-        "dev": "vite",
+        "dev": "vite --host",
         "dev-desktop-electron": "vite --mode desktop-electron",
         "build": "vite build",
         "build-desktop": "vite build --mode desktop",
@@ -15,7 +15,7 @@
         "lint-fix": "eslint src --ext .js,.ts,.vue --fix",
         "save-bundle-size": "node scripts/save-bundle-size.mjs",
         "e2e-test": "cd ./tests && npm i && npx playwright install && npx codeceptjs run-workers 3",
-        "ci-test": "start-server-and-test dev http://127.0.0.1:5173 e2e-test"
+        "ci-test": "start-server-and-test dev http://127.0.0.1:5173/ e2e-test"
     },
     "dependencies": {
         "@codemirror/autocomplete": "^6.16.0",
@@ -69,7 +69,7 @@
         "eslint": "^8.28.0",
         "eslint-plugin-vue": "^9.7.0",
         "rollup-plugin-copy": "^3.4.0",
-        "start-server-and-test": "1.15.2",
+        "start-server-and-test": "2.0.4",
         "vite": "^4.5.0",
         "vite-plugin-checker": "^0.6.4",
         "vite-plugin-pwa": "^0.16.6",
