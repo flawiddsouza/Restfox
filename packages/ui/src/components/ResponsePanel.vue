@@ -22,7 +22,7 @@
             </div>
             <div class="response-panel-address-bar-select-container">
                 <div v-if="response.createdAt" class="custom-dropdown" @click="handleResponseHistoryMenu" @contextmenu.prevent="handleResponseHistoryContextMenu">
-                    {{ timeAgo(response.createdAt) }} - {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}
+                    {{ timeAgo(response.createdAt) }} | {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}
                     <i class="fa fa-caret-down space-right"></i>
                 </div>
 
