@@ -887,17 +887,4 @@ export default {
     align-items: center;
     margin-top: 0.5rem;
 }
-
-.custom-dropdown {
-    cursor: pointer;
-    padding-left: 0.8rem;
-    display: flex;
-    align-items: center;
-    user-select: none;
-    height: 100%;
-}
-
-.custom-dropdown i {
-    padding-left: 4px;
-}
 </style>

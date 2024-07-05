@@ -1634,3 +1634,49 @@ export function bufferToString(buffer: BufferSource) {
     const textDecoder = new TextDecoder('utf-8')
     return textDecoder.decode(buffer)
 }
+
+export function timeAgo(timestamp: number) {
+    const now: any = new Date()
+    const date: any = new Date(timestamp)
+    const secondsPast = Math.floor((now - date) / 1000)
+
+    if (secondsPast < 60) {
+        return secondsPast === 1 || secondsPast < 1 ? 'Just Now' : `${secondsPast} seconds ago`
+    }
+    if (secondsPast < 3600) {
+        const minutesPast = Math.floor(secondsPast / 60)
+        return minutesPast === 1 ? 'one minute ago' : `${minutesPast} minutes ago`
+    }
+    if (secondsPast < 86400) {
+        const hoursPast = Math.floor(secondsPast / 3600)
+        return hoursPast === 1 ? 'one hour ago' : `${hoursPast} hours ago`
+    }
+    if (secondsPast < 2592000) { // Less than 30 days
+        const daysPast = Math.floor(secondsPast / 86400)
+        return daysPast === 1 ? 'one day ago' : `${daysPast} days ago`
+    }
+    if (secondsPast < 31536000) { // Less than 365 days
+        const monthsPast = Math.floor(secondsPast / 2592000)
+        return monthsPast === 1 ? 'one month ago' : `${monthsPast} months ago`
+    }
+    const yearsPast = Math.floor(secondsPast / 31536000)
+    return yearsPast === 1 ? 'one year ago' : `${yearsPast} years ago`
+}
+
+export function responseStatusColorMapping(response: Response) {
+    let color
+
+    if(response.status >= 200 && response.status <= 299) {
+        color = 'green'
+    }
+
+    if(response.status >= 400 && response.status <= 499) {
+        color = 'yellow'
+    }
+
+    if(response.status >= 500 || response.statusText === 'Error') {
+        color = 'red'
+    }
+
+    return color
+}

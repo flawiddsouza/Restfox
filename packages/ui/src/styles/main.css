@@ -657,3 +657,31 @@ select {
 .sidebar-item {
     cursor: pointer;
 }
+
+.tag.green {
+    background: #75ba24;
+    color: white;
+}
+
+.tag.yellow {
+    background: #ec8702;
+    color: white;
+}
+
+.tag.red {
+    background: #e15251;
+    color: white;
+}
+
+.custom-dropdown {
+    cursor: pointer;
+    padding-left: 0.8rem;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    height: 100%;
+}
+
+.custom-dropdown i {
+    padding-left: 4px;
+}
