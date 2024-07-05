@@ -48,7 +48,8 @@
         "electron-squirrel-startup": "^1.0.0",
         "open": "^10.1.0",
         "undici": "^6.19.2",
-        "update-electron-app": "^2.0.1"
+        "update-electron-app": "^2.0.1",
+        "electron-window-state": "5.0.3"
     },
     "config": {
         "forge": "./forge.config.js"
