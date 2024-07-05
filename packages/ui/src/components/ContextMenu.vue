@@ -12,14 +12,12 @@
                             :disabled="option.disabled"
                             @click.stop="handleClick(option)"
                         >
-                            <i :class="option.icon" v-if="option.icon"></i><div v-html="isOptionSelected(option)"></div>
+                            <i :class="option.icon" v-if="option.icon"></i><span v-html="isOptionSelected(option)"></span>
                         </button>
                     </slot>
                 </template>
                 <template v-if="option.type === 'separator'">
-                    <slot name="separator">
-                        <div class="context-menu-separator"></div>
-                    </slot>
+                    <div class="context-menu-separator"></div>
                 </template>
             </div>
         </div>
@@ -147,10 +145,13 @@ export default {
             }
         },
         isOptionSelected(option) {
-            if (option.value === this.selectedOption) {
-                return `<span class="selected-indicator">✔</span> ${option.label}`
+            if (option.value?._id) {
+                if (option.value === this.selectedOption) {
+                    return `<span class="selected-indicator">✔</span> ${option.label}`
+                }
+                return `<span class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</span>${option.label}`
             }
-            return `<span class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</span>${option.label}`
+            return option.label
         }
     }
 }
@@ -213,13 +214,14 @@ button.context-menu-item > i {
 
 .context-menu-separator {
     border-bottom: 1px solid var(--modal-border-color);
-    margin: 5px 0;
+    margin-top: 5px;
+    margin-bottom: 5px;
 }
 
 .selected-indicator {
     padding-right: 0.1rem;
     font-size: 0.5rem;
-    color:  var(--button-text-color);
+    color: var(--button-text-color);
 }
 
 </style>
