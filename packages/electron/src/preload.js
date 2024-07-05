@@ -30,6 +30,7 @@ const ipcFunctions = [
     'openFolderSelectionDialog',
     'openFolder',
     'readFile',
+    'updateElectronApp',
 ]
 
 const electronIPC = ipcFunctions.reduce((acc, funcName) => {
