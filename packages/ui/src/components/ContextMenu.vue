@@ -8,11 +8,11 @@
                         <button
                             type="button"
                             class="context-menu-item"
-                            :class="option.class || ''"
+                            :class="[{ 'selected': option.value === selectedOption }, option.class || '']"
                             :disabled="option.disabled"
                             @click.stop="handleClick(option)"
                         >
-                            <i :class="option.icon" v-if="option.icon"></i> <div v-html="option.label"></div>
+                            <i :class="option.icon" v-if="option.icon"></i><div v-html="isOptionSelected(option)"></div>
                         </button>
                     </slot>
                 </template>
@@ -91,7 +91,8 @@ export default {
     },
     data() {
         return {
-            contextMenuStyle: {}
+            contextMenuStyle: {},
+            selectedOption: null
         }
     },
     computed: {
@@ -108,6 +109,7 @@ export default {
                 nextTick(() => {
                     this.$store.state.openContextMenuElement = this.$el
                     this.setContextMenuStyle()
+                    this.selectFirstOption()
                 })
             } else {
                 this.$store.state.openContextMenuElement = null
@@ -135,8 +137,20 @@ export default {
             }
         },
         handleClick(option) {
+            this.selectedOption = option.value
             this.$emit('click', option.value)
             this.$emit('update:show', false)
+        },
+        selectFirstOption() {
+            if (this.options.length > 0 && !this.selectedOption) {
+                this.selectedOption = this.options[0].value
+            }
+        },
+        isOptionSelected(option) {
+            if (option.value === this.selectedOption) {
+                return `<span class="selected-indicator">✔</span> ${option.label}`
+            }
+            return `<span class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</span>${option.label}`
         }
     }
 }
@@ -201,4 +215,11 @@ button.context-menu-item > i {
     border-bottom: 1px solid var(--modal-border-color);
     margin: 5px 0;
 }
+
+.selected-indicator {
+    padding-right: 0.1rem;
+    font-size: 0.5rem;
+    color:  var(--button-text-color);
+}
+
 </style>
