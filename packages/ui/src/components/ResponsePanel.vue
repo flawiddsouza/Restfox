@@ -12,11 +12,7 @@
         <div class="response-panel-address-bar">
             <div class="response-panel-address-bar-tag-container">
                 <div
-                    class="tag" :class="{
-                        'green': response.status >= 200 && response.status <= 299,
-                        'yellow': response.status >= 400 && response.status <= 499,
-                        'red': response.status >= 500 || response.statusText === 'Error'
-                    }"
+                    class="tag" :class="responseStatusColorMapping(response)"
                 >
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText === '' ? getStatusText(response.status) : response.statusText }}
@@ -25,9 +21,19 @@
                 <div class="tag ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
-                <select v-model="response" v-if="responses.length > 0" @contextmenu.prevent="handleResponseHistoryContextMenu">
-                    <option v-for="response in responses" :value="response">{{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}</option>
-                </select>
+                <div v-if="response.createdAt" class="custom-dropdown" @click="handleResponseHistoryMenu" @contextmenu.prevent="handleResponseHistoryContextMenu">
+                    {{ timeAgo(response.createdAt) }} | {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}
+                    <i class="fa fa-caret-down space-right"></i>
+                </div>
+
+                <ContextMenu
+                    :options="getHistoryResponses()"
+                    :show="showContextMenu"
+                    :x="menuX"
+                    :y="menuY"
+                    @update:show="showContextMenu = $event"
+                    @click="handleMenuClick"
+                />
             </div>
         </div>
         <div class="response-panel-tabs">
@@ -168,6 +174,8 @@ import {
     getAlertConfirmPromptContainer,
     getStatusText,
     bufferToString,
+    timeAgo,
+    responseStatusColorMapping,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
@@ -198,6 +206,9 @@ export default {
             responseFilter: '',
             scrollableAreaEventListenerAttached: false,
             scrollableAreaScrollTop: null,
+            showContextMenu: false,
+            menuX: null,
+            menuY: null,
         }
     },
     computed: {
@@ -411,6 +422,7 @@ export default {
         }
     },
     methods: {
+        timeAgo,
         filterResponse(buffer, jsonPath) {
             try {
                 const responseData = JSON.parse(this.bufferToJSONString(buffer))
@@ -570,6 +582,27 @@ export default {
         scrollableAreaOnScroll(event) {
             this.scrollableAreaScrollTop = event.target.scrollTop
         },
+        handleResponseHistoryMenu(event) {
+            this.menuX = event.clientX
+            this.menuY = event.clientY
+            this.showContextMenu = true
+        },
+        handleMenuClick(value) {
+            this.response = value
+        },
+        responseStatusColorMapping,
+        getHistoryResponses() {
+            return this.responses.map(item => {
+                const color = responseStatusColorMapping(item)
+                const label = `${dateFormat(item.createdAt, true)} | <span class="tag ${color}">${item.status} ${this.getStatusText(item.status)}</span><span class="request-method--${item.request.method}"> ${item.request.method} </span> ${item.name ?? item.url}`
+
+                return {
+                    type: 'option',
+                    label,
+                    value: item
+                }
+            })
+        }
     },
     activated() {
         if(this.response && this.scrollableAreaEventListenerAttached && this.scrollableAreaScrollTop !== null) {
@@ -665,6 +698,7 @@ export default {
 .response-panel-address-bar .response-panel-address-bar-select-container {
     height: 100%;
     margin-left: 1rem;
+    margin-right: 1rem;
 }
 
 .response-panel-address-bar  .response-panel-address-bar-select-container select {
