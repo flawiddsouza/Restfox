@@ -157,7 +157,7 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
 .context-menu-background {
     position: fixed;
     z-index: 1;
@@ -169,12 +169,13 @@ export default {
 
 .context-menu {
     position: fixed;
-    z-index: 1000;
+    z-index: 1;
     border: 1px solid var(--menu-border-color);
     box-shadow: 0 0 1rem 0 var(--box-shadow-color);
     border-radius: 0.3rem;
     min-width: 15rem;
-    padding: 5px 0;
+    padding-top: 5px;
+    padding-bottom: 5px;
     background: var(--background-color);
     overflow-y: auto;
     left: -9999px;
@@ -223,5 +224,4 @@ button.context-menu-item > i {
     font-size: 0.5rem;
     color: var(--button-text-color);
 }
-
 </style>

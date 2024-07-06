@@ -173,7 +173,9 @@ import {
     setEnvironmentVariable,
     getAlertConfirmPromptContainer,
     getStatusText,
-    bufferToString, timeAgo, responseStatusColorMapping,
+    bufferToString,
+    timeAgo,
+    responseStatusColorMapping,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
