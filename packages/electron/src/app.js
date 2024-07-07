@@ -8,7 +8,7 @@ const db = require('./db')
 const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
 const updateElectronApp = require('update-electron-app')
-const windowStateKeeper = require('electron-window-state')
+const windowStateKeeper = require('./utils/window-state')
 
 Object.assign(console, log.functions)
 
@@ -34,6 +34,7 @@ function createWindow() {
     const winStateOptions = {
         defaultWidth: parseInt(workAreaSize.width * 0.75),
         defaultHeight: parseInt(workAreaSize.height * 0.75),
+        defaultMaximize: true,
     };
     const winState = windowStateKeeper(winStateOptions);
 

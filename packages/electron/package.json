@@ -49,7 +49,8 @@
         "open": "^10.1.0",
         "undici": "^6.19.2",
         "update-electron-app": "^2.0.1",
-        "electron-window-state": "5.0.3"
+        "jsonfile": "^4.0.0",
+        "mkdirp": "^0.5.1"
     },
     "config": {
         "forge": "./forge.config.js"
