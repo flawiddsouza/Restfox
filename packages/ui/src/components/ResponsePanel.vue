@@ -613,12 +613,15 @@ export default {
         getHistoryResponses() {
             return this.responses.map(item => {
                 const color = responseStatusColorMapping(item)
+
+                const requestMethod = item.request ? `<span class="request-method--${item.request.method}"> ${item.request.method} </span> ` : ''
+
                 const label = `
-                    <div>
-                        <span>${dateFormat(item.createdAt, true)}</span> <span class="tag ${color}" style="padding: 2px 3px; margin-left: 0.3rem;">${item.status} ${this.getStatusText(item.status)}</span> <span class="tag" style="padding: 2px 3px; margin-left: 0.3rem;">${this.humanFriendlyTime(item.timeTaken)}</span>
+                    <div style="display: flex; flex-wrap: wrap; align-items: center;">
+                        <div>${dateFormat(item.createdAt, true)}</div> <div class="tag ${color}" style="padding: 2px 3px; margin-left: 0.5rem;">${item.status} ${this.getStatusText(item.status)}</div> <div class="tag" style="padding: 2px 3px; margin-left: 0.5rem;">${this.humanFriendlyTime(item.timeTaken)}</div>
                     </div>
                     <div style="margin-top: 0.2rem;">
-                        <span class="request-method--${item.request.method}"> ${item.request.method} </span> ${item.name ?? item.url}
+                        ${requestMethod}${item.name ?? item.url}
                     </div>
                 `
 
