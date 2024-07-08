@@ -43,7 +43,7 @@
             </div>
         </div>
         <div class="request-panel-tabs-context">
-            <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context">
+            <div v-if="activeRequestPanelTab === 'Body'">
                 <div v-if="activeTab.body.mimeType" class="custom-select" style="padding-bottom: 0.5rem;" @click="handleRequestBodyMenu">
                     {{ requestBodyList.find(item => item.value === activeTab.body.mimeType)?.label ?? 'No Body' }}
                     <i class="fa fa-caret-down space-right"></i>
