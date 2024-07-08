@@ -8,7 +8,7 @@
                         <button
                             type="button"
                             class="context-menu-item"
-                            :class="[{ 'selected': option.value === internalSelectedOption }, option.class || '']"
+                            :class="`${option.class ? option.class : ''}`"
                             :disabled="option.disabled"
                             @click.stop="handleClick(option)"
                         >
@@ -87,19 +87,18 @@ export default {
             type: Number,
             default: 0
         },
-        selectedOption: {
-            type: [String, Number, Object],
-            default: null
-        }
         width: {
             type: Number,
+            default: null
+        },
+        selectedOption: {
+            type: Object,
             default: null
         },
     },
     data() {
         return {
             contextMenuStyle: {},
-            internalSelectedOption: this.selectedOption
         }
     },
     computed: {
@@ -121,9 +120,6 @@ export default {
                 this.$store.state.openContextMenuElement = null
                 this.contextMenuStyle = {}
             }
-        },
-        selectedOption(newVal) {
-            this.internalSelectedOption = newVal
         }
     },
     methods: {
@@ -147,23 +143,16 @@ export default {
             }
         },
         handleClick(option) {
-            this.internalSelectedOption = option.value
             this.$emit('click', option.value)
             this.$emit('update:show', false)
         },
-        selectFirstOption() {
-            if (this.options.length > 0 && !this.selectedOption) {
-                this.internalSelectedOption = this.options[0].value
-            }
-        },
         isOptionSelected(option) {
-            if (option.showSelectedIcon || option.value?._id) {
-                if (option.value === this.internalSelectedOption) {
-                    return `<span class="selected-indicator">✔</span> ${option.label}`
-                }
-                return `<span class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</span>${option.label}`
-            }
-            return option.label
+            const { _id } = option.value || {}
+            const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType)
+            const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
+            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
+
+            return `${isSelected ? tickMark : noTickMark}<div>${option.label}</div>`
         }
     }
 }

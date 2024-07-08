@@ -54,7 +54,7 @@
                     :show="showRequestBodyMenu"
                     :x="requestBodyMenuX"
                     :y="requestBodyMenuY"
-                    :selected-option="activeTab.body.mimeType"
+                    :selected-option="activeTab.body"
                     @update:show="showRequestBodyMenu = $event"
                     @click="handleRequestBodyMenuClick"
                 />
@@ -848,7 +848,7 @@ export default {
                 })
             }
             this.activeTab.body.mimeType = mimeType
-        },
+        }
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
