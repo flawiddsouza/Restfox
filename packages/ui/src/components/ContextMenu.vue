@@ -1,7 +1,7 @@
 <template>
     <div class="context-menu-container" :style="{ 'visibility': show ? 'visible': 'hidden' }">
         <div class="context-menu-background" @click.stop="$emit('update:show', false)"></div>
-        <div class="context-menu" :style="contextMenuStyle">
+        <div class="context-menu" :style="contextMenuStyle" @click.stop>
             <div v-for="option in options" :key="option.value">
                 <template v-if="option.type === 'option'">
                     <slot name="option" :option="option">
@@ -12,12 +12,13 @@
                             :disabled="option.disabled"
                             @click.stop="handleClick(option)"
                         >
-                            <i :class="option.icon" v-if="option.icon"></i><span v-html="isOptionSelected(option)"></span>
+                            <i :class="option.icon" v-if="option.icon"></i>
+                            <div v-html="isOptionSelected(option)" style="display: flex;"></div>
                         </button>
                     </slot>
                 </template>
                 <template v-if="option.type === 'separator'">
-                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-separator" @click.stop></div>
                 </template>
             </div>
         </div>
@@ -26,12 +27,12 @@
 
 <script>
 // From: https://stackoverflow.com/a/11802841/4932305
-function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0) {
+function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0, width = null) {
     var mousePosition = {}
     var menuPostion = {}
     var menuDimension = {}
 
-    menuDimension.x = contextMenuElement.offsetWidth
+    menuDimension.x = width || contextMenuElement.offsetWidth
     menuDimension.y = contextMenuElement.offsetHeight
     mousePosition.x = x
     mousePosition.y = y
@@ -85,7 +86,11 @@ export default {
         xOffset: {
             type: Number,
             default: 0
-        }
+        },
+        width: {
+            type: Number,
+            default: null
+        },
     },
     data() {
         return {
@@ -127,11 +132,12 @@ export default {
             let x = xDefined ? this.x : this.elementRect.left + (this.xOffset || 0)
             let y = yDefined ? this.y : this.elementRect.bottom
 
-            const contextMenuPosition = getContextMenuPostion(x, y, this.$el.querySelector('.context-menu'), yDefined ? 0 : this.elementRect.height)
+            const contextMenuPosition = getContextMenuPostion(x, y, this.$el.querySelector('.context-menu'), yDefined ? 0 : this.elementRect.height, this.width)
             this.contextMenuStyle = {
                 left: `${contextMenuPosition.x}px`,
                 top: `${contextMenuPosition.y}px`,
                 maxHeight: contextMenuPosition.maxHeight ? `${contextMenuPosition.maxHeight}px` : 'auto',
+                width: this.width ? `${this.width}px` : 'auto',
             }
         },
         handleClick(option) {
@@ -147,11 +153,11 @@ export default {
         isOptionSelected(option) {
             if (option.value?._id) {
                 if (option.value === this.selectedOption) {
-                    return `<span class="selected-indicator">✔</span> ${option.label}`
+                    return `<div class="selected-indicator">✔&nbsp;</div><div>${option.label}</div>`
                 }
-                return `<span class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</span>${option.label}`
+                return `<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> <div>${option.label}</div>`
             }
-            return option.label
+            return `<div>${option.label}</div>`
         }
     }
 }
@@ -179,6 +185,7 @@ export default {
     background: var(--background-color);
     overflow-y: auto;
     left: -9999px;
+    max-height: 23rem;
 }
 
 button.context-menu-item {
@@ -186,7 +193,7 @@ button.context-menu-item {
     outline: none;
     background: var(--background-color);
     border: none;
-    display: block;
+    display: flex;
     width: 100%;
     text-align: left;
     color: var(--text-color);
