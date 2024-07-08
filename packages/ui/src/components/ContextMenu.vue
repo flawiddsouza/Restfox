@@ -1,15 +1,24 @@
 <template>
     <div class="context-menu-container" :style="{ 'visibility': show ? 'visible': 'hidden' }">
         <div class="context-menu-background" @click.stop="$emit('update:show', false)"></div>
-        <div class="context-menu" :style="contextMenuStyle">
-            <div v-for="option in options">
+        <div class="context-menu" :style="contextMenuStyle" @click.stop>
+            <div v-for="option in options" :key="option.value">
                 <template v-if="option.type === 'option'">
-                    <button type="button" class="context-menu-item" :class="`${option.class ? option.class : ''}`" :disabled="option.disabled" @click.stop="$emit('click', option.value); $emit('update:show', false);">
-                        <i :class="option.icon" v-if="option.icon"></i> {{ option.label }}
-                    </button>
+                    <slot name="option" :option="option">
+                        <button
+                            type="button"
+                            class="context-menu-item"
+                            :class="[{ 'selected': option.value === selectedOption }, option.class || '']"
+                            :disabled="option.disabled"
+                            @click.stop="handleClick(option)"
+                        >
+                            <i :class="option.icon" v-if="option.icon"></i>
+                            <div v-html="isOptionSelected(option)" style="display: flex;"></div>
+                        </button>
+                    </slot>
                 </template>
                 <template v-if="option.type === 'separator'">
-                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-separator" @click.stop></div>
                 </template>
             </div>
         </div>
@@ -18,12 +27,12 @@
 
 <script>
 // From: https://stackoverflow.com/a/11802841/4932305
-function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0) {
+function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0, width = null) {
     var mousePosition = {}
     var menuPostion = {}
     var menuDimension = {}
 
-    menuDimension.x = contextMenuElement.offsetWidth
+    menuDimension.x = width || contextMenuElement.offsetWidth
     menuDimension.y = contextMenuElement.offsetHeight
     mousePosition.x = x
     mousePosition.y = y
@@ -53,28 +62,40 @@ import { nextTick } from 'vue'
 
 export default {
     props: {
-        options: Array,
-        element: Element,
+        options: {
+            type: Array,
+            required: true,
+            default: () => []
+        },
+        element: {
+            type: [Element, null],
+            default: null
+        },
         show: {
             type: Boolean,
             default: false
         },
         x: {
             type: Number,
-            required: false
+            default: null
         },
         y: {
             type: Number,
-            required: false
+            default: null
         },
         xOffset: {
             type: Number,
-            required: false
-        }
+            default: 0
+        },
+        width: {
+            type: Number,
+            default: null
+        },
     },
     data() {
         return {
-            contextMenuStyle: {}
+            contextMenuStyle: {},
+            selectedOption: null
         }
     },
     computed: {
@@ -82,16 +103,16 @@ export default {
             if(this.element) {
                 return this.element.getBoundingClientRect()
             }
-
             return null
         }
     },
     watch: {
-        show() {
-            if(this.show) {
+        show(newVal) {
+            if (newVal) {
                 nextTick(() => {
                     this.$store.state.openContextMenuElement = this.$el
                     this.setContextMenuStyle()
+                    this.selectFirstOption()
                 })
             } else {
                 this.$store.state.openContextMenuElement = null
@@ -104,22 +125,39 @@ export default {
             const xDefined = this.x !== null && this.x !== undefined
             const yDefined = this.y !== null && this.y !== undefined
 
-            if((!xDefined && !xDefined) && !this.element) {
+            if (!xDefined && !yDefined && !this.element) {
                 return {}
             }
 
-            let x = xDefined ? this.x : this.elementRect.left + (this.xOffset ? this.xOffset : 0)
+            let x = xDefined ? this.x : this.elementRect.left + (this.xOffset || 0)
             let y = yDefined ? this.y : this.elementRect.bottom
 
-            const contextMenuPosition = getContextMenuPostion(x, y, this.$el.querySelector('.context-menu'), yDefined ? 0 : this.elementRect.height)
-            x = contextMenuPosition.x
-            y = contextMenuPosition.y
-
+            const contextMenuPosition = getContextMenuPostion(x, y, this.$el.querySelector('.context-menu'), yDefined ? 0 : this.elementRect.height, this.width)
             this.contextMenuStyle = {
-                left: x + 'px',
-                top: y + 'px',
-                maxHeight: contextMenuPosition.maxHeight + 'px',
+                left: `${contextMenuPosition.x}px`,
+                top: `${contextMenuPosition.y}px`,
+                maxHeight: contextMenuPosition.maxHeight ? `${contextMenuPosition.maxHeight}px` : 'auto',
+                width: this.width ? `${this.width}px` : 'auto',
             }
+        },
+        handleClick(option) {
+            this.selectedOption = option.value
+            this.$emit('click', option.value)
+            this.$emit('update:show', false)
+        },
+        selectFirstOption() {
+            if (this.options.length > 0 && !this.selectedOption) {
+                this.selectedOption = this.options[0].value
+            }
+        },
+        isOptionSelected(option) {
+            if (option.value?._id) {
+                if (option.value === this.selectedOption) {
+                    return `<div class="selected-indicator">✔&nbsp;</div><div>${option.label}</div>`
+                }
+                return `<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> <div>${option.label}</div>`
+            }
+            return `<div>${option.label}</div>`
         }
     }
 }
@@ -127,12 +165,12 @@ export default {
 
 <style scoped>
 .context-menu-background {
-  position: fixed;
-  z-index: 1;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
 }
 
 .context-menu {
@@ -140,24 +178,26 @@ export default {
     z-index: 1;
     border: 1px solid var(--menu-border-color);
     box-shadow: 0 0 1rem 0 var(--box-shadow-color);
-    border-radius: calc(1rem * 0.3);
+    border-radius: 0.3rem;
     min-width: 15rem;
     padding-top: 5px;
     padding-bottom: 5px;
     background: var(--background-color);
     overflow-y: auto;
     left: -9999px;
+    max-height: 23rem;
 }
 
 button.context-menu-item {
     padding: 0.5rem;
-    outline: 0;
+    outline: none;
     background: var(--background-color);
-    border: 0;
-    display: block;
+    border: none;
+    display: flex;
     width: 100%;
     text-align: left;
     color: var(--text-color);
+    cursor: pointer;
 }
 
 button.context-menu-item:not(:active):focus {
@@ -184,5 +224,11 @@ button.context-menu-item > i {
     border-bottom: 1px solid var(--modal-border-color);
     margin-top: 5px;
     margin-bottom: 5px;
+}
+
+.selected-indicator {
+    padding-right: 0.1rem;
+    font-size: 0.5rem;
+    color: var(--button-text-color);
 }
 </style>
