@@ -1645,7 +1645,7 @@ export function timeAgo(timestamp: number) {
     }
     if (secondsPast < 3600) {
         const minutesPast = Math.floor(secondsPast / 60)
-        return minutesPast === 1 ? 'one minute ago' : `${minutesPast} minutes ago`
+        return minutesPast === 1 ? '1 minute ago' : `${minutesPast} minutes ago`
     }
     if (secondsPast < 86400) {
         const hoursPast = Math.floor(secondsPast / 3600)

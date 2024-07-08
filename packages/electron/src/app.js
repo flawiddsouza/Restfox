@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron')
 const { resolve } = require('path')
 const contextMenu = require('electron-context-menu')
 const log = require('electron-log/main')
@@ -8,6 +8,7 @@ const db = require('./db')
 const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
 const updateElectronApp = require('update-electron-app')
+const windowStateKeeper = require('./utils/window-state')
 
 Object.assign(console, log.functions)
 
@@ -28,7 +29,20 @@ if (process.platform === 'linux' && process.env.SNAP) {
 function createWindow() {
     const autoHideMenuBar = true
 
+    const workAreaSize = screen.getPrimaryDisplay().workAreaSize
+    // console.log("workAreaSize: width: " + workAreaSize.width + ", height: " + workAreaSize.height)
+    const winStateOptions = {
+        defaultWidth: parseInt(workAreaSize.width * 0.75),
+        defaultHeight: parseInt(workAreaSize.height * 0.75),
+        defaultMaximize: true,
+    };
+    const winState = windowStateKeeper(winStateOptions);
+
     const win = new BrowserWindow({
+        x: winState.x,
+        y: winState.y,
+        width: winState.width,
+        height: winState.height,
         show: false,
         autoHideMenuBar,
         webPreferences: {
@@ -39,7 +53,10 @@ function createWindow() {
         icon: resolve(__dirname, '../ui/favicon.png'),
     })
     win.on('show', () => { win.focus() })
-    win.maximize()
+    // win.maximize()
+    // Please do not set useContentSize to true at creating BrowserWindow instance because it changes how to calculate window size.
+    // https://github.com/mawie81/electron-window-state?tab=readme-ov-file#usage
+    winState.manage(win)
     win.show()
 
     if (!app.isPackaged) {

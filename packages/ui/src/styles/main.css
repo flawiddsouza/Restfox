@@ -658,6 +658,10 @@ select {
     cursor: pointer;
 }
 
+.tag {
+    background: var(--sidebar-item-active-color);
+}
+
 .tag.green {
     background: #75ba24;
     color: white;
@@ -680,6 +684,12 @@ select {
     align-items: center;
     user-select: none;
     height: 100%;
+}
+
+.custom-dropdown .custom-dropdown-content {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .custom-dropdown i {

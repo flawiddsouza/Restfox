@@ -21,19 +21,10 @@
                 <div class="tag ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
-                <div v-if="response.createdAt" class="custom-dropdown" @click="handleResponseHistoryMenu" @contextmenu.prevent="handleResponseHistoryContextMenu">
-                    {{ timeAgo(response.createdAt) }} | {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}
+                <div v-if="response" class="custom-dropdown" @click="handleResponseHistoryContextMenu" @contextmenu.prevent="handleResponseHistoryContextMenu">
+                    <span class="custom-dropdown-content">{{ timeAgo(response.createdAt) }} | {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}</span>
                     <i class="fa fa-caret-down space-right"></i>
                 </div>
-
-                <ContextMenu
-                    :options="getHistoryResponses()"
-                    :show="showContextMenu"
-                    :x="menuX"
-                    :y="menuY"
-                    @update:show="showContextMenu = $event"
-                    @click="handleMenuClick"
-                />
             </div>
         </div>
         <div class="response-panel-tabs">
@@ -154,7 +145,16 @@
             <div>Send request to see response here</div>
         </div>
     </template>
-    <ContextMenu :options="responseHistoryContextMenuOptions" :element="responseHistoryContextMenuElement" v-model:show="showResponseHistoryContextMenu" @click="handleResponseHistoryContextMenuItemClick" />
+    <ContextMenu
+        :options="responseHistoryContextMenuOptions"
+        :element="responseHistoryContextMenuElement"
+        :x="responseHistoryContextMenuX"
+        :y="responseHistoryContextMenuY"
+        :width="responseHistoryContextMenuWidth"
+        v-model:show="showResponseHistoryContextMenu"
+        :selected-option="response"
+        @click="handleResponseHistoryContextMenuItemClick"
+    />
     <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal" v-model:is-xml="isXmlResponse"></ResponseFilteringHelpModal>
 </template>
 
@@ -199,6 +199,10 @@ export default {
         return {
             activeResponsePanelTab: 'Preview',
             responseHistoryContextMenuElement: null,
+            responseHistoryContextMenuX: null,
+            responseHistoryContextMenuY: null,
+            responseHistoryContextMenuWidth: null,
+            responseHistoryContextMenuOptionsType: null,
             showResponseHistoryContextMenu: false,
             currentlySelectedText: '',
             isXmlResponse: false,
@@ -206,9 +210,6 @@ export default {
             responseFilter: '',
             scrollableAreaEventListenerAttached: false,
             scrollableAreaScrollTop: null,
-            showContextMenu: false,
-            menuX: null,
-            menuY: null,
         }
     },
     computed: {
@@ -290,28 +291,39 @@ export default {
                 return []
             }
 
-            return [
-                {
-                    'type': 'option',
-                    'label': 'Rename Current Response',
-                    'value': 'Rename Current Response',
-                    'icon': 'fa fa-edit',
-                    'disabled': '_id' in this.response === false
-                },
-                {
-                    'type': 'option',
-                    'label': 'Delete Current Response',
-                    'value': 'Delete Current Response',
-                    'icon': 'fa fa-trash',
-                    'disabled': '_id' in this.response === false
-                },
-                {
-                    'type': 'option',
-                    'label': 'Clear History',
-                    'value': 'Clear History',
-                    'icon': 'fa fa-trash'
-                }
-            ]
+            const options = []
+
+            if(this.responseHistoryContextMenuOptionsType === 'click') {
+                options.push(...this.getHistoryResponses())
+            }
+
+
+            if(this.responseHistoryContextMenuOptionsType === 'contextmenu') {
+                options.push(...[
+                    {
+                        'type': 'option',
+                        'label': 'Rename Current Response',
+                        'value': 'Rename Current Response',
+                        'icon': 'fa fa-edit',
+                        'disabled': '_id' in this.response === false
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Delete Current Response',
+                        'value': 'Delete Current Response',
+                        'icon': 'fa fa-trash',
+                        'disabled': '_id' in this.response === false
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Clear History',
+                        'value': 'Clear History',
+                        'icon': 'fa fa-trash'
+                    }
+                ])
+            }
+
+            return options
         },
         flags() {
             return this.$store.state.flags
@@ -466,7 +478,17 @@ export default {
         humanFriendlyTime,
         humanFriendlySize,
         handleResponseHistoryContextMenu(event) {
-            this.responseHistoryContextMenuElement = event.target
+            if(event.type === 'click') {
+                this.responseHistoryContextMenuOptionsType = 'click'
+            } else {
+                this.responseHistoryContextMenuOptionsType = 'contextmenu'
+            }
+
+            const containerElement = event.target.closest('.custom-dropdown')
+            this.responseHistoryContextMenuX = containerElement.getBoundingClientRect().left
+            this.responseHistoryContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+            this.responseHistoryContextMenuWidth = containerElement.getBoundingClientRect().width
+            this.responseHistoryContextMenuElement = containerElement
             this.showResponseHistoryContextMenu = true
         },
         async handleResponseHistoryContextMenuItemClick(clickedContextMenuitem) {
@@ -476,15 +498,20 @@ export default {
                     return
                 }
                 this.$store.commit('renameCurrentlyActiveResponse', newResponseName)
+                return
             }
 
             if(clickedContextMenuitem === 'Delete Current Response') {
                 this.$store.commit('deleteCurrentlyActiveResponse')
+                return
             }
 
             if(clickedContextMenuitem === 'Clear History') {
                 this.$store.commit('clearResponseHistory')
+                return
             }
+
+            this.response = clickedContextMenuitem
         },
         async copyResponseToClipboard() {
             if(!window.isSecureContext) {
@@ -582,19 +609,18 @@ export default {
         scrollableAreaOnScroll(event) {
             this.scrollableAreaScrollTop = event.target.scrollTop
         },
-        handleResponseHistoryMenu(event) {
-            this.menuX = event.clientX
-            this.menuY = event.clientY
-            this.showContextMenu = true
-        },
-        handleMenuClick(value) {
-            this.response = value
-        },
         responseStatusColorMapping,
         getHistoryResponses() {
             return this.responses.map(item => {
                 const color = responseStatusColorMapping(item)
-                const label = `${dateFormat(item.createdAt, true)} | <span class="tag ${color}">${item.status} ${this.getStatusText(item.status)}</span><span class="request-method--${item.request.method}"> ${item.request.method} </span> ${item.name ?? item.url}`
+                const label = `
+                    <div>
+                        <span>${dateFormat(item.createdAt, true)}</span> <span class="tag ${color}" style="padding: 2px 3px; margin-left: 0.3rem;">${item.status} ${this.getStatusText(item.status)}</span> <span class="tag" style="padding: 2px 3px; margin-left: 0.3rem;">${this.humanFriendlyTime(item.timeTaken)}</span>
+                    </div>
+                    <div style="margin-top: 0.2rem;">
+                        <span class="request-method--${item.request.method}"> ${item.request.method} </span> ${item.name ?? item.url}
+                    </div>
+                `
 
                 return {
                     type: 'option',
@@ -699,6 +725,7 @@ export default {
     height: 100%;
     margin-left: 1rem;
     margin-right: 1rem;
+    overflow: auto;
 }
 
 .response-panel-address-bar  .response-panel-address-bar-select-container select {
