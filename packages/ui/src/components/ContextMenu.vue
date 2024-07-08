@@ -8,7 +8,7 @@
                         <button
                             type="button"
                             class="context-menu-item"
-                            :class="[{ 'selected': option.value === selectedOption }, option.class || '']"
+                            :class="[{ 'selected': option.value === internalSelectedOption }, option.class || '']"
                             :disabled="option.disabled"
                             @click.stop="handleClick(option)"
                         >
@@ -85,12 +85,16 @@ export default {
         xOffset: {
             type: Number,
             default: 0
+        },
+        selectedOption: {
+            type: [String, Number, Object],
+            default: null
         }
     },
     data() {
         return {
             contextMenuStyle: {},
-            selectedOption: null
+            internalSelectedOption: this.selectedOption
         }
     },
     computed: {
@@ -113,6 +117,9 @@ export default {
                 this.$store.state.openContextMenuElement = null
                 this.contextMenuStyle = {}
             }
+        },
+        selectedOption(newVal) {
+            this.internalSelectedOption = newVal
         }
     },
     methods: {
@@ -135,18 +142,18 @@ export default {
             }
         },
         handleClick(option) {
-            this.selectedOption = option.value
+            this.internalSelectedOption = option.value
             this.$emit('click', option.value)
             this.$emit('update:show', false)
         },
         selectFirstOption() {
             if (this.options.length > 0 && !this.selectedOption) {
-                this.selectedOption = this.options[0].value
+                this.internalSelectedOption = this.options[0].value
             }
         },
         isOptionSelected(option) {
-            if (option.value?._id) {
-                if (option.value === this.selectedOption) {
+            if (option.showSelectedIcon || option.value?._id) {
+                if (option.value === this.internalSelectedOption) {
                     return `<span class="selected-indicator">✔</span> ${option.label}`
                 }
                 return `<span class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</span>${option.label}`
@@ -191,6 +198,11 @@ button.context-menu-item {
     text-align: left;
     color: var(--text-color);
     cursor: pointer;
+}
+
+button.context-menu-item:disabled {
+    cursor: default;
+    background-color: var(--menu-border-color);
 }
 
 button.context-menu-item:not(:active):focus {
