@@ -8,7 +8,7 @@
                         <button
                             type="button"
                             class="context-menu-item"
-                            :class="[{ 'selected': option.value === selectedOption }, option.class || '']"
+                            :class="`${option.class ? option.class : ''}`"
                             :disabled="option.disabled"
                             @click.stop="handleClick(option)"
                         >
@@ -91,11 +91,14 @@ export default {
             type: Number,
             default: null
         },
+        selectedOption: {
+            type: Object,
+            default: null
+        },
     },
     data() {
         return {
             contextMenuStyle: {},
-            selectedOption: null
         }
     },
     computed: {
@@ -112,7 +115,6 @@ export default {
                 nextTick(() => {
                     this.$store.state.openContextMenuElement = this.$el
                     this.setContextMenuStyle()
-                    this.selectFirstOption()
                 })
             } else {
                 this.$store.state.openContextMenuElement = null
@@ -141,18 +143,12 @@ export default {
             }
         },
         handleClick(option) {
-            this.selectedOption = option.value
             this.$emit('click', option.value)
             this.$emit('update:show', false)
         },
-        selectFirstOption() {
-            if (this.options.length > 0 && !this.selectedOption) {
-                this.selectedOption = this.options[0].value
-            }
-        },
         isOptionSelected(option) {
             if (option.value?._id) {
-                if (option.value === this.selectedOption) {
+                if (option.value?._id === this.selectedOption?._id) {
                     return `<div class="selected-indicator">✔&nbsp;</div><div>${option.label}</div>`
                 }
                 return `<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> <div>${option.label}</div>`
@@ -186,6 +182,7 @@ export default {
     overflow-y: auto;
     left: -9999px;
     max-height: 23rem;
+    user-select: none;
 }
 
 button.context-menu-item {

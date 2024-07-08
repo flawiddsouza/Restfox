@@ -152,6 +152,7 @@
         :y="responseHistoryContextMenuY"
         :width="responseHistoryContextMenuWidth"
         v-model:show="showResponseHistoryContextMenu"
+        :selected-option="response"
         @click="handleResponseHistoryContextMenuItemClick"
     />
     <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal" v-model:is-xml="isXmlResponse"></ResponseFilteringHelpModal>
