@@ -152,7 +152,7 @@ export default {
             const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
             const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
 
-            return `${isSelected ? tickMark : noTickMark}<div>${option.label}</div>`
+            return `${isSelected ? tickMark : noTickMark}<div style="word-break: break-all;">${option.label}</div>`
         }
     }
 }
