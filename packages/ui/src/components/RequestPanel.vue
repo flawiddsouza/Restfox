@@ -43,21 +43,20 @@
             </div>
         </div>
         <div class="request-panel-tabs-context">
-            <div v-if="activeRequestPanelTab === 'Body'">
+            <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
                 <div v-if="activeTab.body.mimeType" class="custom-select" style="padding-bottom: 0.5rem;" @click="handleRequestBodyMenu">
                     {{ requestBodyList.find(item => item.value === activeTab.body.mimeType)?.label ?? 'No Body' }}
                     <i class="fa fa-caret-down space-right"></i>
+                    <ContextMenu
+                        :options="requestBodyList"
+                        :show="showRequestBodyMenu"
+                        :x="requestBodyMenuX"
+                        :y="requestBodyMenuY"
+                        :selected-option="activeTab.body"
+                        @update:show="showRequestBodyMenu = $event"
+                        @click="handleRequestBodyMenuClick"
+                    />
                 </div>
-
-                <ContextMenu
-                    :options="requestBodyList"
-                    :show="showRequestBodyMenu"
-                    :x="requestBodyMenuX"
-                    :y="requestBodyMenuY"
-                    :selected-option="activeTab.body"
-                    @update:show="showRequestBodyMenu = $event"
-                    @click="handleRequestBodyMenuClick"
-                />
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
                     <table style="table-layout: fixed">
                         <tr v-for="(param, index) in activeTab.body.params">
@@ -456,7 +455,8 @@ export default {
                     'label': 'Structured',
                     'value': '',
                     'icon': 'fa fa-bars',
-                    'disabled': true
+                    'disabled': true,
+                    'class': 'context-menu-header'
                 },
                 {
                     'type': 'option',
@@ -481,7 +481,8 @@ export default {
                     'label': 'Text',
                     'value': '',
                     'icon': 'fa fa-angle-right',
-                    'disabled': true
+                    'disabled': true,
+                    'class': 'context-menu-header'
                 },
                 {
                     'type': 'option',
@@ -500,7 +501,8 @@ export default {
                     'label': 'Other',
                     'value': '',
                     'icon': 'fa fa-ellipsis-h',
-                    'disabled': true
+                    'disabled': true,
+                    'class': 'context-menu-header'
                 },
                 {
                     'type': 'option',

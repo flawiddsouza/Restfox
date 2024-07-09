@@ -198,7 +198,6 @@ button.context-menu-item {
 
 button.context-menu-item:disabled {
     cursor: default;
-    background-color: var(--menu-border-color);
 }
 
 button.context-menu-item:not(:active):focus {
@@ -231,5 +230,13 @@ button.context-menu-item > i {
     padding-right: 0.1rem;
     font-size: 0.5rem;
     color: var(--button-text-color);
+}
+
+.context-menu-header {
+    font-weight: bold;
+    font-size: 12px;
+    padding: 0 12px;
+    color: #888;
+    text-transform: uppercase;
 }
 </style>
