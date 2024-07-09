@@ -44,7 +44,7 @@
         </div>
         <div class="request-panel-tabs-context">
             <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
-                <div v-if="activeTab.body.mimeType" class="custom-select" style="padding-bottom: 0.5rem;" @click="handleRequestBodyMenu">
+                <div v-if="activeTab.body.mimeType" class="custom-select" @click="handleRequestBodyMenu">
                     {{ requestBodyList.find(item => item.value === activeTab.body.mimeType)?.label ?? 'No Body' }}
                     <i class="fa fa-caret-down space-right"></i>
                     <ContextMenu
@@ -981,8 +981,8 @@ export default {
     border: 1px solid var(--default-border-color);
     border-radius: var(--default-border-radius);
     outline: 0;
-    padding: 0.4rem;
-    margin-bottom: 0.4rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
     background: inherit;
     cursor: pointer;
 }
