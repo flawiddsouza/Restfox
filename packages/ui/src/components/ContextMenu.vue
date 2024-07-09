@@ -147,13 +147,12 @@ export default {
             this.$emit('update:show', false)
         },
         isOptionSelected(option) {
-            if (option.value?._id) {
-                if (option.value?._id === this.selectedOption?._id) {
-                    return `<div class="selected-indicator">✔&nbsp;</div><div style="word-break: break-all;">${option.label}</div>`
-                }
-                return `<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> <div style="word-break: break-all;">${option.label}</div>`
-            }
-            return `<div>${option.label}</div>`
+            const { _id } = option.value || {}
+            const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType)
+            const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
+            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
+
+            return `${isSelected ? tickMark : noTickMark}<div style="word-break: break-all;">${option.label}</div>`
         }
     }
 }
@@ -197,6 +196,10 @@ button.context-menu-item {
     cursor: pointer;
 }
 
+button.context-menu-item:disabled {
+    cursor: default;
+}
+
 button.context-menu-item:not(:active):focus {
     outline: 1px solid black;
     background: #82828240;
@@ -227,5 +230,13 @@ button.context-menu-item > i {
     padding-right: 0.1rem;
     font-size: 0.5rem;
     color: var(--button-text-color);
+}
+
+.context-menu-header {
+    font-weight: bold;
+    font-size: 12px;
+    padding: 0 12px;
+    color: #888;
+    text-transform: uppercase;
 }
 </style>

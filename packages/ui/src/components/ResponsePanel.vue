@@ -24,7 +24,7 @@
                 <div class="tag ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
-                <div v-if="response" class="custom-dropdown" @click="handleResponseHistoryContextMenu" @contextmenu.prevent="handleResponseHistoryContextMenu">
+                <div v-if="response.createdAt" class="custom-dropdown" @click="handleResponseHistoryContextMenu" @contextmenu.prevent="handleResponseHistoryContextMenu">
                     <span class="custom-dropdown-content">{{ timeAgo(response.createdAt) }} | {{ dateFormat(response.createdAt, true) }} | {{ response.name ?? response.url }}</span>
                     <i class="fa fa-caret-down space-right"></i>
                 </div>

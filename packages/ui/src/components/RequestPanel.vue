@@ -44,15 +44,19 @@
         </div>
         <div class="request-panel-tabs-context">
             <div v-if="activeRequestPanelTab === 'Body'" class="request-panel-tabs-context-container">
-                <select v-model="activeTab.body.mimeType" style="margin-bottom: 0.5rem" @change="bodyMimeTypeChanged($event.target.value)">
-                    <option value="No Body">No Body</option>
-                    <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
-                    <option value="multipart/form-data">Multipart Form</option>
-                    <option value="text/plain">Plain Text</option>
-                    <option value="application/json">JSON</option>
-                    <option value="application/graphql">GraphQL</option>
-                    <option value="application/octet-stream">Binary File</option>
-                </select>
+                <div v-if="activeTab.body.mimeType" class="custom-select" @click="handleRequestBodyMenu">
+                    {{ requestBodyList.find(item => item.value === activeTab.body.mimeType)?.label ?? 'No Body' }}
+                    <i class="fa fa-caret-down space-right"></i>
+                    <ContextMenu
+                        :options="requestBodyList"
+                        :show="showRequestBodyMenu"
+                        :x="requestBodyMenuX"
+                        :y="requestBodyMenuY"
+                        :selected-option="activeTab.body"
+                        @update:show="showRequestBodyMenu = $event"
+                        @click="handleRequestBodyMenuClick"
+                    />
+                </div>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
                     <table style="table-layout: fixed">
                         <tr v-for="(param, index) in activeTab.body.params">
@@ -445,6 +449,77 @@ export default {
             methodSelectorElement: null,
             methodSelectorContextMenuX: null,
             methodSelectorContextMenuY: null,
+            requestBodyList: [
+                {
+                    'type': 'option',
+                    'label': 'Structured',
+                    'value': '',
+                    'icon': 'fa fa-bars',
+                    'disabled': true,
+                    'class': 'context-menu-header'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Multipart Form',
+                    'value': 'multipart/form-data',
+                    'showSelectedIcon': true
+                },
+                {
+                    'type': 'option',
+                    'label': 'Form URL Encoded',
+                    'value': 'application/x-www-form-urlencoded',
+                    'showSelectedIcon': true
+                },
+                {
+                    'type': 'option',
+                    'label': 'GraphQL',
+                    'value': 'application/graphql',
+                    'showSelectedIcon': true
+                },
+                {
+                    'type': 'option',
+                    'label': 'Text',
+                    'value': '',
+                    'icon': 'fa fa-angle-right',
+                    'disabled': true,
+                    'class': 'context-menu-header'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Plain Text',
+                    'value': 'text/plain',
+                    'showSelectedIcon': true
+                },
+                {
+                    'type': 'option',
+                    'label': 'JSON',
+                    'value': 'application/json',
+                    'showSelectedIcon': true
+                },
+                {
+                    'type': 'option',
+                    'label': 'Other',
+                    'value': '',
+                    'icon': 'fa fa-ellipsis-h',
+                    'disabled': true,
+                    'class': 'context-menu-header'
+                },
+                {
+                    'type': 'option',
+                    'label': 'No Body',
+                    'value': 'No Body',
+                    'showSelectedIcon': true
+                },
+                {
+                    'type': 'option',
+                    'label': 'Binary File',
+                    'value': 'application/octet-stream',
+                    'showSelectedIcon': true
+                },
+            ],
+            showRequestBodyMenu: false,
+            requestBodyMenuX: null,
+            requestBodyMenuY: null,
         }
     },
     computed: {
@@ -589,53 +664,6 @@ export default {
                 this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
-        bodyMimeTypeChanged(newMimeType) {
-            let mimeType = null
-
-            if(newMimeType === constants.MIME_TYPE.FORM_URL_ENCODED) {
-                mimeType = constants.MIME_TYPE.FORM_URL_ENCODED
-            }
-
-            if(newMimeType === constants.MIME_TYPE.FORM_DATA) {
-                mimeType = constants.MIME_TYPE.FORM_DATA
-            }
-
-            if(newMimeType === constants.MIME_TYPE.TEXT_PLAIN) {
-                mimeType = constants.MIME_TYPE.TEXT_PLAIN
-            }
-
-            if(newMimeType === constants.MIME_TYPE.JSON || newMimeType === constants.MIME_TYPE.GRAPHQL) {
-                mimeType = constants.MIME_TYPE.JSON
-            }
-
-            if(newMimeType === constants.MIME_TYPE.OCTET_STREAM) {
-                mimeType = constants.MIME_TYPE.OCTET_STREAM
-            }
-
-            if(mimeType === null) {
-                for (let i = 0; i < this.activeTab.headers.length; i++) {
-                    if (this.activeTab.headers[i].name === 'Content-Type') {
-                        this.activeTab.headers.splice(i, 1)
-                    }
-                }
-                return
-            }
-
-            let contentTypeHeader = 'headers' in this.activeTab && this.activeTab.headers.find(header => header.name.toLowerCase() === 'content-type')
-
-            if(contentTypeHeader) {
-                contentTypeHeader.value = mimeType
-            } else {
-                if('headers' in this.activeTab == false) {
-                    this.activeTab.headers = []
-                }
-
-                this.activeTab.headers.push({
-                    name: 'Content-Type',
-                    value: mimeType
-                })
-            }
-        },
         handleAddressBarKeyDown(e) {
             if(!e.defaultPrevented && e.ctrlKey === false && e.key === 'Enter') {
                 if(this.activeTab.url === '') {
@@ -762,6 +790,67 @@ export default {
         selectMethod(method) {
             this.activeTab.method = method
         },
+        handleRequestBodyMenu(event) {
+            this.requestBodyMenuX = event.clientX
+            this.requestBodyMenuY = event.clientY
+            this.showRequestBodyMenu = true
+        },
+        handleRequestBodyMenuClick(newMimeType) {
+            let mimeType = null
+
+            if(newMimeType === constants.MIME_TYPE.FORM_URL_ENCODED) {
+                mimeType = constants.MIME_TYPE.FORM_URL_ENCODED
+            }
+
+            if(newMimeType === constants.MIME_TYPE.FORM_DATA) {
+                mimeType = constants.MIME_TYPE.FORM_DATA
+            }
+
+            if(newMimeType === constants.MIME_TYPE.TEXT_PLAIN) {
+                mimeType = constants.MIME_TYPE.TEXT_PLAIN
+            }
+
+            if(newMimeType === constants.MIME_TYPE.JSON) {
+                mimeType = constants.MIME_TYPE.JSON
+            }
+
+            if(newMimeType === constants.MIME_TYPE.GRAPHQL) {
+                mimeType = constants.MIME_TYPE.GRAPHQL
+            }
+
+            if(newMimeType === 'No Body') {
+                mimeType = newMimeType
+            }
+
+            if(newMimeType === constants.MIME_TYPE.OCTET_STREAM) {
+                mimeType = constants.MIME_TYPE.OCTET_STREAM
+            }
+
+            if(mimeType === null) {
+                for (let i = 0; i < this.activeTab.headers.length; i++) {
+                    if (this.activeTab.headers[i].name === 'Content-Type') {
+                        this.activeTab.headers.splice(i, 1)
+                    }
+                }
+                return
+            }
+
+            let contentTypeHeader = 'headers' in this.activeTab && this.activeTab.headers.find(header => header.name.toLowerCase() === 'content-type')
+
+            if(contentTypeHeader) {
+                contentTypeHeader.value = mimeType
+            } else {
+                if('headers' in this.activeTab == false) {
+                    this.activeTab.headers = []
+                }
+
+                this.activeTab.headers.push({
+                    name: 'Content-Type',
+                    value: mimeType
+                })
+            }
+            this.activeTab.body.mimeType = mimeType
+        }
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
@@ -887,4 +976,15 @@ export default {
     align-items: center;
     margin-top: 0.5rem;
 }
+
+.custom-select {
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--default-border-radius);
+    outline: 0;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: inherit;
+    cursor: pointer;
+}
+
 </style>
