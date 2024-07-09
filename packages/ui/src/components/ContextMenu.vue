@@ -149,9 +149,9 @@ export default {
         isOptionSelected(option) {
             if (option.value?._id) {
                 if (option.value?._id === this.selectedOption?._id) {
-                    return `<div class="selected-indicator">✔&nbsp;</div><div>${option.label}</div>`
+                    return `<div class="selected-indicator">✔&nbsp;</div><div style="word-break: break-all;">${option.label}</div>`
                 }
-                return `<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> <div>${option.label}</div>`
+                return `<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> <div style="word-break: break-all;">${option.label}</div>`
             }
             return `<div>${option.label}</div>`
         }
