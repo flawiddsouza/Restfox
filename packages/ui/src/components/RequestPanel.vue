@@ -981,9 +981,9 @@ export default {
     border: 1px solid var(--default-border-color);
     border-radius: var(--default-border-radius);
     outline: 0;
-    padding: 0.3rem;
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
     background: inherit;
-    margin-bottom: 0.2rem;
     cursor: pointer;
 }
 
