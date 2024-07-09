@@ -49,11 +49,11 @@
                     <i class="fa fa-caret-down space-right"></i>
                     <ContextMenu
                         :options="requestBodyList"
-                        :show="showRequestBodyMenu"
+                        v-model:show="showRequestBodyMenu"
                         :x="requestBodyMenuX"
                         :y="requestBodyMenuY"
+                        :width="requestBodyWidth"
                         :selected-option="activeTab.body"
-                        @update:show="showRequestBodyMenu = $event"
                         @click="handleRequestBodyMenuClick"
                     />
                 </div>
@@ -520,6 +520,7 @@ export default {
             showRequestBodyMenu: false,
             requestBodyMenuX: null,
             requestBodyMenuY: null,
+            requestBodyWidth: null,
         }
     },
     computed: {
@@ -791,8 +792,10 @@ export default {
             this.activeTab.method = method
         },
         handleRequestBodyMenu(event) {
-            this.requestBodyMenuX = event.clientX
-            this.requestBodyMenuY = event.clientY
+            const containerElement = event.target.closest('.custom-select')
+            this.requestBodyMenuX = containerElement.getBoundingClientRect().left
+            this.requestBodyMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+            this.requestBodyWidth = containerElement.getBoundingClientRect().width
             this.showRequestBodyMenu = true
         },
         handleRequestBodyMenuClick(newMimeType) {
