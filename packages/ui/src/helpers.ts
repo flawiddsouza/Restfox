@@ -386,25 +386,16 @@ export async function createRequestData(
 
     const url = new URL(urlWithEnvironmentVariablesSubstituted)
 
-    const urlCopy = new URL(urlWithEnvironmentVariablesSubstituted)
-
     if('parameters' in request && request.parameters) {
+        url.search = ''
+
         request.parameters.filter(item => !item.disabled).forEach(param => {
             const paramName = substituteEnvironmentVariables(environment, param.name)
             const paramValue = substituteEnvironmentVariables(environment, param.value)
 
-            // if the parameter with the same name & value is already in the url, then we remove it, to prevent duplicate parameters
-            // @ts-expect-error searchParams.has has no 2nd parameter on any browser other than firefox
-            if(urlCopy.searchParams.has(paramName, paramValue) && urlCopy.searchParams.getAll(paramName).some(value => value === paramValue)) {
-                // console.log('Removing duplicate parameter', paramName, paramValue)
-                // @ts-expect-error searchParams.delete has no 2nd parameter on any browser other than firefox
-                url.searchParams.delete(paramName, paramValue)
-            }
-
-            // console.log('Adding parameter', paramName, paramValue)
             url.searchParams.append(
                 paramName,
-                paramValue
+                decodeURIComponent(paramValue)
             )
         })
     }
