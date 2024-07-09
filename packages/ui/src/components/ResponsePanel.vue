@@ -12,7 +12,10 @@
         <div class="response-panel-address-bar">
             <div class="response-panel-address-bar-tag-container">
                 <div
-                    class="tag" :class="responseStatusColorMapping(response)"
+                    class="tag"
+                    :class="responseStatusColorMapping(response)"
+                    style="max-width: 15rem; text-overflow: ellipsis; overflow: hidden;"
+                    :title="response.statusText === '' ? getStatusText(response.status) : response.statusText"
                 >
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText === '' ? getStatusText(response.status) : response.statusText }}
