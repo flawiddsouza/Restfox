@@ -697,6 +697,8 @@ select {
 }
 
 .custom-select {
+    display: flex;
+    justify-content: space-between;
     border: 1px solid var(--default-border-color);
     border-radius: var(--default-border-radius);
     outline: 0;

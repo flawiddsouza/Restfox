@@ -13,7 +13,7 @@
                             @click.stop="handleClick(option)"
                         >
                             <i :class="option.icon" v-if="option.icon"></i>
-                            <div v-html="isOptionSelected(option)" style="display: flex;"></div>
+                            <div v-html="getOption(option)" style="display: flex;"></div>
                         </button>
                     </slot>
                 </template>
@@ -92,7 +92,7 @@ export default {
             default: null
         },
         selectedOption: {
-            type: Object,
+            type: [Object, String],
             default: undefined
         },
     },
@@ -146,7 +146,7 @@ export default {
             this.$emit('click', option.value)
             this.$emit('update:show', false)
         },
-        isOptionSelected(option) {
+        getOption(option) {
             const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
             const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</div>'
             const displayedOption = `<div style="word-break: break-all;">${option.label}</div>`
@@ -155,12 +155,8 @@ export default {
                 return displayedOption
             }
 
-            if(option.value === 'No Auth') {
-                return `${tickMark}${displayedOption}`
-            }
-
             const { _id } = option.value || {}
-            const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.authentication?.type)
+            const isSelected = (_id && _id === this.selectedOption?._id) || (option.value === this.selectedOption)
 
             return `${isSelected ? tickMark : noTickMark}${displayedOption}`
         }

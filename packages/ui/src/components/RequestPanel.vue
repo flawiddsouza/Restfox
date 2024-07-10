@@ -47,15 +47,6 @@
                 <div v-if="activeTab.body.mimeType" class="custom-select" @click="handleRequestBodyMenu">
                     {{ requestBodyList.find(item => item.value === activeTab.body.mimeType)?.label ?? 'No Body' }}
                     <i class="fa fa-caret-down space-right"></i>
-                    <ContextMenu
-                        :options="requestBodyList"
-                        v-model:show="showRequestBodyMenu"
-                        :x="requestBodyMenuX"
-                        :y="requestBodyMenuY"
-                        :width="requestBodyWidth"
-                        :selected-option="activeTab.body"
-                        @click="handleRequestBodyMenuClick"
-                    />
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
                     <table style="table-layout: fixed">
@@ -350,6 +341,15 @@
                 </template>
             </div>
         </div>
+        <ContextMenu
+            :options="requestBodyList"
+            v-model:show="showRequestBodyMenu"
+            :x="requestBodyMenuX"
+            :y="requestBodyMenuY"
+            :width="requestBodyWidth"
+            :selected-option="activeTab.body.mimeType"
+            @click="handleRequestBodyMenuClick"
+        />
     </template>
 </template>
 
@@ -462,19 +462,16 @@ export default {
                     'type': 'option',
                     'label': 'Multipart Form',
                     'value': 'multipart/form-data',
-                    'showSelectedIcon': true
                 },
                 {
                     'type': 'option',
                     'label': 'Form URL Encoded',
                     'value': 'application/x-www-form-urlencoded',
-                    'showSelectedIcon': true
                 },
                 {
                     'type': 'option',
                     'label': 'GraphQL',
                     'value': 'application/graphql',
-                    'showSelectedIcon': true
                 },
                 {
                     'type': 'option',
@@ -488,13 +485,11 @@ export default {
                     'type': 'option',
                     'label': 'Plain Text',
                     'value': 'text/plain',
-                    'showSelectedIcon': true
                 },
                 {
                     'type': 'option',
                     'label': 'JSON',
                     'value': 'application/json',
-                    'showSelectedIcon': true
                 },
                 {
                     'type': 'option',
@@ -508,13 +503,11 @@ export default {
                     'type': 'option',
                     'label': 'No Body',
                     'value': 'No Body',
-                    'showSelectedIcon': true
                 },
                 {
                     'type': 'option',
                     'label': 'Binary File',
                     'value': 'application/octet-stream',
-                    'showSelectedIcon': true
                 },
             ],
             showRequestBodyMenu: false,
