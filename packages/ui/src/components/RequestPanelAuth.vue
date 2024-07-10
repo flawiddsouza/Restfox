@@ -101,82 +101,79 @@
     </div>
 </template>
 
-<script lang="ts">
-import { PropType } from 'vue'
+<script setup lang="ts">
+import { PropType, ref } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 
-export default ({
-    name: 'CustomDropdown',
-    components: {
-        ContextMenu,
-        CodeMirrorSingleLine,
+const props = defineProps({
+    collectionItem: {
+        type: Object as PropType<CollectionItem>,
+        required: true
     },
-    props: {
-        collectionItem: {
-            type: Object as PropType<CollectionItem> | null,
-            required: true,
-        },
-        collectionItemEnvironmentResolved: {
-            type: Object as PropType<any>,
-            required: true,
-        },
-    },
-    data() {
-        return {
-            requestAuthList: [
-                {
-                    'type': 'option',
-                    'label': 'Auth Types',
-                    'disabled': true,
-                    'class': 'context-menu-header'
-                },
-                {
-                    'type': 'option',
-                    'label': 'Basic Auth',
-                    'value': 'basic',
-                    'showSelectedIcon': true
-                },
-                {
-                    'type': 'option',
-                    'label': 'Bearer Token',
-                    'value': 'bearer',
-                    'showSelectedIcon': true
-                },
-                {
-                    'type': 'option',
-                    'label': 'Other',
-                    'disabled': true,
-                    'class': 'context-menu-header'
-                },
-                {
-                    'type': 'option',
-                    'label': 'No Auth',
-                    'value': 'No Auth',
-                    'showSelectedIcon': true
-                },
-            ],
-            showRequestAuthMenu: false,
-            requestAuthMenuX: null,
-            requestAuthMenuY: null,
-        }
-    },
-    methods: {
-        handleRequestAuthMenu(event: any) {
-            this.requestAuthMenuX = event.clientX
-            this.requestAuthMenuY = event.clientY
-            this.showRequestAuthMenu = true
-        },
-        handleCollectionItemAuthenticationTypeChange(event: any) {
-            this.collectionItem.authentication.type = event
-        },
-        toggleAuthEnabled(event: any) {
-            const target = event.target as HTMLInputElement
-            this.collectionItem.authentication.disabled = !target.checked
-        },
-    },
+    collectionItemEnvironmentResolved: {
+        type: Object as PropType<any>,
+        required: true
+    }
 })
+
+const requestAuthList = ref([
+    {
+        'type': 'option',
+        'label': 'Auth Types',
+        'disabled': true,
+        'class': 'context-menu-header'
+    },
+    {
+        'type': 'option',
+        'label': 'Basic Auth',
+        'value': 'basic',
+        'showSelectedIcon': true
+    },
+    {
+        'type': 'option',
+        'label': 'Bearer Token',
+        'value': 'bearer',
+        'showSelectedIcon': true
+    },
+    {
+        'type': 'option',
+        'label': 'Other',
+        'disabled': true,
+        'class': 'context-menu-header'
+    },
+    {
+        'type': 'option',
+        'label': 'No Auth',
+        'value': 'No Auth',
+        'showSelectedIcon': true
+    },
+])
+
+const showRequestAuthMenu = ref(false)
+const requestAuthMenuX = ref<number | null>(null)
+const requestAuthMenuY = ref<number | null>(null)
+
+function handleRequestAuthMenu(event: MouseEvent) {
+    requestAuthMenuX.value = event.clientX
+    requestAuthMenuY.value = event.clientY
+    showRequestAuthMenu.value = true
+}
+
+function handleCollectionItemAuthenticationTypeChange(event: string) {
+    if (!props.collectionItem.authentication) {
+        props.collectionItem.authentication = {}
+    }
+    props.collectionItem.authentication.type = event
+}
+
+function toggleAuthEnabled(event: Event) {
+    const target = event.target as HTMLInputElement
+    if (props.collectionItem && props.collectionItem.authentication) {
+        props.collectionItem.authentication.disabled = !target.checked
+    }
+}
 </script>
 
 <style scoped>
@@ -192,9 +189,5 @@ export default ({
 
 .auth-input {
     width: 100%;
-}
-
-.disabled {
-    opacity: 0.5;
 }
 </style>
