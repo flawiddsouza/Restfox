@@ -1,7 +1,7 @@
 <template>
     <div>
         <div class="custom-select" @click="handleRequestAuthMenu">
-            {{ requestAuthList.find(item => item.value === collectionItem.authentication?.type)?.label ?? 'No Auth' }}
+            {{ collectionItem.authentication ? requestAuthList.find(item => item.value === collectionItem.authentication?.type)?.label : 'No Auth' }}
             <i class="fa fa-caret-down space-right"></i>
             <ContextMenu
                 :options="requestAuthList"
