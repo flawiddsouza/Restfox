@@ -979,15 +979,4 @@ export default {
     align-items: center;
     margin-top: 0.5rem;
 }
-
-.custom-select {
-    border: 1px solid var(--default-border-color);
-    border-radius: var(--default-border-radius);
-    outline: 0;
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
-    background: inherit;
-    cursor: pointer;
-}
-
 </style>
