@@ -148,7 +148,7 @@ export default {
         },
         isOptionSelected(option) {
             const { _id } = option.value || {}
-            const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType)
+            const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.authentication?.type)
             const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
             const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
 
@@ -198,6 +198,7 @@ button.context-menu-item {
 
 button.context-menu-item:disabled {
     cursor: default;
+    font-size: 0.7rem;
 }
 
 button.context-menu-item:not(:active):focus {
