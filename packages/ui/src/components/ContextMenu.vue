@@ -93,7 +93,7 @@ export default {
         },
         selectedOption: {
             type: Object,
-            default: null
+            default: undefined
         },
     },
     data() {
@@ -147,10 +147,14 @@ export default {
             this.$emit('update:show', false)
         },
         isOptionSelected(option) {
+            if(this.selectedOption === undefined) {
+                return `<div>${option.label}</div>`
+            }
+
             const { _id } = option.value || {}
             const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.authentication?.type)
             const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
-            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>'
+            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</div>'
 
             return `${isSelected ? tickMark : noTickMark}<div style="word-break: break-all;">${option.label}</div>`
         }
@@ -236,8 +240,6 @@ button.context-menu-item > i {
 .context-menu-header {
     font-weight: bold;
     font-size: 12px;
-    padding: 0 12px;
-    color: #888;
     text-transform: uppercase;
 }
 </style>

@@ -333,16 +333,14 @@ export async function createRequestData(
 
     if(request.body && request.body.mimeType === 'application/x-www-form-urlencoded') {
         if('params' in request.body && request.body.params) {
-            body = new URLSearchParams(
-                Object.fromEntries(
-                    request.body.params.filter(item => !item.disabled).map(item => {
-                        return [
-                            substituteEnvironmentVariables(environment, item.name),
-                            substituteEnvironmentVariables(environment, item.value)
-                        ]
-                    })
-                )
-            ).toString()
+            const formParams = request.body.params.filter(item => !item.disabled).reduce((acc, item) => {
+                const name = substituteEnvironmentVariables(environment, item.name)
+                const value = substituteEnvironmentVariables(environment, item.value)
+                acc.append(name, value)
+                return acc
+            }, new URLSearchParams())
+
+            body = formParams.toString()
         }
     }
 
