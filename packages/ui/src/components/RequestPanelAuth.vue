@@ -1,15 +1,14 @@
 <template>
     <div>
-        <div class="custom-select" @click="handleRequestAuthMenu">
+        <div class="custom-select" style="width: 8rem;" @click="handleRequestAuthMenu">
             {{ collectionItem.authentication ? requestAuthList.find(item => item.value === collectionItem.authentication?.type)?.label : 'No Auth' }}
             <i class="fa fa-caret-down space-right"></i>
             <ContextMenu
                 :options="requestAuthList"
-                :show="showRequestAuthMenu"
+                v-model:show="showRequestAuthMenu"
                 :x="requestAuthMenuX"
                 :y="requestAuthMenuY"
                 :selected-option="collectionItem"
-                @update:show="showRequestAuthMenu = $event"
                 @click="handleCollectionItemAuthenticationTypeChange"
             />
         </div>
@@ -155,9 +154,10 @@ const showRequestAuthMenu = ref(false)
 const requestAuthMenuX = ref<number | null>(null)
 const requestAuthMenuY = ref<number | null>(null)
 
-function handleRequestAuthMenu(event: MouseEvent) {
-    requestAuthMenuX.value = event.clientX
-    requestAuthMenuY.value = event.clientY
+function handleRequestAuthMenu(event: any) {
+    const containerElement = event.target.closest('.custom-select')
+    requestAuthMenuX.value = containerElement.getBoundingClientRect().left
+    requestAuthMenuY.value = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
     showRequestAuthMenu.value = true
 }
 

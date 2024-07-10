@@ -147,16 +147,22 @@ export default {
             this.$emit('update:show', false)
         },
         isOptionSelected(option) {
+            const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
+            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</div>'
+            const displayedOption = `<div style="word-break: break-all;">${option.label}</div>`
+
             if(this.selectedOption === undefined) {
-                return `<div>${option.label}</div>`
+                return displayedOption
+            }
+
+            if(option.value === 'No Auth') {
+                return `${tickMark}${displayedOption}`
             }
 
             const { _id } = option.value || {}
             const isSelected = (_id && _id === this.selectedOption?._id) || (_id && _id === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.mimeType) || (option.value && option.value === this.selectedOption?.authentication?.type)
-            const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
-            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</div>'
 
-            return `${isSelected ? tickMark : noTickMark}<div style="word-break: break-all;">${option.label}</div>`
+            return `${isSelected ? tickMark : noTickMark}${displayedOption}`
         }
     }
 }
