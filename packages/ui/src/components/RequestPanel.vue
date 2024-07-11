@@ -503,7 +503,6 @@ export default {
             requestBodyMenuY: null,
             requestBodyWidth: null,
             httpMethodModalShow: false,
-            customHttpMethod: null,
         }
     },
     computed: {
@@ -845,7 +844,7 @@ export default {
             this.activeTab.method = method
         },
         getHttpMethodList() {
-            const customMethod = this.customHttpMethod ? this.customHttpMethod : 'Custom Method'
+            const customMethod = 'Custom Method'
             let httpMethodList = [
                 'GET',
                 'POST',
