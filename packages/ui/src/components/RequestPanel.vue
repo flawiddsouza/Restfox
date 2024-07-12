@@ -773,6 +773,7 @@ export default {
         selectMethod(method) {
             if (method === 'Custom Method') {
                 this.httpMethodModalShow = true
+                return
             }
 
             this.activeTab.method = method
