@@ -1,13 +1,21 @@
 <template>
     <div v-if="showModalComp">
         <modal title="HTTP Custom Method" v-model="showModalComp">
-            <div style="display: flex; justify-content: space-between; gap: 1rem;">
-                <div>
-                    <div style="margin-bottom: var(--label-margin-bottom);">Name</div>
-                    <input type="text" v-model="method" class="full-width-input" placeholder="Some custom method">
-                </div>
+            <div>
+                <div style="margin-bottom: var(--label-margin-bottom);">Name</div>
+                <input type="text" v-model="methodValue" class="full-width-input" placeholder="Some custom method" v-focus>
             </div>
-            <div style="font-style: italic; text-align: center;margin-top: 0.5rem">* Common examples are {{ commonCustomHttpMethod }}</div>
+            <div style="margin-top: 1rem">Common examples are
+                <span
+                    v-for="(methodItem, methodItemIndex) in commonCustomHttpMethods"
+                    :key="methodItemIndex"
+                    @click="methodValue = methodItem"
+                    style="cursor: pointer;"
+                >
+                    <span v-if="methodItemIndex !== commonCustomHttpMethods.length - 1">{{ methodItem }}, </span>
+                    <span v-else>{{ methodItem }}</span>
+                </span>
+            </div>
             <template #footer>
                 <button class="button" @click="saveMethod" style="margin-left: 1rem; cursor: pointer">Done</button>
             </template>
@@ -20,10 +28,12 @@
 import Modal from '@/components/Modal.vue'
 
 export default {
-    data() {
-        return {
-            method: '',
-            commonCustomHttpMethod: 'PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK, LINK, UNLINK, FIND, PURGE'
+    directives: {
+        focus: {
+            mounted(element) {
+                element.focus()
+                element.select()
+            }
         }
     },
     components: {
@@ -31,6 +41,25 @@ export default {
     },
     props: {
         showModal: Boolean,
+        method: String,
+    },
+    data() {
+        return {
+            methodValue: '',
+            commonCustomHttpMethods: [
+                'PROPFIND',
+                'PROPPATCH',
+                'MKCOL',
+                'COPY',
+                'MOVE',
+                'LOCK',
+                'UNLOCK',
+                'LINK',
+                'UNLINK',
+                'FIND',
+                'PURGE',
+            ],
+        }
     },
     computed: {
         showModalComp: {
@@ -42,14 +71,22 @@ export default {
             }
         }
     },
+    watch: {
+        method() {
+            this.methodValue = this.method
+        }
+    },
     methods: {
         saveMethod() {
             this.showModalComp = false
-            if (this.method === '') {
-                this.method = 'GET'
+            if (this.methodValue.trim() === '') {
+                this.methodValue = 'GET'
             }
-            this.$emit('customHttpMethod', this.method)
+            this.$emit('customHttpMethod', this.methodValue)
         }
-    }
+    },
+    mounted() {
+        this.methodValue = this.method
+    },
 }
 </script>

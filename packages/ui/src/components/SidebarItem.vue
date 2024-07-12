@@ -23,7 +23,7 @@
         <template v-if="sidebarItem._type === 'socket'">
             <div class="sidebar-item-method" :class="`request-method--SOCK`">SOCK</div>
         </template>
-        <div style="width: 100%; margin-right: 0.5rem; margin-left: 1rem;">
+        <div style="width: 100%; margin-right: 0.5rem">
             <div v-if="!showInputToRenameRequest">
                 {{ sidebarItem.name }}
                 <span v-if="sidebarItem.name === ''" style="visibility: hidden;">Empty Name</span>

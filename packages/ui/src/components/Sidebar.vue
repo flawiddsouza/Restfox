@@ -584,9 +584,11 @@ export default {
 }
 
 .sidebar .sidebar-item-method {
-    min-width: 1.5rem;
+    min-width: 1.9rem;
+    max-width: 1.9rem;
+    margin-right: 0.2rem;
+    overflow: hidden;
     font-size: 0.7rem;
-    margin-right: 0.5rem;
 }
 
 .sidebar .sidebar-item * {

@@ -351,7 +351,11 @@
             @click="handleRequestBodyMenuClick"
         />
     </template>
-    <HttpMethodModal v-model:showModal="httpMethodModalShow" @customHttpMethod="handleCustomHttpMethod"></HttpMethodModal>
+    <HttpMethodModal
+        v-model:showModal="httpMethodModalShow"
+        :method="activeTab?.method"
+        @customHttpMethod="handleCustomHttpMethod"
+    />
 </template>
 
 <script>
