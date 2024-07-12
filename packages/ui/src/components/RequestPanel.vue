@@ -351,6 +351,7 @@
             @click="handleRequestBodyMenuClick"
         />
     </template>
+    <HttpMethodModal v-model:showModal="httpMethodModalShow" @customHttpMethod="handleCustomHttpMethod"></HttpMethodModal>
 </template>
 
 <script>
@@ -367,6 +368,7 @@ import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentV
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
+import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 
 const renderer = new marked.Renderer()
 
@@ -388,6 +390,7 @@ export default {
         RequestPanelHeaders,
         RequestPanelAuth,
         ReferencesButton,
+        HttpMethodModal
     },
     props: {
         activeTab: Object,
@@ -415,22 +418,7 @@ export default {
                 },
             ],
             activeRequestPanelTab: 'Body',
-            methods: [
-                'GET',
-                'POST',
-                'PUT',
-                'PATCH',
-                'DELETE',
-                'OPTIONS',
-                'HEAD'
-            ].map(method => {
-                return {
-                    type: 'option',
-                    label: method,
-                    value: method,
-                    class: 'request-method--' + method,
-                }
-            }),
+            methods: this.getHttpMethodList(),
             graphql: {
                 query: '',
                 variables: '{}'
@@ -514,6 +502,7 @@ export default {
             requestBodyMenuX: null,
             requestBodyMenuY: null,
             requestBodyWidth: null,
+            httpMethodModalShow: false,
         }
     },
     computed: {
@@ -782,6 +771,11 @@ export default {
             }
         },
         selectMethod(method) {
+            if (method === 'Custom Method') {
+                this.httpMethodModalShow = true
+                return
+            }
+
             this.activeTab.method = method
         },
         handleRequestBodyMenu(event) {
@@ -846,6 +840,38 @@ export default {
                 })
             }
             this.activeTab.body.mimeType = mimeType
+        },
+        handleCustomHttpMethod(method) {
+            this.activeTab.method = method
+        },
+        getHttpMethodList() {
+            const customMethod = 'Custom Method'
+            let httpMethodList = [
+                'GET',
+                'POST',
+                'PUT',
+                'PATCH',
+                'DELETE',
+                'OPTIONS',
+                'HEAD',
+            ].map(method => {
+                return {
+                    type: 'option',
+                    label: method,
+                    value: method,
+                    class: 'request-method--' + method,
+                }
+            })
+
+            httpMethodList.push({ type: 'separator' })
+            httpMethodList.push({
+                type: 'option',
+                label: customMethod,
+                value: customMethod,
+                class: 'request-method--' + customMethod,
+            })
+
+            return httpMethodList
         }
     },
     mounted() {
