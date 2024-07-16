@@ -174,7 +174,19 @@ export default {
                                     workspaceId: this.activeWorkspace._id,
                                     environments: this.activeWorkspace.environments
                                 })
-                                this.activeWorkspace.environment = this.activeWorkspace.environments.find(environment => environment.name === (this.activeWorkspace.currentEnvironment ?? 'Default')).environment
+
+                                let foundEnvironment = this.activeWorkspace.environments.find(environment => environment.name === (this.activeWorkspace.currentEnvironment ?? 'Default'))
+
+                                if(!foundEnvironment) {
+                                    foundEnvironment = this.activeWorkspace.environments[0]
+                                    this.activeWorkspace.currentEnvironment = foundEnvironment.name
+                                    this.$store.commit('updateWorkspaceCurrentEnvironment',  {
+                                        workspaceId: this.activeWorkspace._id,
+                                        currentEnvironment: this.activeWorkspace.currentEnvironment
+                                    })
+                                }
+
+                                this.activeWorkspace.environment = foundEnvironment.environment
                                 this.$store.commit('updateWorkspaceEnvironment', {
                                     workspaceId: this.activeWorkspace._id,
                                     environment: this.activeWorkspace.environment,
