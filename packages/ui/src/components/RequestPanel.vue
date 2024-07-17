@@ -843,6 +843,16 @@ export default {
                     value: mimeType
                 })
             }
+
+
+            if (this.activeTab.headers[0].value === constants.MIME_TYPE.GRAPHQL) {
+                this.activeTab.headers[0].value = constants.MIME_TYPE.JSON
+            }
+
+            if (this.activeTab.headers[0].value === 'No Body') {
+                this.activeTab.headers.shift()
+            }
+
             this.activeTab.body.mimeType = mimeType
         },
         handleCustomHttpMethod(method) {
