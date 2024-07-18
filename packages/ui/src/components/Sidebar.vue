@@ -88,6 +88,88 @@ export default {
             pluginManagerShow: false,
             generateCodeModalCollectionItem: null,
             generateCodeModalShow: false,
+            createNewList: [
+                {
+                    'type': 'option',
+                    'label': 'Create',
+                    'icon': 'fa fa-plus',
+                    'disabled': true,
+                    'class': 'text-with-line'
+                },
+                {
+                    'type': 'option',
+                    'label': 'HTTP Request',
+                    'value': 'New Request',
+                    'icon': 'fa fa-plus-circle',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'WebSocket',
+                    'value': 'New Socket',
+                    'icon': 'fa fa-plus-circle',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'New Folder',
+                    'value': 'New Folder',
+                    'icon': 'fa fa-folder',
+                    'class': 'context-menu-item-with-left-padding'
+                },],
+            commonActions: [
+                {
+                    'type': 'option',
+                    'label': 'Actions',
+                    'icon': 'fa fa-cog',
+                    'disabled': true,
+                    'class': 'text-with-line'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Duplicate',
+                    'value': 'Duplicate',
+                    'icon': 'fa fa-copy',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Export',
+                    'value': 'Export',
+                    'icon': 'fa fa-download',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Plugins',
+                    'value': 'Plugins',
+                    'icon': 'fa fa-plug',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Delete',
+                    'value': 'Delete',
+                    'icon': 'fa fa-trash',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+            ],
+            itemProperties: [
+                {
+                    'type': 'option',
+                    'label': '',
+                    'icon': 'fa fa-cog',
+                    'disabled': true,
+                    'class': 'text-with-line'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Properties',
+                    'value': 'Properties',
+                    'icon': 'fa fa-wrench',
+                    'class': 'context-menu-item-with-left-padding'
+                }
+            ]
         }
     },
     computed: {
@@ -105,32 +187,7 @@ export default {
         ...mapState(['activeSidebarItemForContextMenu', 'sidebarContextMenuElement']),
         options() {
             if(this.enableOptionsForEmptyContextMenu) {
-                return [
-                    {
-                        'type': 'option',
-                        'label': 'New Request',
-                        'value': 'New Request',
-                        'icon': 'fa fa-plus-circle',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'New Socket',
-                        'value': 'New Socket',
-                        'icon': 'fa fa-plus-circle',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'New Folder',
-                        'value': 'New Folder',
-                        'icon': 'fa fa-folder',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Import',
-                        'value': 'Import Into',
-                        'icon': 'fa fa-upload'
-                    }
-                ]
+                return this.createNewList
             }
 
             if(this.activeSidebarItemForContextMenu === null) {
@@ -139,51 +196,22 @@ export default {
 
             if(this.activeSidebarItemForContextMenu._type === 'request' || this.activeSidebarItemForContextMenu._type === 'socket') {
                 let contextMenuOptions = [
-                    {
-                        'type': 'option',
-                        'label': 'Duplicate',
-                        'value': 'Duplicate',
-                        'icon': 'fa fa-copy',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Export',
-                        'value': 'Export',
-                        'icon': 'fa fa-download'
-                    },
+                    ...this.commonActions,
                     {
                         'type': 'option',
                         'label': 'Copy as Curl',
                         'value': 'Copy as Curl',
-                        'icon': 'fa fa-copy'
+                        'icon': 'fa fa-copy',
+                        'class': 'context-menu-item-with-left-padding'
                     },
                     {
                         'type': 'option',
                         'label': 'Generate Code',
                         'value': 'Generate Code',
-                        'icon': 'fa fa-code'
+                        'icon': 'fa fa-code',
+                        'class': 'context-menu-item-with-left-padding'
                     },
-                    {
-                        'type': 'option',
-                        'label': 'Plugins',
-                        'value': 'Plugins',
-                        'icon': 'fa fa-plug',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Delete',
-                        'value': 'Delete',
-                        'icon': 'fa fa-trash',
-                    },
-                    {
-                        'type': 'separator'
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Properties',
-                        'value': 'Properties',
-                        'icon': 'fa fa-wrench',
-                    }
+                    ...this.itemProperties
                 ]
 
                 if(this.activeSidebarItemForContextMenu._type === 'socket') {
@@ -200,75 +228,30 @@ export default {
 
             if(this.activeSidebarItemForContextMenu._type === 'request_group') {
                 return [
+                    ...this.createNewList,
                     {
                         'type': 'option',
-                        'label': 'New Request',
-                        'value': 'New Request',
-                        'icon': 'fa fa-plus-circle',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'New Socket',
-                        'value': 'New Socket',
-                        'icon': 'fa fa-plus-circle',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'New Folder',
-                        'value': 'New Folder',
-                        'icon': 'fa fa-folder',
-                    },
-                    {
-                        'type': 'separator'
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Duplicate',
-                        'value': 'Duplicate',
-                        'icon': 'fa fa-copy',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Export',
-                        'value': 'Export',
-                        'icon': 'fa fa-download'
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Environment',
-                        'value': 'Environment',
-                        'icon': 'fa fa-code',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Plugins',
-                        'value': 'Plugins',
-                        'icon': 'fa fa-plug',
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Delete',
-                        'value': 'Delete',
-                        'icon': 'fa fa-trash',
-                    },
-                    {
-                        'type': 'separator'
+                        'label': 'Import',
+                        'icon': 'fa fa-file-import',
+                        'disabled': true,
+                        'class': 'text-with-line'
                     },
                     {
                         'type': 'option',
                         'label': 'Import Into',
                         'value': 'Import Into',
-                        'icon': 'fa fa-upload'
+                        'icon': 'fa fa-upload',
+                        'class': 'context-menu-item-with-left-padding'
                     },
-                    {
-                        'type': 'separator'
-                    },
+                    ...this.commonActions,
                     {
                         'type': 'option',
-                        'label': 'Properties',
-                        'value': 'Properties',
-                        'icon': 'fa fa-wrench',
-                    }
+                        'label': 'Environment',
+                        'value': 'Environment',
+                        'icon': 'fa fa-code',
+                        'class': 'context-menu-item-with-left-padding'
+                    },
+                    ...this.itemProperties
                 ]
             }
 

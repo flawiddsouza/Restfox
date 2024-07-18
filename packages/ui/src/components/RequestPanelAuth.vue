@@ -120,28 +120,31 @@ const requestAuthList = ref([
         'type': 'option',
         'label': 'Auth Types',
         'disabled': true,
-        'class': 'context-menu-header'
+        'class': 'text-with-line'
     },
     {
         'type': 'option',
         'label': 'Basic Auth',
         'value': 'basic',
+        'class': 'context-menu-item-with-left-padding'
     },
     {
         'type': 'option',
         'label': 'Bearer Token',
         'value': 'bearer',
+        'class': 'context-menu-item-with-left-padding'
     },
     {
         'type': 'option',
         'label': 'Other',
         'disabled': true,
-        'class': 'context-menu-header'
+        'class': 'text-with-line'
     },
     {
         'type': 'option',
         'label': 'No Auth',
         'value': 'No Auth',
+        'class': 'context-menu-item-with-left-padding'
     },
 ])
 

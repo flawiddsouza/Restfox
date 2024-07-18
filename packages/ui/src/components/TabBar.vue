@@ -12,21 +12,8 @@ export default {
             indexOfDraggedTab: null,
             tabContextMenuElement: null,
             tabContextMenuTab: null,
-            showTabContextMenu: false
-        }
-    },
-    computed: {
-        tabs() {
-            return this.$store.state.tabs
-        },
-        activeTab() {
-            return this.$store.state.activeTab
-        },
-        sidebarItemTemporaryName() {
-            return this.$store.state.sidebarItemTemporaryName
-        },
-        tabContextMenuOptions() {
-            return [
+            showTabContextMenu: false,
+            tabsContextMenuList: [
                 {
                     'type': 'option',
                     'label': 'Move to New Window',
@@ -42,16 +29,52 @@ export default {
                 },
                 {
                     'type': 'option',
-                    'label': 'Close Others',
-                    'value': 'Close Others',
-                    'disabled': this.tabs.length === 1
-                },
-                {
-                    'type': 'option',
                     'label': 'Close All',
                     'value': 'Close All'
                 },
             ]
+        }
+    },
+    computed: {
+        tabs() {
+            return this.$store.state.tabs
+        },
+        activeTab() {
+            return this.$store.state.activeTab
+        },
+        sidebarItemTemporaryName() {
+            return this.$store.state.sidebarItemTemporaryName
+        },
+        tabContextMenuOptions() {
+            if (this.tabs.length === 1) {
+                return this.tabsContextMenuList
+            } else {
+                return [
+                    {
+                        'type': 'option',
+                        'label': 'Move to New Window',
+                        'value': 'Move to New Window'
+                    },
+                    {
+                        'type': 'separator'
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Close',
+                        'value': 'Close'
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Close Others',
+                        'value': 'Close Others',
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Close All',
+                        'value': 'Close All'
+                    },
+                ]
+            }
         }
     },
     methods: {
