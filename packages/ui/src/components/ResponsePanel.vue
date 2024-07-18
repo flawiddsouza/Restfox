@@ -730,20 +730,14 @@ export default {
 .response-panel-address-bar .response-panel-address-bar-select-container {
     height: 100%;
     margin-left: 1rem;
-    margin-right: 1rem;
     overflow: auto;
 }
 
-.response-panel-address-bar  .response-panel-address-bar-select-container select {
-    width: 100%;
-    height: 100%;
-    border: 0;
-    outline: 0;
-    padding-left: 0.5em;
-    padding-right: 0.5em;
+.response-panel-address-bar  .response-panel-address-bar-select-container .custom-dropdown {
+    padding-right: 0.7rem;
 }
 
-.response-panel-address-bar  .response-panel-address-bar-select-container select:hover {
+.response-panel-address-bar  .response-panel-address-bar-select-container .custom-dropdown:hover {
     background-color: var(--response-panel-history-select-hover-color);
 }
 

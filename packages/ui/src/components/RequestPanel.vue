@@ -790,6 +790,8 @@ export default {
             this.showRequestBodyMenu = true
         },
         handleRequestBodyMenuClick(newMimeType) {
+            this.activeTab.body.mimeType = newMimeType
+
             let mimeType = null
 
             if(newMimeType === constants.MIME_TYPE.FORM_URL_ENCODED) {
@@ -804,16 +806,8 @@ export default {
                 mimeType = constants.MIME_TYPE.TEXT_PLAIN
             }
 
-            if(newMimeType === constants.MIME_TYPE.JSON) {
+            if(newMimeType === constants.MIME_TYPE.JSON || newMimeType === constants.MIME_TYPE.GRAPHQL) {
                 mimeType = constants.MIME_TYPE.JSON
-            }
-
-            if(newMimeType === constants.MIME_TYPE.GRAPHQL) {
-                mimeType = constants.MIME_TYPE.GRAPHQL
-            }
-
-            if(newMimeType === 'No Body') {
-                mimeType = newMimeType
             }
 
             if(newMimeType === constants.MIME_TYPE.OCTET_STREAM) {
@@ -843,7 +837,6 @@ export default {
                     value: mimeType
                 })
             }
-            this.activeTab.body.mimeType = mimeType
         },
         handleCustomHttpMethod(method) {
             this.activeTab.method = method
