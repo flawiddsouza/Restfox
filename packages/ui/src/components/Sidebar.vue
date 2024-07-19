@@ -117,43 +117,6 @@ export default {
                     'icon': 'fa fa-folder',
                     'class': 'context-menu-item-with-left-padding'
                 },],
-            commonActions: [
-                {
-                    'type': 'option',
-                    'label': 'Actions',
-                    'icon': 'fa fa-cog',
-                    'disabled': true,
-                    'class': 'text-with-line'
-                },
-                {
-                    'type': 'option',
-                    'label': 'Duplicate',
-                    'value': 'Duplicate',
-                    'icon': 'fa fa-copy',
-                    'class': 'context-menu-item-with-left-padding'
-                },
-                {
-                    'type': 'option',
-                    'label': 'Export',
-                    'value': 'Export',
-                    'icon': 'fa fa-download',
-                    'class': 'context-menu-item-with-left-padding'
-                },
-                {
-                    'type': 'option',
-                    'label': 'Plugins',
-                    'value': 'Plugins',
-                    'icon': 'fa fa-plug',
-                    'class': 'context-menu-item-with-left-padding'
-                },
-                {
-                    'type': 'option',
-                    'label': 'Delete',
-                    'value': 'Delete',
-                    'icon': 'fa fa-trash',
-                    'class': 'context-menu-item-with-left-padding'
-                },
-            ],
             itemProperties: [
                 {
                     'type': 'option',
@@ -196,21 +159,7 @@ export default {
 
             if(this.activeSidebarItemForContextMenu._type === 'request' || this.activeSidebarItemForContextMenu._type === 'socket') {
                 let contextMenuOptions = [
-                    ...this.commonActions,
-                    {
-                        'type': 'option',
-                        'label': 'Copy as Curl',
-                        'value': 'Copy as Curl',
-                        'icon': 'fa fa-copy',
-                        'class': 'context-menu-item-with-left-padding'
-                    },
-                    {
-                        'type': 'option',
-                        'label': 'Generate Code',
-                        'value': 'Generate Code',
-                        'icon': 'fa fa-code',
-                        'class': 'context-menu-item-with-left-padding'
-                    },
+                    ...this.getCommonActions(this.activeSidebarItemForContextMenu._type),
                     ...this.itemProperties
                 ]
 
@@ -243,14 +192,7 @@ export default {
                         'icon': 'fa fa-upload',
                         'class': 'context-menu-item-with-left-padding'
                     },
-                    ...this.commonActions,
-                    {
-                        'type': 'option',
-                        'label': 'Environment',
-                        'value': 'Environment',
-                        'icon': 'fa fa-code',
-                        'class': 'context-menu-item-with-left-padding'
-                    },
+                    ...this.getCommonActions(this.activeSidebarItemForContextMenu._type),
                     ...this.itemProperties
                 ]
             }
@@ -496,6 +438,74 @@ export default {
         collapseFolders() {
             this.$store.dispatch('collapseFolders', this.sidebarItems)
         },
+        getCommonActions(type) {
+            const startIndex = 3
+            const contextMenuItemClass = 'context-menu-item-with-left-padding'
+
+            let commonActions = [
+                {
+                    'type': 'option',
+                    'label': 'Actions',
+                    'icon': 'fa fa-cog',
+                    'disabled': true,
+                    'class': 'text-with-line'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Duplicate',
+                    'value': 'Duplicate',
+                    'icon': 'fa fa-copy',
+                    'class': contextMenuItemClass
+                },
+                {
+                    'type': 'option',
+                    'label': 'Export',
+                    'value': 'Export',
+                    'icon': 'fa fa-download',
+                    'class': contextMenuItemClass
+                },
+                {
+                    'type': 'option',
+                    'label': 'Plugins',
+                    'value': 'Plugins',
+                    'icon': 'fa fa-plug',
+                    'class': contextMenuItemClass
+                },
+                {
+                    'type': 'option',
+                    'label': 'Delete',
+                    'value': 'Delete',
+                    'icon': 'fa fa-trash',
+                    'class': contextMenuItemClass
+                },
+            ]
+
+            if(type === 'request_group'){
+                commonActions.splice(startIndex, 0,{
+                    'type': 'option',
+                    'label': 'Environment',
+                    'value': 'Environment',
+                    'icon': 'fa fa-code',
+                    'class': contextMenuItemClass
+                })
+            } else {
+                commonActions.splice(startIndex, 0,...[{
+                    'type': 'option',
+                    'label': 'Copy as Curl',
+                    'value': 'Copy as Curl',
+                    'icon': 'fa fa-copy',
+                    'class': contextMenuItemClass
+                },
+                {
+                    'type': 'option',
+                    'label': 'Generate Code',
+                    'value': 'Generate Code',
+                    'icon': 'fa fa-code',
+                    'class': contextMenuItemClass
+                }])
+            }
+            return commonActions
+        }
     },
     mounted() {
         document.addEventListener('dragstart', this.dragStart)
@@ -510,7 +520,7 @@ export default {
         document.removeEventListener('dragover', this.dragOver)
         document.removeEventListener('dragleave', this.dragLeave)
         document.removeEventListener('drop', this.drop)
-    }
+    },
 }
 </script>
 
