@@ -186,7 +186,7 @@ export default {
     background: var(--background-color);
     overflow-y: auto;
     left: -9999px;
-    max-height: 23rem;
+    max-height: 30rem;
     user-select: none;
 }
 
@@ -243,5 +243,9 @@ button.context-menu-item > i {
     font-weight: bold;
     font-size: 12px;
     text-transform: uppercase;
+}
+
+button.context-menu-item-with-left-padding {
+    padding-left: 1rem;
 }
 </style>

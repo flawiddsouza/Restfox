@@ -707,3 +707,14 @@ select {
     background: inherit;
     cursor: pointer;
 }
+
+.text-with-line::after {
+    content: '';
+    display: flex;
+    flex-grow: 1.5;
+    height: 0.05rem;
+    background-color: var(--default-border-color);
+    margin-top: 0.5rem;
+    margin-left: 0.5rem;
+    vertical-align: center;
+}

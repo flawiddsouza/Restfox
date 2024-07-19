@@ -3,8 +3,8 @@ export = function() {
 
         createRequest(requestName: string) {
             this.rightClick('.sidebar')
-            this.waitForText('New Request')
-            this.click('New Request')
+            this.waitForText('HTTP Request')
+            this.click('HTTP Request')
             this.fillField('input[placeholder="My Request"]', requestName)
             this.click('Create')
         },
