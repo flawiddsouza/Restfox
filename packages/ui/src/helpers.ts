@@ -1669,3 +1669,55 @@ export function responseStatusColorMapping(response: Response) {
 
     return color
 }
+
+// From: https://dexie.org/docs/StorageManager#summary
+async function tryPersistWithoutPromtingUser() {
+    if (!navigator.storage || !navigator.storage.persisted) {
+        return 'never'
+    }
+    let persisted = await navigator.storage.persisted()
+    if (persisted) {
+        return 'persisted'
+    }
+    if (!navigator.permissions || !navigator.permissions.query) {
+        return 'prompt' // It MAY be successful to prompt. Don't know.
+    }
+    const permission = await navigator.permissions.query({
+        name: 'persistent-storage'
+    })
+    if (permission.state === 'granted') {
+        persisted = await navigator.storage.persist()
+        if (persisted) {
+            return 'persisted'
+        } else {
+            throw new Error('Failed to persist')
+        }
+    }
+    if (permission.state === 'prompt') {
+        return 'prompt'
+    }
+    return 'never'
+}
+
+// From: https://dexie.org/docs/StorageManager#summary
+export async function initStoragePersistence() {
+    const persist = await tryPersistWithoutPromtingUser()
+    switch (persist) {
+        case 'never':
+            console.log('Not possible to persist storage')
+            break
+        case 'persisted':
+            console.log('Successfully persisted storage silently')
+            break
+        case 'prompt':
+            console.log('Not persisted, so we will try to prompt user')
+            if(navigator.storage && navigator.storage.persist) {
+                if(await navigator.storage.persist()) {
+                    console.log('Storage is now persisted')
+                } else {
+                    console.log('Storage was not persisted')
+                }
+            }
+            break
+    }
+}
