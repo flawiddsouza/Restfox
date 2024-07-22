@@ -452,7 +452,7 @@ export default {
                     'value': '',
                     'icon': 'fa fa-bars',
                     'disabled': true,
-                    'class': 'context-menu-header'
+                    'class': 'text-with-line'
                 },
                 {
                     'type': 'option',
@@ -475,7 +475,7 @@ export default {
                     'value': '',
                     'icon': 'fa fa-angle-right',
                     'disabled': true,
-                    'class': 'context-menu-header'
+                    'class': 'text-with-line'
                 },
                 {
                     'type': 'option',
@@ -493,7 +493,7 @@ export default {
                     'value': '',
                     'icon': 'fa fa-ellipsis-h',
                     'disabled': true,
-                    'class': 'context-menu-header'
+                    'class': 'text-with-line'
                 },
                 {
                     'type': 'option',

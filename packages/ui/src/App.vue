@@ -14,7 +14,12 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 <script>
 import { getCollectionForWorkspace } from './db'
 import constants from './constants'
-import { checkHotkeyAgainstKeyEvent, applyTheme, debounce } from './helpers'
+import {
+    checkHotkeyAgainstKeyEvent,
+    applyTheme,
+    debounce,
+    initStoragePersistence,
+} from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
 
@@ -407,6 +412,8 @@ export default {
             }, 500)
             window.electronIPC.workspaceChanged((...args) => this.onWorkspaceChanged(refreshWorkspace, ...args))
         }
+
+        initStoragePersistence()
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)
