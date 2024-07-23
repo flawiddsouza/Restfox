@@ -303,9 +303,10 @@
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
                     <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div>Pre Request</div>
-                        <div>
+                        <div><i class="fa fa-file-import" /> Pre Request</div>
+                        <div style="display: flex">
                             <ReferencesButton />
+                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" />
                         </div>
                     </div>
                     <CodeMirrorEditor
@@ -316,7 +317,12 @@
                         :key="`pre-request-script-editor-${activeTab._id}`"
                     ></CodeMirrorEditor>
 
-                    <div style="margin-top: 1rem; margin-bottom: var(--label-margin-bottom);">Post Request</div>
+                    <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div><i class="fa fa-file-export" /> Post Request</div>
+                        <div style="display: flex; margin-top: 0.5rem">
+                            <SnippetDropdown @optionSelected="insertSnippetPostScript" type="postScripts" />
+                        </div>
+                    </div>
                     <CodeMirrorEditor
                         v-model="script.post_request"
                         lang="javascript"
@@ -366,6 +372,7 @@ import RequestPanelHeaders from '@/components/RequestPanelHeaders.vue'
 import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import ReferencesButton from '@/components/ReferencesButton.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
+import SnippetDropdown from '@/components/SnippetDropdown.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentVariables } from '@/helpers'
@@ -394,7 +401,8 @@ export default {
         RequestPanelHeaders,
         RequestPanelAuth,
         ReferencesButton,
-        HttpMethodModal
+        HttpMethodModal,
+        SnippetDropdown
     },
     props: {
         activeTab: Object,
@@ -869,6 +877,12 @@ export default {
             })
 
             return httpMethodList
+        },
+        insertSnippetPreScript(text) {
+            this.script.pre_request += text + `\n`
+        },
+        insertSnippetPostScript(text) {
+            this.script.post_request += text + `\n`
         }
     },
     mounted() {
