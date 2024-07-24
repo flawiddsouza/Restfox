@@ -161,7 +161,22 @@ export default {
         ...mapState(['activeSidebarItemForContextMenu', 'sidebarContextMenuElement']),
         options() {
             if(this.enableOptionsForEmptyContextMenu) {
-                return this.createNewList
+                return [...this.createNewList,
+                    {
+                        'type': 'option',
+                        'label': 'Import',
+                        'icon': 'fa fa-file-import',
+                        'disabled': true,
+                        'class': 'text-with-line'
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'Import',
+                        'value': 'Import Into',
+                        'icon': 'fa fa-upload',
+                        'class': 'context-menu-item-with-left-padding'
+                    }
+                ]
             }
 
             if(this.activeSidebarItemForContextMenu === null) {
