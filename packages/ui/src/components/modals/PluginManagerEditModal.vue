@@ -22,7 +22,7 @@
                         <div>Code</div>
                         <div style="display: flex">
                             <ReferencesButton />
-                            <SnippetDropdown @optionSelected="insertSnippet"/>
+                            <SnippetDropdown @optionSelected="insertSnippet" style="margin-left: 0.5rem"/>
                         </div>
                     </div>
                     <CodeMirrorEditor

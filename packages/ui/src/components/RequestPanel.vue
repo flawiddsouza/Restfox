@@ -308,7 +308,7 @@
                         <div><i class="fa fa-file-import" /> Pre Request</div>
                         <div style="display: flex">
                             <ReferencesButton />
-                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" />
+                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem"/>
                         </div>
                     </div>
                     <CodeMirrorEditor
