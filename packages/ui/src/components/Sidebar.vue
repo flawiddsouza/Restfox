@@ -26,6 +26,7 @@
     </div>
     <ContextMenu :options="options" :element="sidebarContextMenuElement" v-model:show="showContextMenu" @click="handleClick" :x="contextMenuX" :y="contextMenuY" :x-offset="20" />
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
+    <AddGraphQLRequestModal v-model:showModal="addGraphQLRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddSocketModal v-model:showModal="addSocketModalShow" :parent-id="addSocketModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
@@ -50,12 +51,14 @@ import GenerateCodeModal from './modals/GenerateCodeModal.vue'
 import { mapState } from 'vuex'
 import { flattenTree, exportRestfoxCollection, generateNewIdsForTree } from '@/helpers'
 import { generateCode } from '@/utils/generate-code'
+import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
 
 export default {
     components: {
         SidebarItem,
         ContextMenu,
         AddRequestModal,
+        AddGraphQLRequestModal,
         AddSocketModal,
         AddFolderModal,
         EnvironmentModal,
@@ -68,6 +71,7 @@ export default {
         return {
             showContextMenu: false,
             addRequestModalShow: false,
+            addGraphQLRequestModalShow: false,
             addRequestModalParentId: null,
             addSocketModalShow: false,
             addSocketModalParentId: null,
@@ -100,6 +104,13 @@ export default {
                     'type': 'option',
                     'label': 'HTTP Request',
                     'value': 'New Request',
+                    'icon': 'fa fa-plus-circle',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'GraphQL Request',
+                    'value': 'New GraphQL Request',
                     'icon': 'fa fa-plus-circle',
                     'class': 'context-menu-item-with-left-padding'
                 },
@@ -276,6 +287,11 @@ export default {
             if(clickedSidebarItem === 'New Request') {
                 this.addRequestModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
                 this.addRequestModalShow = true
+            }
+
+            if(clickedSidebarItem === 'New GraphQL Request') {
+                this.addRequestModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
+                this.addGraphQLRequestModalShow = true
             }
 
             if(clickedSidebarItem === 'New Socket') {

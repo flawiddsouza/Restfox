@@ -27,6 +27,15 @@ Scenario('Add requests', async() => {
     }
 })
 
+Scenario('Add GraphQL requests', async() => {
+    for(let i = 1; i <= 5; i++) {
+        const requestName = `GraphQL Request ${i}`
+        I.createGraphQLRequest(requestName)
+        await I.isActiveSidebarItem(`POST${requestName}`)
+        await I.isActiveTab(`POST ${requestName}x`)
+    }
+})
+
 Scenario('type url with query params', async() => {
     const queryTab = '[data-testid="request-panel-tab-Query"]'
 
@@ -62,6 +71,7 @@ Scenario('Send GET request', async() => {
     I.createRequest('Request 1')
     I.typeInRequestPanelAddressBar(`${host}${path}${queryString}`)
     I.click('[data-testid="request-panel-address-bar__send-button"]')
+    I.waitForElement('//*[@class="response-panel-tab"][text() = "Timeline"]')
     I.click('//*[@class="response-panel-tab"][text() = "Timeline"]')
     const text = await I.grabTextFrom('[data-testid="response-panel-tab-Timeline__preview"]')
     I.expectContain(text, `* Preparing request to ${host}${path}${queryString}`)
