@@ -61,7 +61,13 @@ import SettingsModal from './modals/SettingsModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import BackupAndRestoreModal from './modals/BackupAndRestoreModal.vue'
 import LogsModal from './modals/LogsModal.vue'
-import { exportRestfoxCollection, applyTheme, generateNewIdsForTree, toTree } from '@/helpers'
+import {
+    exportRestfoxCollection,
+    applyTheme,
+    generateNewIdsForTree,
+    toTree,
+    flattenTree,
+} from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
 
@@ -161,7 +167,7 @@ export default {
             if(this.activeWorkspace._type === 'file') {
                 const collectionTree = toTree(collection)
                 generateNewIdsForTree(collectionTree)
-                collection = collectionTree
+                collection = flattenTree(collectionTree)
             }
 
             exportRestfoxCollection(collection, this.activeWorkspace.environments)
