@@ -886,6 +886,10 @@ const store = createStore<State>({
                     parentId: payload.parentId,
                     workspaceId: context.state.activeWorkspace._id
                 }
+
+                if(payload.headers) {
+                    newCollectionItem['headers'] = [...payload.headers]
+                }
             }
 
             if(payload.type === 'socket') {

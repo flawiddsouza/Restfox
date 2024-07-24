@@ -9,6 +9,14 @@ export = function() {
             this.click('Create')
         },
 
+        createGraphQLRequest(requestName: string) {
+            this.rightClick('.sidebar')
+            this.waitForText('GraphQL Request')
+            this.click('GraphQL Request')
+            this.fillField('input[placeholder="My GraphQL Request"]', requestName)
+            this.click('Create')
+        },
+
         async isActiveSidebarItem(name: string) {
             const text = await this.grabTextFrom('.sidebar-item.sidebar-item-active')
             this.expectEqual(text.trim() === name, true)
