@@ -478,8 +478,10 @@ export async function handleRequest(
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation)
 
+        const globalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
+
         if (!headers['user-agent']) {
-            headers['user-agent'] = `Restfox/${getVersion()}`
+            headers['user-agent'] = globalUserAgent || `Restfox/${getVersion()}`
         }
 
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)

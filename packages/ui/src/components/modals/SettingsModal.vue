@@ -18,6 +18,22 @@
                 </div>
             </div>
             <div style="padding-top: 1rem"></div>
+            <div>
+                <div style="margin-bottom: var(--label-margin-bottom);">Global User Agent</div>
+                <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
+                <div style="margin-top: 1rem">
+                    Common examples are
+                    <span
+                        v-for="(userAgentItem, userAgentItemIndex) in commonUserAgent"
+                        :key="userAgentItemIndex"
+                        @click="globalUserAgent = userAgentItem.value"
+                        style="cursor: pointer;"
+                    >
+                        <span v-if="userAgentItemIndex !== commonUserAgent.length - 1"><b>{{ userAgentItem.combination }}</b>, </span>
+                        <span v-else><b>{{ userAgentItem.combination }}</b></span>
+                    </span>
+                </div>
+            </div>
             <div style="padding-top: 1rem"></div>
             <div>
                 <label style="display: flex;">
@@ -87,6 +103,8 @@ export default {
             electronSwitchToChromiumFetch: false,
             disableIframeSandbox: false,
             disableAutoUpdate: false,
+            globalUserAgent: '',
+            commonUserAgent: constants.COMMON_USER_AGENT_STRINGS,
         }
     },
     computed: {
@@ -130,6 +148,9 @@ export default {
         disableAutoUpdate() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE, this.disableAutoUpdate)
             this.$store.state.flags.disableAutoUpdate = this.disableAutoUpdate
+        },
+        globalUserAgent() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT, this.globalUserAgent)
         }
     },
     methods: {
@@ -156,6 +177,10 @@ export default {
         resetDisableAutoUpdate() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
         },
+        resetGlobalUserAgent() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
+            this.globalUserAgent = ''
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -174,6 +199,7 @@ export default {
             this.resetElectronSwitchToChromiumFetch()
             this.resetDisableIframeSandbox()
             this.resetDisableAutoUpdate()
+            this.resetGlobalUserAgent()
 
             document.location.reload()
         },
@@ -186,6 +212,7 @@ export default {
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
+            const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -235,6 +262,9 @@ export default {
                 } catch (e) {
                     this.disableAutoUpdate = false
                 }
+            }
+            if(savedGlobalUserAgent) {
+                this.globalUserAgent = savedGlobalUserAgent
             }
         }
     }
