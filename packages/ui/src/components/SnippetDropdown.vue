@@ -276,6 +276,12 @@ export default defineComponent ({
                         })
                         break
                     default:
+                        preScripts.forEach ((method) => {
+                            contextMenuOptions.value.push (method)
+                        })
+                        postScripts.forEach ((method) => {
+                            contextMenuOptions.value.push (method)
+                        })
                         break
                 }
             },

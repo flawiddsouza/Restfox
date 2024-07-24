@@ -20,8 +20,9 @@
                 <div style="overflow: auto; display: grid; grid-template-rows: auto 1fr;">
                     <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: center;">
                         <div>Code</div>
-                        <div>
+                        <div style="display: flex">
                             <ReferencesButton />
+                            <SnippetDropdown @optionSelected="insertSnippet"/>
                         </div>
                     </div>
                     <CodeMirrorEditor
@@ -44,6 +45,7 @@ import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import ReferencesButton from '@/components/ReferencesButton.vue'
 import constants from '@/constants'
+import SnippetDropdown from '@/components/SnippetDropdown.vue'
 
 export default {
     directives: {
@@ -76,6 +78,7 @@ export default {
         }
     },
     components: {
+        SnippetDropdown,
         Modal,
         CodeMirrorEditor,
         ReferencesButton,
@@ -132,7 +135,10 @@ export default {
 
             this.resetPlugin()
             this.showModalComp = false
-        }
+        },
+        insertSnippet(text) {
+            this.code += text + `\n`
+        },
     }
 }
 </script>
