@@ -191,6 +191,8 @@
                         </div>
                     </div>
                     <div class="request-panel-body-footer">
+                        <button class="button" @click="showGraphQLDocs">Show Documentations</button>
+                        <GraphQLSchemaFetcher :isVisible="showGraphQLDocumentation" :endpoint="this.activeTab.url ?? ''" @close="toggleSidebar"/>
                         <button class="button" @click="beautifyGraphQL">Beautify</button>
                     </div>
                 </div>
@@ -373,6 +375,7 @@ import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
+import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 
 const renderer = new marked.Renderer()
 
@@ -394,7 +397,8 @@ export default {
         RequestPanelHeaders,
         RequestPanelAuth,
         ReferencesButton,
-        HttpMethodModal
+        HttpMethodModal,
+        GraphQLSchemaFetcher
     },
     props: {
         activeTab: Object,
@@ -507,6 +511,7 @@ export default {
             requestBodyMenuY: null,
             requestBodyWidth: null,
             httpMethodModalShow: false,
+            showGraphQLDocumentation: false
         }
     },
     computed: {
@@ -650,6 +655,12 @@ export default {
                 const formattedJSON = jsonPrettify(this.graphql.variables, '    ')
                 this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
+        },
+        showGraphQLDocs(){
+            this.showGraphQLDocumentation = true
+        },
+        toggleSidebar() {
+            this.showGraphQLDocumentation = !this.showGraphQLDocumentation
         },
         handleAddressBarKeyDown(e) {
             if(!e.defaultPrevented && e.ctrlKey === false && e.key === 'Enter') {
