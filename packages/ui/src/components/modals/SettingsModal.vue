@@ -22,16 +22,7 @@
                 <div style="margin-bottom: var(--label-margin-bottom);">Global User Agent</div>
                 <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
                 <div style="margin-top: 1rem">
-                    Common examples are
-                    <span
-                        v-for="(userAgentItem, userAgentItemIndex) in commonUserAgent"
-                        :key="userAgentItemIndex"
-                        @click="globalUserAgent = userAgentItem.value"
-                        style="cursor: pointer;"
-                    >
-                        <span v-if="userAgentItemIndex !== commonUserAgent.length - 1"><b>{{ userAgentItem.combination }}</b>, </span>
-                        <span v-else><b>{{ userAgentItem.combination }}</b></span>
-                    </span>
+                    <p>Note that the default user agent <b>Restfox/{{ getVersion() }}</b> is used when no global user agent is set here or on request level.</p>
                 </div>
             </div>
             <div style="padding-top: 1rem"></div>
@@ -85,6 +76,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
+import {getVersion} from '@/helpers'
 
 export default {
     props: {
@@ -104,7 +96,6 @@ export default {
             disableIframeSandbox: false,
             disableAutoUpdate: false,
             globalUserAgent: '',
-            commonUserAgent: constants.COMMON_USER_AGENT_STRINGS,
         }
     },
     computed: {
@@ -154,6 +145,7 @@ export default {
         }
     },
     methods: {
+        getVersion,
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
