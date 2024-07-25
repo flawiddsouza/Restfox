@@ -305,7 +305,7 @@
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
                     <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div><i class="fa fa-file-import" /> Pre Request <span v-if="this.script.pre_request !== ''" class="active-script">●</span></div>
+                        <div><i class="fa fa-file-import" /> Pre Request <i class="fa fa-circle active-script" v-if="this.script.pre_request !== ''"></i></div>
                         <div style="display: flex">
                             <ReferencesButton />
                             <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem"/>
@@ -320,7 +320,7 @@
                     ></CodeMirrorEditor>
 
                     <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div><i class="fa fa-file-export" /> Post Request <span v-if="this.script.post_request !== ''" class="active-script">●</span></div>
+                        <div><i class="fa fa-file-export" /> Post Request <i class="fa fa-circle active-script" v-if="this.script.post_request !== ''"></i></div>
                         <div style="display: flex; margin-top: 0.5rem">
                             <SnippetDropdown @optionSelected="insertSnippetPostScript" type="postScripts" />
                         </div>
