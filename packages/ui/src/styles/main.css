@@ -722,6 +722,5 @@ select {
 
 .active-script {
     color: rgba(76, 237, 39, 0.65);
-    font-size:0.6rem !important;
-    display: inline;
+    font-size: 0.6rem !important;
 }
