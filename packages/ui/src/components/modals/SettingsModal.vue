@@ -22,7 +22,7 @@
                 <div style="margin-bottom: var(--label-margin-bottom);">Global User Agent</div>
                 <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
                 <div style="margin-top: 1rem">
-                    <p>Note that the default user agent <b>Restfox/{{ getVersion() }}</b> is used when no global user agent is set here or on request level.</p>
+                    Note that the default user agent <strong>Restfox/{{ getVersion() }}</strong> is used when no global user agent is set here or on request level.
                 </div>
             </div>
             <div style="padding-top: 1rem"></div>
