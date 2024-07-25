@@ -1,5 +1,5 @@
 <template>
-    <span>{{ requestPanelTab.name }} <i class="fa fa-circle active-script" v-if="scriptIndicator && requestPanelTab.name === 'Script'"></i></span>
+    <span>{{ requestPanelTab.name }}<i class="fa fa-circle active-script" v-if="scriptIndicator && requestPanelTab.name === 'Script'" style="margin-left: 0.2rem"></i></span>
     <template v-if="requestPanelTab.name === 'Body'">
         <template v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
             <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
