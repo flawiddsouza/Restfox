@@ -28,6 +28,7 @@ export default {
         ELECTRON_SWITCH_TO_CHROMIUM_FETCH: 'Restfox-ElectronSwitchToChromiumFetch',
         GENERATE_CODE_LANGUAGE: 'Restfox-GenerateCodeLanguage',
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',
+        GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',
@@ -299,5 +300,5 @@ export default {
         '508': 'Loop Detected',
         '510': 'Not Extended',
         '511': 'Network Authentication Required'
-    }
+    },
 }

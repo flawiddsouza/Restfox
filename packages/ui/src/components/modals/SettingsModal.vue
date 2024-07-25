@@ -18,6 +18,13 @@
                 </div>
             </div>
             <div style="padding-top: 1rem"></div>
+            <div>
+                <div style="margin-bottom: var(--label-margin-bottom);">Global User Agent</div>
+                <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
+                <div style="margin-top: 1rem">
+                    Note that the default user agent <strong>Restfox/{{ getVersion() }}</strong> is used when no global user agent is set here or on request level.
+                </div>
+            </div>
             <div style="padding-top: 1rem"></div>
             <div>
                 <label style="display: flex;">
@@ -69,6 +76,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
+import {getVersion} from '@/helpers'
 
 export default {
     props: {
@@ -87,6 +95,7 @@ export default {
             electronSwitchToChromiumFetch: false,
             disableIframeSandbox: false,
             disableAutoUpdate: false,
+            globalUserAgent: '',
         }
     },
     computed: {
@@ -130,9 +139,13 @@ export default {
         disableAutoUpdate() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE, this.disableAutoUpdate)
             this.$store.state.flags.disableAutoUpdate = this.disableAutoUpdate
+        },
+        globalUserAgent() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT, this.globalUserAgent)
         }
     },
     methods: {
+        getVersion,
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
@@ -156,6 +169,10 @@ export default {
         resetDisableAutoUpdate() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
         },
+        resetGlobalUserAgent() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
+            this.globalUserAgent = ''
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -174,6 +191,7 @@ export default {
             this.resetElectronSwitchToChromiumFetch()
             this.resetDisableIframeSandbox()
             this.resetDisableAutoUpdate()
+            this.resetGlobalUserAgent()
 
             document.location.reload()
         },
@@ -186,6 +204,7 @@ export default {
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
+            const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -235,6 +254,9 @@ export default {
                 } catch (e) {
                     this.disableAutoUpdate = false
                 }
+            }
+            if(savedGlobalUserAgent) {
+                this.globalUserAgent = savedGlobalUserAgent
             }
         }
     }
