@@ -29,7 +29,7 @@
         </div>
         <div class="request-panel-tabs" v-show="tabView === 'full'">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs" :data-testid="`request-panel-tab-${requestPanelTab.name}`">
-                <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab"></RequestPanelTabTitle>
+                <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab" :script-indicator="this.script.pre_request !== '' || this.script.post_request !== ''"></RequestPanelTabTitle>
             </div>
             <div class="request-panel-tab-fill"></div>
         </div>
@@ -305,7 +305,7 @@
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
                     <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div><i class="fa fa-file-import" /> Pre Request</div>
+                        <div><i class="fa fa-file-import" /> Pre Request <span v-if="this.script.pre_request !== ''" class="active-script">●</span></div>
                         <div style="display: flex">
                             <ReferencesButton />
                             <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem"/>
@@ -320,7 +320,7 @@
                     ></CodeMirrorEditor>
 
                     <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div><i class="fa fa-file-export" /> Post Request</div>
+                        <div><i class="fa fa-file-export" /> Post Request <span v-if="this.script.post_request !== ''" class="active-script">●</span></div>
                         <div style="display: flex; margin-top: 0.5rem">
                             <SnippetDropdown @optionSelected="insertSnippetPostScript" type="postScripts" />
                         </div>

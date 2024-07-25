@@ -1,5 +1,5 @@
 <template>
-    <span>{{ requestPanelTab.name }}</span>
+    <span>{{ requestPanelTab.name }}<span v-if="scriptIndicator && requestPanelTab.name === 'Script'" class="active-script"> ●</span></span>
     <template v-if="requestPanelTab.name === 'Body'">
         <template v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
             <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
@@ -43,6 +43,9 @@ export default {
         activeTab: {
             type: Object,
             required: true
+        },
+        scriptIndicator: {
+            type: Boolean
         }
     },
     methods: {

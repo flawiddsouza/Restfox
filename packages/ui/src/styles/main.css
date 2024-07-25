@@ -719,3 +719,7 @@ select {
     margin-left: 0.5rem;
     vertical-align: center;
 }
+
+.active-script {
+    color: green;
+}
