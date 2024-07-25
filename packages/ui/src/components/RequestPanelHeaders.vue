@@ -1,47 +1,82 @@
 <template>
-    <table style="table-layout: fixed">
-        <tr v-for="(header, index) in collectionItem.headers">
-            <td>
-                <CodeMirrorSingleLine
-                    v-model="header.name"
-                    placeholder="name"
-                    :env-variables="collectionItemEnvironmentResolved"
-                    :input-text-compatible="true"
-                    :disabled="header.disabled"
-                    :key="'header-name-' + index"
-                />
-            </td>
-            <td>
-                <CodeMirrorSingleLine
-                    v-model="header.value"
-                    placeholder="value"
-                    :env-variables="collectionItemEnvironmentResolved"
-                    :input-text-compatible="true"
-                    :disabled="header.disabled"
-                    :key="'header-value-' + index"
-                />
-            </td>
-            <td>
-                <input type="checkbox" :checked="header.disabled === undefined || header.disabled === false" @change="header.disabled = ($event as any).target.checked ? false : true">
-            </td>
-            <td @click="collectionItem.headers?.splice(index, 1)">
-                <i class="fa fa-trash"></i>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(collectionItem, 'headers', { name: '', value: '' })">
-                + Add Item
-            </td>
-        </tr>
-    </table>
+    <div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <button class="button" @click="toggleBulkEdit">
+                {{ isBulkEditMode ? 'Regular Edit' : 'Bulk Edit' }}
+            </button>
+            <button v-if="!isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
+                    @click="handleDeleteAllHeadersClick"
+            >
+                <i v-if="isConfirmingDelete" class="fa fa-exclamation-circle" aria-hidden="true"></i>
+                {{ isConfirmingDelete ? 'Click to Confirm' : 'Delete All' }}
+            </button>
+        </div>
+
+        <div v-if="isBulkEditMode">
+            <p style="margin-bottom: 0.5rem;">
+                Note: Add headers in the format <code>name: value</code>, one per line.
+                Disabled headers are not shown here.
+            </p>
+            <textarea
+                v-model="bulkEditText"
+                placeholder="Enter headers in the format: name: value"
+                rows="10"
+                style="width: 100%;"
+            ></textarea>
+            <div style="text-align: right; margin-top: 0.5rem;">
+                <button class="button" @click="applyBulkEdit">Apply Changes</button>
+            </div>
+        </div>
+
+        <table v-else style="table-layout: fixed;">
+            <tr v-for="(header, index) in collectionItem.headers" :key="'header-row-' + index">
+                <td>
+                    <CodeMirrorSingleLine
+                        v-model="header.name"
+                        placeholder="name"
+                        :env-variables="collectionItemEnvironmentResolved"
+                        :input-text-compatible="true"
+                        :disabled="header.disabled"
+                        :key="'header-name-' + index"
+                    />
+                </td>
+                <td>
+                    <CodeMirrorSingleLine
+                        v-model="header.value"
+                        placeholder="value"
+                        :env-variables="collectionItemEnvironmentResolved"
+                        :input-text-compatible="true"
+                        :disabled="header.disabled"
+                        :key="'header-value-' + index"
+                    />
+                </td>
+                <td>
+                    <input
+                        type="checkbox"
+                        :checked="!(header.disabled ?? false)"
+                        @change="header.disabled = !($event.target as HTMLInputElement).checked"
+                    />
+                </td>
+                <td @click="collectionItem.headers?.splice(index, 1)">
+                    <i class="fa fa-trash"></i>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" style="text-align: center; user-select: none" @click="pushItem(collectionItem, 'headers', { name: '', value: '' })">
+                    + Add Item
+                </td>
+            </tr>
+        </table>
+    </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { PropType } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
 
-defineProps({
+const props = defineProps({
     collectionItem: {
         type: Object as PropType<CollectionItem>,
         required: true
@@ -52,11 +87,84 @@ defineProps({
     }
 })
 
+const isBulkEditMode = ref(false)
+const bulkEditText = ref('')
+const isConfirmingDelete = ref(false)
+let confirmationTimeout: number | null = null
+
+// Toggles between bulk and single edit modes
+const toggleBulkEdit = () => {
+    isBulkEditMode.value = !isBulkEditMode.value
+    if (isBulkEditMode.value) {
+        // Populate bulkEditText with only enabled headers
+        bulkEditText.value = props.collectionItem.headers
+            .filter(header => !header.disabled) // Only include enabled headers
+            .map(header => `${header.name}: ${header.value}`)
+            .join('\n')
+    }
+}
+
+// Applies changes from bulk edit textarea to the headers
+const applyBulkEdit = () => {
+    // Parse bulkEditText to update headers
+    const headers = bulkEditText.value.split('\n').map(line => {
+        const [name, ...valueParts] = line.split(':')
+        return {
+            name: name.trim(),
+            value: valueParts.join(':').trim(),
+            disabled: false // Ensure headers are enabled by default in bulk edit
+        }
+    })
+
+    // Combine existing disabled headers with new headers from bulk edit
+    const disabledHeaders = props.collectionItem.headers.filter(header => header.disabled)
+    const updatedHeaders = [...headers, ...disabledHeaders]
+
+    // Update collectionItem.headers
+    props.collectionItem.headers.splice(0, props.collectionItem.headers.length, ...updatedHeaders)
+    isBulkEditMode.value = false // Switch back to single edit mode
+}
+
+// Handles the delete all headers button click
+const handleDeleteAllHeadersClick = () => {
+    if (isConfirmingDelete.value) {
+        // If already confirming, delete all headers
+        deleteAllHeaders()
+    } else {
+        // Start confirmation process
+        isConfirmingDelete.value = true
+        // Set timeout to revert button after 1.5 seconds
+        confirmationTimeout = setTimeout(() => {
+            isConfirmingDelete.value = false
+        }, 1500)
+    }
+}
+
+// Deletes all headers
+const deleteAllHeaders = () => {
+    props.collectionItem.headers.splice(0, props.collectionItem.headers.length)
+    isConfirmingDelete.value = false
+    if (confirmationTimeout) {
+        clearTimeout(confirmationTimeout)
+        confirmationTimeout = null
+    }
+}
+
+// Adds a new header to the collection
 function pushItem(object: any, key: string, itemToPush: any) {
-    if(key in object === false) {
+    if (!(key in object)) {
         object[key] = []
     }
-
     object[key].push(itemToPush)
 }
 </script>
+
+<style scoped>
+.confirm-delete {
+    background: var(--background-color);
+    color: orange;
+    border: 1px solid var(--button-border-color);
+    border-radius: 3px;
+    cursor: pointer;
+}
+</style>
