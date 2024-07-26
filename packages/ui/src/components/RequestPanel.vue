@@ -29,7 +29,7 @@
         </div>
         <div class="request-panel-tabs" v-show="tabView === 'full'">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs" :data-testid="`request-panel-tab-${requestPanelTab.name}`">
-                <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab" :script-indicator="script.pre_request !== '' || script.post_request !== ''" :doc-indicator="activeTab.description !== ''"></RequestPanelTabTitle>
+                <RequestPanelTabTitle :request-panel-tab="requestPanelTab" :active-tab="activeTab" :script-indicator="!!script.pre_request || !!script.post_request" :doc-indicator="!!activeTab.description"></RequestPanelTabTitle>
             </div>
             <div class="request-panel-tab-fill"></div>
         </div>
