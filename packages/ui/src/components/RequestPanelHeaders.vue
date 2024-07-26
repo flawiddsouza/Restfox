@@ -4,8 +4,9 @@
             <button class="button" @click="toggleBulkEdit">
                 {{ isBulkEditMode ? 'Regular Edit' : 'Bulk Edit' }}
             </button>
-            <button v-if="props.collectionItem.headers.length > 0 && !isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
-                    @click="handleDeleteAllHeadersClick"
+            <button
+                v-if="props.collectionItem.headers.length > 0 && !isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
+                @click="handleDeleteAllHeadersClick"
             >
                 <i v-if="isConfirmingDelete" class="fa fa-exclamation-circle" aria-hidden="true"></i>
                 {{ isConfirmingDelete ? 'Click to Confirm' : 'Delete All' }}
@@ -96,7 +97,6 @@ let confirmationTimeout: NodeJS.Timeout | null = null
 const toggleBulkEdit = () => {
     isBulkEditMode.value = !isBulkEditMode.value
     if (isBulkEditMode.value) {
-        // @ts-ignore
         bulkEditText.value = props.collectionItem.headers
             .filter(header => !header.disabled)
             .map(header => `${header.name}: ${header.value}`)
@@ -115,11 +115,9 @@ const applyBulkEdit = () => {
         }
     })
 
-    // @ts-ignore
     const disabledHeaders = props.collectionItem.headers.filter(header => header.disabled)
     const updatedHeaders = [...headers, ...disabledHeaders]
 
-    // @ts-ignore
     props.collectionItem.headers.splice(0, props.collectionItem.headers.length, ...updatedHeaders)
     isBulkEditMode.value = false // Switch back to single edit mode
 }
@@ -141,7 +139,6 @@ const handleDeleteAllHeadersClick = () => {
 
 // Deletes all headers
 const deleteAllHeaders = () => {
-    // @ts-ignore
     props.collectionItem.headers.splice(0, props.collectionItem.headers.length)
     isConfirmingDelete.value = false
     if (confirmationTimeout) {

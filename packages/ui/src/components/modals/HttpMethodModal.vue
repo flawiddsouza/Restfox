@@ -5,7 +5,8 @@
                 <div style="margin-bottom: var(--label-margin-bottom);">Name</div>
                 <input type="text" v-model="methodValue" class="full-width-input" placeholder="Some custom method" v-focus>
             </div>
-            <div style="margin-top: 1rem">Common examples are
+            <div style="margin-top: 1rem">
+                Common examples are
                 <span
                     v-for="(methodItem, methodItemIndex) in commonCustomHttpMethods"
                     :key="methodItemIndex"
@@ -21,7 +22,6 @@
             </template>
         </modal>
     </div>
-
 </template>
 
 <script>
