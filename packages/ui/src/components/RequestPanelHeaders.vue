@@ -4,7 +4,7 @@
             <button class="button" @click="toggleBulkEdit">
                 {{ isBulkEditMode ? 'Regular Edit' : 'Bulk Edit' }}
             </button>
-            <button v-if="!isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
+            <button v-if="props.collectionItem.headers.length > 0 && !isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
                     @click="handleDeleteAllHeadersClick"
             >
                 <i v-if="isConfirmingDelete" class="fa fa-exclamation-circle" aria-hidden="true"></i>
@@ -90,21 +90,20 @@ const props = defineProps({
 const isBulkEditMode = ref(false)
 const bulkEditText = ref('')
 const isConfirmingDelete = ref(false)
-let confirmationTimeout: number | null = null
+// eslint-disable-next-line no-undef
+let confirmationTimeout: NodeJS.Timeout | null = null
 
-// Toggles between bulk and single edit modes
 const toggleBulkEdit = () => {
     isBulkEditMode.value = !isBulkEditMode.value
     if (isBulkEditMode.value) {
-        // Populate bulkEditText with only enabled headers
+        // @ts-ignore
         bulkEditText.value = props.collectionItem.headers
-            .filter(header => !header.disabled) // Only include enabled headers
+            .filter(header => !header.disabled)
             .map(header => `${header.name}: ${header.value}`)
             .join('\n')
     }
 }
 
-// Applies changes from bulk edit textarea to the headers
 const applyBulkEdit = () => {
     // Parse bulkEditText to update headers
     const headers = bulkEditText.value.split('\n').map(line => {
@@ -112,15 +111,15 @@ const applyBulkEdit = () => {
         return {
             name: name.trim(),
             value: valueParts.join(':').trim(),
-            disabled: false // Ensure headers are enabled by default in bulk edit
+            disabled: false
         }
     })
 
-    // Combine existing disabled headers with new headers from bulk edit
+    // @ts-ignore
     const disabledHeaders = props.collectionItem.headers.filter(header => header.disabled)
     const updatedHeaders = [...headers, ...disabledHeaders]
 
-    // Update collectionItem.headers
+    // @ts-ignore
     props.collectionItem.headers.splice(0, props.collectionItem.headers.length, ...updatedHeaders)
     isBulkEditMode.value = false // Switch back to single edit mode
 }
@@ -142,6 +141,7 @@ const handleDeleteAllHeadersClick = () => {
 
 // Deletes all headers
 const deleteAllHeaders = () => {
+    // @ts-ignore
     props.collectionItem.headers.splice(0, props.collectionItem.headers.length)
     isConfirmingDelete.value = false
     if (confirmationTimeout) {
