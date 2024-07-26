@@ -1,5 +1,6 @@
 <template>
-    <span>{{ requestPanelTab.name }}</span>
+    <span>{{ requestPanelTab.name }}<i class="fa fa-circle active-script" v-if="scriptIndicator && requestPanelTab.name === 'Script'" style="margin-left: 0.2rem"></i></span>
+    <i class="fa fa-circle active-script" v-if="docIndicator && requestPanelTab.name === 'Docs'" style="margin-left: 0.2rem"></i>
     <template v-if="requestPanelTab.name === 'Body'">
         <template v-if="activeTab.body.mimeType === 'application/x-www-form-urlencoded'">
             <template v-if="'params' in activeTab.body && activeTab.body.params.filter(item => item.disabled === undefined || item.disabled === false).length > 0">
@@ -43,6 +44,12 @@ export default {
         activeTab: {
             type: Object,
             required: true
+        },
+        scriptIndicator: {
+            type: Boolean
+        },
+        docIndicator: {
+            type: Boolean
         }
     },
     methods: {
