@@ -96,7 +96,7 @@ let confirmationTimeout: NodeJS.Timeout | null = null
 
 const toggleBulkEdit = () => {
     isBulkEditMode.value = !isBulkEditMode.value
-    if (isBulkEditMode.value) {
+    if (isBulkEditMode.value && props.collectionItem.headers) {
         bulkEditText.value = props.collectionItem.headers
             .filter(header => !header.disabled)
             .map(header => `${header.name}: ${header.value}`)
@@ -105,49 +105,46 @@ const toggleBulkEdit = () => {
 }
 
 const applyBulkEdit = () => {
-    // Parse bulkEditText to update headers
-    const headers = bulkEditText.value.split('\n').map(line => {
-        const [name, ...valueParts] = line.split(':')
-        return {
-            name: name.trim(),
-            value: valueParts.join(':').trim(),
-            disabled: false
-        }
-    })
+    if(isBulkEditMode.value && props.collectionItem.headers) {
+        const headers = bulkEditText.value.split('\n').map(line => {
+            const [name, ...valueParts] = line.split(':')
+            return {
+                name: name.trim(),
+                value: valueParts.join(':').trim(),
+                disabled: false
+            }
+        })
 
-    const disabledHeaders = props.collectionItem.headers.filter(header => header.disabled)
-    const updatedHeaders = [...headers, ...disabledHeaders]
+        const disabledHeaders = props.collectionItem.headers.filter(header => header.disabled)
+        const updatedHeaders = [...headers, ...disabledHeaders]
 
-    props.collectionItem.headers.splice(0, props.collectionItem.headers.length, ...updatedHeaders)
-    isBulkEditMode.value = false // Switch back to single edit mode
+        props.collectionItem.headers.splice(0, props.collectionItem.headers.length, ...updatedHeaders)
+    }
+    isBulkEditMode.value = false
 }
 
-// Handles the delete all headers button click
 const handleDeleteAllHeadersClick = () => {
-    if (isConfirmingDelete.value) {
-        // If already confirming, delete all headers
+    if(isConfirmingDelete.value) {
         deleteAllHeaders()
     } else {
-        // Start confirmation process
         isConfirmingDelete.value = true
-        // Set timeout to revert button after 1.5 seconds
         confirmationTimeout = setTimeout(() => {
             isConfirmingDelete.value = false
         }, 1500)
     }
 }
 
-// Deletes all headers
 const deleteAllHeaders = () => {
-    props.collectionItem.headers.splice(0, props.collectionItem.headers.length)
-    isConfirmingDelete.value = false
-    if (confirmationTimeout) {
-        clearTimeout(confirmationTimeout)
-        confirmationTimeout = null
+    if(props.collectionItem.headers) {
+        props.collectionItem.headers.splice(0, props.collectionItem.headers.length)
+        isConfirmingDelete.value = false
+        if(confirmationTimeout) {
+            clearTimeout(confirmationTimeout)
+            confirmationTimeout = null
+        }
     }
 }
 
-// Adds a new header to the collection
 function pushItem(object: any, key: string, itemToPush: any) {
     if(!(key in object)) {
         object[key] = []
