@@ -152,7 +152,7 @@ const deleteAllHeaders = () => {
 
 // Adds a new header to the collection
 function pushItem(object: any, key: string, itemToPush: any) {
-    if (!(key in object)) {
+    if(!(key in object)) {
         object[key] = []
     }
     object[key].push(itemToPush)
