@@ -5,7 +5,7 @@
                 {{ isBulkEditMode ? 'Regular Edit' : 'Bulk Edit' }}
             </button>
             <button
-                v-if="props.collectionItem.headers.length > 0 && !isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
+                v-if="props.collectionItem.headers?.length > 0 && !isBulkEditMode" :class="isConfirmingDelete ? 'confirm-delete' : 'button'"
                 @click="handleDeleteAllHeadersClick"
             >
                 <i v-if="isConfirmingDelete" class="fa fa-exclamation-circle" aria-hidden="true"></i>
