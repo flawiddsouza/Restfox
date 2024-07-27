@@ -192,7 +192,7 @@
                     </div>
                     <div class="request-panel-body-footer">
                         <button class="button" @click="showGraphQLDocs">Show Documentations</button>
-                        <GraphQLSchemaFetcher :isVisible="showGraphQLDocumentation" :endpoint="this.activeTab.url ?? ''" @close="toggleSidebar"/>
+                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="activeTab.url ?? ''" @close="toggleSidebar" />
                         <button class="button" @click="beautifyGraphQL">Beautify</button>
                     </div>
                 </div>
@@ -308,7 +308,7 @@
                         <div><i class="fa fa-file-import" /> Pre Request <i class="fa fa-circle active-script" v-if="script.pre_request !== ''"></i></div>
                         <div style="display: flex">
                             <ReferencesButton />
-                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem"/>
+                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem" />
                         </div>
                     </div>
                     <CodeMirrorEditor
