@@ -421,7 +421,6 @@ export default {
                 this.activeResponsePanelTab = 'Preview'
             }
 
-            this.responseFilter = ''
             this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) ? true : false
 
             if(this.$refs.scrollableArea) {
