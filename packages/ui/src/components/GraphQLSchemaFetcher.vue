@@ -79,7 +79,7 @@
 <script>
 import { ref, onMounted, computed, watch } from 'vue'
 import { gql, GraphQLClient } from 'graphql-request'
-import {generateBasicAuthString, substituteEnvironmentVariables} from '@/helpers'
+import { resolveAuthentication} from '@/helpers'
 
 export default {
     name: 'SchemaSlideOut',
@@ -135,18 +135,8 @@ export default {
 
                 let authentication
 
-                if (props.collectionItem.authentication) {
-                    if (props.collectionItem.authentication.type === 'basic') {
-                        authentication = generateBasicAuthString(
-                            substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, props.collectionItem.authentication.username ?? ''),
-                            substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, props.collectionItem.authentication.password ?? ''))
-                    }
-
-                    if (props.collectionItem.authentication.type === 'bearer') {
-                        const authenticationBearerPrefix = props.collectionItem.authentication.prefix !== undefined && props.collectionItem.authentication.prefix !== '' ? props.collectionItem.authentication.prefix : 'Bearer'
-                        const authenticationBearerToken = props.collectionItem.authentication.token !== undefined ? props.collectionItem.authentication.token : ''
-                        authentication = `${substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, authenticationBearerPrefix)} ${substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, authenticationBearerToken)}`
-                    }
+                if(props.collectionItem.authentication) {
+                    authentication = resolveAuthentication(props.collectionItem.authentication, props.collectionItemEnvironmentResolved)
                 }
 
                 const graphQLClient = new GraphQLClient(props.endpoint, {

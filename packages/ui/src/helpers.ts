@@ -398,7 +398,7 @@ export async function createRequestData(
         })
     }
 
-    const headers: Record<string, string> = {}
+    const headers: Record<string, string | any> = {}
 
     Object.keys(parentHeaders).forEach(header => {
         headers[substituteEnvironmentVariables(environment, header.toLowerCase())] = substituteEnvironmentVariables(environment, parentHeaders[header])
@@ -427,18 +427,7 @@ export async function createRequestData(
     }
 
     const setAuthentication = (authentication: RequestAuthentication) => {
-        if(authentication.type === 'basic') {
-            headers['Authorization'] = generateBasicAuthString(
-                substituteEnvironmentVariables(environment, authentication.username ?? ''),
-                substituteEnvironmentVariables(environment, authentication.password ?? '')
-            )
-        }
-
-        if(authentication.type === 'bearer') {
-            const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
-            const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
-            headers['Authorization'] = `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
-        }
+        headers['Authorization'] = resolveAuthentication(authentication, environment)
     }
 
     if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
@@ -1721,5 +1710,20 @@ export async function initStoragePersistence() {
                 }
             }
             break
+    }
+}
+
+export function resolveAuthentication(authentication: RequestAuthentication, environment: any) {
+    if(authentication.type === 'basic') {
+        return generateBasicAuthString(
+            substituteEnvironmentVariables(environment, authentication.username ?? ''),
+            substituteEnvironmentVariables(environment, authentication.password ?? '')
+        )
+    }
+
+    if(authentication.type === 'bearer') {
+        const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
+        const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
+        return `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
     }
 }
