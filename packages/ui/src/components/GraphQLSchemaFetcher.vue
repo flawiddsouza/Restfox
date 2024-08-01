@@ -1,7 +1,7 @@
 <template>
     <div :class="{ 'overlay': true, 'active': isVisible }">
         <div class="sidebar-graphql">
-            <button class="close-btn" @click="$emit('close')">&times;</button>
+            <button class="close-btn" @click="$emit('close')"><i class="fa fa-times"></i></button>
             <h2>Schema</h2>
             <div class="search-container">
                 <input
@@ -259,9 +259,9 @@ export default {
 
 .close-btn {
     position: absolute;
-    top: 10px;
+    top: 20px;
     right: 20px;
-    font-size: 30px;
+    font-size: 15px;
     cursor: pointer;
     background: none;
     border: none;

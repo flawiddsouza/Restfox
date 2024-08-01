@@ -192,7 +192,7 @@
                     </div>
                     <div class="request-panel-body-footer">
                         <button class="button" @click="showGraphQLDocs">Show Documentations</button>
-                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="activeTab.url ?? ''" @close="toggleSidebar" />
+                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" />
                         <button class="button" @click="beautifyGraphQL">Beautify</button>
                     </div>
                 </div>
