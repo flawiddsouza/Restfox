@@ -59,6 +59,8 @@ export default {
                     return 'Basic'
                 case 'bearer':
                     return 'Bearer'
+                case 'oauth2':
+                    return 'OAuth 2.0'
             }
         }
     }

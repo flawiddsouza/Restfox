@@ -18,6 +18,7 @@
                     />
                 </td>
             </tr>
+
             <template v-if="collectionItem.authentication.type === 'basic'">
                 <tr>
                     <td class="user-select-none">
@@ -86,6 +87,152 @@
                     </td>
                 </tr>
             </template>
+
+            <template v-if="collectionItem.authentication.type === 'oauth2'">
+                <tr>
+                    <td class="user-select-none">
+                        <label for="oauth-client-id" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Client ID
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <CodeMirrorSingleLine
+                            v-model="collectionItem.authentication.clientId"
+                            :env-variables="collectionItemEnvironmentResolved"
+                            :input-text-compatible="true"
+                            :disabled="collectionItem.authentication.disabled"
+                            :key="'oauth-client-id'"
+                        />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="user-select-none">
+                        <label for="oauth-client-secret" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Client Secret
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <CodeMirrorSingleLine
+                            v-model="collectionItem.authentication.clientSecret"
+                            :env-variables="collectionItemEnvironmentResolved"
+                            :input-text-compatible="true"
+                            :disabled="collectionItem.authentication.disabled"
+                            :key="'oauth-client-secret'"
+                        />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="user-select-none">
+                        <label for="oauth-token-url" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Token URL
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <CodeMirrorSingleLine
+                            v-model="collectionItem.authentication.tokenUrl"
+                            :env-variables="collectionItemEnvironmentResolved"
+                            :input-text-compatible="true"
+                            :disabled="collectionItem.authentication.disabled"
+                            :key="'oauth-token-url'"
+                        />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="user-select-none">
+                        <label for="oauth-scope" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Scope
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <CodeMirrorSingleLine
+                            v-model="collectionItem.authentication.scope"
+                            :env-variables="collectionItemEnvironmentResolved"
+                            :input-text-compatible="true"
+                            :disabled="collectionItem.authentication.disabled"
+                            :key="'oauth-scope'"
+                        />
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="user-select-none">
+                        <label for="oauth-grant-type" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Grant Type
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <div class="custom-select" @click="handleGrantTypeMenu">
+                            {{ grantTypes.find(item => item.value === collectionItem.authentication?.grantType)?.label }}
+                            <i class="fa fa-caret-down space-right"></i>
+                        </div>
+                    </td>
+                </tr>
+
+                <template v-if="collectionItem.authentication.grantType === 'password'">
+                    <tr>
+                        <td class="user-select-none">
+                            <label for="oauth-username" :class="{ disabled: collectionItem.authentication.disabled }">
+                                Username
+                            </label>
+                        </td>
+                        <td class="full-width">
+                            <CodeMirrorSingleLine
+                                v-model="collectionItem.authentication.username"
+                                :env-variables="collectionItemEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="collectionItem.authentication.disabled"
+                                :key="'oauth-username'"
+                            />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="user-select-none">
+                            <label for="oauth-password" :class="{ disabled: collectionItem.authentication.disabled }">
+                                Password
+                            </label>
+                        </td>
+                        <td class="full-width">
+                            <CodeMirrorSingleLine
+                                v-model="collectionItem.authentication.password"
+                                :env-variables="collectionItemEnvironmentResolved"
+                                :input-text-compatible="true"
+                                :disabled="collectionItem.authentication.disabled"
+                                :key="'oauth-password'"
+                            />
+                        </td>
+                    </tr>
+                </template>
+                <tr>
+                    <td colspan="2">
+                        <button class="button" @click="requestOAuthToken" :disabled="collectionItem.authentication.disabled">Get Token</button>
+                        <button class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled || !collectionItem.authentication.refreshToken" style="margin-left: 0.5rem">Refresh Token</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="user-select-none">
+                        <label for="access-token" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Access Token
+                        </label>
+                    </td>
+                    <td class="user-select">
+                        <label for="access-token" style="max-width: 100px; word-wrap: break-word">
+                            {{ collectionItem.authentication.token || 'N/A' }}
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="user-select-none">
+                        <label for="access-token" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Refresh Token
+                        </label>
+                    </td>
+                    <td class="user-select">
+                        <label for="access-token" style="max-width: 100px; word-wrap: break-word">
+                            {{ collectionItem.authentication.refreshToken || 'N/A' }}
+                        </label>
+                    </td>
+                </tr>
+            </template>
         </table>
     </div>
     <ContextMenu
@@ -96,6 +243,15 @@
         :selected-option="collectionItem.authentication?.type ?? 'No Auth'"
         @click="handleCollectionItemAuthenticationTypeChange"
     />
+
+    <ContextMenu
+        :options="grantTypes"
+        v-model:show="showGrantTypeMenu"
+        :x="grantTypeMenuX"
+        :y="grantTypeMenuY"
+        :selected-option="collectionItem.authentication?.grantType"
+        @click="handleGrantTypeChange"
+    />
 </template>
 
 <script setup lang="ts">
@@ -103,6 +259,11 @@ import { PropType, ref } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
+import { fetchWrapper } from '@/helpers'
+import { useToast } from 'vue-toast-notification'
+import constants from '@/constants'
+
+const toast = useToast()
 
 const props = defineProps({
     collectionItem: {
@@ -136,6 +297,12 @@ const requestAuthList = ref([
     },
     {
         'type': 'option',
+        'label': 'OAuth 2.0',
+        'value': 'oauth2',
+        'class': 'context-menu-item-with-left-padding'
+    },
+    {
+        'type': 'option',
         'label': 'Other',
         'disabled': true,
         'class': 'text-with-line'
@@ -148,9 +315,34 @@ const requestAuthList = ref([
     },
 ])
 
+const grantTypes = ref([
+    {
+        'type': 'option',
+        'label': 'Grant Types',
+        'disabled': true,
+        'class': 'text-with-line'
+    },
+    {
+        'type': 'option',
+        'label': 'Password Credentials',
+        'value': constants.GRANT_TYPES.password_credentials,
+        'class': 'context-menu-item-with-left-padding'
+    },
+    {
+        'type': 'option',
+        'label': 'Client Credentials',
+        'value': constants.GRANT_TYPES.client_credentials,
+        'class': 'context-menu-item-with-left-padding'
+    },
+])
+
 const showRequestAuthMenu = ref(false)
 const requestAuthMenuX = ref<number | null>(null)
 const requestAuthMenuY = ref<number | null>(null)
+
+const showGrantTypeMenu = ref(false)
+const grantTypeMenuX = ref<number | null>(null)
+const grantTypeMenuY = ref<number | null>(null)
 
 function handleRequestAuthMenu(event: any) {
     const containerElement = event.target.closest('.custom-select')
@@ -166,13 +358,134 @@ function handleCollectionItemAuthenticationTypeChange(event: string) {
     props.collectionItem.authentication.type = event
 }
 
+function handleGrantTypeMenu(event: any) {
+    const containerElement = event.target.closest('.custom-select')
+    grantTypeMenuX.value = containerElement.getBoundingClientRect().left
+    grantTypeMenuY.value = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+    showGrantTypeMenu.value = true
+}
+
+function handleGrantTypeChange(event: string) {
+    if (!props.collectionItem.authentication) {
+        props.collectionItem.authentication = {}
+    }
+    props.collectionItem.authentication.grantType = event
+}
+
 function toggleAuthEnabled(event: Event) {
     const target = event.target as HTMLInputElement
     if (props.collectionItem && props.collectionItem.authentication) {
         props.collectionItem.authentication.disabled = !target.checked
     }
 }
+
+async function requestOAuthToken() {
+    const auth = props.collectionItem?.authentication
+    const env = props.collectionItemEnvironmentResolved
+
+    if (auth) {
+        const clientId: string = resolveEnvValue(auth.clientId, env.clientId)
+        const clientSecret: string = resolveEnvValue(auth.clientSecret, env.clientSecret)
+        const tokenUrl: any = resolveEnvValue(auth.tokenUrl, env.tokenUrl)
+        const scope: string = resolveEnvValue(auth.scope, env.scope)
+        const username: string = resolveEnvValue(auth.username, env.username)
+        const password: string = resolveEnvValue(auth.password, env.password)
+        const grantType: string | any = auth.grantType
+
+        oath2Precheck(clientId, clientSecret, tokenUrl)
+
+        const bodyData = new URLSearchParams({
+            grant_type: grantType,
+            client_id: clientId,
+            client_secret: clientSecret,
+            scope,
+        })
+
+        if (grantType === 'password') {
+            bodyData.append('username', username)
+            bodyData.append('password', password)
+        }
+
+        try {
+            const response = await fetchWrapper(tokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED }, bodyData)
+
+            if(response.status !== 200) {
+                couldNotFetchTokenError(response)
+                return
+            }
+
+            const res = JSON.parse(new TextDecoder().decode(response.buffer))
+            if (auth && props.collectionItem && props.collectionItem.authentication) {
+                props.collectionItem.authentication.token = res.access_token
+                props.collectionItem.authentication.refreshToken = res.refresh_token
+            }
+            toast.success('OAuth token obtained successfully!')
+
+        } catch (error) {
+            couldNotFetchTokenError(error)
+        }
+    }
+}
+
+async function refreshOAuthToken() {
+    const auth = props.collectionItem?.authentication
+    const env = props.collectionItemEnvironmentResolved
+
+    if(auth) {
+        if(props.collectionItem && props.collectionItem.authentication) {
+            const clientId: string = resolveEnvValue(auth.clientId, env.clientId)
+            const clientSecret: string = resolveEnvValue(auth.clientSecret, env.clientSecret)
+            const tokenUrl: any = resolveEnvValue(auth.tokenUrl, env.tokenUrl)
+            const refreshToken: string | any = props.collectionItem.authentication.refreshToken
+
+            oath2Precheck(clientId, clientSecret, tokenUrl)
+
+            const bodyData = new URLSearchParams({
+                grant_type: constants.GRANT_TYPES.refresh_token,
+                client_id: clientId,
+                client_secret: clientSecret,
+                refresh_token: refreshToken,
+            })
+
+            try {
+                const response = await fetchWrapper(tokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED }, bodyData)
+
+                if(response.status !== 200) {
+                    couldNotFetchTokenError(response)
+                    return
+                }
+
+                const res = JSON.parse(new TextDecoder().decode(response.buffer))
+                if(props.collectionItem && props.collectionItem.authentication) {
+                    props.collectionItem.authentication.token = res.access_token
+                    props.collectionItem.authentication.refreshToken = res.refresh_token
+                }
+                toast.success('Refresh token obtained successfully!')
+
+            } catch (error) {
+                couldNotFetchTokenError(error)
+            }
+        }
+    }
+}
+
+function resolveEnvValue(value: any, fallback: any) {
+    return value?.includes('{{') ? fallback : value
+}
+
+function couldNotFetchTokenError(error: any) {
+    console.error('Error fetching OAuth token:', error)
+    toast.error('Error fetching OAuth token. Please check the console for more details.')
+}
+
+function oath2Precheck(clientId: string, clientSecret: string, tokenUrl: string) {
+    if (!clientId || !clientSecret || !tokenUrl) {
+        toast.error('Please provide all OAuth credentials.')
+        return
+    }
+}
 </script>
+
 
 <style scoped>
 .table-layout-fixed {
