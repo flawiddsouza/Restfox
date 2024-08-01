@@ -76,11 +76,10 @@
     </div>
 </template>
 
-
-
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
-import { request, gql } from 'graphql-request'
+import { ref, onMounted, computed, watch } from 'vue'
+import { gql, GraphQLClient } from 'graphql-request'
+import {generateBasicAuthString, substituteEnvironmentVariables} from '@/helpers'
 
 export default {
     name: 'SchemaSlideOut',
@@ -90,6 +89,18 @@ export default {
             required: true,
         },
         endpoint: {
+            type: String,
+            required: true,
+        },
+        collectionItem: {
+            type: Object,
+            required: true
+        },
+        collectionItemEnvironmentResolved: {
+            type: Object,
+            required: true
+        },
+        schemaAction: {
             type: String,
             required: true,
         },
@@ -121,6 +132,30 @@ export default {
         const fetchSchema = async() => {
             loading.value = true
             try {
+
+                let authentication
+
+                if (props.collectionItem.authentication) {
+                    if (props.collectionItem.authentication.type === 'basic') {
+                        authentication = generateBasicAuthString(
+                            substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, props.collectionItem.authentication.username ?? ''),
+                            substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, props.collectionItem.authentication.password ?? ''))
+                    }
+
+                    if (props.collectionItem.authentication.type === 'bearer') {
+                        const authenticationBearerPrefix = props.collectionItem.authentication.prefix !== undefined && props.collectionItem.authentication.prefix !== '' ? props.collectionItem.authentication.prefix : 'Bearer'
+                        const authenticationBearerToken = props.collectionItem.authentication.token !== undefined ? props.collectionItem.authentication.token : ''
+                        authentication = `${substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, authenticationBearerPrefix)} ${substituteEnvironmentVariables(props.collectionItemEnvironmentResolved, authenticationBearerToken)}`
+                    }
+                }
+
+                const graphQLClient = new GraphQLClient(props.endpoint, {
+                    headers: {
+                        authorization: authentication,
+                    },
+                })
+
+
                 const query = gql`
           {
             __schema {
@@ -139,7 +174,7 @@ export default {
             }
           }
         `
-                const data = await request(props.endpoint, query)
+                const data = await graphQLClient.request(query)
                 schema.value = data.__schema.types
                 error.value = null
             } catch (err) {
@@ -154,9 +189,9 @@ export default {
         })
 
         watch(
-            () => props.endpoint,
-            (newEndpoint) => {
-                if (newEndpoint) {
+            () => props.schemaAction,
+            (action) => {
+                if (action === 'refresh-schema') {
                     fetchSchema()
                 }
             }
