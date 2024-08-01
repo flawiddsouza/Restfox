@@ -133,16 +133,14 @@ export default {
             loading.value = true
             try {
 
-                let authentication
+                let headers = []
 
                 if(props.collectionItem.authentication) {
-                    authentication = resolveAuthentication(props.collectionItem.authentication, props.collectionItemEnvironmentResolved)
+                    headers['Authentication'] = resolveAuthentication(props.collectionItem.authentication, props.collectionItemEnvironmentResolved)
                 }
 
                 const graphQLClient = new GraphQLClient(props.endpoint, {
-                    headers: {
-                        authorization: authentication,
-                    },
+                    headers,
                 })
 
 
