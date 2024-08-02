@@ -66,7 +66,7 @@
                     </template>
                     <div class="content-box" v-else>
                         <div style="white-space: pre-line;">{{ response.error }}</div>
-                        <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error !== 'Error: Invalid URL' && response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error in Plugin ') === false">
+                        <div style="margin-top: 1.5rem; width: 35rem;" v-if="response.error !== 'Error: Invalid URL' && response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error in Plugin ') === false">
                             <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
                             <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
                             <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
