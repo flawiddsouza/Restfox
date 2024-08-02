@@ -303,6 +303,6 @@ export default {
     },
     DEFAULT_ENVIRONMENT: {
         name: 'Default',
-        color: '#000000',
+        color: 'var(--text-color)',
     }
 }
