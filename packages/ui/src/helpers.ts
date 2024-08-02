@@ -1534,8 +1534,9 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
         const environmentToModify = store.state.activeWorkspace.environment ?? {}
         const environmentsToModify = store.state.activeWorkspace.environments ?? [
             {
-                name: 'Default',
-                environment: {}
+                name: constants.DEFAULT_ENVIRONMENT.name,
+                environment: {},
+                color: constants.DEFAULT_ENVIRONMENT.color
             }
         ]
         setObjectPathValue(environmentToModify, objectPath, value)

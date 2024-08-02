@@ -19,9 +19,19 @@
                 </template>
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
-                    <select v-model="currentEnvironment" style="border: 1px solid var(--default-border-color); outline: 0; background-color: inherit; height: 84%; border-radius: var(--default-border-radius)" title="Change Environment">
-                        <option v-for="environment in environments">{{ environment.name }}</option>
-                    </select>
+                    <div class="custom-dropdown" @click="toggleEnvSelectorDropdown">
+                        <div><i class="fa fa-circle" :style="{ color: envColor }"></i> {{ currentEnvironment ?? 'Default' }}</div>
+                        <i class="fa fa-caret-down space-right"></i>
+                        <ContextMenu
+                            :options="getEnvList()"
+                            :element="envSelectorElement"
+                            :x="envSelectorContextMenuX"
+                            :y="envSelectorContextMenuY"
+                            v-model:show="envSelectorDropdownVisible"
+                            :selected-option="currentEnvironment"
+                            @click="selectEnv"
+                        />
+                    </div>
                 </div>
                 <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
                 <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
@@ -70,9 +80,11 @@ import {
 } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 export default {
     components: {
+        ContextMenu,
         PluginManagerModal,
         AddWorkspaceModal,
         SettingsModal,
@@ -81,7 +93,7 @@ export default {
         LogsModal
     },
     props: {
-        nav: String
+        nav: String,
     },
     data() {
         return {
@@ -90,6 +102,11 @@ export default {
             showAddWorkspaceModal: false,
             environmentModalShow: false,
             showLogsModal: false,
+            envSelectorElement: null,
+            envSelectorContextMenuX: null,
+            envSelectorContextMenuY: null,
+            envSelectorDropdownVisible: false,
+            envColor: null,
         }
     },
     computed: {
@@ -102,14 +119,15 @@ export default {
         environments() {
             return this.activeWorkspace.environments ?? [
                 {
-                    name: 'Default',
-                    environment: this.activeWorkspace.environment
+                    name: constants.DEFAULT_ENVIRONMENT.name,
+                    environment: this.activeWorkspace.environment,
+                    color: constants.DEFAULT_ENVIRONMENT.color
                 }
             ]
         },
         currentEnvironment: {
             get() {
-                return this.activeWorkspace.currentEnvironment ?? 'Default'
+                return this.activeWorkspace?.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
             },
             set(value) {
                 this.activeWorkspace.currentEnvironment = value
@@ -232,6 +250,46 @@ export default {
             const currentIndex = themes.indexOf(this.theme)
             const nextIndex = (currentIndex + 1) % themes.length
             this.theme = themes[nextIndex]
+        },
+        toggleEnvSelectorDropdown(event) {
+            this.envSelectorDropdownVisible = !this.envSelectorDropdownVisible
+            if (this.envSelectorDropdownVisible) {
+                const containerElement = event.target.closest('.custom-dropdown')
+                this.envSelectorContextMenuX = containerElement.getBoundingClientRect().left
+                this.envSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.envSelectorElement = containerElement
+            } else {
+                this.envSelectorElement = null
+            }
+        },
+        getEnvList() {
+            return this.environments.map(item => {
+                return {
+                    type: 'option',
+                    label: `&nbsp;<i class="fa fa-circle" style="color:${item.color}"></i> ${item.name}`,
+                    value: `${item.name}`,
+                }
+            })
+        },
+        selectEnv(value) {
+            this.currentEnvironment = value
+            this.envColor = this.environments.find(env => env.name === value).color || constants.DEFAULT_ENVIRONMENT.color
+            this.$store.dispatch('reloadTabEnvironmentResolved')
+        }
+    },
+    watch: {
+        currentEnvironment(newVal) {
+            this.envColor = this.environments.find(env => env.name === newVal).color || constants.DEFAULT_ENVIRONMENT.color
+        },
+        activeWorkspaceLoaded(newVal) {
+            if (newVal) {
+                this.envColor = this.environments.find(env => env.name === this.currentEnvironment).color || constants.DEFAULT_ENVIRONMENT.color
+            }
+        }
+    },
+    created() {
+        if (this.activeWorkspaceLoaded) {
+            this.envColor = this.environments.find(env => env.name === this.currentEnvironment).color || constants.DEFAULT_ENVIRONMENT.color
         }
     }
 }

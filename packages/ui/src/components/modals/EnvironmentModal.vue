@@ -15,13 +15,9 @@
                     <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment()">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
                         <div v-for="environment in environments" class="environment-sidebar-item" :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" @click="changeEnvironment(environment)" :ref="'environment-' + environment.name">
-                            <div>{{ environment.name }}</div>
+                            <div><i class="fa fa-circle" :style="{ color: environment.color, marginRight: '0.5rem' }"></i>{{ environment.name }}</div>
                             <div class="environment-sidebar-item-menu" :class="{ 'environment-sidebar-item-menu-disable-hide': environment.name === clickedContextMenuEnvironment.name && showEnvironmentContextMenuPopup === true }" @click.stop="showEnvironmentContextMenu($event, environment)">
-                                <svg viewBox="0 0 24 24" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
-                                    <g>
-                                        <path d="M12,16.5c0.83,0,1.5,0.67,1.5,1.5s-0.67,1.5-1.5,1.5s-1.5-0.67-1.5-1.5S11.17,16.5,12,16.5z M10.5,12 c0,0.83,0.67,1.5,1.5,1.5s1.5-0.67,1.5-1.5s-0.67-1.5-1.5-1.5S10.5,11.17,10.5,12z M10.5,6c0,0.83,0.67,1.5,1.5,1.5 s1.5-0.67,1.5-1.5S12.83,4.5,12,4.5S10.5,5.17,10.5,6z" style="fill: var(--text-color);"></path>
-                                    </g>
-                                </svg>
+                                <i class="fa fa-ellipsis-v"></i>
                             </div>
                         </div>
                     </div>
@@ -56,6 +52,7 @@
             <div class="context-menu-background-overlay" @click="hideEnvironmentContextMenu()"></div>
             <div class="context-menu" :style="{ top: showEnvironmentContextMenuPopupCoords.y, left: showEnvironmentContextMenuPopupCoords.x }">
                 <div @click="renameEnvironment">Rename</div>
+                <div @click="changeEnvironmentColor">Change color</div>
                 <div @click="deleteEnvironment">Delete</div>
             </div>
         </template>
@@ -67,6 +64,7 @@ import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import { nextTick } from 'vue'
 import { emitter } from '@/event-bus'
+import constants from '@/constants'
 
 export default {
     props: {
@@ -105,8 +103,9 @@ export default {
             if(this.collectionItem) {
                 return this.collectionItem.environments ?? [
                     {
-                        name: 'Default',
-                        environment: this.environmentToSave
+                        name: constants.DEFAULT_ENVIRONMENT.name,
+                        environment: this.environmentToSave,
+                        color: constants.DEFAULT_ENVIRONMENT.color
                     }
                 ]
             }
@@ -114,8 +113,9 @@ export default {
             if(this.workspace) {
                 return this.workspace.environments ?? [
                     {
-                        name: 'Default',
-                        environment: this.environmentToSave
+                        name: constants.DEFAULT_ENVIRONMENT.name,
+                        environment: this.environmentToSave,
+                        color: constants.DEFAULT_ENVIRONMENT.color
                     }
                 ]
             }
@@ -124,11 +124,11 @@ export default {
         },
         currentEnvironment() {
             if(this.collectionItem) {
-                return this.collectionItem.currentEnvironment ?? 'Default'
+                return this.collectionItem.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
             }
 
             if(this.workspace) {
-                return this.workspace.currentEnvironment ?? 'Default'
+                return this.workspace.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
             }
 
             return undefined
@@ -189,6 +189,8 @@ export default {
                 }
             }
 
+            const environmentColor = await window.createPrompt('Choose a color for the environment', constants.DEFAULT_ENVIRONMENT.color)
+
             if(this.environments.some(environment => environment.name === newEnvironmentName)) {
                 if(!isImport) {
                     this.$toast.error(`Given environment name already exists: ${newEnvironmentName}`)
@@ -202,7 +204,7 @@ export default {
                 }
             }
 
-            let environment = { name: newEnvironmentName, environment: {} }
+            let environment = { name: newEnvironmentName, color: environmentColor || constants.DEFAULT_ENVIRONMENT.color, environment: {} }
 
             if(!isMerge) {
                 if(environmentObject !== undefined) {
@@ -210,10 +212,11 @@ export default {
                 }
 
                 if(this.collectionItem) {
-                    if('environments' in this.collectionItem === false) {
+                    if(!('environments' in this.collectionItem)) {
                         this.collectionItem.environments = [
                             {
-                                name: 'Default',
+                                name: constants.DEFAULT_ENVIRONMENT.name,
+                                color: constants.DEFAULT_ENVIRONMENT.color,
                                 environment: this.environmentToSave
                             }
                         ]
@@ -222,10 +225,11 @@ export default {
                 }
 
                 if(this.workspace) {
-                    if('environments' in this.workspace === false) {
+                    if(!('environments' in this.workspace)) {
                         this.workspace.environments = [
                             {
-                                name: 'Default',
+                                name: constants.DEFAULT_ENVIRONMENT.name,
+                                color: constants.DEFAULT_ENVIRONMENT.color,
                                 environment: this.environmentToSave
                             }
                         ]
@@ -371,6 +375,23 @@ export default {
             if(changeCurrentEnvironment) {
                 this.changeEnvironment(this.clickedContextMenuEnvironment)
             }
+
+            this.hideEnvironmentContextMenu()
+        },
+        async changeEnvironmentColor() {
+            const newEnvironmentColor = await window.createPrompt('Choose another color for your environment', this.clickedContextMenuEnvironment.color)
+
+            this.clickedContextMenuEnvironment.color = newEnvironmentColor
+
+            if(this.workspace && 'environments' in this.workspace === false) {
+                this.workspace.environments = this.environments
+            }
+
+            if(this.collectionItem && 'environments' in this.collectionItem === false) {
+                this.collectionItem.environments = this.environments
+            }
+
+            this.saveEnvironments()
 
             this.hideEnvironmentContextMenu()
         },
