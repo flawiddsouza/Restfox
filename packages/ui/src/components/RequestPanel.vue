@@ -191,9 +191,20 @@
                         </div>
                     </div>
                     <div class="request-panel-body-footer">
-                        <button class="button" @click="showGraphQLDocs">Show Documentations</button>
-                        <GraphQLSchemaFetcher :isVisible="showGraphQLDocumentation" :endpoint="this.activeTab.url ?? ''" @close="toggleSidebar"/>
-                        <button class="button" @click="beautifyGraphQL">Beautify</button>
+                        <div class="custom-dropdown" @click="toggleSchemaSelectorDropdown">
+                            <div><i class="fa fa-wrench"></i> Schema</div>
+                            <i class="fa fa-caret-down space-right"></i>
+                            <ContextMenu
+                                :options="schemaOptionList"
+                                :element="schemaSelectorElement"
+                                :x="schemaSelectorContextMenuX"
+                                :y="schemaSelectorContextMenuY"
+                                v-model:show="schemaSelectorDropdownVisible"
+                                @click="showGraphQLDocs"
+                            />
+                        </div>
+                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved" :schema-action="schemaAction"/>
+                        <button class="button" @click="beautifyGraphQL" style="margin-left: 0.5rem">Beautify</button>
                     </div>
                 </div>
                 <div v-if="activeTab.body.mimeType === 'application/octet-stream'">
@@ -308,7 +319,7 @@
                         <div><i class="fa fa-file-import" /> Pre Request <i class="fa fa-circle active-script" v-if="script.pre_request !== ''"></i></div>
                         <div style="display: flex">
                             <ReferencesButton />
-                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem"/>
+                            <SnippetDropdown @optionSelected="insertSnippetPreScript" type="preScripts" style="margin-left: 0.5rem" />
                         </div>
                     </div>
                     <CodeMirrorEditor
@@ -453,6 +464,24 @@ export default {
             methodSelectorElement: null,
             methodSelectorContextMenuX: null,
             methodSelectorContextMenuY: null,
+            schemaSelectorDropdownVisible: false,
+            schemaSelectorElement: null,
+            schemaSelectorContextMenuX: null,
+            schemaSelectorContextMenuY: null,
+            schemaOptionList: [
+                {
+                    'type': 'option',
+                    'label': 'Show Documentation',
+                    'value': 'show-documentation',
+                    'icon': 'fa fa-book'
+                },
+                {
+                    'type': 'option',
+                    'label': 'Refresh Schema',
+                    'value': 'refresh-schema',
+                    'icon': 'fa fa-repeat'
+                },
+            ],
             requestBodyList: [
                 {
                     'type': 'option',
@@ -519,7 +548,8 @@ export default {
             requestBodyMenuY: null,
             requestBodyWidth: null,
             httpMethodModalShow: false,
-            showGraphQLDocumentation: false
+            showGraphQLDocumentation: false,
+            schemaAction: null
         }
     },
     computed: {
@@ -664,8 +694,11 @@ export default {
                 this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
-        showGraphQLDocs(){
-            this.showGraphQLDocumentation = true
+        showGraphQLDocs(value){
+            this.schemaAction = value
+            if (value === 'show-documentation') {
+                this.showGraphQLDocumentation = true
+            }
         },
         toggleSidebar() {
             this.showGraphQLDocumentation = !this.showGraphQLDocumentation
@@ -791,6 +824,17 @@ export default {
                 this.methodSelectorElement = containerElement
             } else {
                 this.methodSelectorElement = null
+            }
+        },
+        toggleSchemaSelectorDropdown(event) {
+            this.schemaSelectorDropdownVisible = !this.schemaSelectorDropdownVisible
+            if (this.schemaSelectorDropdownVisible) {
+                const containerElement = event.target.closest('.custom-dropdown')
+                this.schemaSelectorContextMenuX = containerElement.getBoundingClientRect().left
+                this.schemaSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.schemaSelectorElement = containerElement
+            } else {
+                this.schemaSelectorElement = null
             }
         },
         selectMethod(method) {
