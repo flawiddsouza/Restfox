@@ -266,8 +266,9 @@ export default {
             return this.environments.map(item => {
                 return {
                     type: 'option',
-                    label: `${item.name}&nbsp;<i class="fa fa-circle" style="color:${item.color}"></i>`,
+                    label: `${item.name}`,
                     value: `${item.name}`,
+                    icon: 'fa fa-circle'
                 }
             })
         },
