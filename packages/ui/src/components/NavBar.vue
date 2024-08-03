@@ -268,7 +268,7 @@ export default {
                     type: 'option',
                     label: `${item.name}`,
                     value: `${item.name}`,
-                    icon: 'fa fa-circle'
+                    class: 'text-left-align'
                 }
             })
         },
