@@ -268,7 +268,7 @@ export default {
                     type: 'option',
                     label: `${item.name}`,
                     value: `${item.name}`,
-                    class: 'text-left-align'
+                    class: 'context-menu-item-with-left-padding'
                 }
             })
         },
