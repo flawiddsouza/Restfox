@@ -304,5 +304,5 @@ export default {
     DEFAULT_ENVIRONMENT: {
         name: 'Default',
         color: 'var(--text-color)',
-    }
+    },
 }
