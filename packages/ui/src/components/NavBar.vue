@@ -263,15 +263,14 @@ export default {
             }
         },
         getEnvList() {
-            const listHeader = [
+          const listHeader = [
             {
-                type: 'option',
-                label: 'Environment',
-                icon: 'fa fa-globe',
-                disabled: true,
-                class: 'text-with-line'
-            },
-            ]
+              type: 'option',
+              label: 'Environment',
+              icon: 'fa fa-globe',
+              disabled: true,
+              class: 'text-with-line'
+            },]
             const list =  this.environments.map(item => {
                 return {
                     type: 'option',
