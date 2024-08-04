@@ -147,7 +147,7 @@ export default {
             this.$emit('update:show', false)
         },
         getOption(option) {
-            const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
+            const tickMark = '<div class="selected-indicator"><i class="fa fa-check"></i>&nbsp;</div>'
             const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</div>'
             const displayedOption = `<div style="word-break: break-all;">${option.label}</div>`
 

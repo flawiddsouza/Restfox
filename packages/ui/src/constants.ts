@@ -301,4 +301,8 @@ export default {
         '510': 'Not Extended',
         '511': 'Network Authentication Required'
     },
+    DEFAULT_ENVIRONMENT: {
+        name: 'Default',
+        color: 'var(--text-color)',
+    },
 }
