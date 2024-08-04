@@ -276,7 +276,7 @@ export default {
                 return {
                     type: 'option',
                     label: `&nbsp;<i
-class="fa fa-circle" style="color:$ {item.color}"></i> ${item.name}'
+class="fa fa-circle" style="color:$ {item.color}"></i> ${item.name}',
                     value: `${item.name}`,
                     class: 'context-menu-item-with-left-padding'
                 }
