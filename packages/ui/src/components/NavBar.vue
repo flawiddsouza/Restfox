@@ -20,7 +20,7 @@
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
                     <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
-                        <i class="fa fa-circle" :style="{ color: envColor }"></i> {{ currentEnvironment ?? 'Default' }}
+                        <i class="fa fa-circle" :style="{ color: envColor }">&nbsp;</i> {{ currentEnvironment ?? 'Default' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
                     <ContextMenu
