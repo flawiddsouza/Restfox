@@ -20,17 +20,18 @@
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
                     <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
-                        <i class="fa fa-circle" :style="{ color: envColor }"></i> {{ currentEnvironment ?? 'Default' }}</div>
-                        <i class="fa fa-caret-down space-right"></i>
-                        <ContextMenu
-                            :options="getEnvList()"
-                            :element="envSelectorElement"
-                            :x="envSelectorContextMenuX"
-                            :y="envSelectorContextMenuY"
-                            v-model:show="envSelectorDropdownVisible"
-                            :selected-option="currentEnvironment"
-                            @click="selectEnv"
-                        />
+                        <i class="fa fa-circle" :style="{ color: envColor }"></i> {{ currentEnvironment ?? 'Default' }}
+                    </div>
+                    <i class="fa fa-caret-down space-right"></i>
+                    <ContextMenu
+                        :options="getEnvList()"
+                        :element="envSelectorElement"
+                        :x="envSelectorContextMenuX"
+                        :y="envSelectorContextMenuY"
+                        v-model:show="envSelectorDropdownVisible"
+                        :selected-option="currentEnvironment"
+                        @click="selectEnv"
+                    />
                 </div>
                 <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
                 <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
@@ -262,14 +263,14 @@ export default {
             }
         },
         getEnvList() {
-          const listHeader = [
-              {
-                type: 'option',
-                label: 'Environment',
-                icon: 'fa fa-globe',
-                disabled: true,
-                class: 'text-with-line'
-              },]
+            const listHeader = [
+                {
+                    type: 'option',
+                    label: 'Environment',
+                    icon: 'fa fa-globe',
+                    disabled: true,
+                    class: 'text-with-line'
+                },]
             const list =  this.environments.map(item => {
                 return {
                     type: 'option',

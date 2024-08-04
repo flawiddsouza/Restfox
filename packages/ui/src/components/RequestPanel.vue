@@ -203,7 +203,7 @@
                                 @click="showGraphQLDocs"
                             />
                         </div>
-                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved" :schema-action="schemaAction"/>
+                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved" :schema-action="schemaAction" />
                         <button class="button" @click="beautifyGraphQL" style="margin-left: 0.5rem">Beautify</button>
                     </div>
                 </div>
