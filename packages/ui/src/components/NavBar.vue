@@ -263,14 +263,25 @@ export default {
             }
         },
         getEnvList() {
-            return this.environments.map(item => {
+            const listHeader = [
+            {
+                type: 'option',
+                label: 'Environment',
+                icon: 'fa fa-globe',
+                disabled: true,
+                class: 'text-with-line'
+            },
+            ]
+            const list =  this.environments.map(item => {
                 return {
                     type: 'option',
-                    label: `${item.name}`,
+                    label: `&nbsp;<i
+class="fa fa-circle" style="color:$ {item.color}"></i> ${item.name}'
                     value: `${item.name}`,
                     class: 'context-menu-item-with-left-padding'
                 }
             })
+            return [...listHeader, ...list]
         },
         selectEnv(value) {
             this.currentEnvironment = value
