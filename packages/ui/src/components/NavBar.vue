@@ -20,7 +20,7 @@
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
                     <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
-                        <div><i class="fa fa-circle" :style="{ color: envColor }"></i> {{ currentEnvironment ?? 'Default' }}</div>
+                        <i class="fa fa-circle" :style="{ color: envColor }"></i> {{ currentEnvironment ?? 'Default' }}</div>
                         <i class="fa fa-caret-down space-right"></i>
                         <ContextMenu
                             :options="getEnvList()"
@@ -31,7 +31,6 @@
                             :selected-option="currentEnvironment"
                             @click="selectEnv"
                         />
-                    </div>
                 </div>
                 <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
                 <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
@@ -274,7 +273,7 @@ export default {
             const list =  this.environments.map(item => {
                 return {
                     type: 'option',
-                    label: `&nbsp;<i class="fa fa-circle" style="color:$ {item.color}"></i> ${item.name}`,
+                    label: `&nbsp;<i class="fa fa-circle" style="color:${item.color}"></i> ${item.name}`,
                     value: `${item.name}`,
                     class: 'context-menu-item-with-left-padding'
                 }
