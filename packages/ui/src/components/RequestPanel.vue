@@ -25,15 +25,12 @@
                     data-testid="request-panel-address-bar"
                 />
             </div>
-            <button v-if="!intervalRequestSending" @click="sendRequest('send')" data-testid="request-panel-address-bar__send-button">Send</button>
-            <button v-if="intervalRequestSending" @click="sendRequest('cancel')" data-testid="request-panel-address-bar__cancel-button">Cancel</button>
+            <button v-if="!intervalRequestSending && !delayRequestSending" @click="sendRequest('send')" data-testid="request-panel-address-bar__send-button">Send</button>
+            <button v-if="intervalRequestSending || delayRequestSending" @click="sendRequest('cancel')" data-testid="request-panel-address-bar__cancel-button">Cancel</button>
             <div
-                v-if="!intervalRequestSending"
+                v-if="!intervalRequestSending && !delayRequestSending"
                 class="custom-dropdown send-options"
                 @click="toggleSendSelectorDropdown"
-                style="background-color: #7f4fd5; color: white; margin-right: 0rem; padding-left: 0; padding-right: 0.5rem; padding-left: 0.5rem"
-                onmouseover="this.style.backgroundColor='#5a2ebf'"
-                onmouseout="this.style.backgroundColor='#7f4fd5'"
             >
                 <i class="fa fa-caret-down space-right"></i>
                 <ContextMenu
@@ -591,6 +588,7 @@ export default {
             generateCodeModalCollectionItem: null,
             generateCodeModalShow: false,
             intervalRequestSending: null,
+            delayRequestSending: null,
         }
     },
     computed: {
@@ -724,12 +722,12 @@ export default {
             }
 
             if(value === 'send-with-delay') {
-                const delayInSeconds = await window.createPrompt('Delay in seconds')
+                this.delayRequestSending = await window.createPrompt('Delay in seconds')
 
-                if(delayInSeconds) {
-                    setTimeout(() => {
+                if(this.delayRequestSending) {
+                    this.delayRequestSending = setTimeout(() => {
                         this.$store.dispatch('sendRequest', this.activeTab)
-                    }, delayInSeconds * 1000)
+                    }, this.delayRequestSending * 1000)
                 }
             }
 
@@ -744,8 +742,15 @@ export default {
             }
 
             if(value === 'cancel') {
-                clearInterval(this.intervalRequestSending)
-                this.intervalRequestSending = null
+                if (this.intervalRequestSending) {
+                    clearInterval(this.intervalRequestSending)
+                    this.intervalRequestSending = null
+                }
+
+                if (this.delayRequestSending) {
+                    clearTimeout(this.delayRequestSending)
+                    this.delayRequestSending = null
+                }
             }
         },
         pushItem(object, key, itemToPush) {
@@ -1169,5 +1174,22 @@ export default {
     justify-content: flex-end;
     align-items: center;
     margin-top: 0.5rem;
+}
+
+.send-options {
+    background-color: var(--send-request-button-color);
+    color: var(--primary-text-color);
+    margin-right: 0rem;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    height: 100%;
+}
+
+.send-options:hover {
+    background-color: var(--send-request-button-hover-color);
 }
 </style>
