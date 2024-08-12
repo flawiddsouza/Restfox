@@ -20,7 +20,7 @@
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
                     <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
-                        <i class="fa fa-circle" :style="{ color: envColor }">&nbsp;</i> {{ currentEnvironment ?? 'Default' }}
+                        <i class="fa fa-circle" :style="{ color: currentEnvironmentColor }">&nbsp;</i> {{ currentEnvironment ?? 'Default' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
                     <ContextMenu
@@ -106,7 +106,6 @@ export default {
             envSelectorContextMenuX: null,
             envSelectorContextMenuY: null,
             envSelectorDropdownVisible: false,
-            envColor: null,
         }
     },
     computed: {
@@ -124,6 +123,9 @@ export default {
                     color: constants.DEFAULT_ENVIRONMENT.color
                 }
             ]
+        },
+        currentEnvironmentColor() {
+            return this.environments.find(env => env.name === this.currentEnvironment).color ?? constants.DEFAULT_ENVIRONMENT.color
         },
         currentEnvironment: {
             get() {
@@ -283,25 +285,9 @@ export default {
         },
         selectEnv(value) {
             this.currentEnvironment = value
-            this.envColor = this.environments.find(env => env.name === value).color || constants.DEFAULT_ENVIRONMENT.color
             this.$store.dispatch('reloadTabEnvironmentResolved')
         }
     },
-    watch: {
-        currentEnvironment(newVal) {
-            this.envColor = this.environments.find(env => env.name === newVal).color || constants.DEFAULT_ENVIRONMENT.color
-        },
-        activeWorkspaceLoaded(newVal) {
-            if (newVal) {
-                this.envColor = this.environments.find(env => env.name === this.currentEnvironment).color || constants.DEFAULT_ENVIRONMENT.color
-            }
-        }
-    },
-    created() {
-        if (this.activeWorkspaceLoaded) {
-            this.envColor = this.environments.find(env => env.name === this.currentEnvironment).color || constants.DEFAULT_ENVIRONMENT.color
-        }
-    }
 }
 </script>
 
