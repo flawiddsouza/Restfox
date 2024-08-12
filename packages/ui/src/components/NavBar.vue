@@ -9,6 +9,9 @@
             <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded && activeWorkspace._type === 'file'">
                 <button class="button" @click="openWorkspaceFolder">Open Folder</button>
             </div>
+            <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded">
+                <button class="button workspace-quick-switcher" @click="openWorkspaceQuickSwitcher"><i class="fa fa-repeat"></i> Switch</button>
+            </div>
         </div>
         <div class="right-nav-container">
             <a href="#" @click.prevent="cycleTheme()" class="bl theme-selector">Theme: {{ getThemeName(theme) }}</a>
@@ -20,7 +23,7 @@
                 <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
                     <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
                     <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
-                        <i class="fa fa-circle" :style="{ color: envColor }">&nbsp;</i> {{ currentEnvironment ?? 'Default' }}
+                        <i class="fa fa-circle" :style="{ color: currentEnvironmentColor }"></i>&nbsp;&nbsp;{{ currentEnvironment ?? 'Default' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
                     <ContextMenu
@@ -62,6 +65,15 @@
     <LogsModal v-model:showModal="showLogsModal"></LogsModal>
     <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" />
     <BackupAndRestoreModal />
+    <ContextMenu
+        :options="workspaceQuickSwitcherOptions"
+        :element="workspaceQuickSwitcherElement"
+        :x="workspaceQuickSwitcherContextMenuX"
+        :y="workspaceQuickSwitcherContextMenuY"
+        v-model:show="workspaceQuickSwitcherDropdownVisible"
+        :selected-option="activeWorkspace"
+        @click="setActiveWorkspace"
+    />
 </template>
 
 <script>
@@ -106,7 +118,10 @@ export default {
             envSelectorContextMenuX: null,
             envSelectorContextMenuY: null,
             envSelectorDropdownVisible: false,
-            envColor: null,
+            workspaceQuickSwitcherElement: null,
+            workspaceQuickSwitcherContextMenuX: null,
+            workspaceQuickSwitcherContextMenuY: null,
+            workspaceQuickSwitcherDropdownVisible: false,
         }
     },
     computed: {
@@ -124,6 +139,9 @@ export default {
                     color: constants.DEFAULT_ENVIRONMENT.color
                 }
             ]
+        },
+        currentEnvironmentColor() {
+            return this.environments.find(env => env.name === this.currentEnvironment).color ?? constants.DEFAULT_ENVIRONMENT.color
         },
         currentEnvironment: {
             get() {
@@ -170,6 +188,27 @@ export default {
         },
         flags() {
             return this.$store.state.flags
+        },
+        workspaceQuickSwitcherOptions() {
+            const workspacesOptions = this.$store.state.workspaces.map(workspace => {
+                return {
+                    type: 'option',
+                    label: workspace.name,
+                    value: workspace,
+                    class: 'context-menu-item-with-left-padding',
+                }
+            })
+
+            return [
+                {
+                    type: 'option',
+                    label: 'Workspaces',
+                    icon: 'fa fa-book',
+                    disabled: true,
+                    class: 'text-with-line'
+                },
+                ...workspacesOptions
+            ]
         },
     },
     methods: {
@@ -274,7 +313,7 @@ export default {
             const list =  this.environments.map(item => {
                 return {
                     type: 'option',
-                    label: `&nbsp;<i class="fa fa-circle" style="color:${item.color}"></i> ${item.name}`,
+                    label: `<i class="fa fa-circle" style="color:${item.color}"></i>&nbsp;&nbsp;${item.name}`,
                     value: `${item.name}`,
                     class: 'context-menu-item-with-left-padding'
                 }
@@ -283,25 +322,16 @@ export default {
         },
         selectEnv(value) {
             this.currentEnvironment = value
-            this.envColor = this.environments.find(env => env.name === value).color || constants.DEFAULT_ENVIRONMENT.color
             this.$store.dispatch('reloadTabEnvironmentResolved')
-        }
-    },
-    watch: {
-        currentEnvironment(newVal) {
-            this.envColor = this.environments.find(env => env.name === newVal).color || constants.DEFAULT_ENVIRONMENT.color
         },
-        activeWorkspaceLoaded(newVal) {
-            if (newVal) {
-                this.envColor = this.environments.find(env => env.name === this.currentEnvironment).color || constants.DEFAULT_ENVIRONMENT.color
-            }
-        }
+        openWorkspaceQuickSwitcher(event) {
+            const containerElement = event.target.closest('.workspace-quick-switcher')
+            this.workspaceQuickSwitcherContextMenuX = containerElement.getBoundingClientRect().left
+            this.workspaceQuickSwitcherContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+            this.workspaceQuickSwitcherElement = containerElement
+            this.workspaceQuickSwitcherDropdownVisible = true
+        },
     },
-    created() {
-        if (this.activeWorkspaceLoaded) {
-            this.envColor = this.environments.find(env => env.name === this.currentEnvironment).color || constants.DEFAULT_ENVIRONMENT.color
-        }
-    }
 }
 </script>
 

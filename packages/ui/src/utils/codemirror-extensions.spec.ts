@@ -65,7 +65,40 @@ test('validate variableMatchingRegex', async() => {
         },
         {
             var: '{{ cat! }}',
-            valid: false,
+            valid: true,
+            extract: [
+                'cat!'
+            ]
+        },
+        {
+            // this one doesn't actually substitute in our env substitution, but it's a valid variable path actually
+            var: '{{ API["URL"] }}',
+            valid: true,
+            extract: [
+                'API["URL"]'
+            ]
+        },
+        {
+            var: '{{ API[0].cat }}',
+            valid: true,
+            extract: [
+                'API[0].cat'
+            ]
+        },
+        {
+            var: '{{API[0].cat!}}',
+            valid: true,
+            extract: [
+                'API[0].cat!'
+            ]
+        },
+        {
+            // GH Issue #211
+            var: '{{my-key}}',
+            valid: true,
+            extract: [
+                'my-key'
+            ]
         },
     ]
 
@@ -74,7 +107,8 @@ test('validate variableMatchingRegex', async() => {
         let i = 0
         while ((match = variableMatchingRegex.exec(testValue.var))) {
             const varName = match[1] || match[2]
-            expect(varName).toBe(testValue.extract![i])
+            const expectedVarName = testValue.extract ? testValue.extract[i] : 'extract array not defined for valid true case!'
+            expect(varName).toBe(expectedVarName)
             i++
         }
 

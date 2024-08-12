@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitepress'
+import { withPwa } from '@vite-pwa/vitepress'
 import sidebar from './sidebar'
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withPwa(defineConfig({
     title: 'Restfox',
     description: 'A powerful minimalistic HTTP client',
     head: [
@@ -22,5 +23,10 @@ export default defineConfig({
         socialLinks: [
             { icon: 'github', link: 'https://github.com/flawiddsouza/Restfox' }
         ]
-    }
-})
+    },
+    pwa: {
+        workbox: {
+            globPatterns: ['**/*.{css,js,html,svg,png,ico,txt,woff2}'],
+        },
+    },
+}))

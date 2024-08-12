@@ -72,7 +72,7 @@
         "rollup-plugin-copy": "^3.4.0",
         "start-server-and-test": "2.0.4",
         "vite": "^4.5.0",
-        "vite-plugin-checker": "^0.6.4",
+        "vite-plugin-checker": "^0.7.2",
         "vite-plugin-pwa": "^0.16.6",
         "vitest": "^0.25.2"
     },
