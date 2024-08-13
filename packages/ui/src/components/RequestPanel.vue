@@ -727,8 +727,8 @@ export default {
                 if(this.delayRequestSending) {
                     this.delayRequestSending = setTimeout(() => {
                         this.$store.dispatch('sendRequest', this.activeTab)
+                        this.delayRequestSending = null
                     }, this.delayRequestSending * 1000)
-                    this.delayRequestSending = null
                 }
             }
 

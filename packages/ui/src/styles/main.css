@@ -109,7 +109,7 @@ html {
     --primary-hover-background-color: rgba(26, 115, 232, 0.5);
     --menu-border-color: #82828240;
     --send-request-button-color: #7f4fd5;
-    --send-request-button-hover-color: #5a2ebf;
+    --send-request-button-hover-color: #673ab7;
 }
 
 html.theme-dark {
@@ -207,7 +207,7 @@ html.theme-dark {
     --primary-hover-background-color: rgba(26, 115, 232, 0.5);
     --menu-border-color: #48484880;
     --send-request-button-color: #7f4fd5;
-    --send-request-button-hover-color: #5a2ebf;
+    --send-request-button-hover-color: #673ab7;
 }
 
 html.theme-dracula {
