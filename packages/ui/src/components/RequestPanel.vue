@@ -728,6 +728,7 @@ export default {
                     this.delayRequestSending = setTimeout(() => {
                         this.$store.dispatch('sendRequest', this.activeTab)
                     }, this.delayRequestSending * 1000)
+                    this.delayRequestSending = null
                 }
             }
 
@@ -1096,7 +1097,7 @@ export default {
 }
 
 .request-panel-address-bar button {
-    background-color: #7f4fd5;
+    background-color: var(--send-request-button-color);
     color: white;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
@@ -1105,7 +1106,7 @@ export default {
 }
 
 .request-panel-address-bar button:hover {
-    background-color: #673ab7;
+    background-color: var(--send-request-button-hover-color);
 }
 
 .request-panel-tabs {
