@@ -21,6 +21,7 @@
             <div>
                 <div style="margin-bottom: var(--label-margin-bottom);">Global User Agent</div>
                 <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
+                <button class="button" @click="getCuurentUserAgent" style="margin-top: 0.5rem">Get UserAgent</button>
                 <div style="margin-top: 1rem">
                     Note that the default user agent <strong>Restfox/{{ getVersion() }}</strong> is used when no global user agent is set here or on request level.
                 </div>
@@ -258,6 +259,9 @@ export default {
             if(savedGlobalUserAgent) {
                 this.globalUserAgent = savedGlobalUserAgent
             }
+        },
+        getCuurentUserAgent() {
+            this.globalUserAgent = navigator.userAgent
         }
     }
 }
