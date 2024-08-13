@@ -1181,8 +1181,8 @@ export default {
     background-color: var(--send-request-button-color);
     color: var(--primary-text-color);
     margin-right: 0rem;
-    padding-right: 0.5rem;
-    padding-left: 0.5rem;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1192,5 +1192,9 @@ export default {
 
 .send-options:hover {
     background-color: var(--send-request-button-hover-color);
+}
+
+.send-options.custom-dropdown > i {
+    padding: 0;
 }
 </style>
