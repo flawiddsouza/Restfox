@@ -6,10 +6,10 @@
                 <i class="fa fa-caret-down space-right"></i>
                 <ContextMenu
                     :options="methods"
-                    :element="methodSelectorElement"
-                    :x="methodSelectorContextMenuX"
-                    :y="methodSelectorContextMenuY"
-                    v-model:show="methodSelectorDropdownVisible"
+                    :element="methodSelectorDropdownState.element"
+                    :x="methodSelectorDropdownState.contextMenuX"
+                    :y="methodSelectorDropdownState.contextMenuY"
+                    v-model:show="methodSelectorDropdownState.visible"
                     @click="selectMethod"
                 />
             </div>
@@ -25,7 +25,23 @@
                     data-testid="request-panel-address-bar"
                 />
             </div>
-            <button @click="sendRequest" data-testid="request-panel-address-bar__send-button">Send</button>
+            <button v-if="!intervalRequestSending && !delayRequestSending" @click="sendRequest('send')" data-testid="request-panel-address-bar__send-button">Send</button>
+            <button v-if="intervalRequestSending || delayRequestSending" @click="sendRequest('cancel')" data-testid="request-panel-address-bar__cancel-button">Cancel</button>
+            <div
+                v-if="!intervalRequestSending && !delayRequestSending"
+                class="custom-dropdown send-options"
+                @click="toggleSendSelectorDropdown"
+            >
+                <i class="fa fa-caret-down space-right"></i>
+                <ContextMenu
+                    :options="sendOptions"
+                    :element="sendSelectorDropdownState.element"
+                    :x="sendSelectorDropdownState.contextMenuX"
+                    :y="sendSelectorDropdownState.contextMenuY"
+                    v-model:show="sendSelectorDropdownState.visible"
+                    @click="sendRequest"
+                />
+            </div>
         </div>
         <div class="request-panel-tabs" v-show="tabView === 'full'">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs" :data-testid="`request-panel-tab-${requestPanelTab.name}`">
@@ -196,10 +212,10 @@
                             <i class="fa fa-caret-down space-right"></i>
                             <ContextMenu
                                 :options="schemaOptionList"
-                                :element="schemaSelectorElement"
-                                :x="schemaSelectorContextMenuX"
-                                :y="schemaSelectorContextMenuY"
-                                v-model:show="schemaSelectorDropdownVisible"
+                                :element="schemaSelectorDropdownState.element"
+                                :x="schemaSelectorDropdownState.contextMenuX"
+                                :y="schemaSelectorDropdownState.contextMenuY"
+                                v-model:show="schemaSelectorDropdownState.visible"
                                 @click="showGraphQLDocs"
                             />
                         </div>
@@ -375,6 +391,7 @@
         :method="activeTab?.method"
         @customHttpMethod="handleCustomHttpMethod"
     />
+    <GenerateCodeModal v-model:showModal="generateCodeModalShow" :collection-item="generateCodeModalCollectionItem" />
 </template>
 
 <script>
@@ -388,12 +405,18 @@ import ContextMenu from '@/components/ContextMenu.vue'
 import SnippetDropdown from '@/components/SnippetDropdown.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
-import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentVariables } from '@/helpers'
+import {
+    convertCurlCommandToRestfoxCollection,
+    debounce,
+    substituteEnvironmentVariables,
+    toggleDropdown
+} from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
+import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
 
 const renderer = new marked.Renderer()
 
@@ -408,6 +431,7 @@ marked.setOptions({
 
 export default {
     components: {
+        GenerateCodeModal,
         ContextMenu,
         CodeMirrorSingleLine,
         CodeMirrorEditor,
@@ -446,6 +470,7 @@ export default {
             ],
             activeRequestPanelTab: 'Body',
             methods: this.getHttpMethodList(),
+            sendOptions: this.getSendOptions(),
             graphql: {
                 query: '',
                 variables: '{}'
@@ -460,14 +485,24 @@ export default {
             },
             skipScriptUpdate: false,
             editDescription: false,
-            methodSelectorDropdownVisible: false,
-            methodSelectorElement: null,
-            methodSelectorContextMenuX: null,
-            methodSelectorContextMenuY: null,
-            schemaSelectorDropdownVisible: false,
-            schemaSelectorElement: null,
-            schemaSelectorContextMenuX: null,
-            schemaSelectorContextMenuY: null,
+            schemaSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
+            methodSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
+            sendSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
             schemaOptionList: [
                 {
                     'type': 'option',
@@ -549,7 +584,11 @@ export default {
             requestBodyWidth: null,
             httpMethodModalShow: false,
             showGraphQLDocumentation: false,
-            schemaAction: null
+            schemaAction: null,
+            generateCodeModalCollectionItem: null,
+            generateCodeModalShow: false,
+            intervalRequestSending: null,
+            delayRequestSending: null,
         }
     },
     computed: {
@@ -672,8 +711,48 @@ export default {
         },
     },
     methods: {
-        sendRequest() {
-            this.$store.dispatch('sendRequest', this.activeTab)
+        async sendRequest(value) {
+            if(value === 'send') {
+                this.$store.dispatch('sendRequest', this.activeTab)
+            }
+
+            if(value === 'generate-code') {
+                this.generateCodeModalCollectionItem = JSON.parse(JSON.stringify(this.activeTab))
+                this.generateCodeModalShow = true
+            }
+
+            if(value === 'send-with-delay') {
+                this.delayRequestSending = await window.createPrompt('Delay in seconds')
+
+                if(this.delayRequestSending) {
+                    this.delayRequestSending = setTimeout(() => {
+                        this.$store.dispatch('sendRequest', this.activeTab)
+                        this.delayRequestSending = null
+                    }, this.delayRequestSending * 1000)
+                }
+            }
+
+            if(value === 'send-with-interval') {
+                this.intervalRequestSending = await window.createPrompt('Interval in seconds')
+
+                if(this.intervalRequestSending) {
+                    this.intervalRequestSending = setInterval(() => {
+                        this.$store.dispatch('sendRequest', this.activeTab)
+                    }, this.intervalRequestSending * 1000)
+                }
+            }
+
+            if(value === 'cancel') {
+                if (this.intervalRequestSending) {
+                    clearInterval(this.intervalRequestSending)
+                    this.intervalRequestSending = null
+                }
+
+                if (this.delayRequestSending) {
+                    clearTimeout(this.delayRequestSending)
+                    this.delayRequestSending = null
+                }
+            }
         },
         pushItem(object, key, itemToPush) {
             if(key in object === false) {
@@ -816,26 +895,13 @@ export default {
             console.log('Script saved')
         }, 500),
         toggleMethodSelectorDropdown(event) {
-            this.methodSelectorDropdownVisible = !this.methodSelectorDropdownVisible
-            if (this.methodSelectorDropdownVisible) {
-                const containerElement = event.target.closest('.custom-dropdown')
-                this.methodSelectorContextMenuX = containerElement.getBoundingClientRect().left
-                this.methodSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
-                this.methodSelectorElement = containerElement
-            } else {
-                this.methodSelectorElement = null
-            }
+            toggleDropdown(event, this.methodSelectorDropdownState)
         },
         toggleSchemaSelectorDropdown(event) {
-            this.schemaSelectorDropdownVisible = !this.schemaSelectorDropdownVisible
-            if (this.schemaSelectorDropdownVisible) {
-                const containerElement = event.target.closest('.custom-dropdown')
-                this.schemaSelectorContextMenuX = containerElement.getBoundingClientRect().left
-                this.schemaSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
-                this.schemaSelectorElement = containerElement
-            } else {
-                this.schemaSelectorElement = null
-            }
+            toggleDropdown(event, this.schemaSelectorDropdownState)
+        },
+        toggleSendSelectorDropdown(event) {
+            toggleDropdown(event, this.sendSelectorDropdownState)
         },
         selectMethod(method) {
             if (method === 'Custom Method') {
@@ -938,6 +1004,52 @@ export default {
         },
         insertSnippetPostScript(text) {
             this.script.post_request += text + `\n`
+        },
+        getSendOptions() {
+            return [
+                {
+                    type: 'option',
+                    label: 'Basic',
+                    disabled: true,
+                    value: '',
+                    class: 'text-with-line',
+                },
+                {
+                    type: 'option',
+                    label: 'Send Now',
+                    value: 'send',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-paper-plane'
+                },
+                {
+                    type: 'option',
+                    label: 'Generate Client Code',
+                    value: 'generate-code',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-code'
+                },
+                {
+                    type: 'option',
+                    label: 'Advanced',
+                    disabled: true,
+                    value: '',
+                    class: 'text-with-line',
+                },
+                {
+                    type: 'option',
+                    label: 'Send After Delay',
+                    value: 'send-with-delay',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-clock'
+                },
+                {
+                    type: 'option',
+                    label: 'Repeat on Interval',
+                    value: 'send-with-interval',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-refresh'
+                },
+            ]
         }
     },
     mounted() {
@@ -985,7 +1097,7 @@ export default {
 }
 
 .request-panel-address-bar button {
-    background-color: #7f4fd5;
+    background-color: var(--send-request-button-color);
     color: white;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
@@ -994,7 +1106,7 @@ export default {
 }
 
 .request-panel-address-bar button:hover {
-    background-color: #673ab7;
+    background-color: var(--send-request-button-hover-color);
 }
 
 .request-panel-tabs {
@@ -1063,5 +1175,22 @@ export default {
     justify-content: flex-end;
     align-items: center;
     margin-top: 0.5rem;
+}
+
+.send-options {
+    background-color: var(--send-request-button-color);
+    color: var(--primary-text-color);
+    margin-right: 0rem;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    height: 100%;
+}
+
+.send-options:hover {
+    background-color: var(--send-request-button-hover-color);
 }
 </style>

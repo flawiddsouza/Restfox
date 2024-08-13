@@ -1728,3 +1728,17 @@ export function resolveAuthentication(authentication: RequestAuthentication, env
         return `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
     }
 }
+
+export function toggleDropdown(event: any, dropdownState: any) {
+    dropdownState.visible = !dropdownState.visible
+
+    if (dropdownState.visible) {
+        const containerElement = event.target.closest('.custom-dropdown')
+        const rect = containerElement.getBoundingClientRect()
+        dropdownState.contextMenuX = rect.left
+        dropdownState.contextMenuY = rect.top + rect.height
+        dropdownState.element = containerElement
+    } else {
+        dropdownState.element = null
+    }
+}

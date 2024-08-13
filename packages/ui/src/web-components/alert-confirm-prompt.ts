@@ -15,6 +15,15 @@ class AlertConfirmPrompt extends HTMLElement {
                     <input type="color" value="${defaultValue ?? '#000000'}" class="color-preview" id="dialog-color-input">
                 </div>
                 `
+            }  else if(title.toLowerCase().includes('in seconds')) {
+                inputHtml = `
+                <div style="margin-top: 0.5rem;">
+                    <input type="number" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
+                    <datalist id="selectList">
+                        ${selectList.map(item => `<option value="${item}"></option>`).join('')}
+                    </datalist>
+                </div>
+                `
             } else {
                 inputHtml = `
                 <div style="margin-top: 0.5rem;">
@@ -198,6 +207,7 @@ class AlertConfirmPrompt extends HTMLElement {
         .dialog-primary-button, .dialog-secondary-button {
             padding: 8px 16px;
             border-radius: var(--border-radius);
+            cursor: pointer;
         }
 
         .dialog-primary-button {
