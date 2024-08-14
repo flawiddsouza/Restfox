@@ -151,6 +151,7 @@ export default {
                 environment = JSON.parse(this.environment)
                 this.parseError = ''
                 this.environmentToSave = environment
+                console.log('environment changed', environment)
                 this.saveEnvironment()
             } catch(e) {
                 this.parseError = e.message
@@ -305,6 +306,7 @@ export default {
             }
 
             if(this.workspace) {
+                console.log('updating workspace environments', this.environments)
                 this.$store.commit('updateWorkspaceEnvironments',  { workspaceId: this.workspace._id, environments: this.environments })
             }
 

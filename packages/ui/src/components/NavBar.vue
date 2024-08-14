@@ -63,7 +63,7 @@
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" />
     <SettingsModal v-model:showModal="showSettingsModal" />
     <LogsModal v-model:showModal="showLogsModal"></LogsModal>
-    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" />
+    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" :key="activeWorkspace._id" />
     <BackupAndRestoreModal />
     <ContextMenu
         :options="workspaceQuickSwitcherOptions"
