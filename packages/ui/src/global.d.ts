@@ -148,7 +148,7 @@ export interface State {
 
 export interface Plugin {
     _id: string
-    name: string
+    name: string | null
     type?: 'script'
     code: string | { pre_request: string, post_request: string }
     workspaceId: string | null
