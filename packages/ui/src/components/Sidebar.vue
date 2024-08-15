@@ -173,7 +173,7 @@ export default {
                         'type': 'option',
                         'label': 'Import',
                         'value': 'Import Into',
-                        'icon': 'fa fa-upload',
+                        'icon': 'fa fa-file-import',
                         'class': 'context-menu-item-with-left-padding'
                     }
                 ]
@@ -215,7 +215,7 @@ export default {
                         'type': 'option',
                         'label': 'Import Into',
                         'value': 'Import Into',
-                        'icon': 'fa fa-upload',
+                        'icon': 'fa fa-file-import',
                         'class': 'context-menu-item-with-left-padding'
                     },
                     ...this.getCommonActions(this.activeSidebarItemForContextMenu._type),
@@ -492,7 +492,7 @@ export default {
                     'type': 'option',
                     'label': 'Export',
                     'value': 'Export',
-                    'icon': 'fa fa-download',
+                    'icon': 'fa fa-file-export',
                     'class': contextMenuItemClass
                 },
                 {
@@ -592,6 +592,7 @@ export default {
     border: 1px solid var(--default-border-color);
     border-right: 0;
     border-radius: var(--default-border-radius);
+    border-left: 2px solid red;
 }
 
 .sidebar .sidebar-item:hover {

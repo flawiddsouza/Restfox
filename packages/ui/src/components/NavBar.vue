@@ -36,17 +36,32 @@
                         @click="selectEnv"
                     />
                 </div>
-                <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
-                <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
+                <div class="navbar-items">
+                    <i class="fas fa-file-import" style="margin-left: 0.5rem"></i>
+                    <a href="#" @click.prevent="showImportModal">Import</a>
+                </div>
+                <div class="navbar-items">
+                    <i class="fas fa-file-export" style="margin-left: 0.5rem"></i>
+                    <a href="#" @click.prevent="exportCollection">Export</a>
+                </div>
             </div>
             <template v-if="nav === 'workspaces'">
                 <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
                 <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron">Open File Workspace</a>
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
-            <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
-            <a href="#" @click.prevent="showSettings" class="bl br">Settings</a>
-            <a href="#" @click.prevent="showLogs" class="bl br">Logs</a>
+            <div class="navbar-items">
+                <i class="fas fa-code" style="margin-left: 0.5rem"></i>
+                <a href="#" @click.prevent="showPluginsManager">Plugins</a>
+            </div>
+            <div class="navbar-items">
+                <i class="fas fa-cog" style="margin-left: 0.5rem"></i>
+                <a href="#" @click.prevent="showSettings">Settings</a>
+            </div>
+            <div class="navbar-items">
+                <i class="fas fa-file-lines" style="margin-left: 0.5rem"></i>
+                <a href="#" @click.prevent="showLogs" class="br">Logs</a>
+            </div>
             <span class="spacer"></span>
             <div class="github-star">
                 <a class="gh-button-container" href="https://github.com/flawiddsouza/Restfox" rel="noopener" target="_blank" title="Star Restfox" aria-label="Star Restfox on GitHub">
@@ -401,5 +416,13 @@ export default {
     .theme-selector, .view-switcher, .github-star {
         display: none !important;
     }
+}
+
+.navbar-items {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    margin-right: 0.5rem;
+    border-left: 1px solid var(--border-color-lighter);
 }
 </style>
