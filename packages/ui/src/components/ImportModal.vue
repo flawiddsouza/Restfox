@@ -156,7 +156,13 @@ export default {
                         }
 
                         if(this.importFrom === 'Postman') {
-                            collectionTree = collectionTree.concat(await convertPostmanExportToRestfoxCollection(json, fileToImport.name.endsWith('.zip'), this.activeWorkspace._id))
+                            const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
+
+                            collectionTree = collectionTree.concat(collection)
+
+                            if(newPlugins.length > 0) {
+                                plugins = plugins.concat(newPlugins)
+                            }
                         }
 
                         if(this.importFrom === 'Insomnia') {
