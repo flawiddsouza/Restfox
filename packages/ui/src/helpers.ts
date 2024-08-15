@@ -792,15 +792,19 @@ function importPostmanV1(collections: any[], workspaceId: string) {
 
 function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: string | null = null, workspaceId: string) {
     const requests: CollectionItem[] = []
+    const plugins: Plugin[] = []
 
     postmanCollectionItem.item.forEach((request: any) => {
         const requestId = request.id ?? nanoid()
         if('item' in request) {
+            const { requests, plugins: newPlugins } = handlePostmanV2CollectionItem(request, requestId, workspaceId)
+            plugins.push(...newPlugins)
+
             requests.push({
                 _id: requestId,
                 _type: 'request_group',
                 name: request.name,
-                children: handlePostmanV2CollectionItem(request, requestId, workspaceId),
+                children: requests,
                 parentId,
                 workspaceId
             })
@@ -894,6 +898,36 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             }
         }
 
+        if(request.event) {
+            const scriptId = nanoid()
+            let preScript = ''
+            let postScript = ''
+            request.event.forEach((script: any) => {
+                if(script.listen === 'prerequest') {
+                    preScript += script.script.exec.join('\n')
+                }
+
+                if(script.listen === 'test') {
+                    postScript += script.script.exec.join('\n')
+                }
+            })
+
+            plugins.push({
+                '_id': scriptId,
+                'type': 'script',
+                'name': null,
+                'code': {
+                    'pre_request': postmanScriptToRestfoxScriptConversion(preScript),
+                    'post_request': postmanScriptToRestfoxScriptConversion(postScript)
+                },
+                'collectionId': requestId,
+                'workspaceId': workspaceId,
+                'enabled': true,
+                'createdAt': Date.now(),
+                'updatedAt': Date.now()
+            })
+        }
+
         requests.push({
             _id: requestId,
             _type: 'request',
@@ -910,13 +944,17 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
         })
     })
 
-    return requests
+    return { requests, plugins }
 }
 
 function importPostmanV2(collections: any[], workspaceId: string) {
     const collection: CollectionItem[] = []
+    const plugins: Plugin[] = []
 
     collections.forEach(postmanCollectionItem => {
+        const { requests, plugins: newPlugins } = handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId)
+        plugins.push(...newPlugins)
+
         collection.push({
             _id: postmanCollectionItem.info._postman_id,
             _type: 'request_group',
@@ -925,13 +963,13 @@ function importPostmanV2(collections: any[], workspaceId: string) {
                 prev[acc.key] = acc.value
                 return prev
             }, {}) : undefined,
-            children: handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId),
+            children: requests,
             parentId: null,
             workspaceId
         })
     })
 
-    return collection
+    return { collection, plugins }
 }
 
 function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
@@ -1741,4 +1779,11 @@ export function toggleDropdown(event: any, dropdownState: any) {
     } else {
         dropdownState.element = null
     }
+}
+
+export function postmanScriptToRestfoxScriptConversion(scriptToConvert: string) {
+    return scriptToConvert
+        .replaceAll('pm.environment.set', 'rf.setEnvVar')
+        .replaceAll('pm.environment.get', 'rf.getEnvVar')
+        .replaceAll('pm.response.json()', 'rf.response.getBodyJSON()')
 }
