@@ -20,8 +20,9 @@
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl view-switcher">View: Column</a>
                     <a href="#" @click.prevent="requestResponseLayout = 'left-right'" v-else class="bl view-switcher">View: Row</a>
                 </template>
-                <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
-                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
+                <div class="navbar-items">
+                    <i class="fas fa-code" style="margin-left: 0.5rem"></i>
+                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;">Environment</a>
                     <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
                         <i class="fa fa-circle" :style="{ color: currentEnvironmentColor }"></i>&nbsp;&nbsp;{{ currentEnvironment ?? 'Default' }}
                         <i class="fa fa-caret-down space-right"></i>
@@ -51,7 +52,7 @@
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
             <div class="navbar-items">
-                <i class="fas fa-code" style="margin-left: 0.5rem"></i>
+                <i class="fas fa-plug" style="margin-left: 0.5rem"></i>
                 <a href="#" @click.prevent="showPluginsManager">Plugins</a>
             </div>
             <div class="navbar-items">
