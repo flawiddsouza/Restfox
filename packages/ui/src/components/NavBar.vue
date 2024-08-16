@@ -31,10 +31,10 @@
                     </div>
                     <ContextMenu
                         :options="getEnvList()"
-                        :element="envSelectorElement"
-                        :x="envSelectorContextMenuX"
-                        :y="envSelectorContextMenuY"
-                        v-model:show="envSelectorDropdownVisible"
+                        :element="envSelectorDropdownState.element"
+                        :x="envSelectorDropdownState.contextMenuX"
+                        :y="envSelectorDropdownState.contextMenuY"
+                        v-model:show="envSelectorDropdownState.visible"
                         :selected-option="currentEnvironment"
                         @click="selectEnv"
                     />
@@ -46,10 +46,18 @@
                     </a>
                 </div>
                 <div class="navbar-item">
-                    <a href="#" @click.prevent="exportCollection">
-                        <i class="fas fa-file-export" style="padding-right: 0.5rem"></i>
-                        Export
-                    </a>
+                    <div class="custom-dropdown" style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown">
+                        <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
+                        <i class="fa fa-caret-down space-right"></i>
+                    </div>
+                    <ContextMenu
+                        :options="getExportList()"
+                        :element="exportSelectorDropdownState.element"
+                        :x="exportSelectorDropdownState.contextMenuX"
+                        :y="exportSelectorDropdownState.contextMenuY"
+                        v-model:show="exportSelectorDropdownState.visible"
+                        @click="exportCollection"
+                    />
                 </div>
             </div>
             <template v-if="nav === 'workspaces'">
@@ -117,6 +125,8 @@ import {
     generateNewIdsForTree,
     toTree,
     flattenTree,
+    convertCollectionsFromRestfoxToPostman,
+    exportAsPostmanCollection,
 } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
@@ -142,14 +152,22 @@ export default {
             showAddWorkspaceModal: false,
             environmentModalShow: false,
             showLogsModal: false,
-            envSelectorElement: null,
-            envSelectorContextMenuX: null,
-            envSelectorContextMenuY: null,
-            envSelectorDropdownVisible: false,
             workspaceQuickSwitcherElement: null,
             workspaceQuickSwitcherContextMenuX: null,
             workspaceQuickSwitcherContextMenuY: null,
             workspaceQuickSwitcherDropdownVisible: false,
+            exportSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
+            envSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
         }
     },
     computed: {
@@ -240,7 +258,7 @@ export default {
         },
     },
     methods: {
-        async exportCollection() {
+        async exportCollection(value) {
             let { collection } = await getCollectionForWorkspace(this.activeWorkspace._id)
             for(const item of collection) {
                 item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
@@ -255,7 +273,13 @@ export default {
                 collection = flattenTree(collectionTree)
             }
 
-            exportRestfoxCollection(collection, this.activeWorkspace.environments)
+            if (value === 'Restfox') {
+                exportRestfoxCollection(collection, this.activeWorkspace.environments)
+            }
+
+            if (value === 'Postman') {
+                exportAsPostmanCollection(await convertCollectionsFromRestfoxToPostman(collection))
+            }
         },
         setActiveWorkspace(workspace) {
             this.$store.commit('setActiveWorkspace', workspace)
@@ -319,14 +343,25 @@ export default {
             this.theme = themes[nextIndex]
         },
         toggleEnvSelectorDropdown(event) {
-            this.envSelectorDropdownVisible = !this.envSelectorDropdownVisible
-            if (this.envSelectorDropdownVisible) {
+            this.envSelectorDropdownState.visible = !this.envSelectorDropdownState.visible
+            if (this.envSelectorDropdownState.visible) {
                 const containerElement = event.target.closest('.custom-dropdown')
-                this.envSelectorContextMenuX = containerElement.getBoundingClientRect().left
-                this.envSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
-                this.envSelectorElement = containerElement
+                this.envSelectorDropdownState.contextMenuX = containerElement.getBoundingClientRect().left
+                this.envSelectorDropdownState.contextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.envSelectorDropdownState.element = containerElement
             } else {
-                this.envSelectorElement = null
+                this.envSelectorDropdownState.element = null
+            }
+        },
+        toggleExportSelectorDropdown(event) {
+            this.exportSelectorDropdownState.visible = !this.exportSelectorDropdownState.visible
+            if (this.exportSelectorDropdownState.visible) {
+                const containerElement = event.target.closest('.custom-dropdown')
+                this.exportSelectorDropdownState.contextMenuX = containerElement.getBoundingClientRect().left
+                this.exportSelectorDropdownState.contextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.exportSelectorDropdownState.element = containerElement
+            } else {
+                this.exportSelectorDropdownState.element = null
             }
         },
         getEnvList() {
@@ -347,6 +382,22 @@ export default {
                 }
             })
             return [...listHeader, ...list]
+        },
+        getExportList() {
+            return [
+                {
+                    type: 'option',
+                    label: 'Restfox collection',
+                    value: 'Restfox',
+                    class: 'context-menu-item-with-left-padding'
+                },
+                {
+                    type: 'option',
+                    label: 'Postman collection',
+                    value: 'Postman',
+                    class: 'context-menu-item-with-left-padding'
+                },
+            ]
         },
         selectEnv(value) {
             this.currentEnvironment = value
