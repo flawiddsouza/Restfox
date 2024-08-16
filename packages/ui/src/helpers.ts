@@ -917,8 +917,8 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
                 'type': 'script',
                 'name': null,
                 'code': {
-                    'pre_request': postmanScriptToRestfoxScriptConversion(preScript),
-                    'post_request': postmanScriptToRestfoxScriptConversion(postScript)
+                    'pre_request': scriptConversion(preScript, 'postmanToRestfox'),
+                    'post_request': scriptConversion(postScript, 'postmanToRestfox')
                 },
                 'collectionId': requestId,
                 'workspaceId': workspaceId,
@@ -1785,12 +1785,40 @@ export function toggleDropdown(event: any, dropdownState: any) {
     }
 }
 
-export function postmanScriptToRestfoxScriptConversion(scriptToConvert: string) {
-    return scriptToConvert
-        .replaceAll('pm.environment.set', 'rf.setEnvVar')
-        .replaceAll('pm.environment.get', 'rf.getEnvVar')
-        .replaceAll('pm.response.json()', 'rf.response.getBodyJSON()')
+/**
+ * Convert a script from one environment to another based on script type.
+ *
+ * @param {string} scriptToConvert - The script to convert.
+ * @param {string} scriptType - The type of script being converted.
+ * @returns {string} - The converted script.
+ */
+export function scriptConversion(scriptToConvert: string, scriptType: 'postmanToRestfox' | 'restfoxToPostman') {
+    const mappings = {
+        postmanToRestfox: {
+            'pm.environment.set': 'rf.setEnvVar',
+            'pm.environment.get': 'rf.getEnvVar',
+            'pm.response.json()': 'rf.response.getBodyJSON()'
+        },
+        restfoxToPostman: {
+            'rf.setEnvVar': 'pm.environment.set',
+            'rf.getEnvVar': 'pm.environment.get',
+            'rf.response.getBodyJSON()': 'pm.response.json()'
+        },
+    }
+
+    const selectedMapping = mappings[scriptType]
+    if (!selectedMapping) {
+        throw new Error(`Unsupported script type: ${scriptType}`)
+    }
+
+    let convertedScript = scriptToConvert
+    for (const [key, value] of Object.entries(selectedMapping)) {
+        convertedScript = convertedScript.replaceAll(key, value)
+    }
+
+    return convertedScript
 }
+
 
 export async function convertCollectionsFromRestfoxToPostman(restfoxCollections: any) {
     const restfoxData: any = restfoxCollections
@@ -1853,7 +1881,7 @@ export async function convertCollectionsFromRestfoxToPostman(restfoxCollections:
                                 listen: 'prerequest',
                                 script: {
                                     type: 'text/javascript',
-                                    exec: plugin.code.pre_request.split('\n')
+                                    exec: scriptConversion(plugin.code.pre_request, 'restfoxToPostman').trim().split('\n')
                                 }
                             })
                         }
@@ -1862,7 +1890,7 @@ export async function convertCollectionsFromRestfoxToPostman(restfoxCollections:
                                 listen: 'test',
                                 script: {
                                     type: 'text/javascript',
-                                    exec: plugin.code.post_request.split('\n')
+                                    exec: scriptConversion(plugin.code.post_request, 'restfoxToPostman').trim().split('\n')
                                 }
                             })
                         }
