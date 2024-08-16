@@ -3,10 +3,10 @@
         <modal :title="`Environment (JSON Format) — ${collectionItem ? collectionItem.name : workspace.name}`" v-model="showModalComp" height="70vh" width="55rem">
             <template #after-title>
                 <button type="button" class="button" @click="importEnvironment">
-                    <i class="fa fa-upload"></i> Import
+                    <i class="fa fa-file-import"></i> Import
                 </button>
                 <button type="button" class="button ml-1rem" @click="exportEnvironment">
-                    <i class="fa fa-download"></i> Export
+                    <i class="fa fa-file-export"></i> Export
                 </button>
             </template>
 

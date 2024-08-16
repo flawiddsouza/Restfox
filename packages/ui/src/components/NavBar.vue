@@ -20,9 +20,12 @@
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl view-switcher">View: Column</a>
                     <a href="#" @click.prevent="requestResponseLayout = 'left-right'" v-else class="bl view-switcher">View: Row</a>
                 </template>
-                <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
-                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
-                    <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;">
+                        <i class="fas fa-code" style="padding-right: 0.5rem"></i>
+                        Environment
+                    </a>
+                    <div class="custom-dropdown" style="padding-left: 0; padding-right: 0.5rem;" @click="toggleEnvSelectorDropdown">
                         <i class="fa fa-circle" :style="{ color: currentEnvironmentColor }"></i>&nbsp;&nbsp;{{ currentEnvironment ?? 'Default' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
@@ -57,9 +60,24 @@
                 <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron">Open File Workspace</a>
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
-            <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
-            <a href="#" @click.prevent="showSettings" class="bl br">Settings</a>
-            <a href="#" @click.prevent="showLogs" class="bl br">Logs</a>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showPluginsManager">
+                    <i class="fas fa-plug" style="padding-right: 0.5rem"></i>
+                    Plugins
+                </a>
+            </div>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showSettings">
+                    <i class="fas fa-cog" style="padding-right: 0.5rem"></i>
+                    Settings
+                </a>
+            </div>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showLogs" class="br">
+                    <i class="fas fa-file-lines" style="padding-right: 0.5rem"></i>
+                    Logs
+                </a>
+            </div>
             <span class="spacer"></span>
             <div class="github-star">
                 <a class="gh-button-container" href="https://github.com/flawiddsouza/Restfox" rel="noopener" target="_blank" title="Star Restfox" aria-label="Star Restfox on GitHub">
@@ -455,5 +473,12 @@ export default {
     .theme-selector, .view-switcher, .github-star {
         display: none !important;
     }
+}
+
+.navbar-item {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    border-left: 1px solid var(--border-color-lighter);
 }
 </style>
