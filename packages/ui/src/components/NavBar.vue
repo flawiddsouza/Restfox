@@ -387,13 +387,13 @@ export default {
             return [
                 {
                     type: 'option',
-                    label: 'Restfox collections',
+                    label: 'Restfox collection',
                     value: 'Restfox',
                     class: 'context-menu-item-with-left-padding'
                 },
                 {
                     type: 'option',
-                    label: 'Postman collections',
+                    label: 'Postman collection',
                     value: 'Postman',
                     class: 'context-menu-item-with-left-padding'
                 },
