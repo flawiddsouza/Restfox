@@ -1408,6 +1408,10 @@ export function exportRestfoxCollection(collection: CollectionItem[], environmen
     })
 }
 
+export function exportAsPostmanCollection(collection: any) {
+    downloadObjectAsJSON(`Postman_${todayISODate()}.json`, collection)
+}
+
 // From: https://github.com/Kong/insomnia/blob/fac2627d695a10865d0f7f9ea7b2c04a77d92194/packages/insomnia/src/common/misc.ts#L169-L192
 export function humanFriendlySize(bytes: number, long = false) {
     bytes = Math.round(bytes * 10) / 10
@@ -1786,4 +1790,93 @@ export function postmanScriptToRestfoxScriptConversion(scriptToConvert: string) 
         .replaceAll('pm.environment.set', 'rf.setEnvVar')
         .replaceAll('pm.environment.get', 'rf.getEnvVar')
         .replaceAll('pm.response.json()', 'rf.response.getBodyJSON()')
+}
+
+export async function convertCollectionsFromRestfoxToPostman(restfoxCollections: any) {
+    const restfoxData: any = restfoxCollections
+
+    const postmanCollection: any = {
+        info: {
+            name: 'Imported Collection',
+            schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+        },
+        item: []
+    }
+
+    const requestMap: any = {}
+
+    restfoxData.forEach((item: any) => {
+        if (item._type === 'request_group') {
+            const postmanItem: { name: any, item: any[] } = {
+                name: item.name,
+                item: []
+            }
+            requestMap[item._id] = postmanItem
+            postmanCollection.item.push(postmanItem)
+        } else if (item._type === 'request') {
+            const postmanRequest: any = {
+                name: item.name,
+                request: {
+                    method: item.method,
+                    header: [],
+                    body: {
+                        mode: 'raw',
+                        raw: item.body.text,
+                        options: {
+                            raw: {
+                                language: item.body.mimeType.split('/')[1]
+                            }
+                        }
+                    },
+                    url: {
+                        raw: item.url,
+                        host: item.url,
+                        query: item.parameters ? item.parameters.filter((param: any) => !param.disabled).map((param: any) => ({ key: param.name, value: param.value })) : []
+                    }
+                },
+                event: [],
+                response: []
+            }
+
+            if (item.headers && item.headers.length > 0) {
+                postmanRequest.request.header = item.headers.map((header: any) => ({
+                    key: header.name,
+                    value: header.value
+                }))
+            }
+
+            if (item.plugins && item.plugins.length > 0) {
+                item.plugins.forEach((plugin: any) => {
+                    if (plugin.enabled && plugin.type === 'script') {
+                        if (plugin.code.pre_request) {
+                            postmanRequest.event.push({
+                                listen: 'prerequest',
+                                script: {
+                                    type: 'text/javascript',
+                                    exec: plugin.code.pre_request.split('\n')
+                                }
+                            })
+                        }
+                        if (plugin.code.post_request) {
+                            postmanRequest.event.push({
+                                listen: 'test',
+                                script: {
+                                    type: 'text/javascript',
+                                    exec: plugin.code.post_request.split('\n')
+                                }
+                            })
+                        }
+                    }
+                })
+            }
+
+            if (item.parentId && requestMap[item.parentId]) {
+                requestMap[item.parentId].item.push(postmanRequest)
+            } else {
+                postmanCollection.item.push(postmanRequest)
+            }
+        }
+    })
+
+    return postmanCollection
 }
