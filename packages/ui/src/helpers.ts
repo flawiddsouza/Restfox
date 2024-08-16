@@ -1408,8 +1408,8 @@ export function exportRestfoxCollection(collection: CollectionItem[], environmen
     })
 }
 
-export function exportAsPostmanCollection(collection: any) {
-    downloadObjectAsJSON(`Postman_${todayISODate()}.json`, collection)
+export function exportCollection(collection: any, appName: 'Postman' | 'Insomnia') {
+    downloadObjectAsJSON(`${appName}_${todayISODate()}.json`, collection)
 }
 
 // From: https://github.com/Kong/insomnia/blob/fac2627d695a10865d0f7f9ea7b2c04a77d92194/packages/insomnia/src/common/misc.ts#L169-L192
@@ -1792,7 +1792,7 @@ export function toggleDropdown(event: any, dropdownState: any) {
  * @param {string} scriptType - The type of script being converted.
  * @returns {string} - The converted script.
  */
-export function scriptConversion(scriptToConvert: string, scriptType: 'postmanToRestfox' | 'restfoxToPostman') {
+export function scriptConversion(scriptToConvert: string, scriptType: 'postmanToRestfox' | 'restfoxToPostman' | 'restfoxToInsomnia') {
     const mappings = {
         postmanToRestfox: {
             'pm.environment.set': 'rf.setEnvVar',
@@ -1803,6 +1803,11 @@ export function scriptConversion(scriptToConvert: string, scriptType: 'postmanTo
             'rf.setEnvVar': 'pm.environment.set',
             'rf.getEnvVar': 'pm.environment.get',
             'rf.response.getBodyJSON()': 'pm.response.json()'
+        },
+        restfoxToInsomnia: {
+            'rf.setEnvVar': 'insomnia.setEnvironmentVariable',
+            'rf.getEnvVar': 'insomnia.getEnvironmentVariable',
+            'rf.response.getBodyJSON()': 'insomnia.response.json()'
         },
     }
 
@@ -1907,4 +1912,90 @@ export async function convertCollectionsFromRestfoxToPostman(restfoxCollections:
     })
 
     return postmanCollection
+}
+
+export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections: any) {
+    const insomniaCollection: any = {
+        _type: 'export',
+        __export_format: 4,
+        __export_date: new Date().toISOString(),
+        __export_source: 'restfox-to-insomnia-converter',
+        resources: []
+    }
+
+    const workspaceId = restfoxCollections[0].workspaceId || 'root_workspace'
+
+    const workspace = {
+        _id: workspaceId,
+        _type: 'workspace',
+        name: 'Imported from Restfox',
+        description: '',
+        scope: 'collection',
+    }
+
+    insomniaCollection.resources.push(workspace)
+
+    restfoxCollections.forEach((restfoxRequest: any) => {
+        if (restfoxRequest._type !== 'request') {
+            return
+        }
+
+        const insomniaRequest: any = {
+            _id: restfoxRequest._id,
+            _type: 'request',
+            parentId: workspaceId,
+            name: restfoxRequest.name || restfoxRequest.url,
+            method: restfoxRequest.method,
+            url: restfoxRequest.url,
+            body: {
+                mimeType: restfoxRequest.body?.mimeType || constants.MIME_TYPE.JSON,
+                text: restfoxRequest.body?.text || ''
+            },
+            headers: restfoxRequest.headers.map((header: any) => ({
+                name: header.name,
+                value: header.value
+            })),
+            authentication: convertAuth(restfoxRequest.authentication),
+            parameters: restfoxRequest.parameters?.map((param: any) => ({
+                name: param.name,
+                value: param.value
+            })),
+        }
+
+        const scripts = restfoxRequest.plugins?.find((plugin: any) => plugin.type === 'script')
+        if (scripts) {
+            insomniaRequest.hook = {
+                preRequest: scriptConversion(scripts.code.pre_request, 'restfoxToInsomnia').trim() || '',
+                postRequest: scriptConversion(scripts.code.post_request, 'restfoxToInsomnia').trim() || ''
+            }
+        }
+
+        insomniaCollection.resources.push(insomniaRequest)
+    })
+
+    return insomniaCollection
+}
+
+function convertAuth(auth: any) {
+    const insomniaAuth: any = {}
+
+    switch (auth?.type) {
+        case 'No Auth':
+            insomniaAuth.type = 'none'
+            break
+        case 'Basic Auth':
+            insomniaAuth.type = 'basic'
+            insomniaAuth.username = auth?.username || ''
+            insomniaAuth.password = auth?.password || ''
+            break
+        case 'Bearer Token':
+            insomniaAuth.type = 'bearer'
+            insomniaAuth.token = auth?.token || ''
+            break
+        default:
+            insomniaAuth.type = 'none'
+            break
+    }
+
+    return insomniaAuth
 }
