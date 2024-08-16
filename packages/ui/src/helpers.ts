@@ -1955,7 +1955,7 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
                 name: header.name,
                 value: header.value
             })),
-            authentication: convertAuth(restfoxRequest.authentication),
+            authentication: converInsomniatAuth(restfoxRequest.authentication),
             parameters: restfoxRequest.parameters?.map((param: any) => ({
                 name: param.name,
                 value: param.value
@@ -1976,7 +1976,7 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
     return insomniaCollection
 }
 
-function convertAuth(auth: any) {
+function converInsomniatAuth(auth: any) {
     const insomniaAuth: any = {}
 
     switch (auth?.type) {
