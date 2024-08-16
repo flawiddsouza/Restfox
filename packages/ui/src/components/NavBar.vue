@@ -20,10 +20,12 @@
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl view-switcher">View: Column</a>
                     <a href="#" @click.prevent="requestResponseLayout = 'left-right'" v-else class="bl view-switcher">View: Row</a>
                 </template>
-                <div class="navbar-items">
-                    <i class="fas fa-code" style="margin-left: 0.5rem"></i>
-                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;">Environment</a>
-                    <div class="custom-dropdown" style="padding-left: 0;" @click="toggleEnvSelectorDropdown">
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;">
+                        <i class="fas fa-code" style="padding-right: 0.5rem"></i>
+                        Environment
+                    </a>
+                    <div class="custom-dropdown" style="padding-left: 0; padding-right: 0.5rem;" @click="toggleEnvSelectorDropdown">
                         <i class="fa fa-circle" :style="{ color: currentEnvironmentColor }"></i>&nbsp;&nbsp;{{ currentEnvironment ?? 'Default' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
@@ -37,13 +39,17 @@
                         @click="selectEnv"
                     />
                 </div>
-                <div class="navbar-items">
-                    <i class="fas fa-file-import" style="margin-left: 0.5rem"></i>
-                    <a href="#" @click.prevent="showImportModal">Import</a>
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="showImportModal">
+                        <i class="fas fa-file-import" style="padding-right: 0.5rem"></i>
+                        Import
+                    </a>
                 </div>
-                <div class="navbar-items">
-                    <i class="fas fa-file-export" style="margin-left: 0.5rem"></i>
-                    <a href="#" @click.prevent="exportCollection">Export</a>
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="exportCollection">
+                        <i class="fas fa-file-export" style="padding-right: 0.5rem"></i>
+                        Export
+                    </a>
                 </div>
             </div>
             <template v-if="nav === 'workspaces'">
@@ -51,17 +57,23 @@
                 <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron">Open File Workspace</a>
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
-            <div class="navbar-items">
-                <i class="fas fa-plug" style="margin-left: 0.5rem"></i>
-                <a href="#" @click.prevent="showPluginsManager">Plugins</a>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showPluginsManager">
+                    <i class="fas fa-plug" style="padding-right: 0.5rem"></i>
+                    Plugins
+                </a>
             </div>
-            <div class="navbar-items">
-                <i class="fas fa-cog" style="margin-left: 0.5rem"></i>
-                <a href="#" @click.prevent="showSettings">Settings</a>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showSettings">
+                    <i class="fas fa-cog" style="padding-right: 0.5rem"></i>
+                    Settings
+                </a>
             </div>
-            <div class="navbar-items">
-                <i class="fas fa-file-lines" style="margin-left: 0.5rem"></i>
-                <a href="#" @click.prevent="showLogs" class="br">Logs</a>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showLogs" class="br">
+                    <i class="fas fa-file-lines" style="padding-right: 0.5rem"></i>
+                    Logs
+                </a>
             </div>
             <span class="spacer"></span>
             <div class="github-star">
@@ -419,11 +431,10 @@ export default {
     }
 }
 
-.navbar-items {
+.navbar-item {
     display: inline-flex;
     align-items: center;
     height: 100%;
-    margin-right: 0.5rem;
     border-left: 1px solid var(--border-color-lighter);
 }
 </style>
