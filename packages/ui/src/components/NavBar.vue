@@ -46,7 +46,7 @@
                     </a>
                 </div>
                 <div class="navbar-item">
-                    <div class="custom-dropdown" style="padding-left: 0; margin-right: 0.5rem" @click="toggleExportSelectorDropdown">
+                    <div class="custom-dropdown" style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown">
                         <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
