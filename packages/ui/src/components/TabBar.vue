@@ -219,7 +219,7 @@ export default {
             @contextmenu.prevent="handleTabContextMenu($event, tab)"
         >
             <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
-            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times" style="margin-left: 0.5rem"></i></span>
+            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times"></i></span>
         </div>
     </div>
     <!-- <div class="tab-add" @click="addTab" style="visibility: hidden">+</div> -->
@@ -231,6 +231,7 @@ export default {
     display: flex;
     flex-basis: fit-content;
     overflow-y: auto;
+    cursor: pointer;
 }
 
 .tab-bar .tab {
@@ -251,7 +252,6 @@ export default {
 .tab-bar .tab-active {
     border-top: 1px solid red;
     border-bottom: 1px solid transparent;
-    cursor: pointer;
 }
 
 .tab-bar .tab-add {

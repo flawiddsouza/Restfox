@@ -585,6 +585,7 @@ export default {
     align-items: center;
     border: 1px solid transparent;
     position: relative;
+    border-left: 2px solid transparent;
 }
 
 .sidebar .sidebar-item-active {
