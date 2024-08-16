@@ -126,7 +126,8 @@ import {
     toTree,
     flattenTree,
     convertCollectionsFromRestfoxToPostman,
-    exportAsPostmanCollection,
+    convertCollectionsFromRestfoxToInsomnia,
+    exportCollection,
 } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
@@ -278,7 +279,11 @@ export default {
             }
 
             if (value === 'Postman') {
-                exportAsPostmanCollection(await convertCollectionsFromRestfoxToPostman(collection))
+                exportCollection(await convertCollectionsFromRestfoxToPostman(collection), value)
+            }
+
+            if (value === 'Insomnia') {
+                exportCollection(await convertCollectionsFromRestfoxToInsomnia(collection), value)
             }
         },
         setActiveWorkspace(workspace) {
@@ -395,6 +400,12 @@ export default {
                     type: 'option',
                     label: 'Postman collection',
                     value: 'Postman',
+                    class: 'context-menu-item-with-left-padding'
+                },
+                {
+                    type: 'option',
+                    label: 'Insomnia collection',
+                    value: 'Insomnia',
                     class: 'context-menu-item-with-left-padding'
                 },
             ]
