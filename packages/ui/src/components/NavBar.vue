@@ -40,8 +40,8 @@
                     />
                 </div>
                 <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
-                <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
-                    <div class="custom-dropdown" style="padding-left: 0;" @click="toggleExportSelectorDropdown">
+                <div class="navbar-item">
+                    <div class="custom-dropdown" style="padding-left: 0; margin-right: 0.5rem" @click="toggleExportSelectorDropdown">
                         <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
@@ -380,13 +380,13 @@ export default {
             return [
                 {
                     type: 'option',
-                    label: 'Restfox collections',
+                    label: '<img src="/pwa-192x192.png" width="15" height="15" style="margin-right: 5px;"> Restfox collections',
                     value: 'Restfox',
                     class: 'context-menu-item-with-left-padding'
                 },
                 {
                     type: 'option',
-                    label: 'Postman collections',
+                    label: '<img src="/postman-icon.png" width="15" height="15" style="margin-right: 5px;"> Postman collections',
                     value: 'Postman',
                     class: 'context-menu-item-with-left-padding'
                 },
