@@ -124,7 +124,9 @@ import {
     applyTheme,
     generateNewIdsForTree,
     toTree,
-    flattenTree, convertCollectionsFromRestfoxToPostman, exportAsPostmanCollection,
+    flattenTree,
+    convertCollectionsFromRestfoxToPostman,
+    exportAsPostmanCollection,
 } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
