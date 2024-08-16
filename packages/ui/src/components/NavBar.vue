@@ -39,7 +39,12 @@
                         @click="selectEnv"
                     />
                 </div>
-                <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="showImportModal">
+                        <i class="fas fa-file-import" style="padding-right: 0.5rem"></i>
+                        Import
+                    </a>
+                </div>
                 <div class="navbar-item">
                     <div class="custom-dropdown" style="padding-left: 0; margin-right: 0.5rem" @click="toggleExportSelectorDropdown">
                         <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
