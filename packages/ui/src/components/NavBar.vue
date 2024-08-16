@@ -387,13 +387,13 @@ export default {
             return [
                 {
                     type: 'option',
-                    label: '<img src="/pwa-192x192.png" width="15" height="15" style="margin-right: 5px;"> Restfox collections',
+                    label: 'Restfox collections',
                     value: 'Restfox',
                     class: 'context-menu-item-with-left-padding'
                 },
                 {
                     type: 'option',
-                    label: '<img src="/postman-icon.png" width="15" height="15" style="margin-right: 5px;"> Postman collections',
+                    label: 'Postman collections',
                     value: 'Postman',
                     class: 'context-menu-item-with-left-padding'
                 },
