@@ -787,7 +787,7 @@ export default {
                 if(this.activeTab.url === '') {
                     return
                 }
-                this.sendRequest()
+                this.sendRequest('send')
             }
         },
         async handleAddressBarPaste(content) {
