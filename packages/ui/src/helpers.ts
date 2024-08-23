@@ -1836,17 +1836,29 @@ export async function convertCollectionsFromRestfoxToPostman(restfoxCollections:
         item: []
     }
 
-    const requestMap: any = {}
+    const folderMap: any = {}
 
+    // First, create all folders and store them in folderMap
     restfoxData.forEach((item: any) => {
         if (item._type === 'request_group') {
             const postmanItem: { name: any, item: any[] } = {
                 name: item.name,
                 item: []
             }
-            requestMap[item._id] = postmanItem
-            postmanCollection.item.push(postmanItem)
-        } else if (item._type === 'request') {
+            folderMap[item._id] = postmanItem
+
+            // Check if the parent folder exists in folderMap and add the folder as a child
+            if (item.parentId && folderMap[item.parentId]) {
+                folderMap[item.parentId].item.push(postmanItem)
+            } else {
+                postmanCollection.item.push(postmanItem)
+            }
+        }
+    })
+
+    // Then, create all requests and push them to the appropriate folders in folderMap
+    restfoxData.forEach((item: any) => {
+        if (item._type === 'request') {
             const postmanRequest: any = {
                 name: item.name,
                 request: {
@@ -1903,8 +1915,9 @@ export async function convertCollectionsFromRestfoxToPostman(restfoxCollections:
                 })
             }
 
-            if (item.parentId && requestMap[item.parentId]) {
-                requestMap[item.parentId].item.push(postmanRequest)
+            // Check if the parent folder exists in folderMap and add the request to that folder
+            if (item.parentId && folderMap[item.parentId]) {
+                folderMap[item.parentId].item.push(postmanRequest)
             } else {
                 postmanCollection.item.push(postmanRequest)
             }
