@@ -1970,6 +1970,15 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
             return
         }
 
+        let body = {}
+
+        if (restfoxRequest.body.mimeType !== 'No Body') {
+            body = {
+                mimeType: restfoxRequest.body?.mimeType,
+                text: restfoxRequest.body?.text,
+            }
+        }
+
         const insomniaRequest: any = {
             _id: restfoxRequest._id,
             _type: 'request',
@@ -1977,10 +1986,7 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
             name: restfoxRequest.name || restfoxRequest.url,
             method: restfoxRequest.method,
             url: restfoxRequest.url,
-            body: {
-                mimeType: restfoxRequest.body?.mimeType || constants.MIME_TYPE.JSON,
-                text: restfoxRequest.body?.text || '',
-            },
+            body,
             headers: restfoxRequest.headers?.map((header: any) => ({
                 name: header.name,
                 value: header.value
