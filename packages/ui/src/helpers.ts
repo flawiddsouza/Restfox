@@ -1984,15 +1984,9 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
             method: restfoxRequest.method,
             url: restfoxRequest.url,
             body,
-            headers: restfoxRequest.headers?.map((header: any) => ({
-                name: header.name,
-                value: header.value
-            })),
+            headers: restfoxRequest.headers,
             authentication: convertRestfoxAuthToInsomniaAuth(restfoxRequest.authentication),
-            parameters: restfoxRequest.parameters?.map((param: any) => ({
-                name: param.name,
-                value: param.value
-            })),
+            parameters: restfoxRequest.parameters,
         }
 
         const scripts = restfoxRequest.plugins?.find((plugin: any) => plugin.type === 'script')
