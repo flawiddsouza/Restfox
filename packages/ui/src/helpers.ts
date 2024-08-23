@@ -1948,6 +1948,23 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
 
     insomniaCollection.resources.push(workspace)
 
+    const folderMap: any = {}
+
+    // First, create all folders and store them in folderMap
+    restfoxCollections.forEach((item: any) => {
+        if (item._type === 'request_group') {
+            const insomniaFolder = {
+                _id: item._id,
+                _type: 'request_group',
+                parentId: item.parentId || workspaceId,
+                name: item.name,
+            }
+            folderMap[item._id] = insomniaFolder
+            insomniaCollection.resources.push(insomniaFolder)
+        }
+    })
+
+    // Then, create all requests and push them to the appropriate folders in folderMap
     restfoxCollections.forEach((restfoxRequest: any) => {
         if (restfoxRequest._type !== 'request') {
             return
@@ -1956,15 +1973,15 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
         const insomniaRequest: any = {
             _id: restfoxRequest._id,
             _type: 'request',
-            parentId: workspaceId,
+            parentId: restfoxRequest.parentId || workspaceId,
             name: restfoxRequest.name || restfoxRequest.url,
             method: restfoxRequest.method,
             url: restfoxRequest.url,
             body: {
                 mimeType: restfoxRequest.body?.mimeType || constants.MIME_TYPE.JSON,
-                text: restfoxRequest.body?.text || ''
+                text: restfoxRequest.body?.text || '',
             },
-            headers: restfoxRequest.headers.map((header: any) => ({
+            headers: restfoxRequest.headers?.map((header: any) => ({
                 name: header.name,
                 value: header.value
             })),
