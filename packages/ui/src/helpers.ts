@@ -1973,10 +1973,7 @@ export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections
         let body = {}
 
         if (restfoxRequest.body.mimeType !== 'No Body') {
-            body = {
-                mimeType: restfoxRequest.body?.mimeType,
-                text: restfoxRequest.body?.text,
-            }
+            body = restfoxRequest.body
         }
 
         const insomniaRequest: any = {
