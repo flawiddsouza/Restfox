@@ -1726,3 +1726,26 @@ function convertRestfoxAuthToInsomniaAuth(auth: any) {
 
     return insomniaAuth
 }
+
+export function covertPostmanAuthToRestfoxAuth(request: any) {
+    let authentication: RequestAuthentication = { type: 'No Auth' }
+
+    if ('auth' in request) {
+        if(request.auth.type === 'bearer' && request.auth.bearer) {
+            authentication = {
+                type: 'bearer',
+                token: request.auth.bearer.token
+            }
+        } else if(request.auth.type === 'basic' && request.auth.basic) {
+            const username = request.auth.basic.find((item: any) => item.key === 'username')?.value || ''
+            const password = request.auth.basic.find((item: any) => item.key === 'password')?.value || ''
+            authentication = {
+                type: 'basic',
+                username: username,
+                password: password
+            }
+        }
+    }
+
+    return authentication
+}
