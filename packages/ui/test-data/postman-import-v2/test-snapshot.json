@@ -1,0 +1,192 @@
+[
+  {
+    "_type": "request_group",
+    "name": "{buildId}",
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 1,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "Argos API",
+    "environment": {
+      "baseUrl": "https://api.argos-ci.com/v2"
+    },
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "builds",
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "builds",
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "POST",
+    "url": "{{baseUrl}}/builds",
+    "name": "create Build",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 2,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "finalize",
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "POST",
+    "url": "{{baseUrl}}/builds/finalize",
+    "name": "finalize Builds",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"parallelNonce\": \"<string>\"\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "GET",
+    "url": "{{baseUrl}}/project",
+    "name": "get Auth Project",
+    "body": {
+      "mimeType": "No Body"
+    },
+    "headers": [
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 1,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "GET",
+    "url": "{{baseUrl}}/project/builds?perPage=<string>&page=<string>&commit=8419e150939eb8e50b0dd2a817574890cfa90270&distinctName=<string>",
+    "name": "get Auth Project Builds",
+    "body": {
+      "mimeType": "No Body"
+    },
+    "headers": [
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [
+      {
+        "name": "perPage",
+        "value": "<string>",
+        "description": "Number of items per page (max 100)"
+      },
+      {
+        "name": "page",
+        "value": "<string>",
+        "description": "Page number"
+      },
+      {
+        "name": "commit",
+        "value": "8419e150939eb8e50b0dd2a817574890cfa90270"
+      },
+      {
+        "name": "distinctName",
+        "value": "<string>",
+        "description": "Only return the latest builds created, unique by name and commit."
+      }
+    ],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "project",
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 1,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "PUT",
+    "url": "{{baseUrl}}/builds/:buildId",
+    "name": "update Build",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+    "sortOrder": 0,
+    "plugins": []
+  }
+]
