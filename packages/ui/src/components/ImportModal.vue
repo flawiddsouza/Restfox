@@ -45,11 +45,11 @@ import {
     fileToJSON,
     fileToString,
     convertInsomniaExportToRestfoxCollection,
-    convertPostmanExportToRestfoxCollection,
     convertRestfoxExportToRestfoxCollection,
     convertOpenAPIExportToRestfoxCollection,
     generateNewIdsForTree
 } from '@/helpers'
+import { convertPostmanExportToRestfoxCollection } from '@/parsers/postman'
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
