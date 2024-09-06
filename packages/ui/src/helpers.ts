@@ -797,14 +797,14 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
     postmanCollectionItem.item.forEach((request: any) => {
         const requestId = request.id ?? nanoid()
         if('item' in request) {
-            const { requests, plugins: newPlugins } = handlePostmanV2CollectionItem(request, requestId, workspaceId)
+            const { convertedRequests, plugins: newPlugins } = handlePostmanV2CollectionItem(request, requestId, workspaceId)
             plugins.push(...newPlugins)
 
             requests.push({
                 _id: requestId,
                 _type: 'request_group',
                 name: request.name,
-                children: requests,
+                children: convertedRequests,
                 parentId,
                 workspaceId
             })
@@ -944,7 +944,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
         })
     })
 
-    return { requests, plugins }
+    return { convertedRequests: requests, plugins }
 }
 
 function importPostmanV2(collections: any[], workspaceId: string) {
@@ -952,7 +952,7 @@ function importPostmanV2(collections: any[], workspaceId: string) {
     const plugins: Plugin[] = []
 
     collections.forEach(postmanCollectionItem => {
-        const { requests, plugins: newPlugins } = handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId)
+        const { convertedRequests, plugins: newPlugins } = handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId)
         plugins.push(...newPlugins)
 
         collection.push({
@@ -963,7 +963,7 @@ function importPostmanV2(collections: any[], workspaceId: string) {
                 prev[acc.key] = acc.value
                 return prev
             }, {}) : undefined,
-            children: requests,
+            children: convertedRequests,
             parentId: null,
             workspaceId
         })
