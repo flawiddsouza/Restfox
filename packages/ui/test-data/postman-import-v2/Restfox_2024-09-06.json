@@ -206,7 +206,8 @@
             ],
             "parameters": [],
             "authentication": {
-                "type": "No Auth"
+                "type": "bearer",
+                "token": "REDACTED"
             },
             "parentId": "CFD9rbeEGUG11xhLMKq6A",
             "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
