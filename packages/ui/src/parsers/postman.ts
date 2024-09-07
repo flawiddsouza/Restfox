@@ -32,10 +32,10 @@ export async function convertPostmanExportToRestfoxCollection(json: any, isZip: 
         return importPostmanV2(collections, workspaceId)
     } else {
         if('info' in json) {
-            const schemaPattern = /^https:\/\/schema\.getpostman\.com\/json\/collection\/v2\.(0|1)\.0\/collection\.json$/
-
-            if (schemaPattern.test (json.info.schema)) {
-                return importPostmanV2 ([json], workspaceId)
+            if('schema' in json.info) {
+                if(json.info.schema.includes('https://schema.getpostman.com/json/collection/v2.') {
+                    return importPostmanV2([json], workspaceId)
+                }
             }
         }
         return importPostmanV1(json.collections, workspaceId)
