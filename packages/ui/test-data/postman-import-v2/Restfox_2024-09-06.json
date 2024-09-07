@@ -10,6 +10,10 @@
             },
             "parentId": null,
             "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+             "authentication": {
+                "type": "bearer",
+                "token": "REDACTED"
+            },
             "sortOrder": 0,
             "plugins": []
         },
@@ -206,8 +210,7 @@
             ],
             "parameters": [],
             "authentication": {
-                "type": "bearer",
-                "token": "REDACTED"
+                "type": "No Auth"
             },
             "parentId": "CFD9rbeEGUG11xhLMKq6A",
             "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
