@@ -183,7 +183,8 @@
     ],
     "parameters": [],
     "authentication": {
-      "type": "No Auth"
+      "type": "bearer",
+      "token": "REDACTED"
     },
     "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
     "sortOrder": 0,
