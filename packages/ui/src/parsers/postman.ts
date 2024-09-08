@@ -33,7 +33,7 @@ export async function convertPostmanExportToRestfoxCollection(json: any, isZip: 
     } else {
         if('info' in json) {
             if('schema' in json.info) {
-                if(json.info.schema.includes('https://schema.getpostman.com/json/collection/v2.')) {
+                if(json.info.schema === 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json' || json.info.schema === 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json') {
                     return importPostmanV2([json], workspaceId)
                 }
             }
