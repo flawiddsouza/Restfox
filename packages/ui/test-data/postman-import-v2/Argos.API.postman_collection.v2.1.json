@@ -1,0 +1,2068 @@
+{
+	"info": {
+		"_postman_id": "0827038f-dddc-44db-9302-d8a3368ba674",
+		"name": "Argos API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "35318869"
+	},
+	"item": [
+		{
+			"name": "builds",
+			"item": [
+				{
+					"name": "finalize",
+					"item": [
+						{
+							"name": "finalize Builds",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds/finalize",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds",
+										"finalize"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Result of build finalization",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"builds\": [\n    {\n      \"id\": \"<string>\",\n      \"number\": \"<number>\",\n      \"status\": \"rejected\",\n      \"url\": \"<uri>\",\n      \"notification\": {\n        \"description\": \"<string>\",\n        \"context\": \"<string>\",\n        \"github\": {\n          \"state\": \"pending\"\n        },\n        \"gitlab\": {\n          \"state\": \"success\"\n        }\n      }\n    },\n    {\n      \"id\": \"<string>\",\n      \"number\": \"<number>\",\n      \"status\": \"accepted\",\n      \"url\": \"<uri>\",\n      \"notification\": {\n        \"description\": \"<string>\",\n        \"context\": \"<string>\",\n        \"github\": {\n          \"state\": \"pending\"\n        },\n        \"gitlab\": {\n          \"state\": \"canceled\"\n        }\n      }\n    }\n  ]\n}"
+								},
+								{
+									"name": "Invalid parameters",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Forbidden",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Not found",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "Not Found",
+									"code": 404,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Server error",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"parallelNonce\": \"<string>\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/finalize",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												"finalize"
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "{buildId}",
+					"item": [
+						{
+							"name": "update Build",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"258d73b250fdb1dfd21e586994ba4806ee0bf186a53cf2b8bab1cd744064c73a\",\n      \"name\": \"./output/screenshots/home-page.png\"\n    }\n  ],\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"passed\"\n    }\n  }\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds/562890",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds",
+										"562890"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Result of build update",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"build\": {\n    \"id\": \"<string>\",\n    \"number\": \"<number>\",\n    \"status\": \"rejected\",\n    \"url\": \"<uri>\",\n    \"notification\": {\n      \"description\": \"<string>\",\n      \"context\": \"<string>\",\n      \"github\": {\n        \"state\": \"success\"\n      },\n      \"gitlab\": {\n        \"state\": \"pending\"\n      }\n    }\n  }\n}"
+								},
+								{
+									"name": "Invalid parameters",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Forbidden",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Not found",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Not Found",
+									"code": 404,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Server error",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								}
+							]
+						},
+						{
+							"name": "update Build Copy",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds"
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "Result of build update",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"build\": {\n    \"id\": \"<string>\",\n    \"number\": \"<number>\",\n    \"status\": \"rejected\",\n    \"url\": \"<uri>\",\n    \"notification\": {\n      \"description\": \"<string>\",\n      \"context\": \"<string>\",\n      \"github\": {\n        \"state\": \"success\"\n      },\n      \"gitlab\": {\n        \"state\": \"pending\"\n      }\n    }\n  }\n}"
+								},
+								{
+									"name": "Invalid parameters",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Forbidden",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Not found",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Not Found",
+									"code": 404,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Server error",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/builds/:buildId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"builds",
+												":buildId"
+											],
+											"variable": [
+												{
+													"key": "buildId"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "create Build",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/builds",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"builds"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Result of build creation",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"build\": {\n    \"id\": \"<string>\",\n    \"number\": \"<number>\",\n    \"status\": \"rejected\",\n    \"url\": \"<uri>\",\n    \"notification\": {\n      \"description\": \"<string>\",\n      \"context\": \"<string>\",\n      \"github\": {\n        \"state\": \"success\"\n      },\n      \"gitlab\": {\n        \"state\": \"failed\"\n      }\n    }\n  },\n  \"screenshots\": [\n    {\n      \"key\": \"<string>\",\n      \"putUrl\": \"<uri>\"\n    },\n    {\n      \"key\": \"<string>\",\n      \"putUrl\": \"<uri>\"\n    }\n  ],\n  \"pwTraces\": [\n    {\n      \"key\": \"<string>\",\n      \"putUrl\": \"<uri>\"\n    },\n    {\n      \"key\": \"<string>\",\n      \"putUrl\": \"<uri>\"\n    }\n  ]\n}"
+						},
+						{
+							"name": "Invalid parameters",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+						},
+						{
+							"name": "Server error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/builds",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"builds"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "project",
+			"item": [
+				{
+					"name": "builds",
+					"item": [
+						{
+							"name": "get Auth Project Builds",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/project/builds/562859",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"project",
+										"builds",
+										"562859"
+									],
+									"query": [
+										{
+											"key": "perPage",
+											"value": "10",
+											"description": "Number of items per page (max 100)",
+											"disabled": true
+										},
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Page number",
+											"disabled": true
+										},
+										{
+											"key": "commit",
+											"value": "04b3b4d583f7a3ec6953dcfebf3aa665c7e3e434",
+											"disabled": true
+										},
+										{
+											"key": "distinctName",
+											"value": "<string>",
+											"description": "Only return the latest builds created, unique by name and commit.",
+											"disabled": true
+										},
+										{
+											"key": "",
+											"value": "",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"response": [
+								{
+									"name": "List of builds",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/project/builds?perPage=<string>&page=<string>&commit=8419e150939eb8e50b0dd2a817574890cfa90270&distinctName=<string>",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"project",
+												"builds"
+											],
+											"query": [
+												{
+													"key": "perPage",
+													"value": "<string>",
+													"description": "Number of items per page (max 100)"
+												},
+												{
+													"key": "page",
+													"value": "<string>",
+													"description": "Page number"
+												},
+												{
+													"key": "commit",
+													"value": "8419e150939eb8e50b0dd2a817574890cfa90270"
+												},
+												{
+													"key": "distinctName",
+													"value": "<string>",
+													"description": "Only return the latest builds created, unique by name and commit."
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"pageInfo\": {\n    \"total\": \"<number>\",\n    \"page\": \"<number>\",\n    \"perPage\": \"<number>\"\n  },\n  \"results\": [\n    {\n      \"id\": \"<string>\",\n      \"number\": \"<number>\",\n      \"status\": \"accepted\",\n      \"url\": \"<uri>\",\n      \"notification\": {\n        \"description\": \"<string>\",\n        \"context\": \"<string>\",\n        \"github\": {\n          \"state\": \"error\"\n        },\n        \"gitlab\": {\n          \"state\": \"canceled\"\n        }\n      }\n    },\n    {\n      \"id\": \"<string>\",\n      \"number\": \"<number>\",\n      \"status\": \"accepted\",\n      \"url\": \"<uri>\",\n      \"notification\": {\n        \"description\": \"<string>\",\n        \"context\": \"<string>\",\n        \"github\": {\n          \"state\": \"pending\"\n        },\n        \"gitlab\": {\n          \"state\": \"canceled\"\n        }\n      }\n    }\n  ]\n}"
+								},
+								{
+									"name": "Invalid parameters",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/project/builds?perPage=<string>&page=<string>&commit=8419e150939eb8e50b0dd2a817574890cfa90270&distinctName=<string>",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"project",
+												"builds"
+											],
+											"query": [
+												{
+													"key": "perPage",
+													"value": "<string>",
+													"description": "Number of items per page (max 100)"
+												},
+												{
+													"key": "page",
+													"value": "<string>",
+													"description": "Page number"
+												},
+												{
+													"key": "commit",
+													"value": "8419e150939eb8e50b0dd2a817574890cfa90270"
+												},
+												{
+													"key": "distinctName",
+													"value": "<string>",
+													"description": "Only return the latest builds created, unique by name and commit."
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/project/builds?perPage=<string>&page=<string>&commit=8419e150939eb8e50b0dd2a817574890cfa90270&distinctName=<string>",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"project",
+												"builds"
+											],
+											"query": [
+												{
+													"key": "perPage",
+													"value": "<string>",
+													"description": "Number of items per page (max 100)"
+												},
+												{
+													"key": "page",
+													"value": "<string>",
+													"description": "Page number"
+												},
+												{
+													"key": "commit",
+													"value": "8419e150939eb8e50b0dd2a817574890cfa90270"
+												},
+												{
+													"key": "distinctName",
+													"value": "<string>",
+													"description": "Only return the latest builds created, unique by name and commit."
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								},
+								{
+									"name": "Server error",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "Authorization",
+												"value": "Bearer <token>",
+												"description": "Added as a part of security scheme: bearer"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/project/builds?perPage=<string>&page=<string>&commit=8419e150939eb8e50b0dd2a817574890cfa90270&distinctName=<string>",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"project",
+												"builds"
+											],
+											"query": [
+												{
+													"key": "perPage",
+													"value": "<string>",
+													"description": "Number of items per page (max 100)"
+												},
+												{
+													"key": "page",
+													"value": "<string>",
+													"description": "Page number"
+												},
+												{
+													"key": "commit",
+													"value": "8419e150939eb8e50b0dd2a817574890cfa90270"
+												},
+												{
+													"key": "distinctName",
+													"value": "<string>",
+													"description": "Only return the latest builds created, unique by name and commit."
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "get Auth Project",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/project",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"project"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Project",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/project",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"project"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"id\": \"<string>\",\n  \"defaultBaseBranch\": \"<string>\",\n  \"hasRemoteContentAccess\": \"<boolean>\"\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/project",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"project"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+						},
+						{
+							"name": "Server error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer <token>",
+										"description": "Added as a part of security scheme: bearer"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/project",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"project"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"<string>\",\n  \"details\": [\n    {\n      \"message\": \"<string>\"\n    },\n    {\n      \"message\": \"<string>\"\n    }\n  ]\n}"
+						}
+					]
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "REDACTED",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://api.argos-ci.com/v2"
+		}
+	]
+}

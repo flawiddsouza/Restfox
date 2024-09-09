@@ -1,0 +1,249 @@
+{
+    "exportedFrom": "Restfox-1.0.0",
+    "collection": [{
+        "_id": "3sHg3sQzwSx3WleCmXEpo",
+        "_type": "request_group",
+        "name": "builds",
+        "parentId": "NSZRgzvXmq5mdbPjpIh3-",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }, {
+        "_id": "IfTro7jYDG8dkm9rmLid3",
+        "_type": "request_group",
+        "name": "builds",
+        "parentId": "ZVA8_fdNzj_ABho6_cRzr",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }, {
+        "_id": "M2dtopISFVlJaqOe6IGPQ",
+        "_type": "request",
+        "method": "POST",
+        "url": "{{baseUrl}}/builds/finalize",
+        "name": "finalize Builds",
+        "body": {
+            "mimeType": "application/json",
+            "text": "{\n  \"parallelNonce\": \"<string>\"\n}"
+        },
+        "headers": [{
+            "name": "Content-Type",
+            "value": "application/json"
+        }, {
+            "name": "Accept",
+            "value": "application/json"
+        }],
+        "parameters": [],
+        "authentication": {
+            "type": "No Auth"
+        },
+        "parentId": "uTXABvBxZHtuKmd4Ey1Ll",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }, {
+        "_id": "NSZRgzvXmq5mdbPjpIh3-",
+        "_type": "request_group",
+        "name": "project",
+        "parentId": "ZVA8_fdNzj_ABho6_cRzr",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 1,
+        "plugins": []
+    }, {
+        "_id": "ZVA8_fdNzj_ABho6_cRzr",
+        "_type": "request_group",
+        "name": "Argos API",
+        "environment": {
+            "baseUrl": "https://api.argos-ci.com/v2"
+        },
+        "parentId": null,
+        "authentication": {
+            "type": "bearer",
+            "token": "REDACTED"
+        },
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }, {
+        "_id": "auocuI_UItOfYqOKeXLmx",
+        "_type": "request",
+        "method": "PUT",
+        "url": "{{baseUrl}}/builds/562890",
+        "name": "update Build",
+        "body": {
+            "mimeType": "application/json",
+            "text": "{\n  \"screenshots\": [\n    {\n      \"key\": \"258d73b250fdb1dfd21e586994ba4806ee0bf186a53cf2b8bab1cd744064c73a\",\n      \"name\": \"./output/screenshots/home-page.png\"\n    }\n  ],\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"passed\"\n    }\n  }\n}"
+        },
+        "headers": [{
+            "name": "Content-Type",
+            "value": "application/json"
+        }, {
+            "name": "Accept",
+            "value": "application/json"
+        }],
+        "parameters": [],
+        "authentication": {
+            "type": "No Auth"
+        },
+        "parentId": "kv_Uu-_HCHJ75AK260UGy",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }, {
+        "_id": "axWYXX_lpRucPQAW5t1Pz",
+        "_type": "request",
+        "method": "GET",
+        "url": "{{baseUrl}}/project",
+        "name": "get Auth Project",
+        "body": {
+            "mimeType": "No Body"
+        },
+        "headers": [{
+            "name": "Accept",
+            "value": "application/json"
+        }],
+        "parameters": [],
+        "authentication": {
+            "type": "No Auth"
+        },
+        "parentId": "NSZRgzvXmq5mdbPjpIh3-",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 1,
+        "plugins": []
+    }, {
+        "_id": "doFQHi51CUO6P16Hq2j72",
+        "_type": "request",
+        "method": "GET",
+        "url": "{{baseUrl}}/builds",
+        "name": "update Build Copy",
+        "body": {
+            "mimeType": "application/json",
+            "text": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}"
+        },
+        "headers": [{
+            "name": "Content-Type",
+            "value": "application/json"
+        }, {
+            "name": "Accept",
+            "value": "application/json"
+        }],
+        "parameters": [],
+        "authentication": {
+            "type": "No Auth"
+        },
+        "parentId": "kv_Uu-_HCHJ75AK260UGy",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 1,
+        "plugins": []
+    }, {
+        "_id": "iZaakd6fm3whIyG5QpslM",
+        "_type": "request",
+        "method": "GET",
+        "url": "{{baseUrl}}/project/builds/562859",
+        "name": "get Auth Project Builds",
+        "body": {
+            "mimeType": "No Body"
+        },
+        "headers": [{
+            "name": "Accept",
+            "value": "application/json"
+        }],
+        "parameters": [{
+            "name": "perPage",
+            "value": "10",
+            "description": "Number of items per page (max 100)",
+            "disabled": true
+        }, {
+            "name": "page",
+            "value": "1",
+            "description": "Page number",
+            "disabled": true
+        }, {
+            "name": "commit",
+            "value": "04b3b4d583f7a3ec6953dcfebf3aa665c7e3e434",
+            "disabled": true
+        }, {
+            "name": "distinctName",
+            "value": "<string>",
+            "description": "Only return the latest builds created, unique by name and commit.",
+            "disabled": true
+        }, {
+            "name": "",
+            "value": "",
+            "disabled": true
+        }],
+        "authentication": {
+            "type": "No Auth"
+        },
+        "parentId": "3sHg3sQzwSx3WleCmXEpo",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }, {
+        "_id": "kv_Uu-_HCHJ75AK260UGy",
+        "_type": "request_group",
+        "name": "{buildId}",
+        "parentId": "IfTro7jYDG8dkm9rmLid3",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 1,
+        "plugins": []
+    }, {
+        "_id": "t3_ZDru36eSTIkOJoAtq4",
+        "_type": "request",
+        "method": "POST",
+        "url": "{{baseUrl}}/builds",
+        "name": "create Build",
+        "body": {
+            "mimeType": "application/json",
+            "text": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}"
+        },
+        "headers": [{
+            "name": "Content-Type",
+            "value": "application/json"
+        }, {
+            "name": "Accept",
+            "value": "application/json"
+        }],
+        "parameters": [],
+        "authentication": {
+            "type": "No Auth"
+        },
+        "parentId": "IfTro7jYDG8dkm9rmLid3",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 2,
+        "plugins": []
+    }, {
+        "_id": "uTXABvBxZHtuKmd4Ey1Ll",
+        "_type": "request_group",
+        "name": "finalize",
+        "parentId": "IfTro7jYDG8dkm9rmLid3",
+        "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+        "sortOrder": 0,
+        "plugins": []
+    }],
+    "environments": [{
+        "name": "Default",
+        "environment": {
+            "headers": {
+                "Accept": "*/*",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Accept-Language": "en-US,en;q=0.9,vi;q=0.8,de;q=0.7",
+                "Cache-Control": "no-cache",
+                "Host": "httpbin.org",
+                "Origin": "http://localhost:5173",
+                "Pragma": "no-cache",
+                "Priority": "u=1, i",
+                "Referer": "http://localhost:5173/",
+                "Sec-Ch-Ua": "\"Google Chrome\";v=\"125\", \"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": "\"macOS\"",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "cross-site",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                "X-Amzn-Trace-Id": "Root=1-66bd971b-51f589454403aa83006a90df"
+            }
+        },
+        "color": "var(--text-color)"
+    }]
+}

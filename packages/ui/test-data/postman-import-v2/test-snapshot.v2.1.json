@@ -1,0 +1,232 @@
+[
+  {
+    "_type": "request_group",
+    "name": "{buildId}",
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 1,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "Argos API",
+    "environment": {
+      "baseUrl": "https://api.argos-ci.com/v2"
+    },
+    "authentication": {
+      "type": "bearer",
+      "token": "REDACTED"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "builds",
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "builds",
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "POST",
+    "url": "{{baseUrl}}/builds",
+    "name": "create Build",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"commit\": \"32cf3db005dd7a943832c4d0098670c8a7b54ad4\",\n  \"branch\": \"<string>\",\n  \"screenshotKeys\": [\n    \"Fb500DBdFcb20FB3D79CDCdeDF8e6ED6ebaAA895Ab24cAc01aBefbBDA5Cdd4AE\",\n    \"BDE542fC68bf8857Bf14Cd886a18B9cccCAdC57B34D5EcB52D746ba274CacFea\"\n  ],\n  \"pwTraceKeys\": [\n    \"2f39aDcD30933EFdd2ce563AC8DF78602Bfcddd3edbb9FE5f3bA1A1EB2b9a8e5\",\n    \"C9FF2Acc0F277dAF5b77fb4FCbd08c23FedEbd792a04c3BFeE4cB7d75533Cbf2\"\n  ],\n  \"name\": \"<string>\",\n  \"parallel\": \"<boolean>\",\n  \"parallelNonce\": \"<string>\",\n  \"prNumber\": \"<integer>\",\n  \"prHeadCommit\": \"<string>\",\n  \"referenceCommit\": \"<string>\",\n  \"referenceBranch\": \"<string>\",\n  \"mode\": \"ci\",\n  \"ciProvider\": \"<string>\",\n  \"argosSdk\": \"<string>\",\n  \"runId\": \"<string>\",\n  \"runAttempt\": \"<integer>\"\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 2,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "finalize",
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "POST",
+    "url": "{{baseUrl}}/builds/finalize",
+    "name": "finalize Builds",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"parallelNonce\": \"<string>\"\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "GET",
+    "url": "{{baseUrl}}/project",
+    "name": "get Auth Project",
+    "body": {
+      "mimeType": "No Body"
+    },
+    "headers": [
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 1,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "GET",
+    "url": "{{baseUrl}}/project/builds/562859",
+    "name": "get Auth Project Builds",
+    "body": {
+      "mimeType": "No Body"
+    },
+    "headers": [
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [
+      {
+        "name": "perPage",
+        "value": "10",
+        "description": "Number of items per page (max 100)",
+        "disabled": true
+      },
+      {
+        "name": "page",
+        "value": "1",
+        "description": "Page number",
+        "disabled": true
+      },
+      {
+        "name": "commit",
+        "value": "04b3b4d583f7a3ec6953dcfebf3aa665c7e3e434",
+        "disabled": true
+      },
+      {
+        "name": "distinctName",
+        "value": "<string>",
+        "description": "Only return the latest builds created, unique by name and commit.",
+        "disabled": true
+      },
+      {
+        "name": "",
+        "value": "",
+        "disabled": true
+      }
+    ],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request_group",
+    "name": "project",
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 1,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "PUT",
+    "url": "{{baseUrl}}/builds/562890",
+    "name": "update Build",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"screenshots\": [\n    {\n      \"key\": \"258d73b250fdb1dfd21e586994ba4806ee0bf186a53cf2b8bab1cd744064c73a\",\n      \"name\": \"./output/screenshots/home-page.png\"\n    }\n  ],\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"passed\"\n    }\n  }\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 0,
+    "plugins": []
+  },
+  {
+    "_type": "request",
+    "method": "GET",
+    "url": "{{baseUrl}}/builds",
+    "name": "update Build Copy",
+    "body": {
+      "mimeType": "application/json",
+      "text": "{\n  \"screenshots\": [\n    {\n      \"key\": \"dddb9b1CfBcfFbE683bAEBDffDb6aA76F36b83a4eCbd0bE721E8cb9FaC10b158\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"screen\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"CF6e3FD38c47Fe92dc50C16D5AA9A1AD975fACeE234a13cF1ef1556dEB35A62D\",\n      \"threshold\": \"<number>\"\n    },\n    {\n      \"key\": \"2C6166A95a2a3F1A6Fc7C43c2B216f683b83fA3F9fF4FBD1aeDE7De6c6cbE5ed\",\n      \"name\": \"<string>\",\n      \"baseName\": \"<string>\",\n      \"metadata\": {\n        \"automationLibrary\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"sdk\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        },\n        \"url\": \"<string>\",\n        \"viewport\": {\n          \"width\": \"<integer>\",\n          \"height\": \"<integer>\"\n        },\n        \"colorScheme\": \"light\",\n        \"mediaType\": \"print\",\n        \"test\": {\n          \"title\": \"<string>\",\n          \"titlePath\": [\n            \"<string>\",\n            \"<string>\"\n          ],\n          \"id\": \"<string>\",\n          \"retries\": \"<integer>\",\n          \"retry\": \"<integer>\",\n          \"repeat\": \"<integer>\",\n          \"location\": {\n            \"file\": \"<string>\",\n            \"line\": \"<integer>\",\n            \"column\": \"<integer>\"\n          }\n        },\n        \"browser\": {\n          \"name\": \"<string>\",\n          \"version\": \"<string>\"\n        }\n      },\n      \"pwTraceKey\": \"9fBA3DfaB0CDB658C6578B2aEcA414ba3ABE80D4E6a67ECD47f6BAbEF230eb4f\",\n      \"threshold\": \"<number>\"\n    }\n  ],\n  \"parallel\": \"<boolean>\",\n  \"parallelTotal\": \"<integer>\",\n  \"parallelIndex\": \"<integer>\",\n  \"metadata\": {\n    \"testReport\": {\n      \"status\": \"interrupted\",\n      \"stats\": {\n        \"startTime\": \"<string>\",\n        \"duration\": \"<number>\"\n      }\n    }\n  }\n}"
+    },
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Accept",
+        "value": "application/json"
+      }
+    ],
+    "parameters": [],
+    "authentication": {
+      "type": "No Auth"
+    },
+    "workspaceId": "ocsi_UOfUyIzTU0U6DjmR",
+    "sortOrder": 1,
+    "plugins": []
+  }
+]

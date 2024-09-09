@@ -1732,9 +1732,10 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
 
     if ('auth' in request) {
         if(request.auth.type === 'bearer' && request.auth.bearer) {
+            const token = Array.isArray(request.auth.bearer) ? request.auth.bearer.find((item: any) => item.key === 'token')?.value || '' : request.auth.bearer.token
             authentication = {
                 type: 'bearer',
-                token: request.auth.bearer.token
+                token
             }
         } else if(request.auth.type === 'basic' && request.auth.basic) {
             const username = request.auth.basic.find((item: any) => item.key === 'username')?.value || ''
