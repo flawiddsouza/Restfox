@@ -305,4 +305,8 @@ export default {
         name: 'Default',
         color: 'var(--text-color)',
     },
+    POSTMAN_SCHEMA: {
+        'v2.0': 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json',
+        'v2.1': 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+    }
 }
