@@ -12,6 +12,10 @@
     "environment": {
       "baseUrl": "https://api.argos-ci.com/v2"
     },
+    "authentication": {
+      "type": "bearer",
+      "token": "REDACTED"
+    },
     "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
     "sortOrder": 0,
     "plugins": []

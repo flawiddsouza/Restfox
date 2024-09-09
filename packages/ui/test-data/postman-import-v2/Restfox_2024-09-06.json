@@ -10,6 +10,10 @@
             },
             "parentId": null,
             "workspaceId": "CaLTeYHHtUzY6uNnNYpYN",
+             "authentication": {
+                "type": "bearer",
+                "token": "REDACTED"
+            },
             "sortOrder": 0,
             "plugins": []
         },

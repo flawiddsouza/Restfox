@@ -7,7 +7,7 @@ import {
     RequestParam,
     Plugin,
 } from '@/global'
-import { scriptConversion } from '@/helpers'
+import { covertPostmanAuthToRestfoxAuth, scriptConversion } from '@/helpers'
 
 export async function convertPostmanExportToRestfoxCollection(json: any, isZip: boolean, workspaceId: string) {
     if(isZip) {
@@ -216,22 +216,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             url = typeof request.request.url === 'string' ? request.request.url : request.request.url.raw
         }
 
-        let authentication: RequestAuthentication = { type: 'No Auth' }
-
-        if('auth' in request.request) {
-            if(request.request.auth.type === 'bearer') {
-                authentication = {
-                    type: 'bearer'
-                }
-                const bearerAuth = 'bearer' in request.request.auth ? request.request.auth.bearer : []
-                if(bearerAuth.length > 0) {
-                    authentication = {
-                        type: 'bearer',
-                        token: bearerAuth[0].value
-                    }
-                }
-            }
-        }
+        const authentication: RequestAuthentication = covertPostmanAuthToRestfoxAuth(request.request)
 
         if(request.event) {
             const scriptId = nanoid()
@@ -300,6 +285,7 @@ function importPostmanV2(collections: any[], workspaceId: string) {
             }, {}) : undefined,
             children: convertedRequests,
             parentId: null,
+            authentication: covertPostmanAuthToRestfoxAuth(postmanCollectionItem),
             workspaceId
         })
     })
