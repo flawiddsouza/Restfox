@@ -8,7 +8,7 @@ import {
     Plugin,
 } from '@/global'
 import { covertPostmanAuthToRestfoxAuth, scriptConversion } from '@/helpers'
-import constants from '@/constants';
+import constants from '@/constants'
 
 export async function convertPostmanExportToRestfoxCollection(json: any, isZip: boolean, workspaceId: string) {
     if(isZip) {
