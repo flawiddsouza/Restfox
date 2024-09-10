@@ -24,7 +24,11 @@
                         :class="{ 'dragging': dragging }"
                     >
                         <p v-if="!filesToImport.length">Drag & Drop files here or click to browse</p>
-                        <p v-else>{{ filesToImport.length }} file(s) selected</p>
+                        <p v-else>
+                            {{ filesToImport.length }} file(s) selected: <br>
+                            <span v-for="fileName in fileNames" :key="fileName">{{ fileName }}<br></span>
+                        </p>
+
                         <input
                             type="file"
                             ref="fileInput"
@@ -88,6 +92,7 @@ export default {
             importFrom: 'Restfox',
             importing: false,
             dragging: false,
+            fileNames: []
         }
     },
     computed: {
@@ -156,6 +161,8 @@ export default {
             this.dragging = false
             const files = event.dataTransfer.files
             this.filesToImport = Array.from(files)
+
+            this.fileNames = this.filesToImport.map(file => file.name)
         },
 
         triggerFileInput() {
@@ -164,6 +171,19 @@ export default {
 
         onFileSelect(event) {
             this.filesToImport = Array.from(event.target.files)
+            this.fileNames = this.filesToImport.map(file => file.name)
+
+            this.filesToImport.forEach(async(file) => {
+                let jsonContent
+                if (file.name.endsWith('.json')) {
+                    jsonContent = await fileToJSON(file)
+                } else {
+                    jsonContent = file
+                }
+
+                const detectedType = this.detectFileType(jsonContent)
+                this.importFrom = detectedType
+            })
         },
 
         detectFileType(jsonContent) {
