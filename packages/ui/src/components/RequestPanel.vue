@@ -406,7 +406,6 @@ import SnippetDropdown from '@/components/SnippetDropdown.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import {
-    beautifyGraphQLQuery,
     convertCurlCommandToRestfoxCollection,
     debounce,
     substituteEnvironmentVariables,
@@ -418,7 +417,7 @@ import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
-import { format as gqlFormat } from 'graphql-formatter'
+import { formatSdl } from 'format-graphql'
 
 const renderer = new marked.Renderer()
 
@@ -803,8 +802,8 @@ export default {
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
 
-                this.graphql.query = beautifyGraphQLQuery(result[0].body.query.replaceAll('\\n', ''))
-                this.graphql.variables = JSON.stringify(result[0].body.variables)
+                this.graphql.query = formatSdl(result[0].body.query.replaceAll('\\n', ''))
+                this.graphql.variables = JSON.parse(JSON.stringify(result[0].body.variables))
 
                 if(result.length) {
                     delete result[0].name
@@ -822,10 +821,9 @@ export default {
         },
         loadGraphql() {
             if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {
-                this.disableGraphqlWatch = false
+                this.disableGraphqlWatch = true
                 try {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)
-                    console.log('jajajaja', parsedBodyText)
                     this.graphql = {
                         query: parsedBodyText.query ?? '',
                         variables: JSON.stringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {}, null, 4)
