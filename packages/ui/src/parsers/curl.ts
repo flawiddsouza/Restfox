@@ -2,6 +2,7 @@
 
 import { ControlOperator, parse, ParseEntry } from 'shell-quote'
 import { Converter, ImportRequest, Parameter, PostData } from './curl.types'
+import constants from '@/constants'
 
 export const id = 'curl'
 export const name = 'cURL'
@@ -169,7 +170,7 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
     const contentTypeHeader = headers.find(
         header => header.name.toLowerCase() === 'content-type',
     )
-    const mimeType = contentTypeHeader
+    let mimeType = contentTypeHeader
         ? contentTypeHeader.value.split(';')[0]
         : null
 
@@ -195,7 +196,7 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
     })
 
     /// /////// Body //////////
-    const body: PostData = mimeType ? { mimeType } : {}
+    let body: PostData = mimeType ? { mimeType } : {}
     const bodyAsGET = getPairValue(pairsByName, false, ['G', 'get'])
 
     if (dataParameters.length !== 0 && bodyAsGET) {
@@ -209,8 +210,38 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
             }
         })
     } else if (dataParameters.length !== 0) {
-        body.text = dataParameters.map(parameter => `${parameter.name}${parameter.value}`).join('&')
-        body.mimeType = mimeType || ''
+        // check if it is the graphql
+        if(dataParameters[0].value && dataParameters[0].value.includes(`"query":`)) {
+            // If it's a GraphQL request, treat the body as a JSON object with `query` and optional `variables`
+            let query: string | undefined = ''
+            let variables = {}
+
+            // Assuming GraphQL query is passed via --data or -d
+            const bodyData = dataParameters[0].value
+
+            if (bodyData) {
+                try {
+                    const parsedBody = JSON.parse(bodyData || '{}')
+                    query = parsedBody.query || ''
+                    variables = parsedBody.variables || {}
+                } catch (e) {
+                    // Fallback if not a valid JSON
+                    query = bodyData
+                }
+            }
+
+            mimeType = constants.MIME_TYPE.GRAPHQL
+            body = {
+                mimeType,
+                text: JSON.stringify({
+                    query,
+                    variables,
+                }),
+            }
+        } else {
+            body.text = dataParameters.map (parameter => `${parameter.name}${parameter.value}`).join ('&')
+            body.mimeType = mimeType || ''
+        }
     } else if (formDataParams.length) {
         body.params = formDataParams
         body.mimeType = mimeType || 'multipart/form-data'
@@ -227,6 +258,7 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
     }
 
     const count = requestCount++
+
     return {
         _id: `__REQ_${count}__`,
         _type: 'request',

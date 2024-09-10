@@ -656,6 +656,9 @@ export default {
             }
             this.loadGraphql()
         },
+        'activeTab.url'() {
+            this.loadGraphql()
+        },
         graphql: {
             handler() {
                 if(this.disableGraphqlWatch) {
@@ -670,6 +673,10 @@ export default {
                     query: this.graphql.query,
                     variables: graphqlVariables
                 }, null, 4)
+                this.graphql = {
+                    query: this.graphql.query,
+                    variables: graphqlVariables
+                }
             },
             deep: true
         },
@@ -812,9 +819,10 @@ export default {
         },
         loadGraphql() {
             if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {
-                this.disableGraphqlWatch = true
+                this.disableGraphqlWatch = false
                 try {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)
+                    console.log('jajajaja', parsedBodyText)
                     this.graphql = {
                         query: parsedBodyText.query ?? '',
                         variables: JSON.stringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {}, null, 4)
