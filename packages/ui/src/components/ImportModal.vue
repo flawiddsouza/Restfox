@@ -3,6 +3,14 @@
         <modal title="Import" v-model="showImportModal">
             <label>
                 <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Import From</div>
+                <select class="full-width-input" v-model="importFrom" :disabled="importing">
+                    <option>Restfox</option>
+                    <option>Postman</option>
+                    <option>Postman URL</option>
+                    <option value="Insomnia">Insomnia / Insomnium</option>
+                    <option>OpenAPI</option>
+                    <option>OpenAPI URL</option>
+                </select>
             </label>
 
             <div style="margin-top: 1rem">
