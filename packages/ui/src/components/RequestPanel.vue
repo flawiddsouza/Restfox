@@ -406,6 +406,7 @@ import SnippetDropdown from '@/components/SnippetDropdown.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import {
+    beautifyGraphQLQuery,
     convertCurlCommandToRestfoxCollection,
     debounce,
     substituteEnvironmentVariables,
@@ -417,6 +418,7 @@ import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
+import { format as gqlFormat } from 'graphql-formatter'
 
 const renderer = new marked.Renderer()
 
@@ -656,9 +658,6 @@ export default {
             }
             this.loadGraphql()
         },
-        'activeTab.url'() {
-            this.loadGraphql()
-        },
         graphql: {
             handler() {
                 if(this.disableGraphqlWatch) {
@@ -803,6 +802,10 @@ export default {
                     return false
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
+
+                this.graphql.query = beautifyGraphQLQuery(result[0].body.query.replaceAll('\\n', ''))
+                this.graphql.variables = JSON.stringify(result[0].body.variables)
+
                 if(result.length) {
                     delete result[0].name
                     delete result[0]._id

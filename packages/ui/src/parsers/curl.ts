@@ -233,10 +233,9 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
             mimeType = constants.MIME_TYPE.GRAPHQL
             body = {
                 mimeType,
-                text: JSON.stringify({
-                    query,
-                    variables,
-                }),
+                text: bodyData,
+                query,
+                variables,
             }
         } else {
             body.text = dataParameters.map (parameter => `${parameter.name}${parameter.value}`).join ('&')

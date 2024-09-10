@@ -628,10 +628,18 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                 }
             }
 
-            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json' || item.body.mimeType === 'application/graphql') {
+            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json') {
                 body = {
                     mimeType: item.body.mimeType,
                     text: item.body.text
+                }
+            }
+
+            if(item.body.mimeType === 'application/graphql') {
+                body = {
+                    mimeType: item.body.mimeType,
+                    query: item.body.query,
+                    variables: item.body.variables
                 }
             }
 
@@ -1749,4 +1757,55 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
     }
 
     return authentication
+}
+
+export function beautifyGraphQLQuery(query: string) {
+    let formattedQuery = ''
+    let indentLevel = 0
+    const indentSize = 2
+    let inString = false
+    let previousChar = ''
+
+    function appendChar(char: any, indentDelta = 0) {
+        formattedQuery += char
+        indentLevel += indentDelta
+    }
+
+    for (let i = 0; i < query.length; i++) {
+        const char = query[i]
+
+        if (char === '"' && previousChar !== '\\') {
+            inString = !inString
+        }
+
+        if (inString) {
+            formattedQuery += char
+            previousChar = char
+            continue
+        }
+
+        switch (char) {
+            case '{':
+                appendChar(' {\n' + ' '.repeat((indentLevel + 1) * indentSize), 1)
+                break
+            case '}':
+                appendChar('\n' + ' '.repeat((indentLevel - 1) * indentSize) + '}', -1)
+                break
+            case ',':
+                formattedQuery += ',\n' + ' '.repeat(indentLevel * indentSize)
+                break
+            case '(':
+                appendChar('(\n' + ' '.repeat((indentLevel + 1) * indentSize), 1)
+                break
+            case ')':
+                appendChar('\n' + ' '.repeat((indentLevel - 1) * indentSize) + ')', -1)
+                break
+            default:
+                formattedQuery += char
+        }
+
+        previousChar = char
+    }
+
+    return formattedQuery.trim()
 }
