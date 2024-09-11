@@ -34,6 +34,12 @@
                     Note that the default user agent <strong>Restfox/{{ getVersion() }}</strong> is used when no global user agent is set here or on request level.
                 </div>
             </div>
+            <div>
+                <div style="margin-top: 1rem">
+                    <div style="margin-bottom: var(--label-margin-bottom);">Editor Indent Size</div>
+                    <input type="number" v-model="indentSize" class="full-width-input" placeholder="4">
+                </div>
+            </div>
             <div style="padding-top: 1rem"></div>
             <div>
                 <label style="display: flex;">
@@ -105,6 +111,7 @@ export default {
             disableIframeSandbox: false,
             disableAutoUpdate: false,
             globalUserAgent: '',
+            indentSize: constants.EDITOR_CONFIG.indent_size,
         }
     },
     computed: {
@@ -151,6 +158,9 @@ export default {
         },
         globalUserAgent() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT, this.globalUserAgent)
+        },
+        indentSize() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE, this.indentSize)
         }
     },
     methods: {
@@ -214,6 +224,7 @@ export default {
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
+            const savedIndentSize = localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -266,6 +277,9 @@ export default {
             }
             if(savedGlobalUserAgent) {
                 this.globalUserAgent = savedGlobalUserAgent
+            }
+            if(savedIndentSize) {
+                this.indentSize = savedIndentSize
             }
         },
         getCurentUserAgent() {

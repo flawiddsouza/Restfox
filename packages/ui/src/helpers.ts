@@ -1750,3 +1750,13 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
 
     return authentication
 }
+
+export function getEditorConfig(): any {
+    return {
+        indentSize: localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE)
+    }
+}
+
+export function jsonStringify(data: any, replacer = null, space = getEditorConfig().indentSize): any {
+    return JSON.stringify(data, replacer, parseInt(space, 10))
+}

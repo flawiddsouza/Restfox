@@ -178,7 +178,7 @@ import {
     getStatusText,
     bufferToString,
     timeAgo,
-    responseStatusColorMapping,
+    responseStatusColorMapping, jsonStringify,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'
@@ -471,7 +471,7 @@ export default {
         bufferToJSONString(buffer) {
             const responseText = this.bufferToString(buffer)
             try {
-                return JSON.stringify(JSON.parse(responseText), null, 4)
+                return jsonStringify(JSON.parse(responseText))
             } catch {
                 return responseText
             }

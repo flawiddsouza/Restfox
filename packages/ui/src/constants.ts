@@ -29,6 +29,7 @@ export default {
         GENERATE_CODE_LANGUAGE: 'Restfox-GenerateCodeLanguage',
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',
         GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
+        INDENT_SIZE: 'Restfox-IndentSize',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',
@@ -305,4 +306,7 @@ export default {
         name: 'Default',
         color: 'var(--text-color)',
     },
+    EDITOR_CONFIG: {
+        indent_size: 4,
+    }
 }
