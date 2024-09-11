@@ -802,8 +802,12 @@ export default {
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
 
-                this.graphql.query = formatSdl(result[0].body.query.replaceAll('\\n', ''))
-                this.graphql.variables = JSON.parse(JSON.stringify(result[0].body.variables))
+                if(result[0].body.query) {
+                    this.graphql = {
+                        query: formatSdl(result[0].body.query.replaceAll('\\n', '')),
+                        variables: JSON.stringify(typeof result[0].body.variables === 'object' ? result[0].body.variables : {}, null, 4),
+                    }
+                }
 
                 if(result.length) {
                     delete result[0].name
@@ -823,10 +827,9 @@ export default {
             if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {
                 this.disableGraphqlWatch = true
                 try {
-                    const parsedBodyText = JSON.parse(this.activeTab.body.text)
                     this.graphql = {
-                        query: parsedBodyText.query ?? '',
-                        variables: JSON.stringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {}, null, 4)
+                        query: formatSdl(this.activeTab.body.query.replaceAll('\\n', '')),
+                        variables: JSON.stringify(typeof this.activeTab.body.variables === 'object' ? this.activeTab.body.variables : {}, null, 2),
                     }
                 } catch {
                     this.graphql = {
