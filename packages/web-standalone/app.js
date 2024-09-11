@@ -1,18 +1,42 @@
 import express from 'express'
 import fetch from 'node-fetch'
+import multer from 'multer'
 
 const app = express()
 
 const port = process.env.PORT || 4004
 
 app.use(express.static('public'))
-app.use(express.raw({ type: '*/*' }))
+
+const upload = multer()
+
+app.use((req, res, next) => {
+    if (req.is('multipart/*')) {
+        upload.any()(req, res, next)
+    } else {
+        express.raw({ type: '*/*' })(req, res, next)
+    }
+})
 
 app.post('/proxy', async(req, res) => {
     const url = req.headers['x-proxy-req-url']
     const method = req.headers['x-proxy-req-method']
     const headers = {}
-    const body = req.body
+    let body
+
+    if (req.is('multipart/*')) {
+        const files = req.files
+
+        body = new FormData()
+
+        Object.keys(files).forEach(field => {
+            const file = files[field]
+            const blob = new Blob([file.buffer], { type: file.mimetype })
+            body.append(file.fieldname, blob, file.originalname)
+        })
+    } else {
+        body = req.body
+    }
 
     Object.keys(req.headers).forEach(header => {
         if(header.startsWith('x-proxy-req-header-')) {
