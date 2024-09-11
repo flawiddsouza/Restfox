@@ -178,7 +178,8 @@ import {
     getStatusText,
     bufferToString,
     timeAgo,
-    responseStatusColorMapping, jsonStringify,
+    responseStatusColorMapping,
+    jsonStringify,
 } from '@/helpers'
 import { emitter } from '@/event-bus'
 import {JSONPath} from 'jsonpath-plus'

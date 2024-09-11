@@ -91,7 +91,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import {getVersion} from '@/helpers'
+import { getVersion } from '@/helpers'
 
 export default {
     props: {
