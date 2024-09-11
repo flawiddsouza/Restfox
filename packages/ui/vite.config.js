@@ -84,7 +84,6 @@ export default defineConfig(({ mode }) => {
         config.plugins.push(
             copy({
                 targets: [
-                    { src: 'dist/*', dest: '../electron/ui' },
                     { src: 'dist/*', dest: '../tauri/ui' },
                     { src: 'dist/*', dest: '../browser-extension/v3-app/src/ui' }
                 ],
@@ -111,6 +110,17 @@ export default defineConfig(({ mode }) => {
                     { src: 'dist/*', dest: '../web-standalone/public' },
                 ],
                 hook: 'buildEnd'
+            })
+        )
+    }
+
+    if(mode === 'vscode') {
+        config.plugins.push(
+            copy({
+                targets: [
+                    { src: 'dist/*', dest: '../vscode/ui' },
+                ],
+                hook: 'writeBundle'
             })
         )
     }
