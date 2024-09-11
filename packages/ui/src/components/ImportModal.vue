@@ -226,9 +226,6 @@ export default {
                             json = fileToImport
                         }
 
-                        const detectedType = this.detectFileType(json)
-                        this.importFrom = detectedType
-
                         if(this.importFrom === 'Postman') {
                             const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
                             collectionTree = collectionTree.concat(collection)
