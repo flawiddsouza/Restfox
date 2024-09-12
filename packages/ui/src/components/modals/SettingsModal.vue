@@ -39,7 +39,7 @@
                     <div style="margin-bottom: var(--label-margin-bottom);">Editor Indent Size</div>
                     <select class="full-width-input" v-model="indentSize">
                         <option value="2">2</option>
-                        <option value="4" selected>4</option>
+                        <option value="4">4</option>
                     </select>
                 </div>
             </div>
