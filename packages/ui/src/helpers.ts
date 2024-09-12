@@ -1753,7 +1753,7 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
 
 export function getEditorConfig(): {
     indentSize: number
-} {
+    } {
     return {
         indentSize: parseInt(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || constants.EDITOR_CONFIG.indent_size.toString(), 10)
     }
