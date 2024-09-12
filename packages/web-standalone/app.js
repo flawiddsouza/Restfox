@@ -1,5 +1,5 @@
 import express from 'express'
-import fetch from 'node-fetch'
+import { fetch, Agent } from 'undici'
 import multer from 'multer'
 
 const app = express()
@@ -18,11 +18,33 @@ app.use((req, res, next) => {
     }
 })
 
+const agents = new Map()
+
+function getAgentForRequest(urlParsed, disableSSLVerification) {
+    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}`
+
+    if(!agents.has(key)) {
+        const agent = new Agent({
+            connect: {
+                rejectUnauthorized: disableSSLVerification ? false : true,
+            },
+            allowH2: true,
+        })
+
+        agents.set(key, agent)
+    }
+
+    return agents.get(key)
+}
+
 app.post('/proxy', async(req, res) => {
+    const disableSSLVerification = req.headers['x-proxy-flag-disable-ssl-verification'] === 'true'
     const url = req.headers['x-proxy-req-url']
     const method = req.headers['x-proxy-req-method']
     const headers = {}
     let body
+
+    const agent = getAgentForRequest(new URL(url), disableSSLVerification)
 
     if (req.is('multipart/*')) {
         const files = req.files
@@ -48,6 +70,7 @@ app.post('/proxy', async(req, res) => {
         const startTime = new Date()
 
         const response = await fetch(url, {
+            dispatcher: agent,
             method,
             headers,
             body: method !== 'GET' ? body : undefined

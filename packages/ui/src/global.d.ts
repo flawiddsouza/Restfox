@@ -135,6 +135,7 @@ export interface State {
         hideBrowserRelatedResponsePanelErrors: boolean
         browserExtensionEnabled: boolean
         isBrowser: boolean
+        isWebStandalone: boolean
         isElectron: boolean
         disableSSLVerification: boolean
         electronSwitchToChromiumFetch: boolean
