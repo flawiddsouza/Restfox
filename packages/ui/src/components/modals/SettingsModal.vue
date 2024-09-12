@@ -56,7 +56,7 @@
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will remove iframe sandbox restrictions. See <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox" target="_blank">this link</a> for more info.</div>
             </div>
-            <template v-if="flags.isElectron">
+            <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
                 <div>
                     <label style="display: flex;">
@@ -64,6 +64,8 @@
                     </label>
                     <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will disable SSL verification for all requests made from the application. This is useful when you are working with self signed certificates.</div>
                 </div>
+            </template>
+            <template v-if="flags.isElectron">
                 <div style="padding-top: 1rem"></div>
                 <div>
                     <label style="display: flex;">
