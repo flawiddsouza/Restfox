@@ -246,7 +246,8 @@ import {
     generateId,
     getObjectPaths,
     getAlertConfirmPromptContainer,
-    setEnvironmentVariable, jsonStringify,
+    setEnvironmentVariable,
+    jsonStringify,
 } from '@/helpers'
 import getObjectPathValue from 'lodash.get'
 import Tabs from './Tabs.vue'
