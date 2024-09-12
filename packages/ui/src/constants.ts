@@ -307,6 +307,6 @@ export default {
         color: 'var(--text-color)',
     },
     EDITOR_CONFIG: {
-        indent_size: 4,
+        indent_size: "4",
     }
 }

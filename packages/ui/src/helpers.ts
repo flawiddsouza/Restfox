@@ -1753,10 +1753,10 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
 
 export function getEditorConfig(): any {
     return {
-        indentSize: localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE)
+        indentSize: parseInt(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || constants.EDITOR_CONFIG.indent_size.toString(), 10)
     }
 }
 
-export function jsonStringify(data: any, replacer = null, space = getEditorConfig().indentSize): any {
-    return JSON.stringify(data, replacer, parseInt(space, 10))
+export function jsonStringify(data: any, space = getEditorConfig().indentSize): any {
+    return JSON.stringify(data, null, space)
 }

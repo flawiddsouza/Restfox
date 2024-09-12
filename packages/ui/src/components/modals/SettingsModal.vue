@@ -37,7 +37,10 @@
             <div>
                 <div style="margin-top: 1rem">
                     <div style="margin-bottom: var(--label-margin-bottom);">Editor Indent Size</div>
-                    <input type="number" v-model="indentSize" class="full-width-input" placeholder="4">
+                    <select class="full-width-input" v-model="indentSize">
+                        <option value="2">2</option>
+                        <option value="4" selected>4</option>
+                    </select>
                 </div>
             </div>
             <div style="padding-top: 1rem"></div>
