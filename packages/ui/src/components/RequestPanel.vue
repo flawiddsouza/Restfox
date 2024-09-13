@@ -672,7 +672,6 @@ export default {
                     query: this.graphql.query,
                     variables: graphqlVariables
                 })
-
             },
             deep: true
         },
@@ -800,14 +799,14 @@ export default {
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
 
-                if(result[0].body.query) {
-                    this.graphql = {
-                        query: formatSdl(result[0].body.query.replaceAll('\\n', '')),
-                        variables: JSON.stringify(typeof result[0].body.variables === 'object' ? result[0].body.variables : {}, null, 4),
-                    }
-                }
-
                 if(result.length) {
+                    if(result[0].body.query) {
+                        this.graphql = {
+                            query: formatSdl(result[0].body.query.replaceAll('\\n', '')),
+                            variables: jsonStringify(typeof result[0].body.variables === 'object' ? result[0].body.variables : {}),
+                        }
+                    }
+
                     delete result[0].name
                     delete result[0]._id
                     delete result[0]._type
