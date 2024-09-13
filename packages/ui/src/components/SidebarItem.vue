@@ -18,7 +18,7 @@
             </div>
         </template>
         <template v-if="sidebarItem._type === 'request'">
-            <div class="sidebar-item-method" :class="`request-method--${sidebarItem.method}`">{{ getMethodShortName(sidebarItem.method) }}</div>
+            <div class="sidebar-item-method" :class="`request-method--${isGqlRequest(sidebarItem) ? 'GQL' : sidebarItem.method}`">{{ getMethodShortName(isGqlRequest(sidebarItem) ? 'GQL' : sidebarItem.method) }}</div>
         </template>
         <template v-if="sidebarItem._type === 'socket'">
             <div class="sidebar-item-method" :class="`request-method--SOCK`">SOCK</div>
@@ -93,6 +93,7 @@ export default {
                 'DELETE':  'DEL',
                 'PATCH':   'PTCH',
                 'OPTIONS': 'OPT',
+                'GRAPHQL': 'GQL'
             }
 
             return methods[method] || method
@@ -166,6 +167,9 @@ export default {
         cancelSidebarItemNameRename() {
             delete this.$store.state.sidebarItemTemporaryName[this.sidebarItem._id]
             this.showInputToRenameRequest = false
+        },
+        isGqlRequest(request) {
+            return request.body.mimeType === 'application/graphql'
         }
     }
 }

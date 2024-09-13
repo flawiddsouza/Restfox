@@ -342,6 +342,10 @@ body {
     color: var(--method-post) !important;
 }
 
+.request-method--GQL {
+    color: var(--method-post) !important;
+}
+
 .request-method--PUT {
     color: var(--method-put) !important;
 }
