@@ -8,6 +8,7 @@ import {
     Plugin,
 } from '@/global'
 import { covertPostmanAuthToRestfoxAuth, scriptConversion } from '@/helpers'
+import constants from '@/constants'
 
 export async function convertPostmanExportToRestfoxCollection(json: any, isZip: boolean, workspaceId: string) {
     if(isZip) {
@@ -33,7 +34,7 @@ export async function convertPostmanExportToRestfoxCollection(json: any, isZip: 
     } else {
         if('info' in json) {
             if('schema' in json.info) {
-                if(json.info.schema === 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json' || json.info.schema === 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json') {
+                if(json.info.schema === constants.POSTMAN_SCHEMA['v2.0'] || json.info.schema === constants.POSTMAN_SCHEMA['v2.1']) {
                     return importPostmanV2([json], workspaceId)
                 }
             }

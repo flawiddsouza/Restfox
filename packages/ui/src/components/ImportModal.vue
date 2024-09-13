@@ -15,7 +15,30 @@
 
             <div style="margin-top: 1rem">
                 <template v-if="importFrom.endsWith(' URL') === false">
-                    <input type="file" @change="filesToImport = Array.from($event.target.files)" accept=".json, .zip, .yml, .yaml" multiple required :disabled="importing">
+                    <div
+                        class="drop-zone"
+                        @click="triggerFileInput"
+                        @dragover.prevent="onDragOver"
+                        @dragleave.prevent="onDragLeave"
+                        @drop.prevent="onFileDrop"
+                        :class="{ 'dragging': dragging }"
+                    >
+                        <p v-if="!filesToImport.length">Drag & Drop files here or click to browse</p>
+                        <p v-else>
+                            {{ filesToImport.length }} file(s) selected: <br>
+                            <span v-for="fileName in fileNames" :key="fileName">{{ fileName }}<br></span>
+                        </p>
+
+                        <input
+                            type="file"
+                            ref="fileInput"
+                            @change="onFileSelect"
+                            accept=".json, .zip, .yml, .yaml"
+                            multiple
+                            :disabled="importing"
+                            class="hidden-file-input"
+                        />
+                    </div>
                 </template>
                 <template v-else>
                     <input type="url" v-model="urlToImport" required :placeholder="importUrlPlaceholder" class="full-width-input" :disabled="importing">
@@ -55,6 +78,7 @@ import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
 import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '../helpers'
 import { mergeArraysByProperty } from '@/utils/array'
+import constants from '@/constants'
 
 export default {
     components: {
@@ -67,6 +91,8 @@ export default {
             urlToImport: '',
             importFrom: 'Restfox',
             importing: false,
+            dragging: false,
+            fileNames: []
         }
     },
     computed: {
@@ -124,6 +150,54 @@ export default {
             this.activeWorkspaceFolders = activeWorkspaceFolders
             this.selectedRequestGroupId = null
         },
+
+        onDragOver() {
+            this.dragging = true
+        },
+        onDragLeave() {
+            this.dragging = false
+        },
+        onFileDrop(event) {
+            this.dragging = false
+            const files = event.dataTransfer.files
+            this.filesToImport = Array.from(files)
+
+            this.fileNames = this.filesToImport.map(file => file.name)
+        },
+
+        triggerFileInput() {
+            this.$refs.fileInput.click()
+        },
+
+        onFileSelect(event) {
+            this.filesToImport = Array.from(event.target.files)
+            this.fileNames = this.filesToImport.map(file => file.name)
+
+            this.filesToImport.forEach(async(file) => {
+                let jsonContent
+                if (file.name.endsWith('.json')) {
+                    jsonContent = await fileToJSON(file)
+                } else {
+                    jsonContent = file
+                }
+
+                const detectedType = this.detectFileType(jsonContent)
+                this.importFrom = detectedType
+            })
+        },
+
+        detectFileType(jsonContent) {
+            if (jsonContent.info && jsonContent.info.schema && (jsonContent.info.schema === constants.POSTMAN_SCHEMA['v2.0'] || jsonContent.info.schema === constants.POSTMAN_SCHEMA['v2.1'])) {
+                return 'Postman'
+            } else if (jsonContent.__export_format || jsonContent.resources) {
+                return 'Insomnia'
+            } else if (jsonContent.openapi || jsonContent.swagger) {
+                return 'OpenAPI'
+            } else {
+                return 'Restfox'
+            }
+        },
+
         async importFile() {
             this.importing = true
 
@@ -131,19 +205,16 @@ export default {
 
             try {
                 let json = null
-
                 let collectionTree = []
                 let plugins = []
 
                 if(this.importFrom === 'Postman URL') {
                     const response = await fetch(this.urlToImport)
                     json = await response.json()
-
                     collectionTree = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
                 } else if(this.importFrom === 'OpenAPI URL') {
                     const response = await fetch(this.urlToImport)
                     json = await response.text()
-
                     collectionTree = await convertOpenAPIExportToRestfoxCollection(json, this.activeWorkspace._id)
                 } else {
                     for(const fileToImport of this.filesToImport) {
@@ -163,13 +234,11 @@ export default {
                             if(newPlugins.length > 0) {
                                 plugins = plugins.concat(newPlugins)
                             }
-                        }
 
-                        if(this.importFrom === 'Insomnia') {
+                        } else if(this.importFrom === 'Insomnia') {
                             collectionTree = collectionTree.concat(convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id))
-                        }
 
-                        if(this.importFrom === 'Restfox') {
+                        } else if(this.importFrom === 'Restfox') {
                             const { newCollectionTree, newPlugins } = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
 
                             collectionTree = collectionTree.concat(newCollectionTree)
@@ -185,6 +254,7 @@ export default {
 
                                 if(!foundEnvironment) {
                                     foundEnvironment = this.activeWorkspace.environments[0]
+
                                     this.activeWorkspace.currentEnvironment = foundEnvironment.name
                                     this.$store.commit('updateWorkspaceCurrentEnvironment',  {
                                         workspaceId: this.activeWorkspace._id,
@@ -202,10 +272,10 @@ export default {
                             if(newPlugins.length > 0) {
                                 plugins = plugins.concat(newPlugins)
                             }
-                        }
 
-                        if(this.importFrom === 'OpenAPI') {
+                        } else if(this.importFrom === 'OpenAPI') {
                             const exportAsString = await fileToString(fileToImport)
+
                             collectionTree = collectionTree.concat(await convertOpenAPIExportToRestfoxCollection(exportAsString, this.activeWorkspace._id))
                         }
                     }
@@ -262,7 +332,6 @@ export default {
     },
     created() {
         this.handleActiveWorkspace()
-
         emitter.on('request_group', this.handleActiveWorkspace)
     },
     beforeUnmount() {
@@ -270,3 +339,20 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+.drop-zone {
+    border: 2px dashed #ccc;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.drop-zone.dragging {
+    background-color: var(--background-color);
+}
+
+.hidden-file-input {
+    display: none;
+}
+</style>
