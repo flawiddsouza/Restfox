@@ -641,7 +641,8 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                 body = {
                     mimeType: item.body.mimeType,
                     query: item.body.query,
-                    variables: item.body.variables
+                    variables: item.body.variables,
+                    text: item.body.text
                 }
             }
 
