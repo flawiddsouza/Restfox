@@ -228,41 +228,54 @@ export default {
 
                         if(this.importFrom === 'Postman') {
                             const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
+
                             collectionTree = collectionTree.concat(collection)
+
                             if(newPlugins.length > 0) {
                                 plugins = plugins.concat(newPlugins)
                             }
+
                         } else if(this.importFrom === 'Insomnia') {
                             collectionTree = collectionTree.concat(convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id))
+
                         } else if(this.importFrom === 'Restfox') {
                             const { newCollectionTree, newPlugins } = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)
+
                             collectionTree = collectionTree.concat(newCollectionTree)
+
                             if(json.environments) {
                                 this.activeWorkspace.environments = mergeArraysByProperty(this.activeWorkspace.environments ?? [], json.environments, 'name')
                                 this.$store.commit('updateWorkspaceEnvironments', {
                                     workspaceId: this.activeWorkspace._id,
                                     environments: this.activeWorkspace.environments
                                 })
+
                                 let foundEnvironment = this.activeWorkspace.environments.find(environment => environment.name === (this.activeWorkspace.currentEnvironment ?? 'Default'))
+
                                 if(!foundEnvironment) {
                                     foundEnvironment = this.activeWorkspace.environments[0]
+
                                     this.activeWorkspace.currentEnvironment = foundEnvironment.name
                                     this.$store.commit('updateWorkspaceCurrentEnvironment',  {
                                         workspaceId: this.activeWorkspace._id,
                                         currentEnvironment: this.activeWorkspace.currentEnvironment
                                     })
                                 }
+
                                 this.activeWorkspace.environment = foundEnvironment.environment
                                 this.$store.commit('updateWorkspaceEnvironment', {
                                     workspaceId: this.activeWorkspace._id,
                                     environment: this.activeWorkspace.environment,
                                 })
                             }
+
                             if(newPlugins.length > 0) {
                                 plugins = plugins.concat(newPlugins)
                             }
+
                         } else if(this.importFrom === 'OpenAPI') {
                             const exportAsString = await fileToString(fileToImport)
+
                             collectionTree = collectionTree.concat(await convertOpenAPIExportToRestfoxCollection(exportAsString, this.activeWorkspace._id))
                         }
                     }
