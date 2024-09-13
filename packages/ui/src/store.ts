@@ -339,6 +339,7 @@ const store = createStore<State>({
                 hideBrowserRelatedResponsePanelErrors: false,
                 browserExtensionEnabled: false,
                 isBrowser: true,
+                isWebStandalone: false,
                 isElectron: false,
                 disableSSLVerification: false,
                 electronSwitchToChromiumFetch: false,

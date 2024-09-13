@@ -296,6 +296,10 @@ export default {
             this.$store.state.flags.isBrowser = false
         }
 
+        if(import.meta.env.MODE === 'web-standalone') {
+            this.$store.state.flags.isWebStandalone = true
+        }
+
         if(import.meta.env.MODE === 'desktop-electron') {
             this.$store.state.flags.isElectron = true
         }

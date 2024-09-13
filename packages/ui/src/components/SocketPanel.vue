@@ -247,6 +247,7 @@ import {
     getObjectPaths,
     getAlertConfirmPromptContainer,
     setEnvironmentVariable,
+    jsonStringify,
 } from '@/helpers'
 import getObjectPathValue from 'lodash.get'
 import Tabs from './Tabs.vue'
@@ -429,7 +430,7 @@ async function connect(client: Client) {
             socket.onevent = function(packet) {
                 const event = packet.data[0]
                 const args = packet.data.slice(1)
-                const receivedMessage = `[${event}] ${typeof args[0] === 'object' ? JSON.stringify(args[0], null, 4) : args[0]}`
+                const receivedMessage = `[${event}] ${typeof args[0] === 'object' ? jsonStringify(args[0]) : args[0]}`
                 clientMessageHandler(client, receivedMessage)
                 originalOnevent.call(this, packet)
             }
@@ -437,7 +438,7 @@ async function connect(client: Client) {
 
         if (client.type === 'Socket.IO-v3' || client.type === 'Socket.IO') {
             socket.onAny(async(event, ...args) => {
-                const receivedMessage = `[${event}] ${typeof args[0] === 'object' ? JSON.stringify(args[0], null, 4) : args[0]}`
+                const receivedMessage = `[${event}] ${typeof args[0] === 'object' ? jsonStringify(args[0]) : args[0]}`
                 clientMessageHandler(client, receivedMessage)
             })
         }
@@ -476,7 +477,7 @@ function addClientMessage(client: Client, clientMessage: ClientMessage) {
 function beautifyJSON(client: Client) {
     try {
         const parsedMessage = JSON.parse(client.message)
-        client.message = JSON.stringify(parsedMessage, null, 4)
+        client.message = jsonStringify(parsedMessage)
         client.payloads.find(payload => payload.id === client.currentPayloadId)!.payload = client.message
     } catch {
         $toast.error('Invalid JSON')
@@ -565,7 +566,7 @@ function disconnect(client: Client) {
 function parseAndFormatMessage(message: string) {
     let parsedMessage = null
     try {
-        parsedMessage = JSON.stringify(JSON.parse(message), null, 4)
+        parsedMessage = jsonStringify(JSON.parse(message))
     } catch {}
     if (parsedMessage) {
         return parsedMessage

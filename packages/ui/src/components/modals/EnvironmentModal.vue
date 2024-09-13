@@ -69,6 +69,7 @@ import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import { nextTick } from 'vue'
 import { emitter } from '@/event-bus'
 import constants from '@/constants'
+import { jsonStringify } from '@/helpers'
 
 export default {
     props: {
@@ -140,10 +141,10 @@ export default {
     },
     watch: {
         collectionItem() {
-            this.environment = this.collectionItem.environment ? JSON.stringify(this.collectionItem.environment, null, 4) : '{}'
+            this.environment = this.collectionItem.environment ? jsonStringify(this.collectionItem.environment) : '{}'
         },
         workspace() {
-            this.environment = this.workspace.environment ? JSON.stringify(this.workspace.environment, null, 4) : '{}'
+            this.environment = this.workspace.environment ? jsonStringify(this.workspace.environment) : '{}'
         },
         environment() {
             let environment = {}
@@ -161,10 +162,10 @@ export default {
             if(this.showModal) {
                 this.parseError = ''
                 if(this.collectionItem) {
-                    this.environment = this.collectionItem.environment ? JSON.stringify(this.collectionItem.environment, null, 4) : '{}'
+                    this.environment = this.collectionItem.environment ? jsonStringify(this.collectionItem.environment) : '{}'
                 }
                 if(this.workspace) {
-                    this.environment = this.workspace.environment ? JSON.stringify(this.workspace.environment, null, 4) : '{}'
+                    this.environment = this.workspace.environment ? jsonStringify(this.workspace.environment) : '{}'
                 }
                 nextTick(() => {
                     this.$refs['environment-' + this.currentEnvironment][0].scrollIntoView({
@@ -268,7 +269,7 @@ export default {
 
             this.saveCurrentEnvironment()
 
-            const environmentString = JSON.stringify(environment.environment, null, 4)
+            const environmentString = jsonStringify(environment.environment)
 
             let manuallyTriggerSave = false
 
@@ -466,7 +467,7 @@ export default {
         },
         exportEnvironment() {
             const environment = this.environments.find(environment => environment.name === this.currentEnvironment)
-            const blob = new Blob([JSON.stringify(environment, null, 4)], { type: 'application/json' })
+            const blob = new Blob([jsonStringify(environment)], { type: 'application/json' })
             const url = URL.createObjectURL(blob)
             const link = document.createElement('a')
             link.href = url
