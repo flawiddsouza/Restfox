@@ -34,6 +34,15 @@
                     Note that the default user agent <strong>Restfox/{{ getVersion() }}</strong> is used when no global user agent is set here or on request level.
                 </div>
             </div>
+            <div>
+                <div style="margin-top: 1rem">
+                    <div style="margin-bottom: var(--label-margin-bottom);">Editor Indent Size</div>
+                    <select class="full-width-input" v-model="indentSize">
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                    </select>
+                </div>
+            </div>
             <div style="padding-top: 1rem"></div>
             <div>
                 <label style="display: flex;">
@@ -47,7 +56,7 @@
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will remove iframe sandbox restrictions. See <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox" target="_blank">this link</a> for more info.</div>
             </div>
-            <template v-if="flags.isElectron">
+            <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
                 <div>
                     <label style="display: flex;">
@@ -55,6 +64,8 @@
                     </label>
                     <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will disable SSL verification for all requests made from the application. This is useful when you are working with self signed certificates.</div>
                 </div>
+            </template>
+            <template v-if="flags.isElectron">
                 <div style="padding-top: 1rem"></div>
                 <div>
                     <label style="display: flex;">
@@ -85,7 +96,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import {getVersion} from '@/helpers'
+import { getVersion } from '@/helpers'
 
 export default {
     props: {
@@ -105,6 +116,7 @@ export default {
             disableIframeSandbox: false,
             disableAutoUpdate: false,
             globalUserAgent: '',
+            indentSize: constants.EDITOR_CONFIG.indent_size,
         }
     },
     computed: {
@@ -151,6 +163,9 @@ export default {
         },
         globalUserAgent() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT, this.globalUserAgent)
+        },
+        indentSize() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE, this.indentSize)
         }
     },
     methods: {
@@ -214,6 +229,7 @@ export default {
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
+            const savedIndentSize = localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -266,6 +282,9 @@ export default {
             }
             if(savedGlobalUserAgent) {
                 this.globalUserAgent = savedGlobalUserAgent
+            }
+            if(savedIndentSize) {
+                this.indentSize = savedIndentSize
             }
         },
         getCurentUserAgent() {

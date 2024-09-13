@@ -29,6 +29,7 @@ export default {
         GENERATE_CODE_LANGUAGE: 'Restfox-GenerateCodeLanguage',
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',
         GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
+        INDENT_SIZE: 'Restfox-IndentSize',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',
@@ -304,5 +305,12 @@ export default {
     DEFAULT_ENVIRONMENT: {
         name: 'Default',
         color: 'var(--text-color)',
+    },
+    POSTMAN_SCHEMA: {
+        'v2.0': 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json',
+        'v2.1': 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+    },
+    EDITOR_CONFIG: {
+        indent_size: '4',
     },
 }

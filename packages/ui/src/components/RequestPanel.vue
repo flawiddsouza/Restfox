@@ -408,6 +408,7 @@ import { jsonPrettify } from '../utils/prettify-json'
 import {
     convertCurlCommandToRestfoxCollection,
     debounce,
+    jsonStringify,
     substituteEnvironmentVariables,
     toggleDropdown
 } from '@/helpers'
@@ -667,14 +668,11 @@ export default {
                 try {
                     graphqlVariables = JSON.parse(this.graphql.variables)
                 } catch {}
-                this.activeTab.body.text = JSON.stringify({
+                this.activeTab.body.text = jsonStringify({
                     query: this.graphql.query,
                     variables: graphqlVariables
-                }, null, 4)
-                this.graphql = {
-                    query: this.graphql.query,
-                    variables: graphqlVariables
-                }
+                })
+
             },
             deep: true
         },
@@ -829,7 +827,7 @@ export default {
                 try {
                     this.graphql = {
                         query: formatSdl(this.activeTab.body.query.replaceAll('\\n', '')),
-                        variables: JSON.stringify(typeof this.activeTab.body.variables === 'object' ? this.activeTab.body.variables : {}, null, 2),
+                        variables: jsonStringify(typeof this.activeTab.body.variables === 'object' ? this.activeTab.body.variables : {}),
                     }
                 } catch {
                     this.graphql = {

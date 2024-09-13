@@ -19,6 +19,7 @@ import {
     HandleRequestState,
     State,
     OpenApiSpecPathParams,
+    EditorConfig,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -178,6 +179,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
     if(import.meta.env.MODE === 'web-standalone') {
         const proxyHeaders: Record<string, string> = {
+            'x-proxy-flag-disable-ssl-verification': flags.disableSSLVerification.toString(),
             'x-proxy-req-url': url.toString(),
             'x-proxy-req-method': method
         }
@@ -1757,5 +1759,15 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
     }
 
     return authentication
+}
+
+export function getEditorConfig(): EditorConfig {
+    return {
+        indentSize: parseInt(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || constants.EDITOR_CONFIG.indent_size.toString(), 10)
+    }
+}
+
+export function jsonStringify(data: any, space: number = getEditorConfig().indentSize): any {
+    return JSON.stringify(data, null, space)
 }
 
