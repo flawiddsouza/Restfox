@@ -309,10 +309,12 @@ function addFetchSyncToVM(vm: QuickJSAsyncContext) {
         vm.setProp(responseObject, 'statusText', responseStatusText)
 
         const responseHeaders = vm.evalCode(`
-            const escapedText = JSON.stringify(${JSON.stringify(response.headers)})
-            const headersArray = JSON.parse(escapedText)
-            const headers = new Headers(headersArray)
-            headers
+            {
+                const escapedText = JSON.stringify(${JSON.stringify(response.headers)})
+                const headersArray = JSON.parse(escapedText)
+                const headers = new Headers(headersArray)
+                headers
+            }
         `)
 
         vm.setProp(responseObject, 'headers', vm.unwrapResult(responseHeaders))
