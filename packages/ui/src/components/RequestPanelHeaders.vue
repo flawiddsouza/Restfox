@@ -107,8 +107,12 @@ const toggleBulkEdit = () => {
 }
 
 const applyBulkEdit = () => {
-    if(isBulkEditMode.value && props.collectionItem.headers) {
-        const headers = bulkEditText.value.split('\n').map(line => {
+    if(!props.collectionItem.headers) {
+        props.collectionItem.headers = []
+    }
+
+    if(isBulkEditMode.value) {
+        const headers = bulkEditText.value.split('\n').filter(item => item).map(line => {
             const [name, ...valueParts] = line.split(':')
             return {
                 name: name.trim(),
