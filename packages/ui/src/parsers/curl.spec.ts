@@ -291,41 +291,41 @@ describe('curl', () => {
         console.log(result)
         expect(result).toMatchObject([
             {
-            "_id": "__REQ_1__",
-                "_type": "request",
-                "authentication": {},
-            "body": {
-                "mimeType": "application/graphql",
-                    "query": "query AccountBreadcrumb_account($slug: String!) {\\n  account(slug: $slug) {\\n    id\\n    slug\\n    name\\n    avatar {\\n      ...AccountAvatarFragment\\n      __typename\\n    }\\n    ...AccountPlanChip_Account\\n    __typename\\n  }\\n}\\n\\nfragment AccountAvatarFragment on AccountAvatar {\\n  url(size: 64)\\n  color\\n  initial\\n  __typename\\n}\\n\\nfragment AccountPlanChip_Account on Account {\\n  subscriptionStatus\\n  plan {\\n    id\\n    displayName\\n    __typename\\n  }\\n  __typename\\n}",
-                    "text": "{\"operationName\":\"AccountBreadcrumb_account\",\"variables\":{\"slug\":\"kobenguyent\"},\"query\":\"query AccountBreadcrumb_account($slug: String!) {\\\\n  account(slug: $slug) {\\\\n    id\\\\n    slug\\\\n    name\\\\n    avatar {\\\\n      ...AccountAvatarFragment\\\\n      __typename\\\\n    }\\\\n    ...AccountPlanChip_Account\\\\n    __typename\\\\n  }\\\\n}\\\\n\\\\nfragment AccountAvatarFragment on AccountAvatar {\\\\n  url(size: 64)\\\\n  color\\\\n  initial\\\\n  __typename\\\\n}\\\\n\\\\nfragment AccountPlanChip_Account on Account {\\\\n  subscriptionStatus\\\\n  plan {\\\\n    id\\\\n    displayName\\\\n    __typename\\\\n  }\\\\n  __typename\\\\n}\"}",
-                    "variables": {
-                    "slug": "kobenguyent",
+                '_id': '__REQ_1__',
+                '_type': 'request',
+                'authentication': {},
+                'body': {
+                    'mimeType': 'application/graphql',
+                    'query': 'query AccountBreadcrumb_account($slug: String!) {\\n  account(slug: $slug) {\\n    id\\n    slug\\n    name\\n    avatar {\\n      ...AccountAvatarFragment\\n      __typename\\n    }\\n    ...AccountPlanChip_Account\\n    __typename\\n  }\\n}\\n\\nfragment AccountAvatarFragment on AccountAvatar {\\n  url(size: 64)\\n  color\\n  initial\\n  __typename\\n}\\n\\nfragment AccountPlanChip_Account on Account {\\n  subscriptionStatus\\n  plan {\\n    id\\n    displayName\\n    __typename\\n  }\\n  __typename\\n}',
+                    'text': '{"operationName":"AccountBreadcrumb_account","variables":{"slug":"kobenguyent"},"query":"query AccountBreadcrumb_account($slug: String!) {\\\\n  account(slug: $slug) {\\\\n    id\\\\n    slug\\\\n    name\\\\n    avatar {\\\\n      ...AccountAvatarFragment\\\\n      __typename\\\\n    }\\\\n    ...AccountPlanChip_Account\\\\n    __typename\\\\n  }\\\\n}\\\\n\\\\nfragment AccountAvatarFragment on AccountAvatar {\\\\n  url(size: 64)\\\\n  color\\\\n  initial\\\\n  __typename\\\\n}\\\\n\\\\nfragment AccountPlanChip_Account on Account {\\\\n  subscriptionStatus\\\\n  plan {\\\\n    id\\\\n    displayName\\\\n    __typename\\\\n  }\\\\n  __typename\\\\n}"}',
+                    'variables': {
+                        'slug': 'kobenguyent',
+                    },
                 },
+                'headers': [
+                    {
+                        'name': 'accept',
+                        'value': '*/*',
+                    },
+                    {
+                        'name': 'accept-language',
+                        'value': 'en-US,en;q=0.9,vi;q=0.8,de;q=0.7',
+                    },
+                    {
+                        'name': 'authorization',
+                        'value': 'Bearer token',
+                    },
+                    {
+                        'name': 'content-type',
+                        'value': 'application/json',
+                    },
+                ],
+                'method': 'POST',
+                'name': 'https://app.argos-ci.com/graphql',
+                'parameters':  [],
+                'parentId': '__WORKSPACE_ID__',
+                'url': 'https://app.argos-ci.com/graphql',
             },
-            "headers": [
-                {
-                "name": "accept",
-                    "value": "*/*",
-            },
-             {
-                "name": "accept-language",
-                    "value": "en-US,en;q=0.9,vi;q=0.8,de;q=0.7",
-            },
-             {
-                "name": "authorization",
-                    "value": "Bearer token",
-            },
-             {
-                "name": "content-type",
-                    "value": "application/json",
-            },
-        ],
-            "method": "POST",
-                "name": "https://app.argos-ci.com/graphql",
-                "parameters":  [],
-                "parentId": "__WORKSPACE_ID__",
-                "url": "https://app.argos-ci.com/graphql",
-        },
-    ])
+        ])
     })
 })
