@@ -824,9 +824,17 @@ export default {
             if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {
                 this.disableGraphqlWatch = true
                 try {
-                    this.graphql = {
-                        query: formatSdl(this.activeTab.body.query.replaceAll('\\n', '')),
-                        variables: jsonStringify(typeof this.activeTab.body.variables === 'object' ? this.activeTab.body.variables : {}),
+                    if(this.activeTab.body.query) {
+                        this.graphql = {
+                            query: formatSdl(this.activeTab.body.query.replaceAll('\\n', '')),
+                            variables: jsonStringify(typeof this.activeTab.body.variables === 'object' ? this.activeTab.body.variables : {}),
+                        }
+                    } else {
+                        const parsedBodyText = JSON.parse(this.activeTab.body.text)
+                        this.graphql = {
+                            query: parsedBodyText.query ?? '',
+                            variables: jsonStringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {})
+                        }
                     }
                 } catch {
                     this.graphql = {
