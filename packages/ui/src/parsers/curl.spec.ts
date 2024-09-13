@@ -288,7 +288,7 @@ describe('curl', () => {
   -H 'content-type: application/json' \\
   --data-raw $'{"operationName":"AccountBreadcrumb_account","variables":{"slug":"kobenguyent"},"query":"query AccountBreadcrumb_account($slug: String\u0021) {\\\\n  account(slug: $slug) {\\\\n    id\\\\n    slug\\\\n    name\\\\n    avatar {\\\\n      ...AccountAvatarFragment\\\\n      __typename\\\\n    }\\\\n    ...AccountPlanChip_Account\\\\n    __typename\\\\n  }\\\\n}\\\\n\\\\nfragment AccountAvatarFragment on AccountAvatar {\\\\n  url(size: 64)\\\\n  color\\\\n  initial\\\\n  __typename\\\\n}\\\\n\\\\nfragment AccountPlanChip_Account on Account {\\\\n  subscriptionStatus\\\\n  plan {\\\\n    id\\\\n    displayName\\\\n    __typename\\\\n  }\\\\n  __typename\\\\n}"}'`.trim()
         const result = convert(chromeCurlCmd)
-        console.log(result)
+
         expect(result).toMatchObject([
             {
                 '_id': '__REQ_1__',

@@ -771,8 +771,10 @@ export default {
         },
         beautifyGraphQL() {
             try {
-                const formattedJSON = jsonPrettify(this.graphql.variables, '    ')
-                this.$refs.jsonEditor.setValue(formattedJSON)
+                const formattedVarsJSON = jsonPrettify(this.graphql.variables, '    ')
+                const formattedGraphqlJSON = formatSdl(this.graphql.query)
+                this.$refs.jsonEditor.setValue(formattedVarsJSON)
+                this.$refs.graphqlEditor.setValue(formattedGraphqlJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
         showGraphQLDocs(value){
@@ -802,7 +804,7 @@ export default {
                 if(result.length) {
                     if(result[0].body.query) {
                         this.graphql = {
-                            query: formatSdl(result[0].body.query.replaceAll('\\n', '')),
+                            query: result[0].body.query.replaceAll('\\n', ''),
                             variables: jsonStringify(typeof result[0].body.variables === 'object' ? result[0].body.variables : {}),
                         }
                     }
@@ -824,17 +826,10 @@ export default {
             if(this.activeTab && this.activeTab.body && this.activeTab.body.mimeType === 'application/graphql') {
                 this.disableGraphqlWatch = true
                 try {
-                    if(this.activeTab.body.query) {
-                        this.graphql = {
-                            query: formatSdl(this.activeTab.body.query.replaceAll('\\n', '')),
-                            variables: jsonStringify(typeof this.activeTab.body.variables === 'object' ? this.activeTab.body.variables : {}),
-                        }
-                    } else {
-                        const parsedBodyText = JSON.parse(this.activeTab.body.text)
-                        this.graphql = {
-                            query: parsedBodyText.query ?? '',
-                            variables: jsonStringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {})
-                        }
+                    const parsedBodyText = JSON.parse(this.activeTab.body.text)
+                    this.graphql = {
+                        query: parsedBodyText.query ?? '',
+                        variables: jsonStringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {})
                     }
                 } catch {
                     this.graphql = {
