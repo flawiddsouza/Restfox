@@ -418,6 +418,7 @@ import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
+import { formatSdl } from 'format-graphql'
 
 const renderer = new marked.Renderer()
 
@@ -770,8 +771,10 @@ export default {
         },
         beautifyGraphQL() {
             try {
-                const formattedJSON = jsonPrettify(this.graphql.variables, '    ')
-                this.$refs.jsonEditor.setValue(formattedJSON)
+                const formattedVarsJSON = jsonPrettify(this.graphql.variables, '    ')
+                const formattedGraphqlJSON = formatSdl(this.graphql.query)
+                this.$refs.jsonEditor.setValue(formattedVarsJSON)
+                this.$refs.graphqlEditor.setValue(formattedGraphqlJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
         showGraphQLDocs(value){
@@ -797,6 +800,7 @@ export default {
                     return false
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
+
                 if(result.length) {
                     delete result[0].name
                     delete result[0]._id
@@ -804,6 +808,10 @@ export default {
                     delete result[0].workspaceId
                     delete result[0].parentId
                     Object.assign(this.activeTab, result[0])
+
+                    if(this.activeTab.body.mimeType === constants.MIME_TYPE.GRAPHQL) {
+                        this.loadGraphql()
+                    }
                 }
 
                 return true

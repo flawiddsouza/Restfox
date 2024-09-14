@@ -805,8 +805,14 @@ export async function convertCurlCommandToRestfoxCollection(curlCommand: string,
 
     if('body' in insomniaExport[0]) {
         if('text' in insomniaExport[0].body) {
-            // for some reason we get \\n instead of \n in the text field
-            insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+            if (insomniaExport[0].body.mimeType !== constants.MIME_TYPE.GRAPHQL) {
+                // for some reason we get \\n instead of \n in the text field
+                insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+            } else {
+                const parsedBody = JSON.parse(insomniaExport[0].body.text)
+                parsedBody.query = parsedBody.query.replaceAll('\\n', '\n')
+                insomniaExport[0].body.text = JSON.stringify(parsedBody)
+            }
         }
     }
     return convertInsomniaExportToRestfoxCollection({ resources: insomniaExport }, workspaceId)
@@ -1762,3 +1768,4 @@ export function getEditorConfig(): EditorConfig {
 export function jsonStringify(data: any, space: number = getEditorConfig().indentSize): any {
     return JSON.stringify(data, null, space)
 }
+

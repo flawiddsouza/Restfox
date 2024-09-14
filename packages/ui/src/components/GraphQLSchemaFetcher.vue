@@ -101,7 +101,7 @@ export default {
             required: true
         },
         schemaAction: {
-            type: String,
+            type: [null, String],
             required: true,
         },
     },

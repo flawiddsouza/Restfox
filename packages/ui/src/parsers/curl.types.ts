@@ -58,6 +58,8 @@ export interface PostData {
   params?: Parameter[];
   mimeType?: string;
   text?: string;
+  query?: string;
+  variables?: any;
 }
 
 export interface QueryString extends Comment {
