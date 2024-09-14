@@ -212,30 +212,13 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
     } else if (dataParameters.length !== 0) {
         // check if it is the graphql
         if(dataParameters[0].value && dataParameters[0].value.includes(`"query":`)) {
-            // If it's a GraphQL request, treat the body as a JSON object with `query` and optional `variables`
-            let query: string | undefined = ''
-            let variables = {}
-
             // Assuming GraphQL query is passed via --data or -d
             const bodyData = dataParameters[0].value
-
-            if (bodyData) {
-                try {
-                    const parsedBody = JSON.parse(bodyData || '{}')
-                    query = parsedBody.query || ''
-                    variables = parsedBody.variables || {}
-                } catch (e) {
-                    // Fallback if not a valid JSON
-                    query = bodyData
-                }
-            }
 
             mimeType = constants.MIME_TYPE.GRAPHQL
             body = {
                 mimeType,
                 text: bodyData,
-                query,
-                variables,
             }
         } else {
             body.text = dataParameters.map (parameter => `${parameter.name}${parameter.value}`).join ('&')

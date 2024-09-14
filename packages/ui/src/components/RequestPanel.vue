@@ -802,19 +802,16 @@ export default {
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
 
                 if(result.length) {
-                    if(result[0].body.query) {
-                        this.graphql = {
-                            query: result[0].body.query.replaceAll('\\n', ''),
-                            variables: jsonStringify(typeof result[0].body.variables === 'object' ? result[0].body.variables : {}),
-                        }
-                    }
-
                     delete result[0].name
                     delete result[0]._id
                     delete result[0]._type
                     delete result[0].workspaceId
                     delete result[0].parentId
                     Object.assign(this.activeTab, result[0])
+
+                    if(this.activeTab.body.mimeType === constants.MIME_TYPE.GRAPHQL) {
+                        this.loadGraphql()
+                    }
                 }
 
                 return true

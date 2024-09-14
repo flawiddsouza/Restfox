@@ -630,18 +630,9 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                 }
             }
 
-            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json') {
+            if(item.body.mimeType === 'text/plain' || item.body.mimeType === 'application/json' || item.body.mimeType === 'application/graphql') {
                 body = {
                     mimeType: item.body.mimeType,
-                    text: item.body.text
-                }
-            }
-
-            if(item.body.mimeType === 'application/graphql') {
-                body = {
-                    mimeType: item.body.mimeType,
-                    query: item.body.query,
-                    variables: item.body.variables,
                     text: item.body.text
                 }
             }
@@ -814,8 +805,14 @@ export async function convertCurlCommandToRestfoxCollection(curlCommand: string,
 
     if('body' in insomniaExport[0]) {
         if('text' in insomniaExport[0].body) {
-            // for some reason we get \\n instead of \n in the text field
-            insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+            if (insomniaExport[0].body.mimeType !== constants.MIME_TYPE.GRAPHQL) {
+                // for some reason we get \\n instead of \n in the text field
+                insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+            } else {
+                const parsedBody = JSON.parse(insomniaExport[0].body.text)
+                parsedBody.query = parsedBody.query.replaceAll('\\n', '\n')
+                insomniaExport[0].body.text = JSON.stringify(parsedBody)
+            }
         }
     }
     return convertInsomniaExportToRestfoxCollection({ resources: insomniaExport }, workspaceId)
