@@ -75,7 +75,7 @@ function getExtensions(vueInstance) {
         ...singleLineEnforcers,
         ...multiLineEnforcers,
         keymap.of([
-            ...defaultKeymap,
+            ...defaultKeymap.filter(key => vueInstance.allowMultipleLines || key.key !== 'Enter'),
             ...historyKeymap
         ]),
         placeholder(vueInstance.placeholder),
