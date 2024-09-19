@@ -1,3 +1,5 @@
+// @vitest-environment edge-runtime
+
 import { test, expect } from 'vitest'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'

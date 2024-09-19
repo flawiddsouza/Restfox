@@ -20,7 +20,7 @@ function newTextToNewJsonPathParams(newText: string, pathParameters: RequestPara
             const param = splitAtFirstMatch(part, ':')
 
             if(param[1] === undefined || param[1] === '') {
-                const extractedParams = /(?<!{){([^{}]+)}(?!})/.exec(param[0]) ?? ''
+                const extractedParams = /(?<!{){(?=[^%])([^{}]+)(?<!%)}(?!})/.exec(param[0]) ?? ''
                 if(extractedParams) {
                     param[1] = extractedParams[1]
                     paramType = 'openapi'

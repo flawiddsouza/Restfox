@@ -1,3 +1,5 @@
+// @vitest-environment edge-runtime
+
 import { assert, test, describe } from 'vitest'
 import {
     substituteEnvironmentVariables,
@@ -32,7 +34,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
     const extremelyMessyKey = 'extremelyMESSY-K_E_Y ~!@#$%^&*()_+12 34567980{{} :>}notReplaced::{{  num }}::notReplaced"?<, . shouldReplaceThisInFuture::{{  num   }}::replaced /;\'[ ]'
     env[ extremelyMessyKey ] = 'Very messy key :)'
 
-    test('Positive Case', () => {
+    test('Positive Case', async() => {
         const input = `{
             "i": {{i}},
             "_i": {{ i }},
@@ -113,11 +115,11 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
             "messyKey": "${env[extremelyMessyKey]}",
         }`
-        assert.equal(substituteEnvironmentVariables(env, input), expectedOutput)
+        assert.equal(await substituteEnvironmentVariables(env, input), expectedOutput)
 
     })
 
-    test('Negative Case', () => {
+    test('Negative Case', async() => {
         const input = `{
             "": "",
             "{": "}",
@@ -212,12 +214,12 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "str": {{ s t r }},
         }`
 
-        assert.equal(substituteEnvironmentVariables(env, input), input)
-        assert.equal(substituteEnvironmentVariables(env, extraForRegExSpecific), extraForRegExSpecific)
+        assert.equal(await substituteEnvironmentVariables(env, input), input)
+        assert.equal(await substituteEnvironmentVariables(env, extraForRegExSpecific), extraForRegExSpecific)
 
     })
 
-    test('Insomnia support', () => {
+    test('Insomnia support', async() => {
         const input = `{
             "num": {{_.num}},
             "_num": {{ _.num }},
@@ -258,10 +260,10 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
             "messyKey": "${env[extremelyMessyKey]}",
         }`
-        assert.equal(substituteEnvironmentVariables(env, input), expectedOutput)
+        assert.equal(await substituteEnvironmentVariables(env, input), expectedOutput)
     })
 
-    test('Insomnia support will not be used if "_" is present as a key in "environment"', () => {
+    test('Insomnia support will not be used if "_" is present as a key in "environment"', async() => {
         env._ = { someKey: '"_" will be used treated as the key, if its present in the env' }
 
         const input = `{
@@ -286,7 +288,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "_.someKey": {{ _.someKey  }},
             "_.someKey": {{  _.someKey  }},
         }`
-        assert.equal(substituteEnvironmentVariables(env, input), expectedOutput)
+        assert.equal(await substituteEnvironmentVariables(env, input), expectedOutput)
     })
 })
 

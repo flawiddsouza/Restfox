@@ -24,6 +24,7 @@ import {
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
 import constants from '@/constants'
+import { handleTags } from '@/utils/tag'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -68,7 +69,13 @@ export function flattenTree(array: CollectionItem[]) {
     return level
 }
 
-export function substituteEnvironmentVariables(environment: any, string: string) {
+export async function substituteEnvironmentVariables(
+    environment: any,
+    string: string,
+    options: { tagTrigger?: boolean, cacheId?: string, noError?: boolean } = {}
+) {
+    const { tagTrigger = true, cacheId = undefined, noError = false } = options
+
     let substitutedString = String(string)
 
     const possibleEnvironmentObjectPaths = getObjectPaths(environment)
@@ -93,6 +100,8 @@ export function substituteEnvironmentVariables(environment: any, string: string)
         substitutedString = substitutedString.replaceAll(`{{${objectPath}}}`, objectPathValue)
         substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
+
+    substitutedString = await handleTags(substitutedString, tagTrigger, cacheId, noError)
 
     return substitutedString
 }
@@ -310,8 +319,10 @@ export async function createRequestData(
     plugins: Plugin[],
     workspaceLocation: string | null
 ): Promise<CreateRequestDataReturn> {
+    const cacheId = nanoid()
+
     for(const plugin of plugins) {
-        const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
+        const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults)
 
         state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : `${plugin.name} (Pre Request)`
 
@@ -331,14 +342,15 @@ export async function createRequestData(
 
     let body: any = null
 
-    if(request.body && request.body.mimeType === 'application/x-www-form-urlencoded') {
-        if('params' in request.body && request.body.params) {
-            const formParams = request.body.params.filter(item => !item.disabled).reduce((acc, item) => {
-                const name = substituteEnvironmentVariables(environment, item.name)
-                const value = substituteEnvironmentVariables(environment, item.value)
-                acc.append(name, value)
-                return acc
-            }, new URLSearchParams())
+    if (request.body && request.body.mimeType === 'application/x-www-form-urlencoded') {
+        if ('params' in request.body && request.body.params) {
+            const formParams = new URLSearchParams()
+
+            for (const item of request.body.params.filter(item => !item.disabled)) {
+                const name = await substituteEnvironmentVariables(environment, item.name, { cacheId })
+                const value = await substituteEnvironmentVariables(environment, item.value, { cacheId })
+                formParams.append(name, value)
+            }
 
             body = formParams.toString()
         }
@@ -348,21 +360,29 @@ export async function createRequestData(
         if(request.body.mimeType === 'multipart/form-data') {
             if('params' in request.body) {
                 const formData = new FormData()
-                request.body.params?.filter(item => !item.disabled).forEach(param => {
-                    if(param.type === 'text') {
-                        formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
-                    } else if (param.files) {
-                        for(const file of param.files) {
-                            formData.append(substituteEnvironmentVariables(environment, param.name), file as File)
+                if (request.body.params) {
+                    for (const param of request.body.params.filter(item => !item.disabled)) {
+                        if (param.type === 'text') {
+                            formData.append(
+                                await substituteEnvironmentVariables(environment, param.name, { cacheId }),
+                                await substituteEnvironmentVariables(environment, param.value, { cacheId })
+                            )
+                        } else if (param.files) {
+                            for (const file of param.files) {
+                                formData.append(
+                                    await substituteEnvironmentVariables(environment, param.name, { cacheId }),
+                                    file as File
+                                )
+                            }
                         }
                     }
-                })
+                }
                 body = formData
             }
         }
 
         if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
-            body = substituteEnvironmentVariables(environment, request.body.text ?? '')
+            body = await substituteEnvironmentVariables(environment, request.body.text ?? '', { cacheId })
         }
 
         if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
@@ -370,16 +390,17 @@ export async function createRequestData(
         }
     }
 
-    let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url!)
+    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, request.url!, { cacheId })
 
     if(request.pathParameters) {
-        request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
-            urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
-                `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
-            ).replaceAll(
-                `{${substituteEnvironmentVariables(environment, pathParameter.name)}}`, substituteEnvironmentVariables(environment, pathParameter.value)
-            )
-        })
+        for (const pathParameter of request.pathParameters.filter(item => !item.disabled)) {
+            const paramName = await substituteEnvironmentVariables(environment, pathParameter.name, { cacheId })
+            const paramValue = await substituteEnvironmentVariables(environment, pathParameter.value, { cacheId })
+
+            urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted
+                .replaceAll(`:${paramName}`, paramValue)
+                .replaceAll(`{${paramName}}`, paramValue)
+        }
     }
 
     const url = new URL(urlWithEnvironmentVariablesSubstituted)
@@ -387,22 +408,22 @@ export async function createRequestData(
     if('parameters' in request && request.parameters) {
         url.search = ''
 
-        request.parameters.filter(item => !item.disabled).forEach(param => {
-            const paramName = substituteEnvironmentVariables(environment, param.name)
-            const paramValue = substituteEnvironmentVariables(environment, param.value)
+        for (const param of request.parameters.filter(item => !item.disabled)) {
+            const paramName = await substituteEnvironmentVariables(environment, param.name, { cacheId })
+            const paramValue = await substituteEnvironmentVariables(environment, param.value, { cacheId })
 
             url.searchParams.append(
                 paramName,
                 decodeURIComponent(paramValue)
             )
-        })
+        }
     }
 
     const headers: Record<string, string | any> = {}
 
-    Object.keys(parentHeaders).forEach(header => {
-        headers[substituteEnvironmentVariables(environment, header.toLowerCase())] = substituteEnvironmentVariables(environment, parentHeaders[header])
-    })
+    for (const header of Object.keys(parentHeaders)) {
+        headers[await substituteEnvironmentVariables(environment, header.toLowerCase(), { cacheId })] = await substituteEnvironmentVariables(environment, parentHeaders[header], { cacheId })
+    }
 
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
@@ -413,8 +434,8 @@ export async function createRequestData(
     if('headers' in request && request.headers !== undefined) {
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
-            const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
-            const headerValue = substituteEnvironmentVariables(environment, header.value)
+            const headerName = await substituteEnvironmentVariables(environment, header.name.toLowerCase(), { cacheId })
+            const headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
 
             if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
                 continue
@@ -426,16 +447,16 @@ export async function createRequestData(
         }
     }
 
-    const setAuthentication = (authentication: RequestAuthentication) => {
-        headers['Authorization'] = resolveAuthentication(authentication, environment)
+    const setAuthentication = async(authentication: RequestAuthentication) => {
+        headers['Authorization'] = await resolveAuthentication(cacheId, authentication, environment)
     }
 
     if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
-        setAuthentication(request.authentication)
+        await setAuthentication(request.authentication)
     }
 
     if(parentAuthentication && parentAuthentication.type !== 'No Auth' && !parentAuthentication.disabled && (request.authentication === undefined || request.authentication.type === 'No Auth')) {
-        setAuthentication(parentAuthentication)
+        await setAuthentication(parentAuthentication)
     }
 
     return {
@@ -581,6 +602,10 @@ export async function handleRequest(
 
             if(e.message === 'Unable to parse plugin') {
                 error = `Error in Plugin "${state.currentPlugin}"${e.lineNumber !== '' ? ' at line number ' + e.lineNumber : ''}\n\n${e.originalError.name}: ${e.originalError.message}`
+            }
+
+            if(e.cause === 'display-error') {
+                error = `Error: ${e.message}`
             }
         }
 
@@ -1361,11 +1386,6 @@ export function getStatusText(statusCode: number): string {
     return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
 }
 
-export function bufferToString(buffer: BufferSource) {
-    const textDecoder = new TextDecoder('utf-8')
-    return textDecoder.decode(buffer)
-}
-
 export function timeAgo(timestamp: number) {
     const now: any = new Date()
     const date: any = new Date(timestamp)
@@ -1464,18 +1484,18 @@ export async function initStoragePersistence() {
     }
 }
 
-export function resolveAuthentication(authentication: RequestAuthentication, environment: any) {
+export async function resolveAuthentication(cacheId: string, authentication: RequestAuthentication, environment: any) {
     if(authentication.type === 'basic') {
         return generateBasicAuthString(
-            substituteEnvironmentVariables(environment, authentication.username ?? ''),
-            substituteEnvironmentVariables(environment, authentication.password ?? '')
+            await substituteEnvironmentVariables(environment, authentication.username ?? '', { cacheId }),
+            await substituteEnvironmentVariables(environment, authentication.password ?? '', { cacheId })
         )
     }
 
     if(authentication.type === 'bearer') {
         const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
         const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
-        return `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
+        return `${await substituteEnvironmentVariables(environment, authenticationBearerPrefix, { cacheId })} ${await substituteEnvironmentVariables(environment, authenticationBearerToken, { cacheId })}`
     }
 }
 

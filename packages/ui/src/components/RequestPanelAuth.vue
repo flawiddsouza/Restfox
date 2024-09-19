@@ -29,6 +29,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.username"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'basic-auth-username'"
@@ -45,6 +47,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.password"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'basic-auth-password'"
@@ -63,6 +67,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.token"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'bearer-auth-token'"
@@ -79,6 +85,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.prefix"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'bearer-auth-prefix'"
@@ -99,10 +107,11 @@
 </template>
 
 <script setup lang="ts">
-import { PropType, ref } from 'vue'
+import { computed, PropType, ref } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
+import constants from '@/constants'
 
 const props = defineProps({
     collectionItem: {
@@ -114,6 +123,8 @@ const props = defineProps({
         required: true
     }
 })
+
+const emit = defineEmits(['tagClick'])
 
 const requestAuthList = ref([
     {
@@ -152,6 +163,10 @@ const showRequestAuthMenu = ref(false)
 const requestAuthMenuX = ref<number | null>(null)
 const requestAuthMenuY = ref<number | null>(null)
 
+const tagAutocompletions = computed(() => {
+    return constants.AUTOCOMPLETIONS.TAGS
+})
+
 function handleRequestAuthMenu(event: any) {
     const containerElement = event.target.closest('.custom-select')
     requestAuthMenuX.value = containerElement.getBoundingClientRect().left
@@ -171,6 +186,10 @@ function toggleAuthEnabled(event: Event) {
     if (props.collectionItem && props.collectionItem.authentication) {
         props.collectionItem.authentication.disabled = !target.checked
     }
+}
+
+function onTagClick(...args: any) {
+    emit('tagClick', ...args)
 }
 </script>
 

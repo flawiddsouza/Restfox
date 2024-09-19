@@ -11,7 +11,8 @@ declare global {
 
     interface ImportMeta {
         env: {
-            MODE: string
+            MODE: string,
+            PROD: boolean,
         }
     }
 }

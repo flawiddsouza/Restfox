@@ -22,6 +22,8 @@
                     @update:modelValue="handleUrlChange"
                     :paste-handler="handleAddressBarPaste"
                     :env-variables="collectionItemEnvironmentResolved"
+                    :autocompletions="tagAutocompletions"
+                    @tagClick="onTagClick"
                     data-testid="request-panel-address-bar"
                 />
             </div>
@@ -72,6 +74,8 @@
                                     v-model="param.name"
                                     placeholder="name"
                                     :env-variables="collectionItemEnvironmentResolved"
+                                    :autocompletions="tagAutocompletions"
+                                    @tagClick="onTagClick"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-name-' + index"
@@ -82,6 +86,8 @@
                                     v-model="param.value"
                                     placeholder="value"
                                     :env-variables="collectionItemEnvironmentResolved"
+                                    :autocompletions="tagAutocompletions"
+                                    @tagClick="onTagClick"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-value-' + index"
@@ -109,6 +115,8 @@
                                     v-model="param.name"
                                     placeholder="name"
                                     :env-variables="collectionItemEnvironmentResolved"
+                                    :autocompletions="tagAutocompletions"
+                                    @tagClick="onTagClick"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-name-' + index"
@@ -121,6 +129,8 @@
                                             v-model="param.value"
                                             placeholder="value"
                                             :env-variables="collectionItemEnvironmentResolved"
+                                            :autocompletions="tagAutocompletions"
+                                            @tagClick="onTagClick"
                                             :input-text-compatible="true"
                                             :disabled="param.disabled"
                                             :key="'body-param-value-' + index"
@@ -165,6 +175,8 @@
                         v-model="activeTab.body.text"
                         lang="text"
                         :env-variables="collectionItemEnvironmentResolved"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         class="code-editor"
                         :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                     ></CodeMirrorEditor>
@@ -174,6 +186,8 @@
                         v-model="activeTab.body.text"
                         lang="json"
                         :env-variables="collectionItemEnvironmentResolved"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         class="code-editor"
                         :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                         ref="jsonEditor"
@@ -188,6 +202,8 @@
                             v-model="graphql.query"
                             lang="graphql"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             class="code-editor"
                             :key="'code-mirror-editor1-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                             ref="graphqlEditor"
@@ -200,6 +216,8 @@
                                 v-model="graphql.variables"
                                 lang="json"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 class="code-editor"
                                 :key="'code-mirror-editor2-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                                 ref="jsonEditor"
@@ -245,6 +263,8 @@
                                 v-model="param.name"
                                 placeholder="name"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-name-' + index"
@@ -256,6 +276,8 @@
                                 v-model="param.value"
                                 placeholder="value"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-value-' + index"
@@ -288,6 +310,8 @@
                                 v-model="param.name"
                                 placeholder="name"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'path-param-name-' + index"
@@ -298,6 +322,8 @@
                                 v-model="param.value"
                                 placeholder="value"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'path-param-value-' + index"
@@ -324,10 +350,18 @@
                 </div>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
-                <RequestPanelHeaders :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelHeaders>
+                <RequestPanelHeaders
+                    :collection-item="activeTab"
+                    :collection-item-environment-resolved="collectionItemEnvironmentResolved"
+                    @tagClick="onTagClick"
+                />
             </template>
             <template v-if="activeRequestPanelTab === 'Auth'">
-                <RequestPanelAuth :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelAuth>
+                <RequestPanelAuth
+                    :collection-item="activeTab"
+                    :collection-item-environment-resolved="collectionItemEnvironmentResolved"
+                    @tagClick="onTagClick"
+                />
             </template>
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
@@ -392,9 +426,16 @@
         @customHttpMethod="handleCustomHttpMethod"
     />
     <GenerateCodeModal v-model:showModal="generateCodeModalShow" :collection-item="generateCodeModalCollectionItem" />
+    <EditTagModal
+        v-if="editTagModalShow"
+        v-model:showModal="editTagModalShow"
+        :parsed-func="editTagParsedFunc"
+        :update-func="editTagUpdateFunc"
+        :active-tab="activeTab"
+    />
 </template>
 
-<script>
+<script lang="ts">
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
@@ -418,6 +459,7 @@ import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
+import EditTagModal from '@/components/modals/EditTagModal.vue'
 import { formatSdl } from 'format-graphql'
 
 const renderer = new marked.Renderer()
@@ -443,7 +485,8 @@ export default {
         ReferencesButton,
         HttpMethodModal,
         SnippetDropdown,
-        GraphQLSchemaFetcher
+        GraphQLSchemaFetcher,
+        EditTagModal,
     },
     props: {
         activeTab: Object,
@@ -591,6 +634,10 @@ export default {
             generateCodeModalShow: false,
             intervalRequestSending: null,
             delayRequestSending: null,
+            editTagModalShow: false,
+            editTagParsedFunc: null,
+            editTagUpdateFunc: null,
+            urlPreview: '',
         }
     },
     computed: {
@@ -619,22 +666,8 @@ export default {
                 ...constants.AUTOCOMPLETIONS.PLUGIN.RESPONSE_METHODS
             ]
         },
-        urlPreview() {
-            let url = this.activeTab.url ?? ''
-
-            url = substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url)
-
-            if(this.activeTab.pathParameters) {
-                this.activeTab.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
-                    url = url.replaceAll(
-                        `:${substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name)}`, substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value)
-                    ).replaceAll(
-                        `{${substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name)}}`, substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value)
-                    )
-                })
-            }
-
-            return url !== '' && url.trim() !== '' ? url : 'No URL'
+        tagAutocompletions() {
+            return constants.AUTOCOMPLETIONS.TAGS
         },
     },
     watch: {
@@ -657,6 +690,15 @@ export default {
                 return
             }
             this.loadGraphql()
+        },
+        'activeTab.url'() {
+            this.getUrlPreview()
+        },
+        'activeTab.pathParameters': {
+            handler() {
+                this.getUrlPreview()
+            },
+            deep: true
         },
         graphql: {
             handler() {
@@ -1059,7 +1101,29 @@ export default {
                     icon: 'fa fa-refresh'
                 },
             ]
-        }
+        },
+        onTagClick(parsedFunc, updateFunc) {
+            this.editTagParsedFunc = parsedFunc
+            this.editTagUpdateFunc = updateFunc
+            this.editTagModalShow = true
+        },
+        async getUrlPreview() {
+            let url = this.activeTab.url ?? ''
+
+            url = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url, { tagTrigger: false, noError: true })
+
+            if (this.activeTab.pathParameters) {
+                for (const pathParameter of this.activeTab.pathParameters.filter(item => !item.disabled)) {
+                    const paramName = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name, { tagTrigger: false, noError: true })
+                    const paramValue = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value, { tagTrigger: false, noError: true })
+
+                    url = url.replaceAll(`:${paramName}`, paramValue)
+                        .replaceAll(`{${paramName}}`, paramValue)
+                }
+            }
+
+            this.urlPreview = url !== '' && url.trim() !== '' ? url : 'No URL'
+        },
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
@@ -1067,6 +1131,8 @@ export default {
         this.attachRootElementResizeObserver()
 
         this.loadGraphql()
+
+        this.getUrlPreview()
     },
     beforeUnmount() {
         emitter.off('response_panel', this.handleResponsePanelEmitter)

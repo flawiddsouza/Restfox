@@ -5,16 +5,18 @@
 <script lang="ts">
 import { EditorView, highlightActiveLine, keymap, highlightSpecialChars, lineNumbers, highlightActiveLineGutter, drawSelection } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
-import { json } from '@codemirror/lang-json'
+import { json, jsonLanguage } from '@codemirror/lang-json'
 import { javascript, javascriptLanguage } from '@codemirror/lang-javascript'
-import { graphql } from 'cm6-graphql'
+import { graphql, graphqlLanguage } from 'cm6-graphql'
 import { closeBrackets, completeFromList, autocompletion } from '@codemirror/autocomplete'
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selectLineBoundaryForward } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
+import { tags } from '@/codemirror-extensions/tags'
 import { codeMirrorStyleOverrides } from '@/utils/code-mirror-style-overrides'
+import type { ParsedResult } from '@/parsers/tag'
 
 /**
  * "Mod-Enter" is "Ctrl-Enter" inside codemirror
@@ -42,6 +44,7 @@ function getLanguageFuncAndHighlightStyle(language) {
 
     if(language === 'json') {
         languageFunc = json()
+        languageData = jsonLanguage
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
@@ -53,6 +56,7 @@ function getLanguageFuncAndHighlightStyle(language) {
 
     if(language === 'graphql') {
         languageFunc = graphql()
+        languageData = graphqlLanguage
         highlightStyle = codeMirrorSyntaxHighlighting()
     }
 
@@ -74,10 +78,24 @@ function getExtensions(vueInstance, language) {
         }) : null,
     ].filter(Boolean)
 
+    let autocompletionExtension = autocompletion()
+
+    if(languageData === null && vueInstance.autocompletions.length > 0) {
+        autocompletionExtension = autocompletion({
+            override: [
+                completeFromList(vueInstance.autocompletions)
+            ]
+        })
+    }
+
+    const tagClickHandler = (parsedFunc: ParsedResult, updateFunc: (updatedTag: string) => void) => {
+        vueInstance.$emit('tag-click', parsedFunc, updateFunc)
+    }
+
     return [
         ...languageArray,
         ...autocompletionsArray,
-        autocompletion(),
+        autocompletionExtension,
         syntaxHighlighting(highlightStyle, { fallback: true }),
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -108,6 +126,7 @@ function getExtensions(vueInstance, language) {
         ]),
         vueInstance.readonly ? EditorState.readOnly.of(true) : EditorState.readOnly.of(false),
         envVarDecoration(vueInstance.envVariables),
+        tags(tagClickHandler),
     ]
 }
 

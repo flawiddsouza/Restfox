@@ -38,6 +38,8 @@
                         v-model="header.name"
                         placeholder="name"
                         :env-variables="collectionItemEnvironmentResolved"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         :input-text-compatible="true"
                         :disabled="header.disabled"
                         :key="'header-name-' + index"
@@ -48,6 +50,8 @@
                         v-model="header.value"
                         placeholder="value"
                         :env-variables="collectionItemEnvironmentResolved"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         :input-text-compatible="true"
                         :disabled="header.disabled"
                         :key="'header-value-' + index"
@@ -74,10 +78,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { PropType } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
+import constants from '@/constants'
 
 const props = defineProps({
     collectionItem: {
@@ -90,11 +95,17 @@ const props = defineProps({
     }
 })
 
+const emit = defineEmits(['tagClick'])
+
 const isBulkEditMode = ref(false)
 const bulkEditText = ref('')
 const isConfirmingDelete = ref(false)
 // eslint-disable-next-line no-undef
 let confirmationTimeout: NodeJS.Timeout | null = null
+
+const tagAutocompletions = computed(() => {
+    return constants.AUTOCOMPLETIONS.TAGS
+})
 
 const toggleBulkEdit = () => {
     isBulkEditMode.value = !isBulkEditMode.value
@@ -156,6 +167,10 @@ function pushItem(object: any, key: string, itemToPush: any) {
         object[key] = []
     }
     object[key].push(itemToPush)
+}
+
+function onTagClick(...args: any) {
+    emit('tagClick', ...args)
 }
 </script>
 

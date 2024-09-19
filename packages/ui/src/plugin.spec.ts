@@ -3,8 +3,9 @@
 import { test, expect } from 'vitest'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import { CollectionItem, RequestFinalResponse, RequestParam } from './global'
+import { nanoid } from 'nanoid'
 
-function createExpose({ parameters = [] }: { parameters?: RequestParam[] } = {}) {
+async function createExpose({ parameters = [] }: { parameters?: RequestParam[] } = {}) {
     const request: CollectionItem = {
         _id: 'test',
         _type: 'request',
@@ -21,7 +22,9 @@ function createExpose({ parameters = [] }: { parameters?: RequestParam[] } = {})
         testResults: []
     }
 
-    const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
+    const cacheId = nanoid()
+
+    const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults)
 
     return { expose, environment }
 }
@@ -57,7 +60,7 @@ function createResponseExpose(responseBuffer: ArrayBuffer) {
 }
 
 test('import crypto-js from esm.sh', async() => {
-    const { expose, environment } = createExpose()
+    const { expose, environment } = await createExpose()
 
     await usePlugin(expose, {
         name: 'Test Plugin',
@@ -82,7 +85,7 @@ test('import crypto-js from esm.sh', async() => {
 })
 
 test('import pako from unpkg.com', async() => {
-    const { expose, environment } = createExpose()
+    const { expose, environment } = await createExpose()
 
     const code = JSON.parse(JSON.stringify(`
         import pako from 'https://unpkg.com/pako@2.1.0/dist/pako.esm.mjs?module'
@@ -105,7 +108,7 @@ test('import pako from unpkg.com', async() => {
 test('Setting query params over existing query params', async() => {
     {
         const parameters: RequestParam[] = [{ name: 'testKey', value: 'testValue' }]
-        const { expose, environment } = createExpose({ parameters })
+        const { expose, environment } = await createExpose({ parameters })
 
         await usePlugin(expose, {
             name: 'Query Params Plugin',
@@ -127,7 +130,7 @@ test('Setting query params over existing query params', async() => {
     // tests for the case mentioned at https://github.com/flawiddsouza/Restfox/issues/110#issue-2218114329, now working:
     {
         const parameters: RequestParam[] = [{ name: 'testKey', value: 'testValue' }]
-        const { expose, environment } = createExpose({ parameters })
+        const { expose, environment } = await createExpose({ parameters })
 
         await usePlugin(expose, {
             name: 'Query Params Plugin',

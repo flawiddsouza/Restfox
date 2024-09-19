@@ -403,7 +403,9 @@ input:disabled {
     border: 1px solid var(--input-disabled-border-color);
 }
 
-input.full-width-input, select.full-width-input {
+input.full-width-input,
+select.full-width-input,
+textarea.full-width-input {
     width: 100%;
     border: 1px solid var(--input-border-color);
     border-radius: var(--default-border-radius);
@@ -415,6 +417,11 @@ input.full-width-input, select.full-width-input {
 input.full-width-input {
     padding: 0.5rem;
     background: var(--modal-background-color);
+}
+
+textarea.full-width-input {
+   resize: vertical;
+   min-height: 4rem;
 }
 
 .code-block {
@@ -552,6 +559,18 @@ button.button:hover, input[type="file"]::file-selector-button:hover {
 
 .cm-editor .invalid-env-var * {
     color: var(--invalid-env-highlight-color) !important;
+}
+
+.cm-editor .tag {
+    border-radius: 3px;
+    padding: 2px 4px;
+    background-color: #dae1ff;
+    color: black;
+    cursor: pointer;
+}
+
+.cm-editor .tag:hover {
+    background-color: #c4d1ff;
 }
 
 .cm-editor :not(.cm-focused) .cm-selectionBackground,

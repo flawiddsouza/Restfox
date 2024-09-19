@@ -227,7 +227,15 @@ export default {
                     info: 'Returns the response body as a parsed JSON object'
                 }
             ],
-        }
+        },
+        TAGS: [
+            {
+                label: 'response()',
+                type: 'function',
+                info: 'Response Tag',
+                apply: snippet('{% response() %}')
+            }
+        ],
     },
     MIME_TYPE: {
         FORM_URL_ENCODED: 'application/x-www-form-urlencoded',

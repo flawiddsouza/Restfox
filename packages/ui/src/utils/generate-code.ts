@@ -39,27 +39,29 @@ export async function generateCode(
         }
 
         if(har.postData.mimeType === 'application/x-www-form-urlencoded') {
-            har.postData.params = har.postData.params?.map((item: RequestParam) => {
+            const params = har.postData.params?.map(async(item: RequestParam) => {
                 return {
-                    name: substituteEnvironmentVariables(environment, item.name),
-                    value: substituteEnvironmentVariables(environment, item.value)
+                    name: await substituteEnvironmentVariables(environment, item.name),
+                    value: await substituteEnvironmentVariables(environment, item.value)
                 }
             })
+
+            har.postData.params = params ? await Promise.all(params) : []
         }
 
         if(har.postData.mimeType === 'multipart/form-data') {
-            har.postData.params?.forEach(param => {
+            for(const param of har.postData.params?.filter((param: RequestParam) => !param.disabled) ?? []) {
                 if(param.type === 'text') {
-                    param.name = substituteEnvironmentVariables(environment, param.name)
-                    param.value = substituteEnvironmentVariables(environment, param.value)
+                    param.name = await substituteEnvironmentVariables(environment, param.name)
+                    param.value = await substituteEnvironmentVariables(environment, param.value)
                 } else {
-                    param.name = substituteEnvironmentVariables(environment, param.name)
+                    param.name = await substituteEnvironmentVariables(environment, param.name)
                 }
-            })
+            }
         }
 
         if(har.postData.mimeType === 'text/plain' || har.postData.mimeType === 'application/json' || har.postData.mimeType === 'application/graphql') {
-            har.postData.text = substituteEnvironmentVariables(environment, har.postData.text ?? '')
+            har.postData.text = await substituteEnvironmentVariables(environment, har.postData.text ?? '')
         }
     }
 
