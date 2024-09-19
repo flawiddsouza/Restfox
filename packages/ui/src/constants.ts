@@ -232,7 +232,6 @@ export default {
             {
                 label: 'response()',
                 type: 'function',
-                info: 'Response Tag',
                 apply: snippet('{% response() %}')
             }
         ],
