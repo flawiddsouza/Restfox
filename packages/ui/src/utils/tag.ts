@@ -90,7 +90,13 @@ async function handleResponseTag(parsedTag: tagParser.ParsedResult, tagTrigger: 
             const contentType = getResponseContentType(response)
 
             if (contentType.startsWith('application/json')) {
-                returnValue = filterJSONResponse(response.buffer, parsedTag.parameters.path as string, true)
+                let jsonPath = parsedTag.parameters.path as string
+
+                if (jsonPath === '') {
+                    jsonPath = '$'
+                }
+
+                returnValue = filterJSONResponse(response.buffer, jsonPath, true)
 
                 if (returnValue.length === 1) {
                     returnValue = returnValue[0]
