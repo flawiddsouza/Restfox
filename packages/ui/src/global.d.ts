@@ -47,7 +47,7 @@ export interface RequestAuthentication {
     username?: string
     password?: string
     disabled?: boolean
-    tokenUrl?: string
+    accessTokenUrl?: string
     scope?: string
     clientId?: string
     clientSecret?: string

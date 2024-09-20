@@ -1776,8 +1776,27 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
             const password = request.auth.basic.find((item: any) => item.key === 'password')?.value || ''
             authentication = {
                 type: 'basic',
-                username: username,
-                password: password
+                username,
+                password
+            };
+        } else if (request.auth.type === 'oauth2' && request.auth.oauth2) {
+            const grantType = request.auth.oauth2.find((item: any) => item.key === 'grant_type')?.value || ''
+            const username = request.auth.oauth2.find((item: any) => item.key === 'username')?.value || ''
+            const password = request.auth.oauth2.find((item: any) => item.key === 'password')?.value || ''
+            const clientId = request.auth.oauth2.find((item: any) => item.key === 'clientId')?.value || ''
+            const clientSecret = request.auth.oauth2.find((item: any) => item.key === 'clientSecret')?.value || ''
+            const accessTokenUrl = request.auth.oauth2.find((item: any) => item.key === 'accessTokenUrl')?.value || ''
+            const scope = request.auth.oauth2.find((item: any) => item.key === 'scope')?.value || ''
+
+            authentication = {
+                type: 'oauth2',
+                grantType,
+                username,
+                password,
+                clientId,
+                clientSecret,
+                accessTokenUrl,
+                scope
             }
         }
     }

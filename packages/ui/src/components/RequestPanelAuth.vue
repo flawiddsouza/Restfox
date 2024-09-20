@@ -131,12 +131,12 @@
                 <tr>
                     <td class="user-select-none">
                         <label for="oauth-token-url" :class="{ disabled: collectionItem.authentication.disabled }">
-                            Token URL
+                            Access Token URL
                         </label>
                     </td>
                     <td class="full-width">
                         <CodeMirrorSingleLine
-                            v-model="collectionItem.authentication.tokenUrl"
+                            v-model="collectionItem.authentication.accessTokenUrl"
                             :env-variables="collectionItemEnvironmentResolved"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
@@ -267,7 +267,7 @@ import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
-import { fetchWrapper } from '@/helpers'
+import { fetchWrapper, substituteEnvironmentVariables } from '@/helpers'
 import { useToast } from 'vue-toast-notification'
 
 const toast = useToast()
@@ -397,15 +397,15 @@ async function requestOAuthToken() {
     const env = props.collectionItemEnvironmentResolved
 
     if (auth) {
-        const clientId: string = resolveEnvValue(auth.clientId, env.clientId)
-        const clientSecret: string = resolveEnvValue(auth.clientSecret, env.clientSecret)
-        const tokenUrl: any = resolveEnvValue(auth.tokenUrl, env.tokenUrl)
-        const scope: string = resolveEnvValue(auth.scope, env.scope)
-        const username: string = resolveEnvValue(auth.username, env.username)
-        const password: string = resolveEnvValue(auth.password, env.password)
+        const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
+        const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret)
+        const accessTokenUrl: any = await substituteEnvironmentVariables(env, auth.accessTokenUrl)
+        const scope: string = await substituteEnvironmentVariables(env, auth.scope)
+        const username: string = await substituteEnvironmentVariables(env, auth.username)
+        const password: string = await substituteEnvironmentVariables(env, auth.password)
         const grantType: string | any = auth.grantType
 
-        oath2Precheck(clientId, clientSecret, tokenUrl)
+        oath2Precheck(clientId, clientSecret, accessTokenUrl)
 
         const bodyData = new URLSearchParams({
             grant_type: grantType,
@@ -420,7 +420,7 @@ async function requestOAuthToken() {
         }
 
         try {
-            const response = await fetchWrapper(tokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED }, bodyData)
+            const response = await fetchWrapper(accessTokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED, 'Access-Control-Allow-Origin': '*' }, bodyData)
 
             if(response.status !== 200) {
                 couldNotFetchTokenError(response)
@@ -446,12 +446,12 @@ async function refreshOAuthToken() {
 
     if(auth) {
         if(props.collectionItem && props.collectionItem.authentication) {
-            const clientId: string = resolveEnvValue(auth.clientId, env.clientId)
-            const clientSecret: string = resolveEnvValue(auth.clientSecret, env.clientSecret)
-            const tokenUrl: any = resolveEnvValue(auth.tokenUrl, env.tokenUrl)
+            const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
+            const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret)
+            const accessTokenUrl: any = await substituteEnvironmentVariables(env, auth.accessTokenUrl)
             const refreshToken: string | any = props.collectionItem.authentication.refreshToken
 
-            oath2Precheck(clientId, clientSecret, tokenUrl)
+            oath2Precheck(clientId, clientSecret, accessTokenUrl)
 
             const bodyData = new URLSearchParams({
                 grant_type: constants.GRANT_TYPES.refresh_token,
@@ -461,7 +461,7 @@ async function refreshOAuthToken() {
             })
 
             try {
-                const response = await fetchWrapper(tokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED }, bodyData)
+                const response = await fetchWrapper(accessTokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED }, bodyData)
 
                 if(response.status !== 200) {
                     couldNotFetchTokenError(response)
@@ -482,17 +482,13 @@ async function refreshOAuthToken() {
     }
 }
 
-function resolveEnvValue(value: any, fallback: any) {
-    return value?.includes('{{') ? fallback : value
-}
-
 function couldNotFetchTokenError(error: any) {
     console.error('Error fetching OAuth token:', error)
     toast.error('Error fetching OAuth token. Please check the console for more details.')
 }
 
-function oath2Precheck(clientId: string, clientSecret: string, tokenUrl: string) {
-    if (!clientId || !clientSecret || !tokenUrl) {
+function oath2Precheck(clientId: string, clientSecret: string, accessTokenUrl: string) {
+    if (!clientId || !clientSecret || !accessTokenUrl) {
         toast.error('Please provide all OAuth credentials.')
         return
     }
