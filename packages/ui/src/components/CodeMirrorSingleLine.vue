@@ -2,12 +2,14 @@
     <div class="code-mirror-single-line" :class="{ disabled }"></div>
 </template>
 
-<script>
-import { EditorView, keymap, placeholder } from '@codemirror/view'
+<script lang="ts">
+import { EditorView, keymap, placeholder, drawSelection } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
-import { history, historyKeymap } from '@codemirror/commands'
-import { autocompletion } from '@codemirror/autocomplete'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { autocompletion, completeFromList } from '@codemirror/autocomplete'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
+import { tags } from '@/codemirror-extensions/tags'
+import type { ParsedResult } from '@/parsers/tag'
 
 function getExtensions(vueInstance) {
     const singleLineEnforcers = []
@@ -50,6 +52,18 @@ function getExtensions(vueInstance) {
         ].forEach(enforcer => multiLineEnforcers.push(enforcer))
     }
 
+    let autocompletions: any[] = []
+
+    if(vueInstance.autocompletions.length > 0) {
+        autocompletions = [
+            completeFromList(vueInstance.autocompletions)
+        ]
+    }
+
+    const tagClickHandler = (parsedFunc: ParsedResult, updateFunc: (updatedTag: string) => void) => {
+        vueInstance.$emit('tag-click', parsedFunc, updateFunc)
+    }
+
     const extensions = [
         history(),
         EditorView.updateListener.of(v => {
@@ -61,12 +75,16 @@ function getExtensions(vueInstance) {
         ...singleLineEnforcers,
         ...multiLineEnforcers,
         keymap.of([
+            ...defaultKeymap.filter(key => vueInstance.allowMultipleLines || key.key !== 'Enter'),
             ...historyKeymap
         ]),
         placeholder(vueInstance.placeholder),
         envVarDecoration(vueInstance.envVariables),
+        tags(tagClickHandler),
+        drawSelection(),
         autocompletion({
             override: [
+                ...autocompletions,
                 context => {
                     let word = context.matchBefore(/\w*/)
                     if(!word) {
@@ -158,6 +176,10 @@ export default {
         disabled: {
             type: Boolean,
             default: false
+        },
+        autocompletions: {
+            type: Array,
+            default: () => []
         },
     },
     data() {

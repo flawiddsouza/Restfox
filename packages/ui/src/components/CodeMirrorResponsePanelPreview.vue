@@ -9,6 +9,7 @@ import { json } from '@codemirror/lang-json'
 import { foldGutter, syntaxHighlighting } from '@codemirror/language'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
+import { defaultKeymap } from '@codemirror/commands'
 import { codeMirrorStyleOverrides } from '@/utils/code-mirror-style-overrides'
 
 function createState(documentText, vueInstance) {
@@ -24,6 +25,7 @@ function createState(documentText, vueInstance) {
         EditorState.readOnly.of(true),
         codeMirrorStyleOverrides,
         keymap.of([
+            ...defaultKeymap,
             ...searchKeymap,
         ]),
         EditorView.updateListener.of(v => {

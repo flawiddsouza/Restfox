@@ -87,8 +87,8 @@ export default {
         }
     },
     methods: {
-        setActiveWorkspace(workspaceId) {
-            this.$store.commit('setActiveWorkspace', workspaceId)
+        setActiveWorkspace(workspace) {
+            this.$store.commit('setActiveWorkspace', workspace)
         },
         handleContextMenu(event, workspace) {
             this.contextMenuElement = event.target.closest('.workspace-settings-button')

@@ -6,10 +6,10 @@
                 <i class="fa fa-caret-down space-right"></i>
                 <ContextMenu
                     :options="methods"
-                    :element="methodSelectorElement"
-                    :x="methodSelectorContextMenuX"
-                    :y="methodSelectorContextMenuY"
-                    v-model:show="methodSelectorDropdownVisible"
+                    :element="methodSelectorDropdownState.element"
+                    :x="methodSelectorDropdownState.contextMenuX"
+                    :y="methodSelectorDropdownState.contextMenuY"
+                    v-model:show="methodSelectorDropdownState.visible"
                     @click="selectMethod"
                 />
             </div>
@@ -22,10 +22,28 @@
                     @update:modelValue="handleUrlChange"
                     :paste-handler="handleAddressBarPaste"
                     :env-variables="collectionItemEnvironmentResolved"
+                    :autocompletions="tagAutocompletions"
+                    @tagClick="onTagClick"
                     data-testid="request-panel-address-bar"
                 />
             </div>
-            <button @click="sendRequest" data-testid="request-panel-address-bar__send-button">Send</button>
+            <button v-if="!intervalRequestSending && !delayRequestSending" @click="sendRequest('send')" data-testid="request-panel-address-bar__send-button">Send</button>
+            <button v-if="intervalRequestSending || delayRequestSending" @click="sendRequest('cancel')" data-testid="request-panel-address-bar__cancel-button">Cancel</button>
+            <div
+                v-if="!intervalRequestSending && !delayRequestSending"
+                class="custom-dropdown send-options"
+                @click="toggleSendSelectorDropdown"
+            >
+                <i class="fa fa-caret-down space-right"></i>
+                <ContextMenu
+                    :options="sendOptions"
+                    :element="sendSelectorDropdownState.element"
+                    :x="sendSelectorDropdownState.contextMenuX"
+                    :y="sendSelectorDropdownState.contextMenuY"
+                    v-model:show="sendSelectorDropdownState.visible"
+                    @click="sendRequest"
+                />
+            </div>
         </div>
         <div class="request-panel-tabs" v-show="tabView === 'full'">
             <div class="request-panel-tab" :class="{ 'request-panel-tab-active': activeRequestPanelTab === requestPanelTab.name }" @click="activeRequestPanelTab = requestPanelTab.name" v-for="requestPanelTab in requestPanelTabs" :data-testid="`request-panel-tab-${requestPanelTab.name}`">
@@ -56,6 +74,8 @@
                                     v-model="param.name"
                                     placeholder="name"
                                     :env-variables="collectionItemEnvironmentResolved"
+                                    :autocompletions="tagAutocompletions"
+                                    @tagClick="onTagClick"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-name-' + index"
@@ -66,6 +86,8 @@
                                     v-model="param.value"
                                     placeholder="value"
                                     :env-variables="collectionItemEnvironmentResolved"
+                                    :autocompletions="tagAutocompletions"
+                                    @tagClick="onTagClick"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-value-' + index"
@@ -93,6 +115,8 @@
                                     v-model="param.name"
                                     placeholder="name"
                                     :env-variables="collectionItemEnvironmentResolved"
+                                    :autocompletions="tagAutocompletions"
+                                    @tagClick="onTagClick"
                                     :input-text-compatible="true"
                                     :disabled="param.disabled"
                                     :key="'body-param-name-' + index"
@@ -105,6 +129,8 @@
                                             v-model="param.value"
                                             placeholder="value"
                                             :env-variables="collectionItemEnvironmentResolved"
+                                            :autocompletions="tagAutocompletions"
+                                            @tagClick="onTagClick"
                                             :input-text-compatible="true"
                                             :disabled="param.disabled"
                                             :key="'body-param-value-' + index"
@@ -149,6 +175,8 @@
                         v-model="activeTab.body.text"
                         lang="text"
                         :env-variables="collectionItemEnvironmentResolved"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         class="code-editor"
                         :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                     ></CodeMirrorEditor>
@@ -158,6 +186,8 @@
                         v-model="activeTab.body.text"
                         lang="json"
                         :env-variables="collectionItemEnvironmentResolved"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         class="code-editor"
                         :key="'code-mirror-editor-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                         ref="jsonEditor"
@@ -172,6 +202,8 @@
                             v-model="graphql.query"
                             lang="graphql"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             class="code-editor"
                             :key="'code-mirror-editor1-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                             ref="graphqlEditor"
@@ -184,6 +216,8 @@
                                 v-model="graphql.variables"
                                 lang="json"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 class="code-editor"
                                 :key="'code-mirror-editor2-' + activeTab._id + '-' + refreshCodeMirrorEditors"
                                 ref="jsonEditor"
@@ -196,14 +230,14 @@
                             <i class="fa fa-caret-down space-right"></i>
                             <ContextMenu
                                 :options="schemaOptionList"
-                                :element="schemaSelectorElement"
-                                :x="schemaSelectorContextMenuX"
-                                :y="schemaSelectorContextMenuY"
-                                v-model:show="schemaSelectorDropdownVisible"
+                                :element="schemaSelectorDropdownState.element"
+                                :x="schemaSelectorDropdownState.contextMenuX"
+                                :y="schemaSelectorDropdownState.contextMenuY"
+                                v-model:show="schemaSelectorDropdownState.visible"
                                 @click="showGraphQLDocs"
                             />
                         </div>
-                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved" :schema-action="schemaAction"/>
+                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved" :schema-action="schemaAction" />
                         <button class="button" @click="beautifyGraphQL" style="margin-left: 0.5rem">Beautify</button>
                     </div>
                 </div>
@@ -229,6 +263,8 @@
                                 v-model="param.name"
                                 placeholder="name"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-name-' + index"
@@ -240,6 +276,8 @@
                                 v-model="param.value"
                                 placeholder="value"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'query-param-value-' + index"
@@ -272,6 +310,8 @@
                                 v-model="param.name"
                                 placeholder="name"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'path-param-name-' + index"
@@ -282,6 +322,8 @@
                                 v-model="param.value"
                                 placeholder="value"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="param.disabled"
                                 :key="'path-param-value-' + index"
@@ -308,10 +350,18 @@
                 </div>
             </template>
             <template v-if="activeRequestPanelTab === 'Header'">
-                <RequestPanelHeaders :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelHeaders>
+                <RequestPanelHeaders
+                    :collection-item="activeTab"
+                    :collection-item-environment-resolved="collectionItemEnvironmentResolved"
+                    @tagClick="onTagClick"
+                />
             </template>
             <template v-if="activeRequestPanelTab === 'Auth'">
-                <RequestPanelAuth :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved"></RequestPanelAuth>
+                <RequestPanelAuth
+                    :collection-item="activeTab"
+                    :collection-item-environment-resolved="collectionItemEnvironmentResolved"
+                    @tagClick="onTagClick"
+                />
             </template>
             <template v-if="activeRequestPanelTab === 'Script'">
                 <div style="height: 100%; display: grid; grid-template-rows: auto 1fr auto 1fr;">
@@ -375,9 +425,17 @@
         :method="activeTab?.method"
         @customHttpMethod="handleCustomHttpMethod"
     />
+    <GenerateCodeModal v-model:showModal="generateCodeModalShow" :collection-item="generateCodeModalCollectionItem" />
+    <EditTagModal
+        v-if="editTagModalShow"
+        v-model:showModal="editTagModalShow"
+        :parsed-func="editTagParsedFunc"
+        :update-func="editTagUpdateFunc"
+        :active-tab="activeTab"
+    />
 </template>
 
-<script>
+<script lang="ts">
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import RequestPanelTabTitle from '@/components/RequestPanelTabTitle.vue'
@@ -388,12 +446,21 @@ import ContextMenu from '@/components/ContextMenu.vue'
 import SnippetDropdown from '@/components/SnippetDropdown.vue'
 import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
-import { convertCurlCommandToRestfoxCollection, debounce, substituteEnvironmentVariables } from '@/helpers'
+import {
+    convertCurlCommandToRestfoxCollection,
+    debounce,
+    jsonStringify,
+    substituteEnvironmentVariables,
+    toggleDropdown
+} from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
 import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
+import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
+import EditTagModal from '@/components/modals/EditTagModal.vue'
+import { formatSdl } from 'format-graphql'
 
 const renderer = new marked.Renderer()
 
@@ -408,6 +475,7 @@ marked.setOptions({
 
 export default {
     components: {
+        GenerateCodeModal,
         ContextMenu,
         CodeMirrorSingleLine,
         CodeMirrorEditor,
@@ -417,7 +485,8 @@ export default {
         ReferencesButton,
         HttpMethodModal,
         SnippetDropdown,
-        GraphQLSchemaFetcher
+        GraphQLSchemaFetcher,
+        EditTagModal,
     },
     props: {
         activeTab: Object,
@@ -446,6 +515,7 @@ export default {
             ],
             activeRequestPanelTab: 'Body',
             methods: this.getHttpMethodList(),
+            sendOptions: this.getSendOptions(),
             graphql: {
                 query: '',
                 variables: '{}'
@@ -460,14 +530,24 @@ export default {
             },
             skipScriptUpdate: false,
             editDescription: false,
-            methodSelectorDropdownVisible: false,
-            methodSelectorElement: null,
-            methodSelectorContextMenuX: null,
-            methodSelectorContextMenuY: null,
-            schemaSelectorDropdownVisible: false,
-            schemaSelectorElement: null,
-            schemaSelectorContextMenuX: null,
-            schemaSelectorContextMenuY: null,
+            schemaSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
+            methodSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
+            sendSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
             schemaOptionList: [
                 {
                     'type': 'option',
@@ -549,7 +629,15 @@ export default {
             requestBodyWidth: null,
             httpMethodModalShow: false,
             showGraphQLDocumentation: false,
-            schemaAction: null
+            schemaAction: null,
+            generateCodeModalCollectionItem: null,
+            generateCodeModalShow: false,
+            intervalRequestSending: null,
+            delayRequestSending: null,
+            editTagModalShow: false,
+            editTagParsedFunc: null,
+            editTagUpdateFunc: null,
+            urlPreview: '',
         }
     },
     computed: {
@@ -578,22 +666,8 @@ export default {
                 ...constants.AUTOCOMPLETIONS.PLUGIN.RESPONSE_METHODS
             ]
         },
-        urlPreview() {
-            let url = this.activeTab.url ?? ''
-
-            url = substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url)
-
-            if(this.activeTab.pathParameters) {
-                this.activeTab.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
-                    url = url.replaceAll(
-                        `:${substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name)}`, substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value)
-                    ).replaceAll(
-                        `{${substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name)}}`, substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value)
-                    )
-                })
-            }
-
-            return url !== '' && url.trim() !== '' ? url : 'No URL'
+        tagAutocompletions() {
+            return constants.AUTOCOMPLETIONS.TAGS
         },
     },
     watch: {
@@ -617,6 +691,15 @@ export default {
             }
             this.loadGraphql()
         },
+        'activeTab.url'() {
+            this.getUrlPreview()
+        },
+        'activeTab.pathParameters': {
+            handler() {
+                this.getUrlPreview()
+            },
+            deep: true
+        },
         graphql: {
             handler() {
                 if(this.disableGraphqlWatch) {
@@ -627,10 +710,10 @@ export default {
                 try {
                     graphqlVariables = JSON.parse(this.graphql.variables)
                 } catch {}
-                this.activeTab.body.text = JSON.stringify({
+                this.activeTab.body.text = jsonStringify({
                     query: this.graphql.query,
                     variables: graphqlVariables
-                }, null, 4)
+                })
             },
             deep: true
         },
@@ -672,8 +755,48 @@ export default {
         },
     },
     methods: {
-        sendRequest() {
-            this.$store.dispatch('sendRequest', this.activeTab)
+        async sendRequest(value) {
+            if(value === 'send') {
+                this.$store.dispatch('sendRequest', this.activeTab)
+            }
+
+            if(value === 'generate-code') {
+                this.generateCodeModalCollectionItem = JSON.parse(JSON.stringify(this.activeTab))
+                this.generateCodeModalShow = true
+            }
+
+            if(value === 'send-with-delay') {
+                this.delayRequestSending = await window.createPrompt('Delay in seconds')
+
+                if(this.delayRequestSending) {
+                    this.delayRequestSending = setTimeout(() => {
+                        this.$store.dispatch('sendRequest', this.activeTab)
+                        this.delayRequestSending = null
+                    }, this.delayRequestSending * 1000)
+                }
+            }
+
+            if(value === 'send-with-interval') {
+                this.intervalRequestSending = await window.createPrompt('Interval in seconds')
+
+                if(this.intervalRequestSending) {
+                    this.intervalRequestSending = setInterval(() => {
+                        this.$store.dispatch('sendRequest', this.activeTab)
+                    }, this.intervalRequestSending * 1000)
+                }
+            }
+
+            if(value === 'cancel') {
+                if (this.intervalRequestSending) {
+                    clearInterval(this.intervalRequestSending)
+                    this.intervalRequestSending = null
+                }
+
+                if (this.delayRequestSending) {
+                    clearTimeout(this.delayRequestSending)
+                    this.delayRequestSending = null
+                }
+            }
         },
         pushItem(object, key, itemToPush) {
             if(key in object === false) {
@@ -690,8 +813,10 @@ export default {
         },
         beautifyGraphQL() {
             try {
-                const formattedJSON = jsonPrettify(this.graphql.variables, '    ')
-                this.$refs.jsonEditor.setValue(formattedJSON)
+                const formattedVarsJSON = jsonPrettify(this.graphql.variables, '    ')
+                const formattedGraphqlJSON = formatSdl(this.graphql.query)
+                this.$refs.jsonEditor.setValue(formattedVarsJSON)
+                this.$refs.graphqlEditor.setValue(formattedGraphqlJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
         showGraphQLDocs(value){
@@ -708,7 +833,7 @@ export default {
                 if(this.activeTab.url === '') {
                     return
                 }
-                this.sendRequest()
+                this.sendRequest('send')
             }
         },
         async handleAddressBarPaste(content) {
@@ -717,6 +842,7 @@ export default {
                     return false
                 }
                 const result = await convertCurlCommandToRestfoxCollection(content, this.activeWorkspace._id)
+
                 if(result.length) {
                     delete result[0].name
                     delete result[0]._id
@@ -724,6 +850,10 @@ export default {
                     delete result[0].workspaceId
                     delete result[0].parentId
                     Object.assign(this.activeTab, result[0])
+
+                    if(this.activeTab.body.mimeType === constants.MIME_TYPE.GRAPHQL) {
+                        this.loadGraphql()
+                    }
                 }
 
                 return true
@@ -738,7 +868,7 @@ export default {
                     const parsedBodyText = JSON.parse(this.activeTab.body.text)
                     this.graphql = {
                         query: parsedBodyText.query ?? '',
-                        variables: JSON.stringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {}, null, 4)
+                        variables: jsonStringify(typeof parsedBodyText.variables === 'object' ? parsedBodyText.variables : {})
                     }
                 } catch {
                     this.graphql = {
@@ -816,26 +946,13 @@ export default {
             console.log('Script saved')
         }, 500),
         toggleMethodSelectorDropdown(event) {
-            this.methodSelectorDropdownVisible = !this.methodSelectorDropdownVisible
-            if (this.methodSelectorDropdownVisible) {
-                const containerElement = event.target.closest('.custom-dropdown')
-                this.methodSelectorContextMenuX = containerElement.getBoundingClientRect().left
-                this.methodSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
-                this.methodSelectorElement = containerElement
-            } else {
-                this.methodSelectorElement = null
-            }
+            toggleDropdown(event, this.methodSelectorDropdownState)
         },
         toggleSchemaSelectorDropdown(event) {
-            this.schemaSelectorDropdownVisible = !this.schemaSelectorDropdownVisible
-            if (this.schemaSelectorDropdownVisible) {
-                const containerElement = event.target.closest('.custom-dropdown')
-                this.schemaSelectorContextMenuX = containerElement.getBoundingClientRect().left
-                this.schemaSelectorContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
-                this.schemaSelectorElement = containerElement
-            } else {
-                this.schemaSelectorElement = null
-            }
+            toggleDropdown(event, this.schemaSelectorDropdownState)
+        },
+        toggleSendSelectorDropdown(event) {
+            toggleDropdown(event, this.sendSelectorDropdownState)
         },
         selectMethod(method) {
             if (method === 'Custom Method') {
@@ -938,7 +1055,75 @@ export default {
         },
         insertSnippetPostScript(text) {
             this.script.post_request += text + `\n`
-        }
+        },
+        getSendOptions() {
+            return [
+                {
+                    type: 'option',
+                    label: 'Basic',
+                    disabled: true,
+                    value: '',
+                    class: 'text-with-line',
+                },
+                {
+                    type: 'option',
+                    label: 'Send Now',
+                    value: 'send',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-paper-plane'
+                },
+                {
+                    type: 'option',
+                    label: 'Generate Client Code',
+                    value: 'generate-code',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-code'
+                },
+                {
+                    type: 'option',
+                    label: 'Advanced',
+                    disabled: true,
+                    value: '',
+                    class: 'text-with-line',
+                },
+                {
+                    type: 'option',
+                    label: 'Send After Delay',
+                    value: 'send-with-delay',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-clock'
+                },
+                {
+                    type: 'option',
+                    label: 'Repeat on Interval',
+                    value: 'send-with-interval',
+                    class: 'context-menu-item-with-left-padding',
+                    icon: 'fa fa-refresh'
+                },
+            ]
+        },
+        onTagClick(parsedFunc, updateFunc) {
+            this.editTagParsedFunc = parsedFunc
+            this.editTagUpdateFunc = updateFunc
+            this.editTagModalShow = true
+        },
+        async getUrlPreview() {
+            let url = this.activeTab.url ?? ''
+
+            url = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url, { tagTrigger: false, noError: true })
+
+            if (this.activeTab.pathParameters) {
+                for (const pathParameter of this.activeTab.pathParameters.filter(item => !item.disabled)) {
+                    const paramName = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name, { tagTrigger: false, noError: true })
+                    const paramValue = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value, { tagTrigger: false, noError: true })
+
+                    url = url.replaceAll(`:${paramName}`, paramValue)
+                        .replaceAll(`{${paramName}}`, paramValue)
+                }
+            }
+
+            this.urlPreview = url !== '' && url.trim() !== '' ? url : 'No URL'
+        },
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
@@ -946,6 +1131,8 @@ export default {
         this.attachRootElementResizeObserver()
 
         this.loadGraphql()
+
+        this.getUrlPreview()
     },
     beforeUnmount() {
         emitter.off('response_panel', this.handleResponsePanelEmitter)
@@ -985,7 +1172,7 @@ export default {
 }
 
 .request-panel-address-bar button {
-    background-color: #7f4fd5;
+    background-color: var(--send-request-button-color);
     color: white;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
@@ -994,7 +1181,7 @@ export default {
 }
 
 .request-panel-address-bar button:hover {
-    background-color: #673ab7;
+    background-color: var(--send-request-button-hover-color);
 }
 
 .request-panel-tabs {
@@ -1063,5 +1250,26 @@ export default {
     justify-content: flex-end;
     align-items: center;
     margin-top: 0.5rem;
+}
+
+.send-options {
+    background-color: var(--send-request-button-color);
+    color: var(--primary-text-color);
+    margin-right: 0rem;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    height: 100%;
+}
+
+.send-options:hover {
+    background-color: var(--send-request-button-hover-color);
+}
+
+.send-options.custom-dropdown > i {
+    padding: 0;
 }
 </style>

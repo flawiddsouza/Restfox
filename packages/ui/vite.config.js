@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
                 }
             }),
             VitePWA({
-                includeAssets: ['favicon.png', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png', 'css/fontawesome-free-5.15.4-web/webfonts/fa-solid-900.woff2'],
+                includeAssets: ['favicon.png', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png', 'css/fontawesome-free-6.6.0-web/webfonts/fa-solid-900.woff2'],
                 manifest: {
                     name: 'Restfox',
                     short_name: 'Restfox',

@@ -23,7 +23,7 @@ Scenario('Add requests', async() => {
         const requestName = `Request ${i}`
         I.createRequest(requestName)
         await I.isActiveSidebarItem(`GET${requestName}`)
-        await I.isActiveTab(`GET ${requestName}x`)
+        await I.isActiveTab(`GET ${requestName}`)
     }
 })
 
@@ -31,8 +31,8 @@ Scenario('Add GraphQL requests', async() => {
     for(let i = 1; i <= 5; i++) {
         const requestName = `GraphQL Request ${i}`
         I.createGraphQLRequest(requestName)
-        await I.isActiveSidebarItem(`POST${requestName}`)
-        await I.isActiveTab(`POST ${requestName}x`)
+        await I.isActiveSidebarItem(`GQL${requestName}`)
+        await I.isActiveTab(`POST ${requestName}`)
     }
 })
 

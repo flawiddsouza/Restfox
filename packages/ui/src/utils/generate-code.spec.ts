@@ -1,3 +1,5 @@
+// @vitest-environment edge-runtime
+
 import { assert, test, describe } from 'vitest'
 import { generateCode } from './generate-code'
 

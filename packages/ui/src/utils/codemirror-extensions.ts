@@ -1,7 +1,7 @@
 import { ViewPlugin, Decoration, EditorView, ViewUpdate } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
 
-export const variableMatchingRegex = /{{ ([.|\w]*?) }}|{{([.|\w]*?)}}/g
+export const variableMatchingRegex = /{{ ([^\s]*?) }}|{{([^\s]*?)}}/g
 
 export function envVarDecoration(envVariables: any) {
     return ViewPlugin.fromClass(class {

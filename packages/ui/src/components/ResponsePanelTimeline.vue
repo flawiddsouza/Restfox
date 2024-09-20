@@ -8,7 +8,8 @@
 
 <script>
 import CodeMirrorResponsePanelPreview from '@/components/CodeMirrorResponsePanelPreview.vue'
-import { bufferToString, dateFormat, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
+import { dateFormat, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
+import { bufferToString } from '@/utils/response'
 
 export default {
     components: { CodeMirrorResponsePanelPreview },

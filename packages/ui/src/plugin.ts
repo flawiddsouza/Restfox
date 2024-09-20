@@ -61,7 +61,7 @@ const generalContextMethodsBase = {
     },
 }
 
-export function createRequestContextForPlugin(request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, testResults: PluginTestResult[]): { expose: PluginExpose } {
+export async function createRequestContextForPlugin(cacheId: string, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, testResults: PluginTestResult[]): Promise<{ expose: PluginExpose }> {
     const state: CollectionItem = JSON.parse(JSON.stringify(request))
 
     if(state.body === undefined) {
@@ -86,6 +86,8 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
         state.body.fileName = request.body.fileName
     }
 
+    const headerCache: Record<string, string | undefined> = {}
+
     const generalContextMethods = {
         ...generalContextMethodsBase,
         getEnvVar(objectPath: string) {
@@ -98,14 +100,21 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
         },
     }
 
+    if (state.headers) {
+        for (const header of state.headers) {
+            substituteEnvironmentVariables(environment, header.value, { cacheId }).then(substitutedValue => {
+                headerCache[header.name.toLowerCase()] = substitutedValue
+            })
+        }
+    }
+
+    const substitutedUrl = state.url !== undefined ? await substituteEnvironmentVariables(environment, state.url, { cacheId }) : undefined
+
     const context: PluginExposeContext = {
         ...generalContextMethods,
         request: {
             getURL() {
-                if (state.url === undefined) {
-                    return undefined
-                }
-                return substituteEnvironmentVariables(environment, state.url)
+                return substitutedUrl
             },
             getMethod() {
                 return state.method
@@ -133,7 +142,7 @@ export function createRequestContextForPlugin(request: CollectionItem, environme
                     state.headers = []
                 }
                 const header = state.headers.find((header) => header.name.toLowerCase() == headerName.toLowerCase())
-                return header ? substituteEnvironmentVariables(environment, header.value) : undefined
+                return header ? headerCache[headerName.toLowerCase()] : undefined
             },
             setHeader(headerName: string, value: string) {
                 if(state.headers === undefined) {
@@ -309,10 +318,12 @@ function addFetchSyncToVM(vm: QuickJSAsyncContext) {
         vm.setProp(responseObject, 'statusText', responseStatusText)
 
         const responseHeaders = vm.evalCode(`
-            const escapedText = JSON.stringify(${JSON.stringify(response.headers)})
-            const headersArray = JSON.parse(escapedText)
-            const headers = new Headers(headersArray)
-            headers
+            {
+                const escapedText = JSON.stringify(${JSON.stringify(response.headers)})
+                const headersArray = JSON.parse(escapedText)
+                const headers = new Headers(headersArray)
+                headers
+            }
         `)
 
         vm.setProp(responseObject, 'headers', vm.unwrapResult(responseHeaders))

@@ -534,3 +534,21 @@ test('Path Params Sync - mac:addresses:should:not:be:treated as a path param', (
 
     assert.deepEqual(activeTab.pathParameters, [])
 })
+
+test('Path Params Sync - response tag should not be treated as a path param', () => {
+    const activeTab: CollectionItem = {
+        _id: 'test',
+        _type: 'request',
+        parentId: 'test',
+        workspaceId: 'test',
+        name: 'test',
+        url: '',
+        pathParameters: []
+    }
+
+    activeTab.url = '{% response() %}'
+
+    assert.equal(onUrlChange(activeTab), true)
+
+    assert.deepEqual(activeTab.pathParameters, [])
+})

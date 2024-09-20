@@ -1,4 +1,3 @@
-import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import dayjs from 'dayjs'
@@ -11,7 +10,6 @@ import { convert as curlConvert } from './parsers/curl'
 import yaml from 'js-yaml'
 import {
     CollectionItem,
-    RequestBody,
     RequestAuthentication,
     RequestParam,
     RequestInitialResponse,
@@ -21,10 +19,12 @@ import {
     HandleRequestState,
     State,
     OpenApiSpecPathParams,
+    EditorConfig,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
 import constants from '@/constants'
+import { handleTags } from '@/utils/tag'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -69,7 +69,13 @@ export function flattenTree(array: CollectionItem[]) {
     return level
 }
 
-export function substituteEnvironmentVariables(environment: any, string: string) {
+export async function substituteEnvironmentVariables(
+    environment: any,
+    string: string,
+    options: { tagTrigger?: boolean, cacheId?: string, noError?: boolean } = {}
+) {
+    const { tagTrigger = true, cacheId = undefined, noError = false } = options
+
     let substitutedString = String(string)
 
     const possibleEnvironmentObjectPaths = getObjectPaths(environment)
@@ -94,6 +100,8 @@ export function substituteEnvironmentVariables(environment: any, string: string)
         substitutedString = substitutedString.replaceAll(`{{${objectPath}}}`, objectPathValue)
         substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
+
+    substitutedString = await handleTags(substitutedString, tagTrigger, cacheId, noError)
 
     return substitutedString
 }
@@ -182,6 +190,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
     if(import.meta.env.MODE === 'web-standalone') {
         const proxyHeaders: Record<string, string> = {
+            'x-proxy-flag-disable-ssl-verification': flags.disableSSLVerification.toString(),
             'x-proxy-req-url': url.toString(),
             'x-proxy-req-method': method
         }
@@ -316,8 +325,10 @@ export async function createRequestData(
     plugins: Plugin[],
     workspaceLocation: string | null
 ): Promise<CreateRequestDataReturn> {
+    const cacheId = nanoid()
+
     for(const plugin of plugins) {
-        const { expose } = createRequestContextForPlugin(request, environment, setEnvironmentVariable, state.testResults)
+        const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults)
 
         state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : `${plugin.name} (Pre Request)`
 
@@ -337,14 +348,15 @@ export async function createRequestData(
 
     let body: any = null
 
-    if(request.body && request.body.mimeType === 'application/x-www-form-urlencoded') {
-        if('params' in request.body && request.body.params) {
-            const formParams = request.body.params.filter(item => !item.disabled).reduce((acc, item) => {
-                const name = substituteEnvironmentVariables(environment, item.name)
-                const value = substituteEnvironmentVariables(environment, item.value)
-                acc.append(name, value)
-                return acc
-            }, new URLSearchParams())
+    if (request.body && request.body.mimeType === 'application/x-www-form-urlencoded') {
+        if ('params' in request.body && request.body.params) {
+            const formParams = new URLSearchParams()
+
+            for (const item of request.body.params.filter(item => !item.disabled)) {
+                const name = await substituteEnvironmentVariables(environment, item.name, { cacheId })
+                const value = await substituteEnvironmentVariables(environment, item.value, { cacheId })
+                formParams.append(name, value)
+            }
 
             body = formParams.toString()
         }
@@ -354,21 +366,29 @@ export async function createRequestData(
         if(request.body.mimeType === 'multipart/form-data') {
             if('params' in request.body) {
                 const formData = new FormData()
-                request.body.params?.filter(item => !item.disabled).forEach(param => {
-                    if(param.type === 'text') {
-                        formData.append(substituteEnvironmentVariables(environment, param.name), substituteEnvironmentVariables(environment, param.value))
-                    } else if (param.files) {
-                        for(const file of param.files) {
-                            formData.append(substituteEnvironmentVariables(environment, param.name), file as File)
+                if (request.body.params) {
+                    for (const param of request.body.params.filter(item => !item.disabled)) {
+                        if (param.type === 'text') {
+                            formData.append(
+                                await substituteEnvironmentVariables(environment, param.name, { cacheId }),
+                                await substituteEnvironmentVariables(environment, param.value, { cacheId })
+                            )
+                        } else if (param.files) {
+                            for (const file of param.files) {
+                                formData.append(
+                                    await substituteEnvironmentVariables(environment, param.name, { cacheId }),
+                                    file as File
+                                )
+                            }
                         }
                     }
-                })
+                }
                 body = formData
             }
         }
 
         if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
-            body = substituteEnvironmentVariables(environment, request.body.text ?? '')
+            body = await substituteEnvironmentVariables(environment, request.body.text ?? '', { cacheId })
         }
 
         if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
@@ -376,16 +396,17 @@ export async function createRequestData(
         }
     }
 
-    let urlWithEnvironmentVariablesSubstituted = substituteEnvironmentVariables(environment, request.url!)
+    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, request.url!, { cacheId })
 
     if(request.pathParameters) {
-        request.pathParameters.filter(item => !item.disabled).forEach(pathParameter => {
-            urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted.replaceAll(
-                `:${substituteEnvironmentVariables(environment, pathParameter.name)}`, substituteEnvironmentVariables(environment, pathParameter.value)
-            ).replaceAll(
-                `{${substituteEnvironmentVariables(environment, pathParameter.name)}}`, substituteEnvironmentVariables(environment, pathParameter.value)
-            )
-        })
+        for (const pathParameter of request.pathParameters.filter(item => !item.disabled)) {
+            const paramName = await substituteEnvironmentVariables(environment, pathParameter.name, { cacheId })
+            const paramValue = await substituteEnvironmentVariables(environment, pathParameter.value, { cacheId })
+
+            urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted
+                .replaceAll(`:${paramName}`, paramValue)
+                .replaceAll(`{${paramName}}`, paramValue)
+        }
     }
 
     const url = new URL(urlWithEnvironmentVariablesSubstituted)
@@ -393,22 +414,22 @@ export async function createRequestData(
     if('parameters' in request && request.parameters) {
         url.search = ''
 
-        request.parameters.filter(item => !item.disabled).forEach(param => {
-            const paramName = substituteEnvironmentVariables(environment, param.name)
-            const paramValue = substituteEnvironmentVariables(environment, param.value)
+        for (const param of request.parameters.filter(item => !item.disabled)) {
+            const paramName = await substituteEnvironmentVariables(environment, param.name, { cacheId })
+            const paramValue = await substituteEnvironmentVariables(environment, param.value, { cacheId })
 
             url.searchParams.append(
                 paramName,
                 decodeURIComponent(paramValue)
             )
-        })
+        }
     }
 
     const headers: Record<string, string | any> = {}
 
-    Object.keys(parentHeaders).forEach(header => {
-        headers[substituteEnvironmentVariables(environment, header.toLowerCase())] = substituteEnvironmentVariables(environment, parentHeaders[header])
-    })
+    for (const header of Object.keys(parentHeaders)) {
+        headers[await substituteEnvironmentVariables(environment, header.toLowerCase(), { cacheId })] = await substituteEnvironmentVariables(environment, parentHeaders[header], { cacheId })
+    }
 
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
@@ -419,8 +440,8 @@ export async function createRequestData(
     if('headers' in request && request.headers !== undefined) {
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
-            const headerName = substituteEnvironmentVariables(environment, header.name.toLowerCase())
-            const headerValue = substituteEnvironmentVariables(environment, header.value)
+            const headerName = await substituteEnvironmentVariables(environment, header.name.toLowerCase(), { cacheId })
+            const headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
 
             if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
                 continue
@@ -432,16 +453,16 @@ export async function createRequestData(
         }
     }
 
-    const setAuthentication = (authentication: RequestAuthentication) => {
-        headers['Authorization'] = resolveAuthentication(authentication, environment)
+    const setAuthentication = async(authentication: RequestAuthentication) => {
+        headers['Authorization'] = await resolveAuthentication(cacheId, authentication, environment)
     }
 
     if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
-        setAuthentication(request.authentication)
+        await setAuthentication(request.authentication)
     }
 
     if(parentAuthentication && parentAuthentication.type !== 'No Auth' && !parentAuthentication.disabled && (request.authentication === undefined || request.authentication.type === 'No Auth')) {
-        setAuthentication(parentAuthentication)
+        await setAuthentication(parentAuthentication)
     }
 
     return {
@@ -588,6 +609,10 @@ export async function handleRequest(
             if(e.message === 'Unable to parse plugin') {
                 error = `Error in Plugin "${state.currentPlugin}"${e.lineNumber !== '' ? ' at line number ' + e.lineNumber : ''}\n\n${e.originalError.name}: ${e.originalError.message}`
             }
+
+            if(e.cause === 'display-error') {
+                error = `Error: ${e.message}`
+            }
         }
 
         return {
@@ -678,266 +703,6 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
     })
 
     return toTree(collection)
-}
-
-export async function convertPostmanExportToRestfoxCollection(json: any, isZip: boolean, workspaceId: string) {
-    if(isZip) {
-        const zip = new JSZip()
-        const extractedZip = await zip.loadAsync(json)
-        const filePaths = Object.keys(extractedZip.files)
-        const filePathMap: Record<string, string> = {}
-        const basePath = filePaths[filePaths.length - 1].replace('archive.json', '')
-        filePaths.forEach(filePath => {
-            filePathMap[filePath.replace(basePath, '')] = filePath
-        })
-
-        const archive = await extractedZip.files[filePathMap['archive.json']].async('text')
-        const archiveCollection = JSON.parse(archive).collection
-
-        const collections: any[] = []
-
-        for(const collectionId of Object.keys(archiveCollection)) {
-            collections.push(JSON.parse(await extractedZip.files[filePathMap[`collection/${collectionId}.json`]].async('text')))
-        }
-
-        return importPostmanV2(collections, workspaceId)
-    } else {
-        if('info' in json) {
-            if('schema' in json.info) {
-                if(json.info.schema === 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json' || json.info.schema === 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json') {
-                    return importPostmanV2([json], workspaceId)
-                }
-            }
-        }
-        return importPostmanV1(json.collections, workspaceId)
-    }
-}
-
-function importPostmanV1(collections: any[], workspaceId: string) {
-    const collection: CollectionItem[]  = []
-
-    collections.forEach(item => {
-        const requests: CollectionItem[] = []
-
-        item.requests.forEach((request: any) => {
-            let body: RequestBody = {
-                mimeType: 'No Body'
-            }
-
-            if(request.dataMode === 'urlencoded') {
-                const params: RequestParam[] = []
-                const requestData = request.data !== null ? request.data : []
-                requestData.forEach((requestDataItem: any) => {
-                    params.push({
-                        name: requestDataItem.key,
-                        value: requestDataItem.value,
-                        description: requestDataItem.description,
-                        disabled: !requestDataItem.enabled
-                    })
-                })
-                body = {
-                    mimeType: 'application/x-www-form-urlencoded',
-                    params
-                }
-            }
-
-            if(request.dataMode === 'raw') {
-                body = {
-                    mimeType: 'text/plain',
-                    text: request.rawModeData
-                }
-            }
-
-            const headers: RequestParam[] = []
-            request.headerData.forEach((header: any) => {
-                headers.push({
-                    name: header.key,
-                    value: header.value,
-                    description: header.description,
-                    disabled: !header.enabled
-                })
-            })
-
-            const parameters: RequestParam[] = []
-            const queryParams = request.queryParams !== null ? request.queryParams : []
-            queryParams.forEach((queryParam: any) => {
-                parameters.push({
-                    name: queryParam.key,
-                    value: queryParam.value,
-                    description: queryParam.description,
-                    disabled: !queryParam.enabled
-                })
-            })
-
-            requests.push({
-                _id: request.id,
-                _type: 'request',
-                method: request.method,
-                url: request.url,
-                name: request.name,
-                body,
-                headers,
-                parameters,
-                parentId: item.id,
-                workspaceId
-            })
-        })
-
-        collection.push({
-            _id: item.id,
-            _type: 'request_group',
-            name: item.name,
-            children: requests,
-            parentId: null,
-            workspaceId
-        })
-    })
-
-    return collection
-}
-
-function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: string | null = null, workspaceId: string) {
-    const requests: CollectionItem[] = []
-
-    postmanCollectionItem.item.forEach((request: any) => {
-        const requestId = request.id ?? nanoid()
-        if('item' in request) {
-            requests.push({
-                _id: requestId,
-                _type: 'request_group',
-                name: request.name,
-                children: handlePostmanV2CollectionItem(request, requestId, workspaceId),
-                parentId,
-                workspaceId
-            })
-            return
-        }
-
-        let body: RequestBody = {
-            mimeType: 'No Body'
-        }
-
-        if('body' in request.request && 'mode' in request.request.body) {
-            if(request.request.body.mode === 'urlencoded') {
-                const params: RequestParam[] = []
-                const requestData = request.request.body.urlencoded
-                requestData.forEach((requestDataItem: any) => {
-                    params.push({
-                        name: requestDataItem.key,
-                        value: requestDataItem.value,
-                        description: requestDataItem.description,
-                        disabled: requestDataItem.disabled
-                    })
-                })
-                body = {
-                    mimeType: 'application/x-www-form-urlencoded',
-                    params
-                }
-            }
-
-            if(request.request.body.mode === 'raw') {
-                let mimeType = 'text/plain'
-
-                if('options' in request.request.body && 'raw' in request.request.body.options && request.request.body.options.raw.language === 'json') {
-                    mimeType = 'application/json'
-                }
-
-                if(mimeType === 'text/plain') {
-                    try {
-                        JSON.parse(request.request.body.raw)
-                        mimeType = 'application/json'
-                    } catch {}
-                }
-
-                body = {
-                    mimeType: mimeType,
-                    text: request.request.body.raw
-                }
-            }
-        }
-
-        const headers: RequestParam[] = []
-        request.request.header.forEach((header: any) => {
-            headers.push({
-                name: header.key,
-                value: header.value,
-                description: header.description,
-                disabled: header.disabled
-            })
-        })
-
-        const parameters: RequestParam[] = []
-        const queryParams = 'url' in request.request && typeof request.request.url !== 'string' && 'query' in request.request.url ? request.request.url.query : []
-        queryParams.forEach((queryParam: any) => {
-            parameters.push({
-                name: queryParam.key,
-                value: queryParam.value,
-                description: queryParam.description,
-                disabled: queryParam.disabled
-            })
-        })
-
-        let url = ''
-
-        if('url' in request.request) {
-            url = typeof request.request.url === 'string' ? request.request.url : request.request.url.raw
-        }
-
-        let authentication: RequestAuthentication = { type: 'No Auth' }
-
-        if('auth' in request.request) {
-            if(request.request.auth.type === 'bearer') {
-                authentication = {
-                    type: 'bearer'
-                }
-                const bearerAuth = 'bearer' in request.request.auth ? request.request.auth.bearer : []
-                if(bearerAuth.length > 0) {
-                    authentication = {
-                        type: 'bearer',
-                        token: bearerAuth[0].value
-                    }
-                }
-            }
-        }
-
-        requests.push({
-            _id: requestId,
-            _type: 'request',
-            method: request.request.method,
-            url,
-            name: request.name,
-            body,
-            headers,
-            parameters,
-            authentication,
-            description: 'description' in request.request ? request.request.description : undefined,
-            parentId,
-            workspaceId
-        })
-    })
-
-    return requests
-}
-
-function importPostmanV2(collections: any[], workspaceId: string) {
-    const collection: CollectionItem[] = []
-
-    collections.forEach(postmanCollectionItem => {
-        collection.push({
-            _id: postmanCollectionItem.info._postman_id,
-            _type: 'request_group',
-            name: postmanCollectionItem.info.name,
-            environment: 'variable' in postmanCollectionItem ? postmanCollectionItem.variable.reduce((prev: any, acc: any) => {
-                prev[acc.key] = acc.value
-                return prev
-            }, {}) : undefined,
-            children: handlePostmanV2CollectionItem(postmanCollectionItem, postmanCollectionItem.info._postman_id, workspaceId),
-            parentId: null,
-            workspaceId
-        })
-    })
-
-    return collection
 }
 
 function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
@@ -1071,8 +836,14 @@ export async function convertCurlCommandToRestfoxCollection(curlCommand: string,
 
     if('body' in insomniaExport[0]) {
         if('text' in insomniaExport[0].body) {
-            // for some reason we get \\n instead of \n in the text field
-            insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+            if (insomniaExport[0].body.mimeType !== constants.MIME_TYPE.GRAPHQL) {
+                // for some reason we get \\n instead of \n in the text field
+                insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
+            } else {
+                const parsedBody = JSON.parse(insomniaExport[0].body.text)
+                parsedBody.query = parsedBody.query.replaceAll('\\n', '\n')
+                insomniaExport[0].body.text = JSON.stringify(parsedBody)
+            }
         }
     }
     return convertInsomniaExportToRestfoxCollection({ resources: insomniaExport }, workspaceId)
@@ -1376,6 +1147,10 @@ export function exportRestfoxCollection(collection: CollectionItem[], environmen
     })
 }
 
+export function exportCollection(collection: any, appName: 'Postman' | 'Insomnia') {
+    downloadObjectAsJSON(`${appName}_${todayISODate()}.json`, collection)
+}
+
 // From: https://github.com/Kong/insomnia/blob/fac2627d695a10865d0f7f9ea7b2c04a77d92194/packages/insomnia/src/common/misc.ts#L169-L192
 export function humanFriendlySize(bytes: number, long = false) {
     bytes = Math.round(bytes * 10) / 10
@@ -1540,8 +1315,9 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
         const environmentToModify = store.state.activeWorkspace.environment ?? {}
         const environmentsToModify = store.state.activeWorkspace.environments ?? [
             {
-                name: 'Default',
-                environment: {}
+                name: constants.DEFAULT_ENVIRONMENT.name,
+                environment: {},
+                color: constants.DEFAULT_ENVIRONMENT.color
             }
         ]
         setObjectPathValue(environmentToModify, objectPath, value)
@@ -1614,11 +1390,6 @@ export function getStatusText(statusCode: number): string {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
-}
-
-export function bufferToString(buffer: BufferSource) {
-    const textDecoder = new TextDecoder('utf-8')
-    return textDecoder.decode(buffer)
 }
 
 export function timeAgo(timestamp: number) {
@@ -1719,17 +1490,308 @@ export async function initStoragePersistence() {
     }
 }
 
-export function resolveAuthentication(authentication: RequestAuthentication, environment: any) {
+export async function resolveAuthentication(cacheId: string, authentication: RequestAuthentication, environment: any) {
     if(authentication.type === 'basic') {
         return generateBasicAuthString(
-            substituteEnvironmentVariables(environment, authentication.username ?? ''),
-            substituteEnvironmentVariables(environment, authentication.password ?? '')
+            await substituteEnvironmentVariables(environment, authentication.username ?? '', { cacheId }),
+            await substituteEnvironmentVariables(environment, authentication.password ?? '', { cacheId })
         )
     }
 
     if(authentication.type === 'bearer') {
         const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
         const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
-        return `${substituteEnvironmentVariables(environment, authenticationBearerPrefix)} ${substituteEnvironmentVariables(environment, authenticationBearerToken)}`
+        return `${await substituteEnvironmentVariables(environment, authenticationBearerPrefix, { cacheId })} ${await substituteEnvironmentVariables(environment, authenticationBearerToken, { cacheId })}`
     }
 }
+
+export function toggleDropdown(event: any, dropdownState: any) {
+    dropdownState.visible = !dropdownState.visible
+
+    if (dropdownState.visible) {
+        const containerElement = event.target.closest('.custom-dropdown')
+        const rect = containerElement.getBoundingClientRect()
+        dropdownState.contextMenuX = rect.left
+        dropdownState.contextMenuY = rect.top + rect.height
+        dropdownState.element = containerElement
+    } else {
+        dropdownState.element = null
+    }
+}
+
+/**
+ * Convert a script from one environment to another based on script type.
+ *
+ * @param {string} scriptToConvert - The script to convert.
+ * @param {string} scriptType - The type of script being converted.
+ * @returns {string} - The converted script.
+ */
+export function scriptConversion(scriptToConvert: string, scriptType: 'postmanToRestfox' | 'restfoxToPostman' | 'restfoxToInsomnia') {
+    const mappings = {
+        postmanToRestfox: {
+            'pm.environment.set': 'rf.setEnvVar',
+            'pm.environment.get': 'rf.getEnvVar',
+            'pm.response.json()': 'rf.response.getBodyJSON()'
+        },
+        restfoxToPostman: {
+            'rf.setEnvVar': 'pm.environment.set',
+            'rf.getEnvVar': 'pm.environment.get',
+            'rf.response.getBodyJSON()': 'pm.response.json()'
+        },
+        restfoxToInsomnia: {
+            'rf.setEnvVar': 'insomnia.setEnvironmentVariable',
+            'rf.getEnvVar': 'insomnia.getEnvironmentVariable',
+            'rf.response.getBodyJSON()': 'insomnia.response.json()'
+        },
+    }
+
+    const selectedMapping = mappings[scriptType]
+    if (!selectedMapping) {
+        throw new Error(`Unsupported script type: ${scriptType}`)
+    }
+
+    let convertedScript = scriptToConvert
+    for (const [key, value] of Object.entries(selectedMapping)) {
+        convertedScript = convertedScript.replaceAll(key, value)
+    }
+
+    return convertedScript
+}
+
+
+export async function convertCollectionsFromRestfoxToPostman(restfoxCollections: any) {
+    const restfoxData: any = restfoxCollections
+
+    const postmanCollection: any = {
+        info: {
+            name: 'Imported Collection',
+            schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+        },
+        item: []
+    }
+
+    const folderMap: any = {}
+
+    // First, create all folders and store them in folderMap
+    restfoxData.forEach((item: any) => {
+        if (item._type === 'request_group') {
+            const postmanItem: { name: any, item: any[] } = {
+                name: item.name,
+                item: []
+            }
+            folderMap[item._id] = postmanItem
+
+            // Check if the parent folder exists in folderMap and add the folder as a child
+            if (item.parentId && folderMap[item.parentId]) {
+                folderMap[item.parentId].item.push(postmanItem)
+            } else {
+                postmanCollection.item.push(postmanItem)
+            }
+        }
+    })
+
+    // Then, create all requests and push them to the appropriate folders in folderMap
+    restfoxData.forEach((item: any) => {
+        if (item._type === 'request') {
+            const postmanRequest: any = {
+                name: item.name,
+                request: {
+                    method: item.method,
+                    header: [],
+                    body: {
+                        mode: 'raw',
+                        raw: item.body.text,
+                        options: {
+                            raw: {
+                                language: item.body.mimeType.split('/')[1]
+                            }
+                        }
+                    },
+                    url: {
+                        raw: item.url,
+                        host: item.url,
+                        query: item.parameters ? item.parameters.filter((param: any) => !param.disabled).map((param: any) => ({ key: param.name, value: param.value })) : []
+                    }
+                },
+                event: [],
+                response: []
+            }
+
+            if (item.headers && item.headers.length > 0) {
+                postmanRequest.request.header = item.headers.map((header: any) => ({
+                    key: header.name,
+                    value: header.value
+                }))
+            }
+
+            if (item.plugins && item.plugins.length > 0) {
+                item.plugins.forEach((plugin: any) => {
+                    if (plugin.enabled && plugin.type === 'script') {
+                        if (plugin.code.pre_request) {
+                            postmanRequest.event.push({
+                                listen: 'prerequest',
+                                script: {
+                                    type: 'text/javascript',
+                                    exec: scriptConversion(plugin.code.pre_request, 'restfoxToPostman').trim().split('\n')
+                                }
+                            })
+                        }
+                        if (plugin.code.post_request) {
+                            postmanRequest.event.push({
+                                listen: 'test',
+                                script: {
+                                    type: 'text/javascript',
+                                    exec: scriptConversion(plugin.code.post_request, 'restfoxToPostman').trim().split('\n')
+                                }
+                            })
+                        }
+                    }
+                })
+            }
+
+            // Check if the parent folder exists in folderMap and add the request to that folder
+            if (item.parentId && folderMap[item.parentId]) {
+                folderMap[item.parentId].item.push(postmanRequest)
+            } else {
+                postmanCollection.item.push(postmanRequest)
+            }
+        }
+    })
+
+    return postmanCollection
+}
+
+export async function convertCollectionsFromRestfoxToInsomnia(restfoxCollections: any) {
+    const insomniaCollection: any = {
+        _type: 'export',
+        __export_format: 4,
+        __export_date: new Date().toISOString(),
+        __export_source: 'restfox-to-insomnia-converter',
+        resources: []
+    }
+
+    const workspaceId = restfoxCollections[0].workspaceId || 'root_workspace'
+
+    const workspace = {
+        _id: workspaceId,
+        _type: 'workspace',
+        name: 'Imported from Restfox',
+        description: '',
+        scope: 'collection',
+    }
+
+    insomniaCollection.resources.push(workspace)
+
+    const folderMap: any = {}
+
+    // First, create all folders and store them in folderMap
+    restfoxCollections.forEach((item: any) => {
+        if (item._type === 'request_group') {
+            const insomniaFolder = {
+                _id: item._id,
+                _type: 'request_group',
+                parentId: item.parentId || workspaceId,
+                name: item.name,
+            }
+            folderMap[item._id] = insomniaFolder
+            insomniaCollection.resources.push(insomniaFolder)
+        }
+    })
+
+    // Then, create all requests and push them to the appropriate folders in folderMap
+    restfoxCollections.forEach((restfoxRequest: any) => {
+        if (restfoxRequest._type !== 'request') {
+            return
+        }
+
+        let body = {}
+
+        if (restfoxRequest.body.mimeType !== 'No Body') {
+            body = restfoxRequest.body
+        }
+
+        const insomniaRequest: any = {
+            _id: restfoxRequest._id,
+            _type: 'request',
+            parentId: restfoxRequest.parentId || workspaceId,
+            name: restfoxRequest.name || restfoxRequest.url,
+            method: restfoxRequest.method,
+            url: restfoxRequest.url,
+            body,
+            headers: restfoxRequest.headers,
+            authentication: convertRestfoxAuthToInsomniaAuth(restfoxRequest.authentication),
+            parameters: restfoxRequest.parameters,
+        }
+
+        const scripts = restfoxRequest.plugins?.find((plugin: any) => plugin.type === 'script')
+        if (scripts) {
+            insomniaRequest.hook = {
+                preRequest: scriptConversion(scripts.code.pre_request, 'restfoxToInsomnia').trim() || '',
+                postRequest: scriptConversion(scripts.code.post_request, 'restfoxToInsomnia').trim() || ''
+            }
+        }
+
+        insomniaCollection.resources.push(insomniaRequest)
+    })
+
+    return insomniaCollection
+}
+
+function convertRestfoxAuthToInsomniaAuth(auth: any) {
+    const insomniaAuth: any = {}
+
+    switch (auth?.type) {
+        case 'No Auth':
+            insomniaAuth.type = 'none'
+            break
+        case 'Basic Auth':
+            insomniaAuth.type = 'basic'
+            insomniaAuth.username = auth?.username || ''
+            insomniaAuth.password = auth?.password || ''
+            break
+        case 'Bearer Token':
+            insomniaAuth.type = 'bearer'
+            insomniaAuth.token = auth?.token || ''
+            break
+        default:
+            insomniaAuth.type = 'none'
+            break
+    }
+
+    return insomniaAuth
+}
+
+export function covertPostmanAuthToRestfoxAuth(request: any) {
+    let authentication: RequestAuthentication = { type: 'No Auth' }
+
+    if ('auth' in request) {
+        if(request.auth.type === 'bearer' && request.auth.bearer) {
+            const token = Array.isArray(request.auth.bearer) ? request.auth.bearer.find((item: any) => item.key === 'token')?.value || '' : request.auth.bearer.token
+            authentication = {
+                type: 'bearer',
+                token
+            }
+        } else if(request.auth.type === 'basic' && request.auth.basic) {
+            const username = request.auth.basic.find((item: any) => item.key === 'username')?.value || ''
+            const password = request.auth.basic.find((item: any) => item.key === 'password')?.value || ''
+            authentication = {
+                type: 'basic',
+                username: username,
+                password: password
+            }
+        }
+    }
+
+    return authentication
+}
+
+export function getEditorConfig(): EditorConfig {
+    return {
+        indentSize: parseInt(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || constants.EDITOR_CONFIG.indent_size.toString(), 10)
+    }
+}
+
+export function jsonStringify(data: any, space: number = getEditorConfig().indentSize): any {
+    return JSON.stringify(data, null, space)
+}
+

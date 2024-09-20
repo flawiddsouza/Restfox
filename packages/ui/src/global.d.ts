@@ -11,7 +11,8 @@ declare global {
 
     interface ImportMeta {
         env: {
-            MODE: string
+            MODE: string,
+            PROD: boolean,
         }
     }
 }
@@ -141,6 +142,7 @@ export interface State {
         hideBrowserRelatedResponsePanelErrors: boolean
         browserExtensionEnabled: boolean
         isBrowser: boolean
+        isWebStandalone: boolean
         isElectron: boolean
         disableSSLVerification: boolean
         electronSwitchToChromiumFetch: boolean
@@ -154,7 +156,7 @@ export interface State {
 
 export interface Plugin {
     _id: string
-    name: string
+    name: string | null
     type?: 'script'
     code: string | { pre_request: string, post_request: string }
     workspaceId: string | null
@@ -247,4 +249,8 @@ export interface OpenApiSpecPathParams {
             }
         }
     }
+}
+
+export interface EditorConfig {
+    indentSize: number
 }

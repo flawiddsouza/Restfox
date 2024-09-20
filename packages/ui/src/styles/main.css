@@ -108,6 +108,8 @@ html {
     --primary-background-color: #1a73e8;
     --primary-hover-background-color: rgba(26, 115, 232, 0.5);
     --menu-border-color: #82828240;
+    --send-request-button-color: #7f4fd5;
+    --send-request-button-hover-color: #673ab7;
 }
 
 html.theme-dark {
@@ -204,6 +206,8 @@ html.theme-dark {
     --primary-background-color: #1a73e8;
     --primary-hover-background-color: rgba(26, 115, 232, 0.5);
     --menu-border-color: #48484880;
+    --send-request-button-color: #7f4fd5;
+    --send-request-button-hover-color: #673ab7;
 }
 
 html.theme-dracula {
@@ -300,6 +304,8 @@ html.theme-dracula {
     --primary-background-color: #ff79c6;
     --primary-hover-background-color: rgba(255, 121, 198, 0.5);
     --menu-border-color: #6272a47f;
+    --send-request-button-color: #7f4fd5;
+    --send-request-button-hover-color: #673ab7;
 }
 
 * {
@@ -333,6 +339,10 @@ body {
 }
 
 .request-method--POST {
+    color: var(--method-post) !important;
+}
+
+.request-method--GQL {
     color: var(--method-post) !important;
 }
 
@@ -393,7 +403,9 @@ input:disabled {
     border: 1px solid var(--input-disabled-border-color);
 }
 
-input.full-width-input, select.full-width-input {
+input.full-width-input,
+select.full-width-input,
+textarea.full-width-input {
     width: 100%;
     border: 1px solid var(--input-border-color);
     border-radius: var(--default-border-radius);
@@ -405,6 +417,11 @@ input.full-width-input, select.full-width-input {
 input.full-width-input {
     padding: 0.5rem;
     background: var(--modal-background-color);
+}
+
+textarea.full-width-input {
+   resize: vertical;
+   min-height: 4rem;
 }
 
 .code-block {
@@ -542,6 +559,18 @@ button.button:hover, input[type="file"]::file-selector-button:hover {
 
 .cm-editor .invalid-env-var * {
     color: var(--invalid-env-highlight-color) !important;
+}
+
+.cm-editor .tag {
+    border-radius: 3px;
+    padding: 2px 4px;
+    background-color: #dae1ff;
+    color: black;
+    cursor: pointer;
+}
+
+.cm-editor .tag:hover {
+    background-color: #c4d1ff;
 }
 
 .cm-editor :not(.cm-focused) .cm-selectionBackground,

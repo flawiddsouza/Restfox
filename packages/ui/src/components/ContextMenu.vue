@@ -147,11 +147,11 @@ export default {
             this.$emit('update:show', false)
         },
         getOption(option) {
-            const tickMark = '<div class="selected-indicator">✔&nbsp;</div>'
-            const noTickMark = '<div class="selected-indicator">&nbsp;&nbsp;&nbsp;&nbsp;</div>'
+            const tickMark = '<div class="selected-indicator" style="margin-right: 0.3rem;"><i class="fa fa-check"></i></div>'
+            const noTickMark = '<div class="selected-indicator" style="margin-left: 1rem;"></div>'
             const displayedOption = `<div style="word-break: break-all;">${option.label}</div>`
 
-            if(this.selectedOption === undefined) {
+            if(this.selectedOption === undefined || option.disabled) {
                 return displayedOption
             }
 

@@ -58,7 +58,7 @@
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                         <template v-else-if="responseContentType.startsWith('application/json')">
-                            <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                            <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                         <template v-else>
                             <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
@@ -66,7 +66,7 @@
                     </template>
                     <div class="content-box" v-else>
                         <div style="white-space: pre-line;">{{ response.error }}</div>
-                        <div style="margin-top: 1.5rem; width: 30rem;" v-if="response.error !== 'Error: Invalid URL' && response.error !== 'Error: Request Cancelled' && response.error.startsWith('Error in Plugin ') === false">
+                        <div style="margin-top: 1.5rem; word-break: break-word;" v-if="response.error === 'Error: Request failed'">
                             <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
                             <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
                             <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
@@ -161,7 +161,7 @@
     <ResponseFilteringHelpModal v-model:showModal="showResponseFilteringHelpModal" v-model:is-xml="isXmlResponse"></ResponseFilteringHelpModal>
 </template>
 
-<script>
+<script lang="ts">
 import { nextTick, toRaw } from 'vue'
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
@@ -176,14 +176,17 @@ import {
     setEnvironmentVariable,
     getAlertConfirmPromptContainer,
     getStatusText,
-    bufferToString,
     timeAgo,
     responseStatusColorMapping,
 } from '@/helpers'
+import {
+    bufferToJSONString,
+    filterJSONResponse,
+    filterXmlResponse,
+    getResponseContentType,
+} from '@/utils/response'
 import { emitter } from '@/event-bus'
-import {JSONPath} from 'jsonpath-plus'
 import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
-import xpath from 'xpath'
 import constants from '@/constants'
 
 export default {
@@ -391,17 +394,7 @@ export default {
             }
         },
         responseContentType() {
-            if(!this.response || this.response.headers === undefined) {
-                return ''
-            }
-
-            const contentTypeHeader = this.response.headers.find(header => header[0].toLowerCase() === 'content-type')
-
-            if(contentTypeHeader) {
-                return contentTypeHeader[1]
-            }
-
-            return ''
+            return getResponseContentType(this.response)
         },
         passedTestCases() {
             if(this.response && 'testResults' in this.response) {
@@ -437,44 +430,8 @@ export default {
     },
     methods: {
         timeAgo,
-        filterResponse(buffer, jsonPath) {
-            try {
-                const responseData = JSON.parse(this.bufferToJSONString(buffer))
-                const filteredData = JSONPath({ json: responseData, path: jsonPath })
-                return JSON.stringify(filteredData, null, 2)
-            } catch (e) {
-                console.log(`Could not filter response due to ${e.message}`)
-                return this.bufferToJSONString(buffer)
-            }
-
-        },
-        filterXmlResponse(buffer, query) {
-            try {
-                const doc = new DOMParser().parseFromString(this.bufferToString(buffer), 'text/xml')
-                const result = xpath.evaluate(query, doc, null, xpath.XPathResult.ANY_TYPE, null)
-                const nodes = []
-                let node = result.iterateNext()
-                while (node) {
-                    nodes.push(new XMLSerializer().serializeToString(node))
-                    node = result.iterateNext()
-                }
-                return nodes.join('\n')
-            } catch (error) {
-                console.error('Error filtering XML:', error.message)
-                return this.bufferToString(buffer)
-            }
-        },
         cancelRequest() {
             this.requestAbortController.abort()
-        },
-        bufferToString,
-        bufferToJSONString(buffer) {
-            const responseText = this.bufferToString(buffer)
-            try {
-                return JSON.stringify(JSON.parse(responseText), null, 4)
-            } catch {
-                return responseText
-            }
         },
         dateFormat,
         humanFriendlyTime,
@@ -633,7 +590,10 @@ export default {
                     value: item
                 }
             })
-        }
+        },
+        bufferToJSONString,
+        filterJSONResponse,
+        filterXmlResponse,
     },
     activated() {
         if(this.response && this.scrollableAreaEventListenerAttached && this.scrollableAreaScrollTop !== null) {

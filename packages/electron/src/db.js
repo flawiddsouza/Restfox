@@ -650,7 +650,10 @@ async function deleteCollectionsByWorkspaceId(workspace) {
         }
 
         if (item.isDirectory()) {
-            await fs.rm(itemPath, { recursive: true })
+            const folderConfigExists = await fileUtils.pathExists(path.join(itemPath, constants.FILES.FOLDER_CONFIG))
+            if (folderConfigExists || item.name === constants.FOLDERS.ENVIRONMENTS) {
+                await fs.rm(itemPath, { recursive: true })
+            }
         } else {
             if (item.name.endsWith('.json')) {
                 await fileUtils.deleteFileOrFolder(itemPath, fsLog, `Delete collection item`)

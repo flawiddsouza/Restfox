@@ -160,7 +160,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
             environment[varName] = dotEnv[key]
         })
         // substitute process.env variables in workspace environment
-        environment = JSON.parse(substituteEnvironmentVariables(environment, JSON.stringify(environment)))
+        environment = JSON.parse(await substituteEnvironmentVariables(environment, JSON.stringify(environment)))
     }
 
     const headers: Record<string, string> = {}
@@ -169,7 +169,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
     for(const parent of requestParentArray) {
         if(parent.environment) {
             let tempEnvironment = JSON.stringify(parent.environment)
-            tempEnvironment = substituteEnvironmentVariables(environment, tempEnvironment)
+            tempEnvironment = await substituteEnvironmentVariables(environment, tempEnvironment)
             tempEnvironment = JSON.parse(tempEnvironment)
             Object.assign(environment, tempEnvironment)
         }
@@ -305,7 +305,7 @@ async function persistActiveWorkspaceTabs(state: State) {
     })
 }
 
-const store = createStore<State>({
+export const store = createStore<State>({
     devtools: true,
     state() {
         return {
@@ -339,6 +339,7 @@ const store = createStore<State>({
                 hideBrowserRelatedResponsePanelErrors: false,
                 browserExtensionEnabled: false,
                 isBrowser: true,
+                isWebStandalone: false,
                 isElectron: false,
                 disableSSLVerification: false,
                 electronSwitchToChromiumFetch: false,
@@ -618,18 +619,6 @@ const store = createStore<State>({
 
                 await deletePlugin(pluginId, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
                 state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
-            }
-        },
-        async saveResponse(state, { workspaceId, collectionId, response }) {
-            if(response._id) {
-                const responseToSave = structuredClone(toRaw(response))
-                state.responses[collectionId].unshift(responseToSave)
-                if(state.responses[collectionId].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
-                    const responsesToDelete = state.responses[collectionId].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
-                    const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
-                    await deleteResponsesByIds(workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
-                }
-                await createResponse(workspaceId, structuredClone(responseToSave))
             }
         },
         async clearResponseHistory(state) {
@@ -1060,6 +1049,23 @@ const store = createStore<State>({
 
             return { environment, parentHeaders, parentAuthentication, requestParentArray }
         },
+        async saveResponse(context, { workspaceId, collectionId, response }) {
+            if(response._id) {
+                const responseToSave = structuredClone(toRaw(response))
+
+                if(collectionId in context.state.responses === false) {
+                    await loadResponses(context.state, collectionId)
+                }
+
+                context.state.responses[collectionId].unshift(responseToSave)
+                if(context.state.responses[collectionId].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
+                    const responsesToDelete = context.state.responses[collectionId].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
+                    const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
+                    await deleteResponsesByIds(workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
+                }
+                await createResponse(workspaceId, structuredClone(responseToSave))
+            }
+        },
         async sendRequest(context, activeTab: CollectionItem) {
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
@@ -1111,11 +1117,13 @@ const store = createStore<State>({
 
             context.state.requestAbortController[activeTab._id] = new AbortController()
             const response = await handleRequest(activeTab, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
-            context.commit('saveResponse', {
+
+            await context.dispatch('saveResponse', {
                 workspaceId: activeTab.workspaceId,
                 collectionId: activeTab._id,
                 response
             })
+
             context.state.requestResponses[activeTab._id] = response
             context.state.requestResponseStatus[activeTab._id] = 'loaded'
         },

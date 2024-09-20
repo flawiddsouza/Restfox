@@ -9,6 +9,9 @@
             <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded && activeWorkspace._type === 'file'">
                 <button class="button" @click="openWorkspaceFolder">Open Folder</button>
             </div>
+            <div style="margin-left: 0.5rem; font-size: 0.6rem" v-if="activeWorkspaceLoaded">
+                <button class="button workspace-quick-switcher" @click="openWorkspaceQuickSwitcher"><i class="fa fa-repeat"></i> Switch</button>
+            </div>
         </div>
         <div class="right-nav-container">
             <a href="#" @click.prevent="cycleTheme()" class="bl theme-selector">Theme: {{ getThemeName(theme) }}</a>
@@ -17,23 +20,69 @@
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl view-switcher">View: Column</a>
                     <a href="#" @click.prevent="requestResponseLayout = 'left-right'" v-else class="bl view-switcher">View: Row</a>
                 </template>
-                <div style="display: inline-flex; align-items: center; height: 100%; margin-right: 0.5rem;">
-                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;" class="bl">Environment</a>
-                    <select v-model="currentEnvironment" style="border: 1px solid var(--default-border-color); outline: 0; background-color: inherit; height: 84%; border-radius: var(--default-border-radius)" title="Change Environment">
-                        <option v-for="environment in environments">{{ environment.name }}</option>
-                    </select>
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="environmentModalShow = true" style="margin-right: 0.2rem; padding-right: 0.2rem;">
+                        <i class="fas fa-code" style="padding-right: 0.5rem"></i>
+                        Environment
+                    </a>
+                    <div class="custom-dropdown" style="padding-left: 0; padding-right: 0.5rem;" @click="toggleEnvSelectorDropdown">
+                        <i class="fa fa-circle" :style="{ color: currentEnvironmentColor }"></i>&nbsp;&nbsp;{{ currentEnvironment ?? 'Default' }}
+                        <i class="fa fa-caret-down space-right"></i>
+                    </div>
+                    <ContextMenu
+                        :options="getEnvList()"
+                        :element="envSelectorDropdownState.element"
+                        :x="envSelectorDropdownState.contextMenuX"
+                        :y="envSelectorDropdownState.contextMenuY"
+                        v-model:show="envSelectorDropdownState.visible"
+                        :selected-option="currentEnvironment"
+                        @click="selectEnv"
+                    />
                 </div>
-                <a href="#" @click.prevent="showImportModal" class="bl">Import</a>
-                <a href="#" @click.prevent="exportCollection" class="bl">Export</a>
+                <div class="navbar-item">
+                    <a href="#" @click.prevent="showImportModal">
+                        <i class="fas fa-file-import" style="padding-right: 0.5rem"></i>
+                        Import
+                    </a>
+                </div>
+                <div class="navbar-item">
+                    <div class="custom-dropdown" style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown">
+                        <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
+                        <i class="fa fa-caret-down space-right"></i>
+                    </div>
+                    <ContextMenu
+                        :options="getExportList()"
+                        :element="exportSelectorDropdownState.element"
+                        :x="exportSelectorDropdownState.contextMenuX"
+                        :y="exportSelectorDropdownState.contextMenuY"
+                        v-model:show="exportSelectorDropdownState.visible"
+                        @click="exportCollection"
+                    />
+                </div>
             </div>
             <template v-if="nav === 'workspaces'">
                 <a href="#" @click.prevent="showAddWorkspace" class="bl">Add Workspace</a>
                 <a href="#" @click.prevent="openFileWorkspace" class="bl" title="Open an existing file workspace" v-if="flags.isElectron">Open File Workspace</a>
                 <a href="#" @click.prevent="backupAndRestore" class="bl">Backup & Restore</a>
             </template>
-            <a href="#" @click.prevent="showPluginsManager" class="bl">Plugins</a>
-            <a href="#" @click.prevent="showSettings" class="bl br">Settings</a>
-            <a href="#" @click.prevent="showLogs" class="bl br">Logs</a>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showPluginsManager">
+                    <i class="fas fa-plug" style="padding-right: 0.5rem"></i>
+                    Plugins
+                </a>
+            </div>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showSettings">
+                    <i class="fas fa-cog" style="padding-right: 0.5rem"></i>
+                    Settings
+                </a>
+            </div>
+            <div class="navbar-item">
+                <a href="#" @click.prevent="showLogs" class="br">
+                    <i class="fas fa-file-lines" style="padding-right: 0.5rem"></i>
+                    Logs
+                </a>
+            </div>
             <span class="spacer"></span>
             <div class="github-star">
                 <a class="gh-button-container" href="https://github.com/flawiddsouza/Restfox" rel="noopener" target="_blank" title="Star Restfox" aria-label="Star Restfox on GitHub">
@@ -50,8 +99,17 @@
     <AddWorkspaceModal v-model:showModal="showAddWorkspaceModal" :is-electron="flags.isElectron" />
     <SettingsModal v-model:showModal="showSettingsModal" />
     <LogsModal v-model:showModal="showLogsModal"></LogsModal>
-    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" />
+    <EnvironmentModal v-model:showModal="environmentModalShow" :workspace="activeWorkspace" v-if="activeWorkspace" :key="activeWorkspace._id" />
     <BackupAndRestoreModal />
+    <ContextMenu
+        :options="workspaceQuickSwitcherOptions"
+        :element="workspaceQuickSwitcherElement"
+        :x="workspaceQuickSwitcherContextMenuX"
+        :y="workspaceQuickSwitcherContextMenuY"
+        v-model:show="workspaceQuickSwitcherDropdownVisible"
+        :selected-option="activeWorkspace"
+        @click="setActiveWorkspace"
+    />
 </template>
 
 <script>
@@ -67,12 +125,17 @@ import {
     generateNewIdsForTree,
     toTree,
     flattenTree,
+    convertCollectionsFromRestfoxToPostman,
+    convertCollectionsFromRestfoxToInsomnia,
+    exportCollection,
 } from '@/helpers'
 import { getCollectionForWorkspace } from '@/db'
 import constants from '../constants'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 export default {
     components: {
+        ContextMenu,
         PluginManagerModal,
         AddWorkspaceModal,
         SettingsModal,
@@ -81,7 +144,7 @@ export default {
         LogsModal
     },
     props: {
-        nav: String
+        nav: String,
     },
     data() {
         return {
@@ -90,6 +153,22 @@ export default {
             showAddWorkspaceModal: false,
             environmentModalShow: false,
             showLogsModal: false,
+            workspaceQuickSwitcherElement: null,
+            workspaceQuickSwitcherContextMenuX: null,
+            workspaceQuickSwitcherContextMenuY: null,
+            workspaceQuickSwitcherDropdownVisible: false,
+            exportSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
+            envSelectorDropdownState: {
+                visible: false,
+                contextMenuX: null,
+                contextMenuY: null,
+                element: null,
+            },
         }
     },
     computed: {
@@ -102,14 +181,18 @@ export default {
         environments() {
             return this.activeWorkspace.environments ?? [
                 {
-                    name: 'Default',
-                    environment: this.activeWorkspace.environment
+                    name: constants.DEFAULT_ENVIRONMENT.name,
+                    environment: this.activeWorkspace.environment,
+                    color: constants.DEFAULT_ENVIRONMENT.color
                 }
             ]
         },
+        currentEnvironmentColor() {
+            return this.environments.find(env => env.name === this.currentEnvironment).color ?? constants.DEFAULT_ENVIRONMENT.color
+        },
         currentEnvironment: {
             get() {
-                return this.activeWorkspace.currentEnvironment ?? 'Default'
+                return this.activeWorkspace?.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
             },
             set(value) {
                 this.activeWorkspace.currentEnvironment = value
@@ -153,9 +236,30 @@ export default {
         flags() {
             return this.$store.state.flags
         },
+        workspaceQuickSwitcherOptions() {
+            const workspacesOptions = this.$store.state.workspaces.map(workspace => {
+                return {
+                    type: 'option',
+                    label: workspace.name,
+                    value: workspace,
+                    class: 'context-menu-item-with-left-padding',
+                }
+            })
+
+            return [
+                {
+                    type: 'option',
+                    label: 'Workspaces',
+                    icon: 'fa fa-book',
+                    disabled: true,
+                    class: 'text-with-line'
+                },
+                ...workspacesOptions
+            ]
+        },
     },
     methods: {
-        async exportCollection() {
+        async exportCollection(value) {
             let { collection } = await getCollectionForWorkspace(this.activeWorkspace._id)
             for(const item of collection) {
                 item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
@@ -170,7 +274,17 @@ export default {
                 collection = flattenTree(collectionTree)
             }
 
-            exportRestfoxCollection(collection, this.activeWorkspace.environments)
+            if (value === 'Restfox') {
+                exportRestfoxCollection(collection, this.activeWorkspace.environments)
+            }
+
+            if (value === 'Postman') {
+                exportCollection(await convertCollectionsFromRestfoxToPostman(collection), value)
+            }
+
+            if (value === 'Insomnia') {
+                exportCollection(await convertCollectionsFromRestfoxToInsomnia(collection), value)
+            }
         },
         setActiveWorkspace(workspace) {
             this.$store.commit('setActiveWorkspace', workspace)
@@ -232,8 +346,82 @@ export default {
             const currentIndex = themes.indexOf(this.theme)
             const nextIndex = (currentIndex + 1) % themes.length
             this.theme = themes[nextIndex]
-        }
-    }
+        },
+        toggleEnvSelectorDropdown(event) {
+            this.envSelectorDropdownState.visible = !this.envSelectorDropdownState.visible
+            if (this.envSelectorDropdownState.visible) {
+                const containerElement = event.target.closest('.custom-dropdown')
+                this.envSelectorDropdownState.contextMenuX = containerElement.getBoundingClientRect().left
+                this.envSelectorDropdownState.contextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.envSelectorDropdownState.element = containerElement
+            } else {
+                this.envSelectorDropdownState.element = null
+            }
+        },
+        toggleExportSelectorDropdown(event) {
+            this.exportSelectorDropdownState.visible = !this.exportSelectorDropdownState.visible
+            if (this.exportSelectorDropdownState.visible) {
+                const containerElement = event.target.closest('.custom-dropdown')
+                this.exportSelectorDropdownState.contextMenuX = containerElement.getBoundingClientRect().left
+                this.exportSelectorDropdownState.contextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+                this.exportSelectorDropdownState.element = containerElement
+            } else {
+                this.exportSelectorDropdownState.element = null
+            }
+        },
+        getEnvList() {
+            const listHeader = [
+                {
+                    type: 'option',
+                    label: 'Environment',
+                    icon: 'fa fa-globe',
+                    disabled: true,
+                    class: 'text-with-line'
+                },]
+            const list =  this.environments.map(item => {
+                return {
+                    type: 'option',
+                    label: `<i class="fa fa-circle" style="color:${item.color}"></i>&nbsp;&nbsp;${item.name}`,
+                    value: `${item.name}`,
+                    class: 'context-menu-item-with-left-padding'
+                }
+            })
+            return [...listHeader, ...list]
+        },
+        getExportList() {
+            return [
+                {
+                    type: 'option',
+                    label: 'Restfox collection',
+                    value: 'Restfox',
+                    class: 'context-menu-item-with-left-padding'
+                },
+                {
+                    type: 'option',
+                    label: 'Postman collection',
+                    value: 'Postman',
+                    class: 'context-menu-item-with-left-padding'
+                },
+                {
+                    type: 'option',
+                    label: 'Insomnia collection',
+                    value: 'Insomnia',
+                    class: 'context-menu-item-with-left-padding'
+                },
+            ]
+        },
+        selectEnv(value) {
+            this.currentEnvironment = value
+            this.$store.dispatch('reloadTabEnvironmentResolved')
+        },
+        openWorkspaceQuickSwitcher(event) {
+            const containerElement = event.target.closest('.workspace-quick-switcher')
+            this.workspaceQuickSwitcherContextMenuX = containerElement.getBoundingClientRect().left
+            this.workspaceQuickSwitcherContextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+            this.workspaceQuickSwitcherElement = containerElement
+            this.workspaceQuickSwitcherDropdownVisible = true
+        },
+    },
 }
 </script>
 
@@ -303,5 +491,12 @@ export default {
     .theme-selector, .view-switcher, .github-star {
         display: none !important;
     }
+}
+
+.navbar-item {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    border-left: 1px solid var(--border-color-lighter);
 }
 </style>

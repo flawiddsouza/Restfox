@@ -195,11 +195,23 @@ async function getEnvironments(envsDirPath, currentEnvironment) {
     const envFiles = await fileUtils.readdirIgnoreError(envsDirPath)
 
     for (const fileName of envFiles) {
+        if (fileName.endsWith('.meta.json')) {
+            continue
+        }
+
         try {
             const envData = JSON.parse(await fs.readFile(path.join(envsDirPath, fileName), 'utf8'))
+            let envMeta = {}
+
+            try {
+                const metaFileName = fileName.replace('.json', '.meta.json')
+                envMeta = JSON.parse(await fs.readFile(path.join(envsDirPath, metaFileName), 'utf8'))
+            } catch {}
+
             environments.push({
                 name: fileUtils.decodeFilename(fileName.replace('.json', '')),
                 environment: envData,
+                ...envMeta,
             })
         } catch (err) {
             console.error(`Error reading environment file: ${fileName}`, err)
@@ -251,10 +263,21 @@ async function saveEnvironments(fsLog, envsDirPath, environments) {
     const environmentNames = environments.map((env) => `${fileUtils.encodeFilename(env.name)}.json`)
 
     for (const existingEnvironment of existingEnvironments) {
+        if (existingEnvironment.endsWith('.meta.json')) {
+            continue
+        }
+
         if (!environmentNames.includes(existingEnvironment)) {
             // this means the environment was removed
             try {
                 await fileUtils.deleteFileOrFolder(path.join(envsDirPath, existingEnvironment), fsLog, 'Deleting environment')
+
+                const metaFileName = existingEnvironment.replace('.json', '.meta.json')
+                const metaExists = existingEnvironments.includes(metaFileName)
+
+                if (metaExists) {
+                    await fileUtils.deleteFileOrFolder(path.join(envsDirPath, metaFileName), fsLog, 'Deleting environment meta')
+                }
             } catch (err) {
                 console.error(`Error removing environment file: ${existingEnvironment}`, err)
             }
@@ -265,6 +288,9 @@ async function saveEnvironments(fsLog, envsDirPath, environments) {
         const envName = fileUtils.encodeFilename(env.name)
         try {
             await fileUtils.writeFileJson(path.join(envsDirPath, `${envName}.json`), env.environment, fsLog, 'Saving environment')
+            if (env.color) {
+                await fileUtils.writeFileJson(path.join(envsDirPath, `${envName}.meta.json`), { color: env.color }, fsLog, 'Saving environment meta')
+            }
         } catch (err) {
             console.error(`Error writing environment file: ${envName}.json`, err)
         }

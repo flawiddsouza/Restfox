@@ -29,6 +29,7 @@ export default {
         GENERATE_CODE_LANGUAGE: 'Restfox-GenerateCodeLanguage',
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',
         GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
+        INDENT_SIZE: 'Restfox-IndentSize',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',
@@ -226,7 +227,14 @@ export default {
                     info: 'Returns the response body as a parsed JSON object'
                 }
             ],
-        }
+        },
+        TAGS: [
+            {
+                label: 'response()',
+                type: 'function',
+                apply: snippet('{% response() %}')
+            }
+        ],
     },
     MIME_TYPE: {
         FORM_URL_ENCODED: 'application/x-www-form-urlencoded',
@@ -300,6 +308,17 @@ export default {
         '508': 'Loop Detected',
         '510': 'Not Extended',
         '511': 'Network Authentication Required'
+    },
+    DEFAULT_ENVIRONMENT: {
+        name: 'Default',
+        color: 'var(--text-color)',
+    },
+    POSTMAN_SCHEMA: {
+        'v2.0': 'https://schema.getpostman.com/json/collection/v2.0.0/collection.json',
+        'v2.1': 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+    },
+    EDITOR_CONFIG: {
+        indent_size: '4',
     },
     GRANT_TYPES: {
         'password_credentials': 'password',

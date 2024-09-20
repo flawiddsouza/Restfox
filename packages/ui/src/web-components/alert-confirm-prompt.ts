@@ -1,4 +1,3 @@
-// Chrome alert, confirm and prompt replacements
 class AlertConfirmPrompt extends HTMLElement {
     constructor() {
         super()
@@ -10,14 +9,31 @@ class AlertConfirmPrompt extends HTMLElement {
 
         let inputHtml = ''
         if (type === 'prompt') {
-            inputHtml = `
-            <div style="margin-top: 0.5rem;">
-                <input type="text" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
-                <datalist id="selectList">
-                    ${selectList.map(item => `<option value="${item}"></option>`).join('')}
-                </datalist>
-            </div>
-            `
+            if (title.toLowerCase().includes('color')) {
+                inputHtml = `
+                <div style="margin-top: 0.5rem;">
+                    <input type="color" value="${defaultValue ?? '#000000'}" class="color-preview" id="dialog-color-input">
+                </div>
+                `
+            }  else if(title.toLowerCase().includes('in seconds')) {
+                inputHtml = `
+                <div style="margin-top: 0.5rem;">
+                    <input type="number" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
+                    <datalist id="selectList">
+                        ${selectList.map(item => `<option value="${item}"></option>`).join('')}
+                    </datalist>
+                </div>
+                `
+            } else {
+                inputHtml = `
+                <div style="margin-top: 0.5rem;">
+                    <input type="text" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
+                    <datalist id="selectList">
+                        ${selectList.map(item => `<option value="${item}"></option>`).join('')}
+                    </datalist>
+                </div>
+                `
+            }
         }
 
         div.innerHTML = `
@@ -42,8 +58,12 @@ class AlertConfirmPrompt extends HTMLElement {
         shadowRoot.querySelector('#root')?.appendChild(div)
 
         if (type === 'prompt') {
-            shadowRoot.getElementById('dialog-input')?.focus();
-            (shadowRoot.getElementById('dialog-input') as HTMLInputElement).select()
+            if (title.toLowerCase().includes('color')) {
+                shadowRoot.getElementById('dialog-color-input')?.focus()
+            } else {
+                shadowRoot.getElementById('dialog-input')?.focus()
+                ;(shadowRoot.getElementById('dialog-input') as HTMLInputElement).select()
+            }
         } else {
             shadowRoot.getElementById('dialog-confirm')?.focus()
         }
@@ -62,7 +82,11 @@ class AlertConfirmPrompt extends HTMLElement {
 
             const confirm = () => {
                 if (type === 'prompt') {
-                    resolve((shadowRoot.getElementById('dialog-input') as HTMLInputElement).value)
+                    if (title.toLowerCase().includes('color')) {
+                        resolve((shadowRoot.getElementById('dialog-color-input') as HTMLInputElement).value)
+                    } else {
+                        resolve((shadowRoot.getElementById('dialog-input') as HTMLInputElement).value)
+                    }
                 } else {
                     resolve(true)
                 }
@@ -89,7 +113,7 @@ class AlertConfirmPrompt extends HTMLElement {
 
                 // Trap focus inside dialog
                 if (e.type === 'keydown') {
-                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled)') as NodeListOf<HTMLElement>
+                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled), input[type="color"]:not(:disabled)') as NodeListOf<HTMLElement>
                     const firstFocusableEl = focusableEls[0]
                     const lastFocusableEl = focusableEls[focusableEls.length - 1]
 
@@ -183,6 +207,7 @@ class AlertConfirmPrompt extends HTMLElement {
         .dialog-primary-button, .dialog-secondary-button {
             padding: 8px 16px;
             border-radius: var(--border-radius);
+            cursor: pointer;
         }
 
         .dialog-primary-button {
@@ -215,6 +240,16 @@ class AlertConfirmPrompt extends HTMLElement {
             caret-color: var(--modal-caret-color);
             background-color: var(--modal-background-color);
             color: var(--text-color);
+        }
+
+        .color-preview {
+            padding: 7px;
+            height: 5rem;
+            width: 5rem;
+            caret-color: var(--modal-caret-color);
+            background-color: var(--modal-background-color);
+            color: var(--text-color);
+            cursor: pointer;
         }
 
         .dialog-input::selection {
