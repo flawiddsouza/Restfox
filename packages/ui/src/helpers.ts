@@ -189,8 +189,8 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     }
 
     if(import.meta.env.MODE === 'web-standalone') {
-        const proxyHeaders: Record<string, string> = {
-            'x-proxy-flag-disable-ssl-verification': flags.disableSSLVerification.toString(),
+        const proxyHeaders: Record<string | any, string | any> = {
+            'x-proxy-flag-disable-ssl-verification': flags?.disableSSLVerification.toString(),
             'x-proxy-req-url': url.toString(),
             'x-proxy-req-method': method
         }
