@@ -48,10 +48,11 @@
             </div>
 
             <div style="margin-top: 1rem">
-                <label>
-                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Live Preview</div>
-                    <textarea class="full-width-input" :value="preview" readonly></textarea>
-                </label>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom); display: flex; align-items: flex-end; justify-content: space-between;">
+                    Live Preview
+                    <button type="button" class="button" @click="generatePreview(true)">Refresh</button>
+                </div>
+                <textarea class="full-width-input" :value="preview" readonly></textarea>
             </div>
 
             <template #footer>
@@ -292,9 +293,13 @@ function fillDefaultValues() {
     }
 }
 
-async function generatePreview() {
+async function generatePreview(tagTrigger = false) {
+    if (tagTrigger === true) {
+        preview.value = 'Loading...'
+    }
+
     preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, {
-        tagTrigger: false,
+        tagTrigger,
         noError: true,
     })
 }
