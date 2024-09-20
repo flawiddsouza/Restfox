@@ -1778,7 +1778,7 @@ export function covertPostmanAuthToRestfoxAuth(request: any) {
                 type: 'basic',
                 username,
                 password
-            };
+            }
         } else if (request.auth.type === 'oauth2' && request.auth.oauth2) {
             const grantType = request.auth.oauth2.find((item: any) => item.key === 'grant_type')?.value || ''
             const username = request.auth.oauth2.find((item: any) => item.key === 'username')?.value || ''
