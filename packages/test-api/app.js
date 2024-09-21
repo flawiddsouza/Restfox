@@ -7,6 +7,9 @@ import { WebSocketServer } from 'ws'
 import { readFileSync, writeFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
 import * as Diff from 'diff'
+import multer from 'multer'
+
+const upload = multer()
 
 const app = express()
 
@@ -18,6 +21,19 @@ app.use((_req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', '*')
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition')
     next()
+})
+
+app.post('/upload-multipart', upload.any(), (req, res) => {
+    res.send({
+        receivedFiles: req.files.map(file => {
+            return {
+                fieldname: file.fieldname,
+                originalname: file.originalname,
+                mimetype: file.mimetype,
+                size: file.size,
+            }
+        })
+    })
 })
 
 app.get('/', (_req, res) => {
@@ -171,7 +187,7 @@ webSocketServer.on('connection', (ws) => {
     })
 })
 
-server.listen(5605, () => console.log(`
+server.listen(5605, '0.0.0.0', () => console.log(`
 ${ENABLE_SSL ? 'HTTPS' : 'HTTP'} at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605
 Socket.IO v3 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v3
 Socket.IO v4 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v4
