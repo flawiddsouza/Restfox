@@ -1,9 +1,9 @@
 // @vitest-environment edge-runtime
 
-import { assert, test, describe } from 'vitest'
+import { assert, test, describe, expect } from 'vitest'
 import {
     substituteEnvironmentVariables,
-    parseContentDispositionHeaderAndGetFileName,
+    parseContentDispositionHeaderAndGetFileName, convertPostmanAuthToRestfoxAuth,
 } from './helpers'
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
@@ -309,5 +309,108 @@ describe(`Function: ${parseContentDispositionHeaderAndGetFileName.name}`, () => 
         const input = `attachment; filename=annacerrato_vbb_ritratti-02056.jpg; filename*=UTF-8''annacerrato_vbb_ritratti-02056.jpg`
         const expectedOutput = 'annacerrato_vbb_ritratti-02056.jpg'
         assert.equal(parseContentDispositionHeaderAndGetFileName(input, 'fallbackFileName'), expectedOutput)
+    })
+})
+
+describe('convertPostmanAuthToRestfoxAuth', () => {
+    test('should return No Auth when auth is not present', () => {
+        const request = {}
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({ type: 'No Auth' })
+    })
+
+    test('should handle bearer authentication', () => {
+        const request = {
+            auth: {
+                type: 'bearer',
+                bearer: [
+                    { key: 'token', value: 'test-token' }
+                ]
+            }
+        }
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({
+            type: 'bearer',
+            token: 'test-token'
+        })
+    })
+
+    test('should handle basic authentication in Postman v2.0 format', () => {
+        const request = {
+            auth: {
+                type: 'basic',
+                basic: {
+                    username: 'user_v2',
+                    password: 'pass_v2'
+                }
+            }
+        }
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({
+            type: 'basic',
+            username: 'user_v2',
+            password: 'pass_v2'
+        })
+    })
+
+    test('should handle basic authentication in Postman v2.1 format', () => {
+        const request = {
+            auth: {
+                type: 'basic',
+                basic: [
+                    { key: 'username', value: 'user_v2.1' },
+                    { key: 'password', value: 'pass_v2.1' }
+                ]
+            }
+        }
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({
+            type: 'basic',
+            username: 'user_v2.1',
+            password: 'pass_v2.1'
+        })
+    })
+
+    test('should handle OAuth2 authentication', () => {
+        const request = {
+            auth: {
+                type: 'oauth2',
+                oauth2: [
+                    { key: 'grant_type', value: 'password' },
+                    { key: 'username', value: 'oauth_user' },
+                    { key: 'password', value: 'oauth_pass' },
+                    { key: 'clientId', value: 'client_123' },
+                    { key: 'clientSecret', value: 'secret_456' },
+                    { key: 'accessTokenUrl', value: 'https://token.url' },
+                    { key: 'scope', value: 'read write' }
+                ]
+            }
+        }
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({
+            type: 'oauth2',
+            grantType: 'password',
+            username: 'oauth_user',
+            password: 'oauth_pass',
+            clientId: 'client_123',
+            clientSecret: 'secret_456',
+            accessTokenUrl: 'https://token.url',
+            scope: 'read write'
+        })
+    })
+
+    test('should handle missing fields gracefully', () => {
+        const request = {
+            auth: {
+                type: 'basic',
+                basic: []
+            }
+        }
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({
+            type: 'basic',
+            username: '',
+            password: ''
+        })
     })
 })
