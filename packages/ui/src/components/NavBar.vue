@@ -46,7 +46,9 @@
                     </a>
                 </div>
                 <div class="navbar-item">
-                    <div class="custom-dropdown" style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown">
+                    <div class="custom-dropdown"
+                         :style="{ 'pointer-events': isCollectionEmpty > 0 ? 'auto' : 'none', 'opacity': isCollectionEmpty > 0 ? '1' : '0.5' }"
+                         style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown">
                         <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
@@ -169,10 +171,12 @@ export default {
                 contextMenuY: null,
                 element: null,
             },
+            isCollectionEmpty: false
         }
     },
     computed: {
-        activeWorkspace() {
+        async activeWorkspace() {
+            this.isCollectionEmpty = (await getCollectionForWorkspace(this.$store.state.activeWorkspace._id)).collection.length
             return this.$store.state.activeWorkspace
         },
         activeWorkspaceLoaded() {
