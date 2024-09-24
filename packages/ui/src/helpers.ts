@@ -221,69 +221,66 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         })
     }
 
-    if(flags) {
-        if (import.meta.env.MODE === 'desktop-electron' && !flags.electronSwitchToChromiumFetch) {
-            let bodyHint: any = null
+    if (import.meta.env.MODE === 'desktop-electron' && !flags?.electronSwitchToChromiumFetch) {
+        let bodyHint: any = null
 
-            if(body instanceof FormData) {
-                bodyHint = 'FormData'
-                body = Array.from(body.entries())
-                let i = 0
-                for(const item of body) {
-                    if(item[1] instanceof File) {
-                        body[i][1] = {
-                            name: item[1].name,
-                            type: item[1].type,
-                            buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
-                        }
+        if(body instanceof FormData) {
+            bodyHint = 'FormData'
+            body = Array.from(body.entries())
+            let i = 0
+            for(const item of body) {
+                if(item[1] instanceof File) {
+                    body[i][1] = {
+                        name: item[1].name,
+                        type: item[1].type,
+                        buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
                     }
-                    i++
                 }
+                i++
             }
-
-            if(body instanceof File) {
-                bodyHint = 'File'
-                body = {
-                    name: body.name,
-                    type: body.type,
-                    buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
-                }
-            }
-
-            return new Promise((resolve, reject) => {
-                const requestId = nanoid()
-
-                if(abortControllerSignal) {
-                    abortControllerSignal.onabort = () => {
-                        window.electronIPC.cancelRequest(requestId)
-                        reject(new DOMException('The user aborted a request.', 'AbortError'))
-                    }
-                }
-
-                window.electronIPC.sendRequest({
-                    requestId,
-                    url: url.toString(),
-                    method,
-                    headers,
-                    body,
-                    bodyHint,
-                    disableSSLVerification: flags?.disableSSLVerification,
-                }).then((data: any) => {
-                    if(data.event === 'response') {
-                        data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
-                        resolve(data.eventData)
-                    }
-
-                    if(data.event === 'responseError') {
-                        reject(new Error(data.eventData))
-                    }
-                }).catch((error: any) => {
-                    reject(error)
-                })
-            })
         }
-    }
 
+        if(body instanceof File) {
+            bodyHint = 'File'
+            body = {
+                name: body.name,
+                type: body.type,
+                buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
+            }
+        }
+
+        return new Promise((resolve, reject) => {
+            const requestId = nanoid()
+
+            if(abortControllerSignal) {
+                abortControllerSignal.onabort = () => {
+                    window.electronIPC.cancelRequest(requestId)
+                    reject(new DOMException('The user aborted a request.', 'AbortError'))
+                }
+            }
+
+            window.electronIPC.sendRequest({
+                requestId,
+                url: url.toString(),
+                method,
+                headers,
+                body,
+                bodyHint,
+                disableSSLVerification: flags?.disableSSLVerification,
+            }).then((data: any) => {
+                if(data.event === 'response') {
+                    data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
+                    resolve(data.eventData)
+                }
+
+                if(data.event === 'responseError') {
+                    reject(new Error(data.eventData))
+                }
+            }).catch((error: any) => {
+                reject(error)
+            })
+        })
+    }
 
     const startTime = new Date()
     const response = await fetch(url, {
