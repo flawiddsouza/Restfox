@@ -46,9 +46,11 @@
                     </a>
                 </div>
                 <div class="navbar-item">
-                    <div class="custom-dropdown"
-                         :style="{ 'pointer-events': collectionLength > 0 ? 'auto' : 'none', 'opacity': collectionLength > 0 ? '1' : '0.5' }"
-                         style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown">
+                    <div
+                        class="custom-dropdown"
+                        :style="{ 'pointer-events': collectionLength > 0 ? 'auto' : 'none', 'opacity': collectionLength > 0 ? '1' : '0.5' }"
+                        style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown"
+                    >
                         <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}
                         <i class="fa fa-caret-down space-right"></i>
                     </div>
@@ -174,9 +176,11 @@ export default {
             collectionLength: 0
         }
     },
+    async beforeMount() {
+        this.collectionLength = (await getCollectionForWorkspace(this.$store.state.activeWorkspace._id)).collection.length
+    },
     computed: {
-        async activeWorkspace() {
-            this.collectionLength = (await getCollectionForWorkspace(this.$store.state.activeWorkspace._id)).collection.length
+        activeWorkspace() {
             return this.$store.state.activeWorkspace
         },
         activeWorkspaceLoaded() {
