@@ -134,8 +134,6 @@ export async function handleTags(string: string, tagTrigger: boolean, cacheId: s
         const start = match.index!
         const end = start + fullMatch.length
 
-        // console.log(`Match: ${fullMatch}, Start: ${start}, End: ${end}`)
-
         const parsedTag = tagParser.parseFunction(match[1], true)
 
         let replacement = undefined
