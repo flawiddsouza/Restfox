@@ -1108,6 +1108,10 @@ export default {
             this.editTagModalShow = true
         },
         async getUrlPreview() {
+            if (!this.activeTab) {
+                return
+            }
+
             let url = this.activeTab.url ?? ''
 
             url = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url, { tagTrigger: false, noError: true })
