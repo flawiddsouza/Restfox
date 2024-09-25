@@ -176,7 +176,7 @@
                         </label>
                     </td>
                     <td class="full-width">
-                        <div class="custom-select" @click="handleGrantTypeMenu">
+                        <div class="custom-select" style="margin: 0;" @click="handleGrantTypeMenu">
                             {{ grantTypes.find(item => item.value === collectionItem.authentication?.grantType)?.label }}
                             <i class="fa fa-caret-down space-right"></i>
                         </div>
