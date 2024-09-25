@@ -281,6 +281,7 @@ import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
 import { fetchWrapper, substituteEnvironmentVariables } from '@/helpers'
 import { useToast } from 'vue-toast-notification'
+import { bufferToString } from '@/utils/response'
 
 const toast = useToast()
 
@@ -412,7 +413,7 @@ async function requestOAuthToken() {
         const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
         const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret)
         const accessTokenUrl: any = await substituteEnvironmentVariables(env, auth.accessTokenUrl)
-        const scope: string = await substituteEnvironmentVariables(env, auth.scope)
+        const scope: string | null = auth.scope ? await substituteEnvironmentVariables(env, auth.scope) : null
         const username: string = await substituteEnvironmentVariables(env, auth.username)
         const password: string = await substituteEnvironmentVariables(env, auth.password)
         const grantType: string | any = auth.grantType
@@ -423,8 +424,11 @@ async function requestOAuthToken() {
             grant_type: grantType,
             client_id: clientId,
             client_secret: clientSecret,
-            scope,
         })
+
+        if (scope) {
+            bodyData.append('scope', scope)
+        }
 
         if (grantType === 'password') {
             bodyData.append('username', username)
@@ -432,7 +436,16 @@ async function requestOAuthToken() {
         }
 
         try {
-            const response = await fetchWrapper(accessTokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED, 'Access-Control-Allow-Origin': '*' }, bodyData)
+            const abortController = new AbortController()
+
+            const headers = {
+                'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED
+            }
+
+            const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
+                electronSwitchToChromiumFetch: false,
+                disableSSLVerification: false,
+            })
 
             if(response.status !== 200) {
                 couldNotFetchTokenError(response)
@@ -473,7 +486,16 @@ async function refreshOAuthToken() {
             })
 
             try {
-                const response = await fetchWrapper(accessTokenUrl, 'POST', { 'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED }, bodyData)
+                const abortController = new AbortController()
+
+                const headers = {
+                    'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED
+                }
+
+                const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
+                    electronSwitchToChromiumFetch: false,
+                    disableSSLVerification: false,
+                })
 
                 if(response.status !== 200) {
                     couldNotFetchTokenError(response)
@@ -495,6 +517,12 @@ async function refreshOAuthToken() {
 }
 
 function couldNotFetchTokenError(error: any) {
+    try {
+        error.body = bufferToString(error.buffer)
+        delete error.buffer
+        error.body = JSON.parse(error.body)
+        error.headers = Object.fromEntries(error.headers)
+    } catch {}
     console.error('Error fetching OAuth token:', error)
     toast.error('Error fetching OAuth token. Please check the console for more details.')
 }
