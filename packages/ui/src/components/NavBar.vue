@@ -173,13 +173,12 @@ export default {
                 contextMenuY: null,
                 element: null,
             },
-            collectionLength: 0
         }
     },
-    beforeMount() {
-        this.collectionLength = this.$store.state.collection.length
-    },
     computed: {
+        collectionLength() {
+            return this.$store.state.collection.length
+        },
         activeWorkspace() {
             return this.$store.state.activeWorkspace
         },
