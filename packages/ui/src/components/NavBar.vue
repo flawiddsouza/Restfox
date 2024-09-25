@@ -176,8 +176,8 @@ export default {
             collectionLength: 0
         }
     },
-    async beforeMount() {
-        this.collectionLength = (await getCollectionForWorkspace(this.$store.state.activeWorkspace._id)).collection.length
+    beforeMount() {
+        this.collectionLength = this.$store.state.collection.length
     },
     computed: {
         activeWorkspace() {
