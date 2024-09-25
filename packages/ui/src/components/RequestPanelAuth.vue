@@ -106,6 +106,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.clientId"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'oauth-client-id'"
@@ -122,6 +124,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.clientSecret"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'oauth-client-secret'"
@@ -138,6 +142,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.accessTokenUrl"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'oauth-token-url'"
@@ -154,6 +160,8 @@
                         <CodeMirrorSingleLine
                             v-model="collectionItem.authentication.scope"
                             :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
                             :input-text-compatible="true"
                             :disabled="collectionItem.authentication.disabled"
                             :key="'oauth-scope'"
@@ -186,6 +194,8 @@
                             <CodeMirrorSingleLine
                                 v-model="collectionItem.authentication.username"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="collectionItem.authentication.disabled"
                                 :key="'oauth-username'"
@@ -202,6 +212,8 @@
                             <CodeMirrorSingleLine
                                 v-model="collectionItem.authentication.password"
                                 :env-variables="collectionItemEnvironmentResolved"
+                                :autocompletions="tagAutocompletions"
+                                @tagClick="onTagClick"
                                 :input-text-compatible="true"
                                 :disabled="collectionItem.authentication.disabled"
                                 :key="'oauth-password'"
