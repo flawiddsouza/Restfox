@@ -110,7 +110,7 @@ export function generateBasicAuthString(username: string, password: string) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal?: AbortSignal, flags?: {
+export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
     electronSwitchToChromiumFetch: boolean,
     disableSSLVerification: boolean
 }): Promise<RequestInitialResponse> {
@@ -175,22 +175,20 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
             window.addEventListener('message',  messageHandler)
 
-            if(abortControllerSignal) {
-                abortControllerSignal.onabort = () => {
-                    window.postMessage({
-                        event: 'cancelRequest',
-                        eventId,
-                    })
-                    reject(new DOMException('The user aborted a request.', 'AbortError'))
-                    window.removeEventListener('message',  messageHandler)
-                }
+            abortControllerSignal.onabort = () => {
+                window.postMessage({
+                    event: 'cancelRequest',
+                    eventId,
+                })
+                reject(new DOMException('The user aborted a request.', 'AbortError'))
+                window.removeEventListener('message',  messageHandler)
             }
         })
     }
 
     if(import.meta.env.MODE === 'web-standalone') {
-        const proxyHeaders: Record<string | any, string | any> = {
-            'x-proxy-flag-disable-ssl-verification': flags?.disableSSLVerification.toString(),
+        const proxyHeaders: Record<string, string> = {
+            'x-proxy-flag-disable-ssl-verification': flags.disableSSLVerification.toString(),
             'x-proxy-req-url': url.toString(),
             'x-proxy-req-method': method
         }
@@ -221,7 +219,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         })
     }
 
-    if (import.meta.env.MODE === 'desktop-electron' && !flags?.electronSwitchToChromiumFetch) {
+    if (import.meta.env.MODE === 'desktop-electron' && !flags.electronSwitchToChromiumFetch) {
         let bodyHint: any = null
 
         if(body instanceof FormData) {
@@ -252,11 +250,9 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         return new Promise((resolve, reject) => {
             const requestId = nanoid()
 
-            if(abortControllerSignal) {
-                abortControllerSignal.onabort = () => {
-                    window.electronIPC.cancelRequest(requestId)
-                    reject(new DOMException('The user aborted a request.', 'AbortError'))
-                }
+            abortControllerSignal.onabort = () => {
+                window.electronIPC.cancelRequest(requestId)
+                reject(new DOMException('The user aborted a request.', 'AbortError'))
             }
 
             window.electronIPC.sendRequest({
@@ -266,7 +262,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 headers,
                 body,
                 bodyHint,
-                disableSSLVerification: flags?.disableSSLVerification,
+                disableSSLVerification: flags.disableSSLVerification,
             }).then((data: any) => {
                 if(data.event === 'response') {
                     data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
@@ -283,6 +279,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     }
 
     const startTime = new Date()
+
     const response = await fetch(url, {
         method,
         headers,
