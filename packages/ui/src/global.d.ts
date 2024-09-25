@@ -47,6 +47,12 @@ export interface RequestAuthentication {
     username?: string
     password?: string
     disabled?: boolean
+    accessTokenUrl?: string
+    scope?: string
+    clientId?: string
+    clientSecret?: string
+    grantType?: 'authorization_code' | 'password' | 'client_credentials' | string
+    refreshToken?: string
 }
 
 export interface FileObject {

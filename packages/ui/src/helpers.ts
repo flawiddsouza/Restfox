@@ -1755,23 +1755,61 @@ function convertRestfoxAuthToInsomniaAuth(auth: any) {
     return insomniaAuth
 }
 
-export function covertPostmanAuthToRestfoxAuth(request: any) {
+export function convertPostmanAuthToRestfoxAuth(request: any) {
     let authentication: RequestAuthentication = { type: 'No Auth' }
 
-    if ('auth' in request) {
-        if(request.auth.type === 'bearer' && request.auth.bearer) {
-            const token = Array.isArray(request.auth.bearer) ? request.auth.bearer.find((item: any) => item.key === 'token')?.value || '' : request.auth.bearer.token
+    if('auth' in request) {
+        const authType = request.auth.type
+
+        if(authType === 'bearer' && request.auth.bearer) {
+            const token = Array.isArray(request.auth.bearer)
+                ? request.auth.bearer.find((item: any) => item.key === 'token')?.value || ''
+                : request.auth.bearer.token
+
             authentication = {
                 type: 'bearer',
-                token
+                token,
             }
-        } else if(request.auth.type === 'basic' && request.auth.basic) {
-            const username = request.auth.basic.find((item: any) => item.key === 'username')?.value || ''
-            const password = request.auth.basic.find((item: any) => item.key === 'password')?.value || ''
+
+        } else if(authType === 'basic' && request.auth.basic) {
+            // Handle Basic Authentication for both v2.0 and v2.1 formats
+            let username = ''
+            let password = ''
+
+            if(Array.isArray(request.auth.basic)) {
+                // Postman v2.1 format
+                username = request.auth.basic.find((item: any) => item.key === 'username')?.value || ''
+                password = request.auth.basic.find((item: any) => item.key === 'password')?.value || ''
+            } else {
+                // Postman v2.0 format
+                username = request.auth.basic.username || ''
+                password = request.auth.basic.password || ''
+            }
+
             authentication = {
                 type: 'basic',
-                username: username,
-                password: password
+                username,
+                password,
+            }
+
+        } else if(authType === 'oauth2' && request.auth.oauth2) {
+            const grantType = request.auth.oauth2.find((item: any) => item.key === 'grant_type')?.value || ''
+            const username = request.auth.oauth2.find((item: any) => item.key === 'username')?.value || ''
+            const password = request.auth.oauth2.find((item: any) => item.key === 'password')?.value || ''
+            const clientId = request.auth.oauth2.find((item: any) => item.key === 'clientId')?.value || ''
+            const clientSecret = request.auth.oauth2.find((item: any) => item.key === 'clientSecret')?.value || ''
+            const accessTokenUrl = request.auth.oauth2.find((item: any) => item.key === 'accessTokenUrl')?.value || ''
+            const scope = request.auth.oauth2.find((item: any) => item.key === 'scope')?.value || ''
+
+            authentication = {
+                type: 'oauth2',
+                grantType,
+                username,
+                password,
+                clientId,
+                clientSecret,
+                accessTokenUrl,
+                scope,
             }
         }
     }
