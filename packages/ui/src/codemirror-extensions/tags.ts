@@ -1,5 +1,5 @@
 import { ViewPlugin, Decoration, EditorView, ViewUpdate, MatchDecorator, WidgetType, DecorationSet } from '@codemirror/view'
-import { parseFunction } from '@/parsers/tag'
+import { parseFunction, tagRegex } from '@/parsers/tag'
 import type { ParsedResult } from '@/parsers/tag'
 
 type OnClickType = (parsedFunc: ParsedResult, updateFunc: (updatedTag: string) => void) => void
@@ -51,7 +51,7 @@ class PlaceholderWidget extends WidgetType {
 
 export function tags(onClick: OnClickType) {
     const placeholderMatcher = new MatchDecorator({
-        regexp: /{% (.+?) %}/g,
+        regexp: tagRegex,
         decoration: (match, view, pos) => Decoration.replace({
             widget: new PlaceholderWidget(match[1], onClick, view, pos),
         })
