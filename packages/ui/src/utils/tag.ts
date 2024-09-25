@@ -126,7 +126,7 @@ async function handleResponseTag(parsedTag: tagParser.ParsedResult, tagTrigger: 
 }
 
 export async function handleTags(string: string, tagTrigger: boolean, cacheId: string | undefined, noError: boolean) {
-    const regex = /{% (.+?) %}/g
+    const regex = tagParser.tagRegex
     const matches = [...string.matchAll(regex)]
 
     for(const match of matches) {

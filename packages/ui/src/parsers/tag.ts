@@ -5,6 +5,8 @@ export type ParsedResult = {
     parameters: Record<string, string | number>
 }
 
+export const tagRegex = /{% (\S+?\([^}]*?\)) %}/g
+
 /**
 * Parses a function invocation string into a ParsedResult object.
 *

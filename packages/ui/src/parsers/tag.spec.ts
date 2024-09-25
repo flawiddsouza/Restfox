@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { parseFunction, toFunctionString } from './tag'
+import { tagRegex, parseFunction, toFunctionString } from './tag'
 
 const sumInput = 'sum(a=1, b=2)'
 const sumParsedResult = {
@@ -46,4 +46,24 @@ test('toFunctionString: response', async() => {
     const expectedOutput = responseInput
     const output = toFunctionString(input)
     expect(output).toBe(expectedOutput)
+})
+
+test('tagRegex', async() => {
+    const input = `{% response( %}{% response() %}{% r %}{% response(path="100",cat="436") %} {% faker() %}{% base64() %}`
+
+    const expectedMatches = [
+        '{% response() %}',
+        'response()',
+        '{% response(path="100",cat="436") %}',
+        'response(path="100",cat="436")',
+        '{% faker() %}',
+        'faker()',
+        '{% base64() %}',
+        'base64()'
+    ]
+
+    const matchesArray = Array.from(input.matchAll(tagRegex), m => [m[0], m[1]])
+    const flattenedMatches = matchesArray.flat()
+
+    expect(flattenedMatches).toEqual(expectedMatches)
 })
