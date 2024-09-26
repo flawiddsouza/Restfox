@@ -6,6 +6,8 @@ const CLIENT_SECRET = 'test-client-secret'
 const REDIRECT_URI = 'http://localhost:3000/callback'
 const AUTHORIZATION_CODE = 'test-authorization-code'
 const ACCESS_TOKEN = 'test-access-token'
+const USERNAME = 'test-user'
+const PASSWORD = 'test-password'
 
 const app = express()
 app.use(express.urlencoded({ extended: true }))
@@ -26,7 +28,7 @@ app.get('/authorize', (req, res) => {
 })
 
 app.post('/token', (req, res) => {
-    const { grant_type, code, redirect_uri, client_id, client_secret } = req.body
+    const { grant_type, code, redirect_uri, client_id, client_secret, username, password } = req.body
 
     if (grant_type === 'authorization_code') {
         if (
@@ -49,6 +51,26 @@ app.post('/token', (req, res) => {
             client_secret !== CLIENT_SECRET
         ) {
             return res.status(400).json({ error: 'invalid_client' })
+        }
+
+        res.json({
+            access_token: ACCESS_TOKEN,
+            token_type: 'Bearer',
+            expires_in: 3600,
+        })
+    } else if (grant_type === 'password') {
+        if (
+            client_id !== CLIENT_ID ||
+            client_secret !== CLIENT_SECRET
+        ) {
+            return res.status(400).json({ error: 'invalid_client' })
+        }
+
+        if (
+            username !== USERNAME ||
+            password !== PASSWORD
+        ) {
+            return res.status(400).json({ error: 'invalid_user_creds' })
         }
 
         res.json({
