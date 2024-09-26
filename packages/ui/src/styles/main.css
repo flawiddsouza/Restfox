@@ -458,9 +458,13 @@ button.button, input[type="file"]::file-selector-button {
     border-radius: 3px;
 }
 
-button.button:hover, input[type="file"]::file-selector-button:hover {
+button.button:hover:not(:disabled), input[type="file"]::file-selector-button:hover {
     background-color: var(--button-hover-background-color);
     cursor: pointer;
+}
+
+button.button:disabled {
+    opacity: 0.5;
 }
 
 .modal button.button, .pwa-toast button.button {
@@ -469,7 +473,7 @@ button.button:hover, input[type="file"]::file-selector-button:hover {
     border: 1px solid var(--modal-button-border-color);
 }
 
-.modal button.button:hover, .pwa-toast button.button:hover {
+.modal button.button:hover:not(:disabled), .pwa-toast button.button:hover {
     background-color: var(--modal-button-hover-background-color);
 }
 
