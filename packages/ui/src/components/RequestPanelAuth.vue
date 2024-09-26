@@ -505,9 +505,11 @@ async function refreshOAuthToken() {
                 const res = JSON.parse(new TextDecoder().decode(response.buffer))
                 if(props.collectionItem && props.collectionItem.authentication) {
                     props.collectionItem.authentication.token = res.access_token
-                    props.collectionItem.authentication.refreshToken = res.refresh_token
+                    if('refresh_token' in res) {
+                        props.collectionItem.authentication.refreshToken = res.refresh_token
+                    }
                 }
-                toast.success('Refresh token obtained successfully!')
+                toast.success('OAuth token refreshed successfully!')
 
             } catch (error) {
                 couldNotFetchTokenError(error)
