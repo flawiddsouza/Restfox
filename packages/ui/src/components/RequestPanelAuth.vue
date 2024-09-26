@@ -224,7 +224,7 @@
                 <tr>
                     <td colspan="2">
                         <button type="button" class="button" @click="requestOAuthToken" :disabled="collectionItem.authentication.disabled">Get Token</button>
-                        <button type="button" class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled || !collectionItem.authentication.refreshToken" style="margin-left: 0.5rem">Refresh Token</button>
+                        <button type="button" class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled" style="margin-left: 0.5rem">Refresh Token</button>
                     </td>
                 </tr>
                 <tr>
@@ -469,6 +469,7 @@ async function refreshOAuthToken() {
     const auth = props.collectionItem?.authentication
     const env = props.collectionItemEnvironmentResolved
 
+    console.log(auth)
     if(auth) {
         if(props.collectionItem && props.collectionItem.authentication) {
             const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
