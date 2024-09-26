@@ -223,8 +223,8 @@
                 </template>
                 <tr>
                     <td colspan="2">
-                        <button class="button" @click="requestOAuthToken" :disabled="collectionItem.authentication.disabled">Get Token</button>
-                        <button class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled || !collectionItem.authentication.refreshToken" style="margin-left: 0.5rem">Refresh Token</button>
+                        <button type="button" class="button" @click="requestOAuthToken" :disabled="collectionItem.authentication.disabled">Get Token</button>
+                        <button type="button" class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled || !collectionItem.authentication.refreshToken" style="margin-left: 0.5rem">Refresh Token</button>
                     </td>
                 </tr>
                 <tr>
