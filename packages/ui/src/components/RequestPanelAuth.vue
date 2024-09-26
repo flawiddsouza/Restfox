@@ -224,7 +224,7 @@
                 <tr>
                     <td colspan="2">
                         <button type="button" class="button" @click="requestOAuthToken" :disabled="collectionItem.authentication.disabled">Get Token</button>
-                        <button type="button" class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled" style="margin-left: 0.5rem">Refresh Token</button>
+                        <button type="button" class="button" @click="refreshOAuthToken" :disabled="collectionItem.authentication.disabled || !collectionItem.authentication.refreshToken" style="margin-left: 0.5rem">Refresh Token</button>
                     </td>
                 </tr>
                 <tr>
@@ -550,5 +550,10 @@ function onTagClick(...args: any) {
 
 .full-width {
     width: 100% !important;
+}
+
+button:disabled {
+    opacity: 0.5;
+    pointer-events: none;
 }
 </style>
