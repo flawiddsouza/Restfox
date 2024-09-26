@@ -469,7 +469,6 @@ async function refreshOAuthToken() {
     const auth = props.collectionItem?.authentication
     const env = props.collectionItemEnvironmentResolved
 
-    console.log(auth)
     if(auth) {
         if(props.collectionItem && props.collectionItem.authentication) {
             const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
