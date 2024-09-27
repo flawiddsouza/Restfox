@@ -1492,7 +1492,7 @@ export async function resolveAuthentication(cacheId: string, authentication: Req
         )
     }
 
-    if(authentication.type === 'bearer') {
+    if(authentication.type === 'bearer' || authentication.type === 'oauth2') {
         const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
         const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
         return `${await substituteEnvironmentVariables(environment, authenticationBearerPrefix, { cacheId })} ${await substituteEnvironmentVariables(environment, authenticationBearerToken, { cacheId })}`
