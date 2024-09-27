@@ -1,5 +1,5 @@
 <template>
-    <div width="600px" style="margin-left: 1rem; margin-right: 1rem; margin-top: 1rem;">
+    <div width="600px" style="margin-left: 1rem; margin-right: 1rem; margin-top: 1rem;" v-if="collectionItem">
         <label>
             <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">
                 Name
@@ -113,30 +113,34 @@ export default {
             activeWorkspaceFolders = toTree(activeWorkspaceFolders)
             sortTree(activeWorkspaceFolders)
 
-            if (this.collectionItem._type === 'request_group') {
-                const filterChildFolders = (folders, parentId) => {
-                    return folders.filter(folder => {
-                        if (folder.parentId !== parentId && folder._id !== parentId) {
-                            if (folder.children) {
-                                folder.children = filterChildFolders(folder.children, parentId)
+            if (activeWorkspaceFolders) {
+                if (this.collectionItem && this.collectionItem._type === 'request_group') {
+                    const filterChildFolders = (folders, parentId) => {
+                        return folders.filter(folder => {
+                            if (folder.parentId !== parentId && folder._id !== parentId) {
+                                if (folder.children) {
+                                    folder.children = filterChildFolders(folder.children, parentId)
+                                }
+                                return true
                             }
-                            return true
-                        }
-                        return false
-                    })
+                            return false
+                        })
+                    }
+                    activeWorkspaceFolders = filterChildFolders(activeWorkspaceFolders, this.collectionItem._id)
                 }
-                activeWorkspaceFolders = filterChildFolders(activeWorkspaceFolders, this.collectionItem._id)
-            }
 
-            prependParentTitleToChildTitle(activeWorkspaceFolders)
-            activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
-            this.activeWorkspaceFolders = activeWorkspaceFolders
+                prependParentTitleToChildTitle(activeWorkspaceFolders)
+                activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
+                this.activeWorkspaceFolders = activeWorkspaceFolders
+            }
         },
         async loadEnvVariables() {
             try {
-                const request = JSON.parse(JSON.stringify(this.collectionItem))
-                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request, includeSelf: true })
-                this.envVariables = environment
+                if(this.collectionItem) {
+                    const request = JSON.parse(JSON.stringify(this.collectionItem))
+                    const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request, includeSelf: true })
+                    this.envVariables = environment
+                }
             } catch (error) {
                 console.error('Error loading environment variables:', error)
             }
