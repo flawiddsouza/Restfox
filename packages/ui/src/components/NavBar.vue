@@ -47,8 +47,7 @@
                 </div>
                 <div class="navbar-item">
                     <div
-                        class="custom-dropdown"
-                        :style="{ 'pointer-events': collectionLength > 0 ? 'auto' : 'none', 'opacity': collectionLength > 0 ? '1' : '0.5' }"
+                        :class="collectionLength > 0 ? 'custom-dropdown' : 'custom-dropdown disabled'"
                         style="padding-left: 0.5rem; padding-right: 0.5rem" @click="toggleExportSelectorDropdown"
                     >
                         <i class="fa fa-file-export"></i>&nbsp;&nbsp;{{ 'Export' }}

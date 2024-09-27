@@ -720,6 +720,11 @@ select {
     height: 100%;
 }
 
+.custom-dropdown.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 .custom-dropdown .custom-dropdown-content {
     white-space: nowrap;
     overflow: hidden;
