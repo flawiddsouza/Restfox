@@ -36,6 +36,10 @@
     <section class="request-response-panels" v-if="collectionItem && collectionItem._type === 'socket'">
         <SocketPanel :key="collectionItem._id" :active-tab="collectionItem" />
     </section>
+
+    <section class="request-response-panels" v-show="collectionItem && collectionItem._type === 'request_group'">
+        <FolderPanel :show-modal="true" :collection-item="collectionItem" @update:collection-item="updateCollectionItem" />
+    </section>
 </template>
 
 <script setup lang="ts">
@@ -48,6 +52,7 @@ import { vResizable } from '@/directives/vResizable'
 import { Store, useStore } from 'vuex'
 import { findItemInTreeById } from '@/helpers'
 import { State } from '@/global'
+import FolderPanel from '@/components/FolderPanel.vue'
 
 const props = defineProps<{
     collectionItem: CollectionItem | null;

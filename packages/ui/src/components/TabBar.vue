@@ -178,6 +178,10 @@ export default {
             if(tab._type === 'socket') {
                 return 'SOCK'
             }
+
+            if(tab._type === 'request_group') {
+                return ''
+            }
         },
         scrollTabs(event) {
             this.$refs.tabContainer.scrollLeft += event.deltaY
@@ -218,7 +222,7 @@ export default {
             draggable="true"
             @contextmenu.prevent="handleTabContextMenu($event, tab)"
         >
-            <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
+            <span :class="`request-method--${getTabMethodName(tab)}`"><i class='fa space-right fa-folder-open' v-show="getTabMethodName(tab) === ''"></i>{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
             <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times"></i></span>
         </div>
     </div>

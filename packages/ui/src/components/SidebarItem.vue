@@ -106,6 +106,7 @@ export default {
             if(sidebarItem._type === 'request_group') {
                 sidebarItem.collapsed = !(sidebarItem.collapsed)
                 this.$store.dispatch('saveCollectionItemCollapsedState', { _id: sidebarItem._id, collapsed: sidebarItem.collapsed })
+                this.$store.dispatch('addTab', sidebarItem)
             }
         },
         handleSidebarItemDoubleClick(sidebarItem) {
