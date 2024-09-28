@@ -1,23 +1,6 @@
 <template>
     <div width="600px" style="margin-left: 1rem; margin-right: 1rem; margin-top: 1rem;" v-if="collectionItem">
-        <label>
-            <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">
-                Name
-            </div>
-            <input type="text" class="full-width-input" v-model="collectionItem.name" placeholder="Folder Name" spellcheck="false" required v-focus>
-        </label>
-
         <div style="padding-top: 1rem"></div>
-
-        <div>
-            <label>
-                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Folder</div>
-                <select class="full-width-input" v-model="collectionItem.parentId" required>
-                    <option :value="null">Root of the workspace</option>
-                    <option v-for="activeWorkspaceFolder in activeWorkspaceFolders" :value="activeWorkspaceFolder._id">{{ activeWorkspaceFolder.name }}</option>
-                </select>
-            </label>
-        </div>
 
         <div v-if="collectionItem._type === 'request_group'">
             <div style="padding-bottom: 1rem"></div>
@@ -48,7 +31,6 @@
 </template>
 
 <script>
-import { getCollectionForWorkspace } from '@/db'
 import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '@/helpers'
 import RequestPanelHeaders from '../../src/components/RequestPanelHeaders.vue'
 import RequestPanelAuth from '../../src/components/RequestPanelAuth.vue'
@@ -77,7 +59,6 @@ export default {
     },
     data() {
         return {
-            activeWorkspaceFolders: [],
             envVariables: {},
         }
     },
@@ -94,46 +75,16 @@ export default {
                 }
             }
         },
-        activeWorkspace() {
-            return this.$store.state.activeWorkspace
-        },
     },
     watch: {
         collectionItem: {
             immediate: true,
             handler() {
-                this.getAllFolders()
                 this.loadEnvVariables()
             }
         }
     },
     methods: {
-        async getAllFolders() {
-            let { collection: activeWorkspaceFolders } = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
-            activeWorkspaceFolders = toTree(activeWorkspaceFolders)
-            sortTree(activeWorkspaceFolders)
-
-            if (activeWorkspaceFolders) {
-                if (this.collectionItem && this.collectionItem._type === 'request_group') {
-                    const filterChildFolders = (folders, parentId) => {
-                        return folders.filter(folder => {
-                            if (folder.parentId !== parentId && folder._id !== parentId) {
-                                if (folder.children) {
-                                    folder.children = filterChildFolders(folder.children, parentId)
-                                }
-                                return true
-                            }
-                            return false
-                        })
-                    }
-                    activeWorkspaceFolders = filterChildFolders(activeWorkspaceFolders, this.collectionItem._id)
-                }
-
-                prependParentTitleToChildTitle(activeWorkspaceFolders)
-                activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
-                this.activeWorkspaceFolders = activeWorkspaceFolders
-            }
-        },
         async loadEnvVariables() {
             try {
                 if(this.collectionItem) {
