@@ -1,12 +1,7 @@
 <template>
     <div width="600px" style="margin-left: 1rem; margin-right: 1rem; margin-top: 1rem;" v-if="collectionItem">
-        <div style="padding-top: 1rem"></div>
-
         <div v-if="collectionItem._type === 'request_group'">
             <div style="padding-bottom: 1rem"></div>
-            <hr style="border: none; height: 1px; background-color: var(--default-border-color);">
-            <div style="padding-bottom: 1rem"></div>
-
             <div class="request-panel-tabs-context">
                 <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Headers</div>
                 <div>
@@ -61,20 +56,6 @@ export default {
         return {
             envVariables: {},
         }
-    },
-    computed: {
-        showModalComp: {
-            get() {
-                return this.showModal
-            },
-            set(value) {
-                if (value === false) {
-                    this.$emit('update:collectionItem', this.collectionItem)
-                } else {
-                    this.$emit('update:showModal', value)
-                }
-            }
-        },
     },
     watch: {
         collectionItem: {
