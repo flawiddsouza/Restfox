@@ -26,7 +26,6 @@
 </template>
 
 <script>
-import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '@/helpers'
 import RequestPanelHeaders from '../../src/components/RequestPanelHeaders.vue'
 import RequestPanelAuth from '../../src/components/RequestPanelAuth.vue'
 
