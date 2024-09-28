@@ -18,28 +18,6 @@
                 </label>
             </div>
 
-            <div v-if="collectionItem._type === 'request_group'">
-                <div style="padding-bottom: 1rem"></div>
-                <hr style="border: none; height: 1px; background-color: var(--default-border-color);">
-                <div style="padding-bottom: 1rem"></div>
-                <div class="request-panel-tabs-context">
-                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Headers</div>
-                    <div>
-                        <RequestPanelHeaders :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelHeaders>
-                    </div>
-                    <div style="margin-top: 0.5rem; color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;">These will be applied to all requests in this folder and its subfolders</div>
-                </div>
-
-                <div style="padding-bottom: 1rem"></div>
-                <div class="request-panel-tabs-context">
-                    <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Auth</div>
-                    <div>
-                        <RequestPanelAuth :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelAuth>
-                    </div>
-                    <div style="margin-top: 0.5rem; color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;">This will be applied to all requests in this folder and its subfolders</div>
-                </div>
-            </div>
-
             <div style="padding-bottom: 1rem"></div>
 
             <template #footer>
@@ -53,8 +31,6 @@
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '@/helpers'
-import RequestPanelHeaders from '../RequestPanelHeaders.vue'
-import RequestPanelAuth from '../RequestPanelAuth.vue'
 
 export default {
     directives: {
@@ -70,13 +46,10 @@ export default {
     },
     components: {
         Modal,
-        RequestPanelHeaders,
-        RequestPanelAuth,
     },
     data() {
         return {
             activeWorkspaceFolders: [],
-            envVariables: {},
         }
     },
     computed: {
@@ -130,10 +103,6 @@ export default {
         showModal() {
             if(this.showModal) {
                 this.getAllFolders()
-
-                if(this.collectionItem._type === 'request_group') {
-                    this.loadEnvVariables()
-                }
             }
         }
     },
@@ -163,11 +132,6 @@ export default {
             prependParentTitleToChildTitle(activeWorkspaceFolders)
             activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
             this.activeWorkspaceFolders = activeWorkspaceFolders
-        },
-        async loadEnvVariables() {
-            const request = JSON.parse(JSON.stringify(this.collectionItem))
-            const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request, includeSelf: true })
-            this.envVariables = environment
         },
     }
 }
