@@ -178,6 +178,10 @@ export default {
             if(tab._type === 'socket') {
                 return 'SOCK'
             }
+
+            if(tab._type === 'request_group') {
+                return ''
+            }
         },
         scrollTabs(event) {
             this.$refs.tabContainer.scrollLeft += event.deltaY
