@@ -173,6 +173,7 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
 export function createResponseContextForPlugin(response: RequestFinalResponse, environment: any, setEnvironmentVariable: (name: string, value: string) => void, testResults: PluginTestResult[]): { expose: PluginExpose } {
     let bufferCopy = response.buffer.slice(0)
     const headers = response.headers
+    const statusCode = response.status
 
     const generalContextMethods = {
         ...generalContextMethodsBase,
@@ -215,6 +216,9 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
             getHeader(headerName: string) {
                 const header = headers.find((header: RequestInitialResponseHeader) => header[0].toLowerCase() == headerName.toLowerCase())
                 return header ? header[1] : undefined
+            },
+            getStatusCode() {
+                return statusCode
             },
             // deprecated but won't be removed
             getEnvironmentVariable: generalContextMethods.getEnvVar,
