@@ -225,6 +225,11 @@ export default {
                     label: 'rf.response.getBodyJSON()',
                     type: 'function',
                     info: 'Returns the response body as a parsed JSON object'
+                },
+                {
+                    label: 'rf.response.getStatusCode()',
+                    type: 'function',
+                    info: 'Returns the status code of the response',
                 }
             ],
         },

@@ -254,6 +254,11 @@ export default defineComponent ({
                 type: 'option',
                 label: 'Returns the response body as a parsed JSON object',
                 value: 'rf.response.getBodyJSON()'
+            },
+            {
+                type: 'option',
+                label: 'Returns the status code of the response',
+                value: 'rf.response.getStatusCode()'
             }
         ]
 
