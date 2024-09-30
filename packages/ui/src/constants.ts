@@ -329,5 +329,22 @@ export default {
         'password_credentials': 'password',
         'client_credentials': 'client_credentials',
         'refresh_token': 'refresh_token',
+    },
+    REQUESTS: {
+        http: {
+            title: 'HTTP Request',
+            alt: 'HTTP Request',
+            type: 'http-request'
+        },
+        graphql: {
+            title: 'GraphQL Request',
+            alt: 'GraphQL Request',
+            type: 'graphql-request'
+        },
+        websocket: {
+            title: 'Websocket Request',
+            alt: 'Websocket Request',
+            type: 'websocket-request'
+        }
     }
 }

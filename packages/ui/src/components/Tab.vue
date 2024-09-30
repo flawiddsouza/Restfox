@@ -40,6 +40,10 @@
     <section class="request-response-panels" v-show="collectionItem && collectionItem._type === 'request_group'">
         <FolderPanel :collection-item="collectionItem" @update:collection-item="updateCollectionItem" />
     </section>
+
+    <section class="request-response-panels" v-if="!collectionItem">
+        <NewRequestShortcutPanel></NewRequestShortcutPanel>
+    </section>
 </template>
 
 <script setup lang="ts">
@@ -53,6 +57,7 @@ import { Store, useStore } from 'vuex'
 import { findItemInTreeById } from '@/helpers'
 import { State } from '@/global'
 import FolderPanel from '@/components/FolderPanel.vue'
+import NewRequestShortcutPanel from '@/components/NewRequestShortcutPanel.vue'
 
 const props = defineProps<{
     collectionItem: CollectionItem | null;
