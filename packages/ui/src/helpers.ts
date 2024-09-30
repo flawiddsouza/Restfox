@@ -1525,7 +1525,8 @@ export function scriptConversion(scriptToConvert: string, scriptType: 'postmanTo
         postmanToRestfox: {
             'pm.environment.set': 'rf.setEnvVar',
             'pm.environment.get': 'rf.getEnvVar',
-            'pm.response.json()': 'rf.response.getBodyJSON()'
+            'pm.response.json()': 'rf.response.getBodyJSON()',
+            'pm.response.code': 'rf.response.getStatusCode()'
         },
         restfoxToPostman: {
             'rf.setEnvVar': 'pm.environment.set',
