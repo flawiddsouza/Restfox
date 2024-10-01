@@ -33,7 +33,7 @@
         <div class="response-panel-tabs">
             <div class="response-panel-tab" :class="{ 'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name }" @click="activeResponsePanelTab = responsePanelTab.name" v-for="responsePanelTab in responsePanelTabs">
                 {{ responsePanelTab.label }}
-                <i :class="`fa fa-circle ${allTestsPassed() ? 'passed-tests' : 'failed-tests' }`" v-if="responsePanelTab.name === 'Tests' && response.testResults && response.testResults.length > 0" style="margin-left: 0.2rem"></i>
+                <i :class="`fa fa-circle ${ allTestsPassed ? 'passed-tests' : 'failed-tests' }`" v-if="responsePanelTab.name === 'Tests' && response.testResults && response.testResults.length > 0" style="margin-left: 0.2rem"></i>
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
@@ -239,7 +239,7 @@ export default {
                 })
             }
 
-            if(this.isTestResultsAvailable()) {
+            if(this.isTestResultsAvailable) {
                 const tab = {
                     name: 'Tests',
                     label: 'Tests'
@@ -398,12 +398,21 @@ export default {
             return getResponseContentType(this.response)
         },
         passedTestCases() {
-            if(this.isTestResultsAvailable()) {
+            if(this.isTestResultsAvailable) {
                 return this.response.testResults.filter(item => item.passed).length
             }
 
             return 0
-        }
+        },
+        allTestsPassed() {
+            if(this.isTestResultsAvailable) {
+                return this.response.testResults.length === this.passedTestCases
+            }
+            return false
+        },
+        isTestResultsAvailable() {
+            return this.response && 'testResults' in this.response
+        },
     },
     watch: {
         response() {
@@ -591,15 +600,6 @@ export default {
                     value: item
                 }
             })
-        },
-        allTestsPassed() {
-            if(this.isTestResultsAvailable()) {
-                return this.response.testResults.length === this.passedTestCases
-            }
-            return false
-        },
-        isTestResultsAvailable() {
-            return this.response && 'testResults' in this.response || false
         },
         bufferToJSONString,
         filterJSONResponse,
