@@ -8,9 +8,7 @@
             <div class="create-request">
                 <p>Create a new request</p>
                 <div class="icons">
-                    <img src="/http-request-icon.png" :alt="constants.REQUESTS.http.alt" :title="constants.REQUESTS.http.title" @click="createRequest(constants.REQUESTS.http.type)" />
-                    <img src="/graphql-request-icon.png" :alt="constants.REQUESTS.graphql.alt" :title="constants.REQUESTS.graphql.title" @click="createRequest(constants.REQUESTS.graphql.type)" />
-                    <img src="/websocket-request-icon.png" :alt="constants.REQUESTS.websocket.alt" :title="constants.REQUESTS.websocket.title" @click="createRequest(constants.REQUESTS.websocket.type)" />
+                    <img :src="`/images/${constants.REQUESTS[key].type}-icon.png`" :alt="constants.REQUESTS[key].alt" :title="constants.REQUESTS[key].title" @click="createRequest(constants.REQUESTS[key].type)" v-for="key in Object.keys(constants.REQUESTS)">
                 </div>
             </div>
         </div>
@@ -68,11 +66,9 @@ export default {
 
 <style scoped>
 .outer-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 80vh;
-    width: 200vh;
+    display: grid;
+    place-items: center;
+    width: 100%;
 }
 
 .inner-container {
