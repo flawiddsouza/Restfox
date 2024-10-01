@@ -3,7 +3,9 @@
 import { assert, test, describe, expect } from 'vitest'
 import {
     substituteEnvironmentVariables,
-    parseContentDispositionHeaderAndGetFileName, convertPostmanAuthToRestfoxAuth,
+    parseContentDispositionHeaderAndGetFileName,
+    convertPostmanAuthToRestfoxAuth,
+    scriptConversion
 } from './helpers'
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
@@ -412,5 +414,82 @@ describe('convertPostmanAuthToRestfoxAuth', () => {
             username: '',
             password: ''
         })
+    })
+})
+
+describe('scriptConversion', () => {
+    test('should convert Postman script to Restfox script with basic mappings', () => {
+        const postmanScript = `
+      pm.environment.set("key", "value");
+      pm.environment.get("key");
+      pm.response.json();
+      pm.response.code;
+      pm.test("Test", function () {});
+    `
+
+        const expectedRestfoxScript = `
+      rf.setEnvVar("key", "value");
+      rf.getEnvVar("key");
+      rf.response.getBodyJSON();
+      rf.response.getStatusCode();
+      test("Test", function () {});
+    `
+
+        const result = scriptConversion(postmanScript, 'postmanToRestfox')
+        expect(result).toBe(expectedRestfoxScript)
+    })
+
+    test('should convert Restfox script to Postman script with basic mappings', () => {
+        const restfoxScript = `
+      rf.setEnvVar("key", "value");
+      rf.getEnvVar("key");
+      rf.response.getBodyJSON();
+    `
+
+        const expectedPostmanScript = `
+      pm.environment.set("key", "value");
+      pm.environment.get("key");
+      pm.response.json();
+    `
+
+        const result = scriptConversion(restfoxScript, 'restfoxToPostman')
+        expect(result).toBe(expectedPostmanScript)
+    })
+
+    test('should convert Restfox script to Insomnia script with basic mappings', () => {
+        const restfoxScript = `
+      rf.setEnvVar("key", "value");
+      rf.getEnvVar("key");
+      rf.response.getBodyJSON();
+    `
+
+        const expectedInsomniaScript = `
+      insomnia.setEnvironmentVariable("key", "value");
+      insomnia.getEnvironmentVariable("key");
+      insomnia.response.json();
+    `
+
+        const result = scriptConversion(restfoxScript, 'restfoxToInsomnia')
+        expect(result).toBe(expectedInsomniaScript)
+    })
+
+    test('should convert Postman status code assertions to Restfox', () => {
+        const postmanScript = `
+      pm.response.to.have.status(200);
+      pm.response.to.have.status(404);
+    `
+
+        const expectedRestfoxScript = `
+      rf.response.getStatusCode() === 200;
+      rf.response.getStatusCode() === 404;
+    `
+
+        const result = scriptConversion(postmanScript, 'postmanToRestfox')
+        expect(result).toBe(expectedRestfoxScript)
+    })
+
+    test('should throw error for unsupported script types', () => {
+        const unsupportedScript = 'some random script'
+        expect(() => scriptConversion(unsupportedScript, 'unsupportedType' as any)).toThrowError('Unsupported script type: unsupportedType')
     })
 })
