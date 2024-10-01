@@ -32,7 +32,7 @@
         </div>
         <div class="response-panel-tabs">
             <div class="response-panel-tab" :class="{ 'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name }" @click="activeResponsePanelTab = responsePanelTab.name" v-for="responsePanelTab in responsePanelTabs">
-                {{ responsePanelTab.label }}
+                {{responsePanelTab.label}}
                 <i :class="`fa fa-circle ${allTestsPassed() ? 'passed-tests' : 'failed-tests' }`" v-if="responsePanelTab.name === 'Tests' && passedTestCases" style="margin-left: 0.2rem"></i>
             </div>
             <div class="response-panel-tab-fill"></div>
