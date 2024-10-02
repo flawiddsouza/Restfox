@@ -495,22 +495,15 @@ describe('scriptConversion', () => {
     })
 })
 
-interface CollectionItem {
-    _id: string;
-    _type: string;
-    parentId: string | null;
-    children?: CollectionItem[];
-}
-
 describe('toTree', () => {
     test('should return an empty array when input is empty', () => {
-        const input: CollectionItem[] = []
+        const input: any = []
         const result = toTree(input)
         expect(result).toEqual([])
     })
 
     test('should handle a flat list with no parent-child relationships', () => {
-        const input: CollectionItem[] = [
+        const input: any = [
             { _id: '1', _type: 'request', parentId: null },
             { _id: '2', _type: 'request', parentId: null }
         ]
@@ -519,7 +512,7 @@ describe('toTree', () => {
     })
 
     test('should build a tree structure when there are parent-child relationships', () => {
-        const input: CollectionItem[] = [
+        const input: any = [
             { _id: '1', _type: 'request_group', parentId: null },
             { _id: '2', _type: 'request', parentId: '1' }
         ]
@@ -536,7 +529,7 @@ describe('toTree', () => {
     })
 
     test('should build nested trees with multiple levels', () => {
-        const input: CollectionItem[] = [
+        const input: any = [
             { _id: '1', _type: 'request_group', parentId: null },
             { _id: '2', _type: 'request_group', parentId: '1' },
             { _id: '3', _type: 'request', parentId: '2' }
@@ -561,7 +554,7 @@ describe('toTree', () => {
     })
 
     test('should handle multiple root elements', () => {
-        const input: CollectionItem[] = [
+        const input: any = [
             { _id: '1', _type: 'request_group', parentId: null },
             { _id: '2', _type: 'request_group', parentId: null },
             { _id: '3', _type: 'request', parentId: '1' }
