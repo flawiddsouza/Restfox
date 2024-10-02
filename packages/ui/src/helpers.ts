@@ -1562,8 +1562,6 @@ export function scriptConversion(scriptToConvert: string, scriptType: 'postmanTo
     return convertedScript
 }
 
-
-
 export async function convertCollectionsFromRestfoxToPostman(restfoxCollections: any) {
     const restfoxData: any = restfoxCollections
 
