@@ -1526,7 +1526,9 @@ export function scriptConversion(scriptToConvert: string, scriptType: 'postmanTo
             'pm.environment.set': 'rf.setEnvVar',
             'pm.environment.get': 'rf.getEnvVar',
             'pm.response.json()': 'rf.response.getBodyJSON()',
-            'pm.response.code': 'rf.response.getStatusCode()'
+            'pm.response.code': 'rf.response.getStatusCode()',
+            'pm.test': 'test',
+            'pm.expect': 'expect',
         },
         restfoxToPostman: {
             'rf.setEnvVar': 'pm.environment.set',
@@ -1546,13 +1548,19 @@ export function scriptConversion(scriptToConvert: string, scriptType: 'postmanTo
     }
 
     let convertedScript = scriptToConvert
+
+    // Replace basic mappings
     for (const [key, value] of Object.entries(selectedMapping)) {
         convertedScript = convertedScript.replaceAll(key, value)
     }
 
+    // Generalize status code conversion for Postman to Restfox
+    if (scriptType === 'postmanToRestfox') {
+        convertedScript = convertedScript.replace(/pm\.response\.to\.have\.status\((\d+)\)/g, 'rf.response.getStatusCode() === $1')
+    }
+
     return convertedScript
 }
-
 
 export async function convertCollectionsFromRestfoxToPostman(restfoxCollections: any) {
     const restfoxData: any = restfoxCollections
