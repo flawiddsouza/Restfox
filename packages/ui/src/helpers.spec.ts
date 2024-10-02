@@ -5,7 +5,8 @@ import {
     substituteEnvironmentVariables,
     parseContentDispositionHeaderAndGetFileName,
     convertPostmanAuthToRestfoxAuth,
-    scriptConversion
+    scriptConversion,
+    toTree
 } from './helpers'
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
@@ -491,5 +492,95 @@ describe('scriptConversion', () => {
     test('should throw error for unsupported script types', () => {
         const unsupportedScript = 'some random script'
         expect(() => scriptConversion(unsupportedScript, 'unsupportedType' as any)).toThrowError('Unsupported script type: unsupportedType')
+    })
+})
+
+interface CollectionItem {
+    _id: string;
+    _type: string;
+    parentId: string | null;
+    children?: CollectionItem[];
+}
+
+describe('toTree', () => {
+    test('should return an empty array when input is empty', () => {
+        const input: CollectionItem[] = []
+        const result = toTree(input)
+        expect(result).toEqual([])
+    })
+
+    test('should handle a flat list with no parent-child relationships', () => {
+        const input: CollectionItem[] = [
+            { _id: '1', _type: 'request', parentId: null },
+            { _id: '2', _type: 'request', parentId: null }
+        ]
+        const result = toTree(input)
+        expect(result).toEqual(input) // No hierarchy, so the result is the same as input
+    })
+
+    test('should build a tree structure when there are parent-child relationships', () => {
+        const input: CollectionItem[] = [
+            { _id: '1', _type: 'request_group', parentId: null },
+            { _id: '2', _type: 'request', parentId: '1' }
+        ]
+        const expected = [
+            {
+                _id: '1',
+                _type: 'request_group',
+                parentId: null,
+                children: [{ _id: '2', _type: 'request', parentId: '1' }]
+            }
+        ]
+        const result = toTree(input)
+        expect(result).toEqual(expected)
+    })
+
+    test('should build nested trees with multiple levels', () => {
+        const input: CollectionItem[] = [
+            { _id: '1', _type: 'request_group', parentId: null },
+            { _id: '2', _type: 'request_group', parentId: '1' },
+            { _id: '3', _type: 'request', parentId: '2' }
+        ]
+        const expected = [
+            {
+                _id: '1',
+                _type: 'request_group',
+                parentId: null,
+                children: [
+                    {
+                        _id: '2',
+                        _type: 'request_group',
+                        parentId: '1',
+                        children: [{ _id: '3', _type: 'request', parentId: '2' }]
+                    }
+                ]
+            }
+        ]
+        const result = toTree(input)
+        expect(result).toEqual(expected)
+    })
+
+    test('should handle multiple root elements', () => {
+        const input: CollectionItem[] = [
+            { _id: '1', _type: 'request_group', parentId: null },
+            { _id: '2', _type: 'request_group', parentId: null },
+            { _id: '3', _type: 'request', parentId: '1' }
+        ]
+        const expected = [
+            {
+                _id: '1',
+                _type: 'request_group',
+                parentId: null,
+                children: [{ _id: '3', _type: 'request', parentId: '1' }]
+            },
+            {
+                _id: '2',
+                _type: 'request_group',
+                parentId: null,
+                children: []
+            }
+        ]
+        const result = toTree(input)
+        expect(result).toEqual(expected)
     })
 })

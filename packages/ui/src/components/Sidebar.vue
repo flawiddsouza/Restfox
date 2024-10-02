@@ -175,6 +175,13 @@ export default {
                         'value': 'Import Into',
                         'icon': 'fa fa-file-import',
                         'class': 'context-menu-item-with-left-padding'
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'cURL Import',
+                        'value': 'cURL Import',
+                        'icon': 'fa fa-terminal',
+                        'class': 'context-menu-item-with-left-padding'
                     }
                 ]
             }
@@ -216,6 +223,13 @@ export default {
                         'label': 'Import Into',
                         'value': 'Import Into',
                         'icon': 'fa fa-file-import',
+                        'class': 'context-menu-item-with-left-padding'
+                    },
+                    {
+                        'type': 'option',
+                        'label': 'cURL Import',
+                        'value': 'cURL Import',
+                        'icon': 'fa fa-terminal',
                         'class': 'context-menu-item-with-left-padding'
                     },
                     ...this.getCommonActions(this.activeSidebarItemForContextMenu._type),
@@ -332,6 +346,11 @@ export default {
             if(clickedSidebarItem === 'Import Into') {
                 this.$store.commit('showImportModalSelectedRequestGroupId', this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null)
                 this.$store.commit('showImportModal', true)
+            }
+
+            if(clickedSidebarItem === 'cURL Import') {
+                this.$store.commit('showImportModalSelectedRequestGroupId', this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null)
+                this.$store.commit('showImportAsCurlModal', true)
             }
 
             if(clickedSidebarItem === 'Properties') {

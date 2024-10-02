@@ -186,7 +186,7 @@ export default {
     background: var(--background-color);
     overflow-y: auto;
     left: -9999px;
-    max-height: 30rem;
+    max-height: 35rem;
     user-select: none;
 }
 

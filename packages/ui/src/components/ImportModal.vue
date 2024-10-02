@@ -61,6 +61,26 @@
             </template>
         </modal>
     </form>
+
+    <form @submit.prevent="importFromCurl(inputString)" v-if="showImportAsCurlModal">
+        <modal title="Import from cURL" v-model="showImportAsCurlModal">
+            <textarea
+                type="text"
+                class="full-width-input"
+                v-model="inputString"
+                placeholder="Paste curl request here"
+                style="min-height: 20rem;"
+            />
+
+            <p v-if="inputString && !startsWithCurl">
+                ❌ The provided cURL is not valid
+            </p>
+
+            <template #footer>
+                <button class="button" v-if="!importing">Import</button>
+            </template>
+        </modal>
+    </form>
 </template>
 
 <script>
@@ -70,7 +90,8 @@ import {
     convertInsomniaExportToRestfoxCollection,
     convertRestfoxExportToRestfoxCollection,
     convertOpenAPIExportToRestfoxCollection,
-    generateNewIdsForTree
+    generateNewIdsForTree,
+    convertCurlCommandToRestfoxCollection
 } from '@/helpers'
 import { convertPostmanExportToRestfoxCollection } from '@/parsers/postman'
 import Modal from '@/components/Modal.vue'
@@ -92,7 +113,8 @@ export default {
             importFrom: 'Restfox',
             importing: false,
             dragging: false,
-            fileNames: []
+            fileNames: [],
+            inputString: ''
         }
     },
     computed: {
@@ -105,6 +127,17 @@ export default {
                     return
                 }
                 this.$store.commit('showImportModal', value)
+            }
+        },
+        showImportAsCurlModal: {
+            get() {
+                return this.$store.state.showImportAsCurlModal
+            },
+            set(value) {
+                if(this.importing) {
+                    return
+                }
+                this.$store.commit('showImportAsCurlModal', value)
             }
         },
         selectedRequestGroupId: {
@@ -131,6 +164,9 @@ export default {
             }
 
             return ''
+        },
+        startsWithCurl() {
+            return this.inputString.trim().toLowerCase().startsWith('curl')
         }
     },
     watch: {
@@ -327,6 +363,40 @@ export default {
                 }
             } finally {
                 this.importing = false
+            }
+        },
+
+        async importFromCurl(command) {
+            try {
+                if(this.startsWithCurl) {
+                    this.importing = true
+                    const result = await convertCurlCommandToRestfoxCollection(command, this.activeWorkspace._id)
+
+                    this.activeTab = {}
+
+                    if(result.length) {
+                        await this.$store.dispatch('createCollectionItem', {
+                            type: 'request',
+                            name: 'New request',
+                            method: result[0].method,
+                            mimeType: result[0].body.mimeType,
+                            parentId: this.selectedRequestGroupId,
+                            headers: result[0].headers,
+                            url: result[0].url,
+                        })
+
+                        Object.assign(this.activeTab, result[0])
+
+                        this.$toast.success('Imported successfully')
+                    }
+                }
+            } catch (e) {
+                console.log(e)
+                this.$toast.error('Imported failed')
+            } finally {
+                this.importing = false
+                this.showImportAsCurlModal = false
+                this.inputString = ''
             }
         }
     },

@@ -122,6 +122,7 @@ export interface State {
     requestAbortController: { [key: string]: AbortController }
     responses: { [key: string]: any[] }
     showImportModal: boolean
+    showImportAsCurlModal: boolean
     showImportModalSelectedRequestGroupId: string | null
     showBackupAndRestoreModal: boolean
     collectionFilter: string

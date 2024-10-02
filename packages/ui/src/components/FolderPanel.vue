@@ -7,7 +7,7 @@
                 <div>
                     <RequestPanelHeaders :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelHeaders>
                 </div>
-                <InfoTip/>
+                <InfoTip />
             </div>
 
             <div style="padding-bottom: 1rem"></div>
@@ -17,7 +17,7 @@
                 <div>
                     <RequestPanelAuth :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelAuth>
                 </div>
-                <InfoTip/>
+                <InfoTip />
             </div>
         </div>
 
