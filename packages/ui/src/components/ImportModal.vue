@@ -383,12 +383,12 @@ export default {
                             url: result[0].url,
                         })
 
-                        this.$toast.success('Imported Successfully')
+                        this.$toast.success('Imported successfully')
                     }
                 }
             } catch (e) {
                 console.log(e)
-                this.$toast.error('Imported Failed')
+                this.$toast.error('Import failed')
             } finally {
                 this.importing = false
                 this.showImportAsCurlModal = false
