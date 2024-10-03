@@ -372,8 +372,6 @@ export default {
                     this.importing = true
                     const result = await convertCurlCommandToRestfoxCollection(command, this.activeWorkspace._id)
 
-                    this.activeTab = {}
-
                     if(result.length) {
                         await this.$store.dispatch('createCollectionItem', {
                             type: 'request',
@@ -385,14 +383,12 @@ export default {
                             url: result[0].url,
                         })
 
-                        Object.assign(this.activeTab, result[0])
-
-                        this.$toast.success('Imported successfully')
+                        this.$toast.success('Imported Successfully')
                     }
                 }
             } catch (e) {
                 console.log(e)
-                this.$toast.error('Imported failed')
+                this.$toast.error('Imported Failed')
             } finally {
                 this.importing = false
                 this.showImportAsCurlModal = false
