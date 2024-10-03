@@ -55,7 +55,7 @@
                         <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
                             <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
                         </div>
-                        <template v-else-if="responseContentType.startsWith('application/xml')">
+                        <template v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml')">
                             <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                         <template v-else-if="responseContentType.startsWith('application/json')">
@@ -95,7 +95,7 @@
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
-                    <div class="row" v-else-if="responseContentType.startsWith('application/xml')">
+                    <div class="row" v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="/store/books/author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
@@ -424,7 +424,7 @@ export default {
                 this.activeResponsePanelTab = 'Preview'
             }
 
-            this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) ? true : false
+            this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) || this.responseContentType.startsWith('text/xml') ? true : false
 
             if(this.$refs.scrollableArea) {
                 this.$refs.scrollableArea.scrollTop = 0
