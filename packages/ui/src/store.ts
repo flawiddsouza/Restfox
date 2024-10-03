@@ -319,6 +319,7 @@ export const store = createStore<State>({
             requestAbortController: {},
             responses: {},
             showImportModal: false,
+            showImportAsCurlModal: false,
             showImportModalSelectedRequestGroupId: null,
             showBackupAndRestoreModal: false,
             collectionFilter: '',
@@ -395,6 +396,9 @@ export const store = createStore<State>({
         },
         showImportModal(state, value) {
             state.showImportModal = value
+        },
+        showImportAsCurlModal(state, value) {
+            state.showImportAsCurlModal = value
         },
         showImportModalSelectedRequestGroupId(state, value) {
             state.showImportModalSelectedRequestGroupId = value
@@ -873,7 +877,8 @@ export const store = createStore<State>({
                         mimeType: payload.mimeType
                     },
                     parentId: payload.parentId,
-                    workspaceId: context.state.activeWorkspace._id
+                    workspaceId: context.state.activeWorkspace._id,
+                    url: payload.url || ''
                 }
 
                 if(payload.headers) {

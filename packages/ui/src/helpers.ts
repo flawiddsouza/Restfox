@@ -44,7 +44,7 @@ export function toTree(array: CollectionItem[]): CollectionItem[] {
     for(i = 0; i < array.length; i += 1) {
         node = array[i]
         if(node.parentId !== null) {
-            array[map[node.parentId]].children?.push(node)
+            array[map[node.parentId]]?.children?.push(node)
         } else {
             res.push(node)
         }
