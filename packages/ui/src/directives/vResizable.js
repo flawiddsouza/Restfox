@@ -10,6 +10,8 @@ const vResizable = {
 
         topBottom = 'top-bottom' in binding.modifiers && binding.modifiers['top-bottom'] && binding.value
 
+        let iframe = null
+
         const resizers = Array.from(element.querySelectorAll('[data-resizer]'))
         if(resizers.length > 0) {
             let activeResizer = null
@@ -22,6 +24,12 @@ const vResizable = {
                     leftPanelInitialRect = activeResizer.previousElementSibling.getBoundingClientRect()
                     document.body.style.cursor = !topBottom ? 'ew-resize' : 'ns-resize'
                     activeResizer.setAttribute('data-resizing', '')
+
+                    iframe = document.querySelector('.response-panel-tabs-context iframe')
+
+                    if(iframe) {
+                        iframe.style.pointerEvents = 'none'
+                    }
                 }
                 resizer.addEventListener('mousedown', mouseDown)
             })
@@ -79,6 +87,11 @@ const vResizable = {
                     activeResizer.removeAttribute('data-resizing')
                     activeResizer = null
                     document.body.style.removeProperty('cursor')
+
+                    if(iframe) {
+                        iframe.style.pointerEvents = ''
+                        iframe = null
+                    }
                 }
             }
 
