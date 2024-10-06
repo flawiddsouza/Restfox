@@ -38,7 +38,7 @@
     </section>
 
     <section class="request-response-panels" v-show="collectionItem && collectionItem._type === 'request_group'">
-        <FolderPanel :collection-item="collectionItem" @update:collection-item="updateCollectionItem" />
+        <FolderPanel :collection-item="collectionItem" />
     </section>
 
     <section class="request-response-panels" v-if="!collectionItem">
