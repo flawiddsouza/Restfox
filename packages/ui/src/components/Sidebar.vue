@@ -85,7 +85,7 @@ export default {
             settingsModalShow: false,
             settingsModalCollectionItem: null,
             draggedSidebarElement: null,
-            sidebarItemCursorPositition: 'below',
+            sidebarItemCursorPosition: 'below',
             showDuplicateCollectionItemModal: false,
             collectionItemToDuplicate: null,
             pluginManagerCollectionItem: null,
@@ -412,12 +412,12 @@ export default {
             const y = event.pageY
             const location = Math.abs(offset - y)
             if (location < (elementHeight / 2)) {
-                this.sidebarItemCursorPositition = 'top'
+                this.sidebarItemCursorPosition = 'top'
                 sidebarItemToDropOn.style.borderTop = '1px dashed var(--text-color)'
                 sidebarItemToDropOn.style.borderBottom = ''
                 sidebarItemToDropOn.style.backgroundColor = ''
             } else {
-                this.sidebarItemCursorPositition = 'bottom'
+                this.sidebarItemCursorPosition = 'bottom'
                 if(sidebarItemToDropOn.dataset.type === 'request_group') {
                     sidebarItemToDropOn.style.borderTop = ''
                     sidebarItemToDropOn.style.borderBottom = ''
@@ -461,7 +461,7 @@ export default {
                         parentId: sidebarItemToDropOn.dataset.parentId,
                         id: sidebarItemToDropOn.dataset.id,
                         type: sidebarItemToDropOn.dataset.type,
-                        cursorPosition: this.sidebarItemCursorPositition
+                        cursorPosition: this.sidebarItemCursorPosition
                     }
                 })
 
