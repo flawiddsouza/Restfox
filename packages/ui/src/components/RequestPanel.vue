@@ -449,6 +449,7 @@ import { jsonPrettify } from '../utils/prettify-json'
 import {
     convertCurlCommandToRestfoxCollection,
     debounce,
+    getEditorConfig,
     getSpaces,
     jsonStringify,
     substituteEnvironmentVariables,
@@ -671,7 +672,7 @@ export default {
             return constants.AUTOCOMPLETIONS.TAGS
         },
         indentSize() {
-            return getSpaces(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE))
+            return getSpaces(getEditorConfig().indentSize)
         }
     },
     watch: {
