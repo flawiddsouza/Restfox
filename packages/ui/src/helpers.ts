@@ -1840,3 +1840,7 @@ export function getSpaces(value: string | number): string {
     const numSpaces = Number(value)
     return isNaN(numSpaces) || numSpaces < 0 ? '' : ' '.repeat(numSpaces)
 }
+
+export function deepClone(obj: any) {
+    return JSON.parse(JSON.stringify(obj))
+}

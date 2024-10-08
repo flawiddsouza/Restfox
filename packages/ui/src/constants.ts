@@ -230,6 +230,11 @@ export default {
                     label: 'rf.response.getStatusCode()',
                     type: 'function',
                     info: 'Returns the status code of the response',
+                },
+                {
+                    info: 'Returns the response time in milliseconds',
+                    type: 'function',
+                    label: 'rf.response.getResponseTime()'
                 }
             ],
         },
