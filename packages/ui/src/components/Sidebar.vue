@@ -49,7 +49,7 @@ import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import GenerateCodeModal from './modals/GenerateCodeModal.vue'
 import { mapState } from 'vuex'
-import { flattenTree, exportRestfoxCollection, generateNewIdsForTree } from '@/helpers'
+import { flattenTree, exportRestfoxCollection, generateNewIdsForTree, deepClone } from '@/helpers'
 import { generateCode } from '@/utils/generate-code'
 import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
 
@@ -258,7 +258,7 @@ export default {
     methods: {
         async handleClick(clickedSidebarItem) {
             if(clickedSidebarItem === 'Delete') {
-                const collectionItemToDelete = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                const collectionItemToDelete = deepClone(this.activeSidebarItemForContextMenu)
                 if(await window.createConfirm('Are you sure?')) {
                     await this.$store.dispatch('deleteCollectionItem', collectionItemToDelete)
                 }
@@ -270,7 +270,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Export') {
-                let collectionItemToExport = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                let collectionItemToExport = deepClone(this.activeSidebarItemForContextMenu)
                 collectionItemToExport.parentId = null
 
                 collectionItemToExport = [collectionItemToExport]
@@ -290,7 +290,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Copy as Curl') {
-                const request = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                const request = deepClone(this.activeSidebarItemForContextMenu)
                 const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
                 try {
                     const curlCommand = await generateCode(request, environment, parentHeaders, parentAuthentication, 'shell', 'curl')
@@ -309,7 +309,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Generate Code') {
-                this.generateCodeModalCollectionItem = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.generateCodeModalCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
                 this.generateCodeModalShow = true
             }
 
@@ -339,7 +339,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Plugins') {
-                this.pluginManagerCollectionItem = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.pluginManagerCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
                 this.pluginManagerShow = true
             }
 
@@ -354,7 +354,7 @@ export default {
             }
 
             if(clickedSidebarItem === 'Properties') {
-                this.settingsModalCollectionItem = JSON.parse(JSON.stringify(this.activeSidebarItemForContextMenu))
+                this.settingsModalCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
                 this.settingsModalShow = true
             }
 

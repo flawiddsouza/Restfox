@@ -259,6 +259,11 @@ export default defineComponent ({
                 type: 'option',
                 label: 'Returns the status code of the response',
                 value: 'rf.response.getStatusCode()'
+            },
+            {
+                type: 'option',
+                label: 'Returns the response time in milliseconds',
+                value: 'rf.response.getResponseTime()'
             }
         ]
 
