@@ -52,7 +52,6 @@ import { mapState } from 'vuex'
 import { flattenTree, exportRestfoxCollection, generateNewIdsForTree, deepClone } from '@/helpers'
 import { generateCode } from '@/utils/generate-code'
 import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
-import { generateTestScripts } from '@/utils/generate-test-scripts'
 
 export default {
     components: {
@@ -94,7 +93,6 @@ export default {
             generateCodeModalCollectionItem: null,
             generateCodeModalShow: false,
             generateTestsModalCollectionItem: null,
-            generatedTestScripts: null,
             createNewList: [
                 {
                     'type': 'option',
@@ -314,47 +312,6 @@ export default {
             if(clickedSidebarItem === 'Generate Code') {
                 this.generateCodeModalCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
                 this.generateCodeModalShow = true
-            }
-
-            if (clickedSidebarItem === 'Generate Test Scripts') {
-                this.generateTestsModalCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
-
-                const pluginData = this.$store.state.plugins.workspace.find(plugin =>
-                    plugin.collectionId === this.generateTestsModalCollectionItem._id && plugin.type === 'script'
-                )
-
-                const { pre_request = '', post_request = '' } = pluginData?.code || {}
-
-                try {
-                    this.generatedTestScripts = await generateTestScripts()
-
-                    const updatedPostRequest = `${post_request}\n${this.generatedTestScripts}`.trim()
-
-                    const pluginPayload = {
-                        code: {
-                            pre_request,
-                            post_request: updatedPostRequest
-                        },
-                        workspaceId: null,
-                        collectionId: this.generateTestsModalCollectionItem._id,
-                        type: 'script'
-                    }
-
-                    if (!pluginData) {
-                        this.$store.commit('addPlugin', pluginPayload)
-                    } else {
-                        this.$store.commit('updatePlugin', {
-                            _id: pluginData._id,
-                            ...pluginPayload
-                        })
-                    }
-
-                    this.$toast.success('Test scripts are generated successfully.')
-                } catch (e) {
-                    this.$toast.error(`Failed to generate test scripts: ${e.message}`)
-                } finally {
-                    this.generatedTestScripts = null
-                }
             }
 
             if(clickedSidebarItem === 'New Request') {
@@ -594,13 +551,6 @@ export default {
                     'type': 'option',
                     'label': 'Generate Code',
                     'value': 'Generate Code',
-                    'icon': 'fa fa-code',
-                    'class': contextMenuItemClass
-                },
-                {
-                    'type': 'option',
-                    'label': 'Generate Test Scripts',
-                    'value': 'Generate Test Scripts',
                     'icon': 'fa fa-code',
                     'class': contextMenuItemClass
                 }])

@@ -383,6 +383,7 @@
                     <div style="margin-bottom: var(--label-margin-bottom); display: flex; justify-content: space-between; align-items: flex-end;">
                         <div><i class="fa fa-file-export" /> Post Request <i class="fa fa-circle active-script" v-if="script.post_request !== ''"></i></div>
                         <div style="display: flex; margin-top: 0.5rem">
+                            <button type="button" class="button" @click="generateTests" style="cursor: pointer; margin-right: 0.5rem;">Generate Test Scripts</button>
                             <SnippetDropdown @optionSelected="insertSnippetPostScript" type="postScripts" />
                         </div>
                     </div>
@@ -461,6 +462,7 @@ import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
 import EditTagModal from '@/components/modals/EditTagModal.vue'
 import { formatSdl } from 'format-graphql'
+import { generateTestScripts } from '@/utils/generate-test-scripts'
 
 const renderer = new marked.Renderer()
 
@@ -1128,6 +1130,46 @@ export default {
 
             this.urlPreview = url !== '' && url.trim() !== '' ? url : 'No URL'
         },
+        async generateTests()  {
+            let generatedTestScripts
+
+            const pluginData = this.$store.state.plugins.workspace.find(plugin =>
+                plugin.collectionId === this.activeTab._id && plugin.type === 'script'
+            )
+
+            const { pre_request = '', post_request = '' } = pluginData?.code || {}
+
+            try {
+                generatedTestScripts = await generateTestScripts()
+
+                const updatedPostRequest = `${post_request}\n${generatedTestScripts}`.trim()
+
+                const pluginPayload = {
+                    code: {
+                        pre_request,
+                        post_request: updatedPostRequest
+                    },
+                    workspaceId: null,
+                    collectionId: this.activeTab._id,
+                    type: 'script'
+                }
+
+                if (!pluginData) {
+                    this.$store.commit('addPlugin', pluginPayload)
+                } else {
+                    this.$store.commit('updatePlugin', {
+                        _id: pluginData._id,
+                        ...pluginPayload
+                    })
+                }
+
+                this.$toast.success('Test scripts are generated successfully.')
+            } catch (e) {
+                this.$toast.error(`Failed to generate test scripts: ${e.message}`)
+            } finally {
+                generatedTestScripts = null
+            }
+        }
     },
     mounted() {
         emitter.on('response_panel', this.handleResponsePanelEmitter)
