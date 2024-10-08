@@ -1,9 +1,42 @@
 // @vitest-environment edge-runtime
 
-import { assert, test, describe } from 'vitest'
+import { assert, test, describe, vi, beforeAll } from 'vitest'
 import { generateCode } from './generate-code'
 
 describe(`${generateCode.name}`, () => {
+    beforeAll(() => {
+        // Define a full localStorage mock to match the Storage interface
+        const localStorageMock = (() => {
+            let store: Record<string, string> = {}
+
+            return {
+                getItem: vi.fn((key: string) => store[key] || null),
+                setItem: vi.fn((key: string, value: string) => {
+                    store[key] = value
+                }),
+                removeItem: vi.fn((key: string) => {
+                    delete store[key]
+                }),
+                clear: vi.fn(() => {
+                    store = {}
+                }),
+                // `length` getter to return the number of items stored
+                get length() {
+                    return Object.keys(store).length
+                },
+                // `key` method to return the key at a specific index
+                key: vi.fn((index: number) => Object.keys(store)[index] || null),
+            }
+        })()
+
+        // Assign the mock to the global object
+        Object.defineProperty(global, 'localStorage', {
+            value: localStorageMock,
+            configurable: true, // Allows reassignment if needed
+            writable: true,     // Ensures it can be changed during tests
+        })
+    })
+
     test('shell - curl', async() => {
         const request = {
             '_id': 'dUrySgUfq8DUMn5Az6z2H',
