@@ -1836,3 +1836,6 @@ export function jsonStringify(data: any, space: number = getEditorConfig().inden
     return JSON.stringify(data, null, space)
 }
 
+export function deepClone(obj: any) {
+    return JSON.parse(JSON.stringify(obj))
+}

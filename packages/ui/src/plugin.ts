@@ -174,6 +174,7 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
     let bufferCopy = response.buffer.slice(0)
     const headers = response.headers
     const statusCode = response.status
+    const responseTime = response.timeTaken
 
     const generalContextMethods = {
         ...generalContextMethodsBase,
@@ -219,6 +220,9 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
             },
             getStatusCode() {
                 return statusCode
+            },
+            getResponseTime() {
+                return responseTime
             },
             // deprecated but won't be removed
             getEnvironmentVariable: generalContextMethods.getEnvVar,
