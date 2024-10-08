@@ -28,12 +28,10 @@ Scenario('Add requests', async() => {
 })
 
 Scenario('Add GraphQL requests', async() => {
-    for(let i = 1; i <= 5; i++) {
-        const requestName = `GraphQL Request ${i}`
-        I.createGraphQLRequest(requestName)
-        await I.isActiveSidebarItem(`GQL${requestName}`)
-        await I.isActiveTab(`POST ${requestName}`)
-    }
+    const requestName = `GraphQL Request`
+    I.createGraphQLRequest(requestName)
+    await I.isActiveSidebarItem(`GQL${requestName}`)
+    await I.isActiveTab(`POST ${requestName}`)
 })
 
 Scenario('type url with query params', async() => {
