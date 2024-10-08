@@ -4,8 +4,9 @@ import {
     RequestAuthentication,
     RequestParam,
 } from '@/global'
-import { createRequestData, substituteEnvironmentVariables } from '@/helpers'
+import { createRequestData, getSpaces, substituteEnvironmentVariables } from '@/helpers'
 import { HTTPSnippet, availableTargets } from 'httpsnippet-browser'
+import constants from '@/constants'
 
 export function getAvailableTargets() {
     return availableTargets()
@@ -67,7 +68,9 @@ export async function generateCode(
 
     const snippet = new HTTPSnippet(har)
 
+    const indentSize = getSpaces(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4)
+
     return snippet.convert(target, clientId, {
-        indent: '    '
+        indent: indentSize
     })
 }

@@ -1836,3 +1836,7 @@ export function jsonStringify(data: any, space: number = getEditorConfig().inden
     return JSON.stringify(data, null, space)
 }
 
+export function getSpaces(value: string | number): string {
+    const numSpaces = Number(value)
+    return isNaN(numSpaces) || numSpaces < 0 ? '' : ' '.repeat(numSpaces)
+}

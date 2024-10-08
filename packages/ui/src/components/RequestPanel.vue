@@ -448,7 +448,7 @@ import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import {
     convertCurlCommandToRestfoxCollection,
-    debounce,
+    debounce, getSpaces,
     jsonStringify,
     substituteEnvironmentVariables,
     toggleDropdown
@@ -669,6 +669,9 @@ export default {
         tagAutocompletions() {
             return constants.AUTOCOMPLETIONS.TAGS
         },
+        indentSize() {
+            return getSpaces(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE))
+        }
     },
     watch: {
         activeTab() {
@@ -807,13 +810,13 @@ export default {
         },
         beautifyJSON() {
             try {
-                const formattedJSON = jsonPrettify(this.activeTab.body.text, '    ')
+                const formattedJSON = jsonPrettify(this.activeTab.body.text, this.indentSize)
                 this.$refs.jsonEditor.setValue(formattedJSON)
             } catch {} // catch all json parsing errors and ignore them
         },
         beautifyGraphQL() {
             try {
-                const formattedVarsJSON = jsonPrettify(this.graphql.variables, '    ')
+                const formattedVarsJSON = jsonPrettify(this.graphql.variables, this.indentSize)
                 const formattedGraphqlJSON = formatSdl(this.graphql.query)
                 this.$refs.jsonEditor.setValue(formattedVarsJSON)
                 this.$refs.graphqlEditor.setValue(formattedGraphqlJSON)

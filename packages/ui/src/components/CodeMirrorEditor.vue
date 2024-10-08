@@ -12,11 +12,12 @@ import { closeBrackets, completeFromList, autocompletion } from '@codemirror/aut
 import { indentOnInput, indentUnit, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap, indentWithTab, history, historyKeymap, selectLine, selectLineBoundaryForward } from '@codemirror/commands'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
-import { codeMirrorSyntaxHighlighting } from '@/helpers'
+import { codeMirrorSyntaxHighlighting, getSpaces } from '@/helpers'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 import { tags } from '@/codemirror-extensions/tags'
 import { codeMirrorStyleOverrides } from '@/utils/code-mirror-style-overrides'
 import type { ParsedResult } from '@/parsers/tag'
+import constants from '@/constants'
 
 /**
  * "Mod-Enter" is "Ctrl-Enter" inside codemirror
@@ -108,7 +109,7 @@ function getExtensions(vueInstance, language) {
         highlightSpecialChars(),
         highlightSelectionMatches(),
         drawSelection(),
-        indentUnit.of('    '), // 4 spaces
+        indentUnit.of(getSpaces(localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE))),
         EditorView.lineWrapping,
         EditorView.updateListener.of(v => {
             if(v.docChanged) {
