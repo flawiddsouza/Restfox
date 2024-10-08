@@ -6,7 +6,8 @@ import {
     parseContentDispositionHeaderAndGetFileName,
     convertPostmanAuthToRestfoxAuth,
     scriptConversion,
-    toTree
+    toTree,
+    getSpaces
 } from './helpers'
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
@@ -575,5 +576,35 @@ describe('toTree', () => {
         ]
         const result = toTree(input)
         expect(result).toEqual(expected)
+    })
+})
+
+describe('getSpaces', () => {
+    test('should return 4 spaces when passed number 4', () => {
+        expect(getSpaces(4)).toBe('    ') // 4 spaces
+    })
+
+    test('should return 4 spaces when passed string "4"', () => {
+        expect(getSpaces('4')).toBe('    ') // 4 spaces
+    })
+
+    test('should return empty string when passed string "abc"', () => {
+        expect(getSpaces('abc')).toBe('') // invalid input
+    })
+
+    test('should return empty string when passed a negative number', () => {
+        expect(getSpaces(-3)).toBe('') // negative number returns empty string
+    })
+
+    test('should return empty string when passed 0', () => {
+        expect(getSpaces(0)).toBe('') // 0 returns empty string
+    })
+
+    test('should return empty string when passed an empty string', () => {
+        expect(getSpaces('')).toBe('') // empty string returns empty string
+    })
+
+    test('should return 10 spaces when passed string "10"', () => {
+        expect(getSpaces('10')).toBe('          ') // 10 spaces
     })
 })

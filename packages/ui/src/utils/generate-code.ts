@@ -4,7 +4,7 @@ import {
     RequestAuthentication,
     RequestParam,
 } from '@/global'
-import { createRequestData, substituteEnvironmentVariables } from '@/helpers'
+import { createRequestData, getEditorConfig, getSpaces, substituteEnvironmentVariables } from '@/helpers'
 import { HTTPSnippet, availableTargets } from 'httpsnippet-browser'
 
 export function getAvailableTargets() {
@@ -67,7 +67,9 @@ export async function generateCode(
 
     const snippet = new HTTPSnippet(har)
 
+    const indentSize = getSpaces(getEditorConfig().indentSize)
+
     return snippet.convert(target, clientId, {
-        indent: '    '
+        indent: indentSize
     })
 }
