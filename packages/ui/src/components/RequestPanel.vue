@@ -1131,7 +1131,7 @@ export default {
             this.urlPreview = url !== '' && url.trim() !== '' ? url : 'No URL'
         },
         async generateTests()  {
-            let generatedTestScripts
+            const generatedTestScripts = await generateTestScripts()
 
             const pluginData = this.$store.state.plugins.workspace.find(plugin =>
                 plugin.collectionId === this.activeTab._id && plugin.type === 'script'
@@ -1140,8 +1140,6 @@ export default {
             const { pre_request = '', post_request = '' } = pluginData?.code || {}
 
             try {
-                generatedTestScripts = await generateTestScripts()
-
                 const updatedPostRequest = `${post_request}\n${generatedTestScripts}`.trim()
 
                 const pluginPayload = {
@@ -1159,15 +1157,13 @@ export default {
                 } else {
                     this.$store.commit('updatePlugin', {
                         _id: pluginData._id,
-                        ...pluginPayload
+                        code: pluginPayload.code
                     })
                 }
 
                 this.$toast.success('Test scripts are generated successfully.')
             } catch (e) {
                 this.$toast.error(`Failed to generate test scripts: ${e.message}`)
-            } finally {
-                generatedTestScripts = null
             }
         }
     },

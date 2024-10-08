@@ -92,7 +92,6 @@ export default {
             pluginManagerShow: false,
             generateCodeModalCollectionItem: null,
             generateCodeModalShow: false,
-            generateTestsModalCollectionItem: null,
             createNewList: [
                 {
                     'type': 'option',
