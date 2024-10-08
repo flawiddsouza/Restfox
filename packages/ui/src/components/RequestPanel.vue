@@ -448,7 +448,8 @@ import { emitter } from '@/event-bus'
 import { jsonPrettify } from '../utils/prettify-json'
 import {
     convertCurlCommandToRestfoxCollection,
-    debounce, getSpaces,
+    debounce,
+    getSpaces,
     jsonStringify,
     substituteEnvironmentVariables,
     toggleDropdown
