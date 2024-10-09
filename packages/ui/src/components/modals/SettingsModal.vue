@@ -56,6 +56,12 @@
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will remove iframe sandbox restrictions. See <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox" target="_blank">this link</a> for more info.</div>
             </div>
+            <div>
+                <label style="padding-top: 1rem; display: flex;">
+                    <input type="checkbox" v-model="disableShowTabs"> <div style="margin-left: 0.5rem;">Tab view</div> <div style="margin-left: 0.5rem;"></div>
+                </label>
+                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Un-ticking this will not show tabs when clicking on either request or folder. Please refresh the app for the changes to take effect.</div>
+            </div>
             <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
                 <div>
@@ -117,6 +123,7 @@ export default {
             disableAutoUpdate: false,
             globalUserAgent: '',
             indentSize: constants.EDITOR_CONFIG.indent_size,
+            disableShowTabs: false,
         }
     },
     computed: {
@@ -166,6 +173,9 @@ export default {
         },
         indentSize() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE, this.indentSize)
+        },
+        disableShowTabs() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE, this.disableShowTabs)
         }
     },
     methods: {
@@ -230,6 +240,7 @@ export default {
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
             const savedIndentSize = localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4
+            const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE) || true
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -285,6 +296,9 @@ export default {
             }
             if(savedIndentSize) {
                 this.indentSize = savedIndentSize
+            }
+            if(savedShowTabs) {
+                this.disableShowTabs = savedShowTabs
             }
         },
         getCurentUserAgent() {

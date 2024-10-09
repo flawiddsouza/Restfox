@@ -20,6 +20,7 @@ import {
     State,
     OpenApiSpecPathParams,
     EditorConfig,
+    AppConfig,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -1843,4 +1844,10 @@ export function getSpaces(value: string | number): string {
 
 export function deepClone(obj: any) {
     return JSON.parse(JSON.stringify(obj))
+}
+
+export function getSettingsConfig(): AppConfig {
+    return {
+        tabMode: localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE) ? (localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE) === 'true') : constants.APP_CONFIG.tab_mode
+    }
 }

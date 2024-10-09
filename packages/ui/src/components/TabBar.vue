@@ -1,6 +1,6 @@
 <script>
 import ContextMenu from './ContextMenu.vue'
-import { arrayMove } from '@/helpers'
+import { arrayMove, getSettingsConfig } from '@/helpers'
 
 export default {
     components: {
@@ -75,9 +75,13 @@ export default {
                     },
                 ]
             }
+        },
+        showTabs() {
+            return getSettingsConfig().tabMode
         }
     },
     methods: {
+        getSettingsConfig,
         setActiveTab(tab) {
             this.$store.dispatch('setActiveTab', tab)
         },
@@ -208,6 +212,7 @@ export default {
 
 <template>
     <div
+        v-if="showTabs"
         class="tabs-container"
         ref="tabContainer"
         @wheel.prevent="scrollTabs"
