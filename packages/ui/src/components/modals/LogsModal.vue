@@ -17,7 +17,7 @@ import { mapState } from 'vuex'
 import Modal from '@/components/Modal.vue'
 
 export default {
-    components: {Modal},
+    components: { Modal },
     props: {
         showModal: Boolean,
     },

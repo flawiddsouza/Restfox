@@ -255,3 +255,7 @@ export interface OpenApiSpecPathParams {
 export interface EditorConfig {
     indentSize: number
 }
+
+export interface AppConfig {
+    showTabs: boolean
+}

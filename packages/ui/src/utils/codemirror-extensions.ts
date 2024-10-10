@@ -36,7 +36,7 @@ export function envVarDecoration(envVariables: any) {
                     const titleText = isInEnv ? envVariables[varName] : 'Environment variable not found'
                     const decoration = Decoration.mark({
                         class: className,
-                        attributes: {title: titleText}
+                        attributes: { title: titleText }
                     })
                     builder.add(start, end, decoration)
                 }

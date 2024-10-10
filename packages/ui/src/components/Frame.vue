@@ -8,9 +8,11 @@ import ImportModal from '@/components/ImportModal.vue'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useStore } from 'vuex'
 import constants from '../constants'
+import { getSettingsConfig } from '@/helpers'
 
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
+const showTabs = computed(() => getSettingsConfig().showTabs)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
 const detachedTabs = computed({
     get() {
@@ -93,7 +95,7 @@ onBeforeUnmount(() => {
             <NavBar nav="collection" />
         </header>
 
-        <section class="tab-bar" v-if="activeTab">
+        <section class="tab-bar" v-if="activeTab && showTabs">
             <TabBar />
         </section>
 

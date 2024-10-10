@@ -71,5 +71,9 @@ module.exports = {
         'vue/singleline-html-element-content-newline': 'off',
         'vue/order-in-components': 'off',
         'vue/require-explicit-emits': 'off',
+        'object-curly-spacing': [
+            "error",
+            "always"
+        ],
     }
 }

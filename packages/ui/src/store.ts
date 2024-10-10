@@ -432,7 +432,7 @@ export const store = createStore<State>({
             if('body' in collectionItem && 'params' in collectionItem.body) {
                 const params: RequestParam[] = []
                 for(const param of collectionItem.body.params) {
-                    const paramExtracted = {...param}
+                    const paramExtracted = { ...param }
                     if('files' in paramExtracted) {
                         paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
                     }
@@ -680,7 +680,7 @@ export const store = createStore<State>({
                     if('params' in tab.body) {
                         const params: RequestParam[] = []
                         for(const param of tab.body.params) {
-                            const paramExtracted = {...param}
+                            const paramExtracted = { ...param }
                             if('files' in paramExtracted) {
                                 paramExtracted.files = [...paramExtracted.files]
                             }

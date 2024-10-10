@@ -83,7 +83,7 @@ export default defineComponent ({
         }
     },
 
-    setup(props, {emit}) {
+    setup(props, { emit }) {
         const contextMenuVisible = ref (false)
         const contextMenuX = ref (0)
         const contextMenuY = ref (0)
@@ -165,11 +165,11 @@ export default defineComponent ({
             {
                 type: 'option',
                 label: 'Returns the HTTP method of the request',
-                value: 'rf.request.getMethod()'},
+                value: 'rf.request.getMethod()' },
             {
                 type: 'option',
                 label: 'Retrieves the URL of the request',
-                value: 'rf.request.getURL()'},
+                value: 'rf.request.getURL()' },
             {
                 type: 'option',
                 label: 'Gets a specific header\'s value by name from the request',
@@ -183,7 +183,7 @@ export default defineComponent ({
             {
                 type: 'option',
                 label: 'Gets all the headers from the request',
-                value: 'rf.request.getHeaders()'},
+                value: 'rf.request.getHeaders()' },
             {
                 type: 'option',
                 label: 'Replaces all headers with the provided array',
@@ -192,7 +192,7 @@ export default defineComponent ({
             {
                 type: 'option',
                 label: 'Gets the request body',
-                value: 'rf.request.getBody()'},
+                value: 'rf.request.getBody()' },
             {
                 type: 'option',
                 label: 'Sets the request body with the provided object',
@@ -221,7 +221,7 @@ export default defineComponent ({
             {
                 type: 'option',
                 label: 'Retrieves the URL from the response',
-                value: 'rf.response.getURL()'},
+                value: 'rf.response.getURL()' },
             {
                 type: 'option',
                 label: 'Gets a specific header\'s value by name from the response',
@@ -235,7 +235,7 @@ export default defineComponent ({
             {
                 type: 'option',
                 label: 'Retrieves the response body as an ArrayBuffer',
-                value: 'rf.response.getBody()'},
+                value: 'rf.response.getBody()' },
             {
                 type: 'option',
                 label: 'Sets the response body with the provided ArrayBuffer',
@@ -244,7 +244,7 @@ export default defineComponent ({
             {
                 type: 'option',
                 label: 'Returns the response body as text',
-                value: 'rf.response.getBodyText()'},
+                value: 'rf.response.getBodyText()' },
             {
                 type: 'option',
                 label: 'Sets the given text as the response body',

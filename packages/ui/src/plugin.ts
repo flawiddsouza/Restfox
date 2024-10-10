@@ -73,7 +73,7 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
     if(request.body?.params) {
         const params: RequestParam[] = []
         for(const param of request.body.params) {
-            const paramExtracted = {...param}
+            const paramExtracted = { ...param }
             if(paramExtracted.files) {
                 paramExtracted.files = [...paramExtracted.files] as File[]
             }

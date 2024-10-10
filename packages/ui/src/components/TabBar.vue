@@ -1,3 +1,27 @@
+<template>
+    <div
+        class="tabs-container"
+        ref="tabContainer"
+        @wheel.prevent="scrollTabs"
+    >
+        <div
+            class="tab"
+            :class="{ 'tab-active': activeTab && activeTab._id === tab._id }"
+            v-for="tab in tabs"
+            @click="setActiveTab(tab)"
+            @mousedown.middle.prevent="closeTab(tab)"
+            :data-id="tab._id"
+            draggable="true"
+            @contextmenu.prevent="handleTabContextMenu($event, tab)"
+        >
+            <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
+            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times"></i></span>
+        </div>
+    </div>
+    <!-- <div class="tab-add" @click="addTab" style="visibility: hidden">+</div> -->
+    <ContextMenu :options="tabContextMenuOptions" :element="tabContextMenuElement" v-model:show="showTabContextMenu" @click="handleTabContextMenuItemClick" />
+</template>
+
 <script>
 import ContextMenu from './ContextMenu.vue'
 import { arrayMove } from '@/helpers'
@@ -75,7 +99,7 @@ export default {
                     },
                 ]
             }
-        }
+        },
     },
     methods: {
         setActiveTab(tab) {
@@ -205,30 +229,6 @@ export default {
     }
 }
 </script>
-
-<template>
-    <div
-        class="tabs-container"
-        ref="tabContainer"
-        @wheel.prevent="scrollTabs"
-    >
-        <div
-            class="tab"
-            :class="{ 'tab-active': activeTab && activeTab._id === tab._id }"
-            v-for="tab in tabs"
-            @click="setActiveTab(tab)"
-            @mousedown.middle.prevent="closeTab(tab)"
-            :data-id="tab._id"
-            draggable="true"
-            @contextmenu.prevent="handleTabContextMenu($event, tab)"
-        >
-            <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
-            <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times"></i></span>
-        </div>
-    </div>
-    <!-- <div class="tab-add" @click="addTab" style="visibility: hidden">+</div> -->
-    <ContextMenu :options="tabContextMenuOptions" :element="tabContextMenuElement" v-model:show="showTabContextMenu" @click="handleTabContextMenuItemClick" />
-</template>
 
 <style scoped>
 .tab-bar .tabs-container {

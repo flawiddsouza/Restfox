@@ -20,6 +20,7 @@ import {
     State,
     OpenApiSpecPathParams,
     EditorConfig,
+    AppConfig,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -1376,7 +1377,7 @@ export function uriParse(urlString: string): {
     hash: string | null;
     search: string | null;
 } {
-    const { protocol, host, port, pathname, hash, search}  = new URL(urlString)
+    const { protocol, host, port, pathname, hash, search }  = new URL(urlString)
     return { protocol, host, port, pathname, hash, search }
 }
 
@@ -1843,4 +1844,14 @@ export function getSpaces(value: string | number): string {
 
 export function deepClone(obj: any) {
     return JSON.parse(JSON.stringify(obj))
+}
+
+export function getSettingsConfig(): AppConfig {
+    return {
+        showTabs: localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) ? (localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) === 'true') : constants.APP_CONFIG.show_tabs
+    }
+}
+
+export function refreshPage(): void {
+    location.reload()
 }
