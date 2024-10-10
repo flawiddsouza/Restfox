@@ -518,7 +518,7 @@ export default {
             if(originalRequestBody.mimeType === 'multipart/form-data' && 'params' in originalRequestBody) {
                 let params = []
                 for(const param of originalRequestBody.params) {
-                    let paramExtracted = {...param}
+                    let paramExtracted = { ...param }
                     if('files' in paramExtracted) {
                         paramExtracted.files = [...paramExtracted.files]
                     }

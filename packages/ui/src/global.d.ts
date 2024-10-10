@@ -257,5 +257,5 @@ export interface EditorConfig {
 }
 
 export interface AppConfig {
-    tabMode: boolean | string
+    showTabs: boolean
 }

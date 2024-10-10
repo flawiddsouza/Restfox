@@ -79,7 +79,7 @@
 <script>
 import { ref, onMounted, computed, watch } from 'vue'
 import { gql, GraphQLClient } from 'graphql-request'
-import { resolveAuthentication} from '@/helpers'
+import { resolveAuthentication } from '@/helpers'
 
 export default {
     name: 'SchemaSlideOut',

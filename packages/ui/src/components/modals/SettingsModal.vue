@@ -23,7 +23,7 @@
                 <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
                 <button
                     class="button"
-                    @click="getCurentUserAgent"
+                    @click="getCurrentUserAgent"
                     style="margin-top: 0.5rem"
                     aria-label="Get the current browser's UserAgent string"
                     title="Get the current browser's UserAgent string"
@@ -58,9 +58,9 @@
             </div>
             <div>
                 <label style="padding-top: 1rem; display: flex;">
-                    <input type="checkbox" v-model="disableShowTabs"> <div style="margin-left: 0.5rem;">Tab view</div> <div style="margin-left: 0.5rem;"></div>
+                    <input type="checkbox" v-model="showTabs"> <div style="margin-left: 0.5rem;">Tab view</div> <div style="margin-left: 0.5rem;"></div>
                 </label>
-                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Un-ticking this will not show tabs when clicking on either request or folder. Please refresh the app for the changes to take effect.</div>
+                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Un-ticking this will not show tabs when clicking on either request or folder. Please refresh the app or click <button type="button" class="button" @click="refreshPage()">Refresh</button> for the changes to take effect.</div>
             </div>
             <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
@@ -102,7 +102,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import { getVersion } from '@/helpers'
+import { getVersion, refreshPage } from '@/helpers'
 
 export default {
     props: {
@@ -123,7 +123,7 @@ export default {
             disableAutoUpdate: false,
             globalUserAgent: '',
             indentSize: constants.EDITOR_CONFIG.indent_size,
-            disableShowTabs: false,
+            showTabs: false,
         }
     },
     computed: {
@@ -174,11 +174,12 @@ export default {
         indentSize() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE, this.indentSize)
         },
-        disableShowTabs() {
-            localStorage.setItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE, this.disableShowTabs)
+        showTabs() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS, this.showTabs)
         }
     },
     methods: {
+        refreshPage,
         getVersion,
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
@@ -240,7 +241,7 @@ export default {
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
             const savedIndentSize = localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4
-            const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE) || true
+            const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) || true
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -298,10 +299,10 @@ export default {
                 this.indentSize = savedIndentSize
             }
             if(savedShowTabs) {
-                this.disableShowTabs = savedShowTabs
+                this.showTabs = savedShowTabs
             }
         },
-        getCurentUserAgent() {
+        getCurrentUserAgent() {
             this.globalUserAgent = navigator.userAgent
         }
     }

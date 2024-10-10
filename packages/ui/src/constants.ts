@@ -30,7 +30,7 @@ export default {
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',
         GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
         INDENT_SIZE: 'Restfox-IndentSize',
-        SHOW_TAB_MODE: 'Restfox-ShowTabMode',
+        SHOW_TABS: 'Restfox-ShowTabs',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',
@@ -332,7 +332,7 @@ export default {
         indent_size: '4',
     },
     APP_CONFIG: {
-        tab_mode: true,
+        show_tabs: true,
     },
     GRANT_TYPES: {
         'password_credentials': 'password',

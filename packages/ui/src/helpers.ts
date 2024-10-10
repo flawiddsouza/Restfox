@@ -1377,7 +1377,7 @@ export function uriParse(urlString: string): {
     hash: string | null;
     search: string | null;
 } {
-    const { protocol, host, port, pathname, hash, search}  = new URL(urlString)
+    const { protocol, host, port, pathname, hash, search }  = new URL(urlString)
     return { protocol, host, port, pathname, hash, search }
 }
 
@@ -1848,6 +1848,10 @@ export function deepClone(obj: any) {
 
 export function getSettingsConfig(): AppConfig {
     return {
-        tabMode: localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE) ? (localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TAB_MODE) === 'true') : constants.APP_CONFIG.tab_mode
+        showTabs: localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) ? (localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) === 'true') : constants.APP_CONFIG.show_tabs
     }
+}
+
+export function refreshPage(): void {
+    location.reload()
 }
