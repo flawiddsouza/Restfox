@@ -242,7 +242,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
                     'post_request': scriptConversion(postScript, 'postmanToRestfox')
                 },
                 'collectionId': requestId,
-                'workspaceId': workspaceId,
+                'workspaceId': null,
                 'enabled': true,
                 'createdAt': Date.now(),
                 'updatedAt': Date.now()
