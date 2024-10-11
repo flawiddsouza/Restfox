@@ -1529,6 +1529,7 @@ export function scriptConversion(scriptToConvert: string, scriptType: 'postmanTo
             'pm.response.code': 'rf.response.getStatusCode()',
             'pm.test': 'test',
             'pm.expect': 'expect',
+            'pm.response.text()': 'rf.response.getBodyText()'
         },
         restfoxToPostman: {
             'rf.setEnvVar': 'pm.environment.set',
