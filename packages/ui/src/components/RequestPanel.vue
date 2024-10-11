@@ -1138,38 +1138,7 @@ export default {
         async generateTests()  {
             const generatedTestScripts = await generateTestScripts()
 
-            const pluginData = this.$store.state.plugins.workspace.find(plugin =>
-                plugin.collectionId === this.activeTab._id && plugin.type === 'script'
-            )
-
-            const { pre_request = '', post_request = '' } = pluginData?.code || {}
-
-            try {
-                const updatedPostRequest = `${post_request}\n${generatedTestScripts}`.trim()
-
-                const pluginPayload = {
-                    code: {
-                        pre_request,
-                        post_request: updatedPostRequest
-                    },
-                    workspaceId: null,
-                    collectionId: this.activeTab._id,
-                    type: 'script'
-                }
-
-                if (!pluginData) {
-                    this.$store.commit('addPlugin', pluginPayload)
-                } else {
-                    this.$store.commit('updatePlugin', {
-                        _id: pluginData._id,
-                        code: pluginPayload.code
-                    })
-                }
-
-                this.$toast.success('Test scripts are generated successfully.')
-            } catch (e) {
-                this.$toast.error(`Failed to generate test scripts: ${e.message}`)
-            }
+            this.script.post_request += generatedTestScripts + `\n`
         }
     },
     mounted() {
