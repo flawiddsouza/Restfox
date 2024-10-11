@@ -331,9 +331,6 @@ export default {
     EDITOR_CONFIG: {
         indent_size: '4',
     },
-    APP_CONFIG: {
-        show_tabs: true,
-    },
     GRANT_TYPES: {
         'password_credentials': 'password',
         'client_credentials': 'client_credentials',

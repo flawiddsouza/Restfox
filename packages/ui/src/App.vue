@@ -336,6 +336,7 @@ export default {
         const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
         const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
         const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
+        const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -400,6 +401,14 @@ export default {
                 this.$store.state.flags.disableAutoUpdate = JSON.parse(savedDisableAutoUpdate)
             } catch(e) {
                 this.$store.state.flags.disableAutoUpdate = false
+            }
+        }
+
+        if(savedShowTabs) {
+            try {
+                this.$store.state.flags.showTabs = JSON.parse(savedShowTabs)
+            } catch(e) {
+                this.$store.state.flags.showTabs = true
             }
         }
 
