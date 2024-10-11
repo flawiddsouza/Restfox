@@ -2,7 +2,7 @@
     <div
         class="sidebar-item"
         :class="{ 'sidebar-item-active': activeTab && sidebarItem._id === activeTab._id }"
-        @click="handleSidebarItemClick(sidebarItem)"
+        @click="handleSidebarItemClick($event, sidebarItem)"
         @dblclick="handleSidebarItemDoubleClick(sidebarItem)"
         @contextmenu.prevent="handleContextMenu(sidebarItem, $event)"
         :draggable="collectionFilter === '' && !showInputToRenameRequest ? true : false"
@@ -12,7 +12,7 @@
         :title="!showInputToRenameRequest ? sidebarItem.name : 'Press Enter to save, Esc to cancel'"
     >
         <template v-if="sidebarItem._type === 'request_group'">
-            <div style="margin-right: 0.3rem">
+            <div style="margin-right: 0.3rem" class="request-group-toggle">
                 <i class="fa space-right fa-folder-open" v-if="getSidebarItemExpandedState(sidebarItem)"></i>
                 <i class="fa space-right fa-folder" v-else></i>
             </div>
@@ -98,7 +98,7 @@ export default {
 
             return methods[method] || method
         },
-        handleSidebarItemClick(sidebarItem) {
+        handleSidebarItemClick(event, sidebarItem) {
             if(sidebarItem._type === 'request' || sidebarItem._type === 'socket') {
                 this.$store.dispatch('addTab', sidebarItem)
             }
@@ -106,6 +106,11 @@ export default {
             if(sidebarItem._type === 'request_group') {
                 sidebarItem.collapsed = !(sidebarItem.collapsed)
                 this.$store.dispatch('saveCollectionItemCollapsedState', { _id: sidebarItem._id, collapsed: sidebarItem.collapsed })
+
+                if(event.target.closest('.request-group-toggle')) {
+                    return
+                }
+
                 this.$store.dispatch('addTab', sidebarItem)
             }
         },

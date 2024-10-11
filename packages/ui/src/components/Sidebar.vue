@@ -636,7 +636,7 @@ export default {
     font-size: 0.7rem;
 }
 
-.sidebar .sidebar-item * {
+.sidebar .sidebar-item *:not(.request-group-toggle) {
     pointer-events: none;
 }
 
