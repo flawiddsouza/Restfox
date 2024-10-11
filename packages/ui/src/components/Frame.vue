@@ -8,11 +8,10 @@ import ImportModal from '@/components/ImportModal.vue'
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useStore } from 'vuex'
 import constants from '../constants'
-import { getSettingsConfig } from '@/helpers'
 
 const store = useStore()
 const activeTab = computed(() => store.state.activeTab)
-const showTabs = computed(() => getSettingsConfig().showTabs)
+const showTabs = computed(() => store.state.flags.showTabs)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
 const detachedTabs = computed({
     get() {

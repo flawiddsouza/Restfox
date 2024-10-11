@@ -346,6 +346,7 @@ export const store = createStore<State>({
                 electronSwitchToChromiumFetch: false,
                 disableIframeSandbox : false,
                 disableAutoUpdate : false,
+                showTabs: true,
             },
             openContextMenuElement: null,
             sockets: {},

@@ -58,9 +58,9 @@
             </div>
             <div>
                 <label style="padding-top: 1rem; display: flex;">
-                    <input type="checkbox" v-model="showTabs"> <div style="margin-left: 0.5rem;">Tab view</div> <div style="margin-left: 0.5rem;"></div>
+                    <input type="checkbox" v-model="showTabs"> <div style="margin-left: 0.5rem;">Show Tabs</div> <div style="margin-left: 0.5rem;"></div>
                 </label>
-                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Un-ticking this will not show tabs when clicking on either request or folder. Please refresh the app or click <button type="button" class="button" @click="refreshPage()">Refresh</button> for the changes to take effect.</div>
+                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Un-ticking this will not show tabs when clicking on either request or folder.</div>
             </div>
             <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
@@ -102,7 +102,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import { getVersion, refreshPage } from '@/helpers'
+import { getVersion } from '@/helpers'
 
 export default {
     props: {
@@ -176,10 +176,10 @@ export default {
         },
         showTabs() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS, this.showTabs)
-        }
+            this.$store.state.flags.showTabs = this.showTabs
+        },
     },
     methods: {
-        refreshPage,
         getVersion,
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
@@ -208,6 +208,14 @@ export default {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
             this.globalUserAgent = ''
         },
+        resetIndentSize() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE)
+            this.indentSize = constants.EDITOR_CONFIG.indent_size
+        },
+        resetShowTabs() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
+            this.showTabs = true
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -227,6 +235,8 @@ export default {
             this.resetDisableIframeSandbox()
             this.resetDisableAutoUpdate()
             this.resetGlobalUserAgent()
+            this.resetIndentSize()
+            this.resetShowTabs()
 
             document.location.reload()
         },
@@ -278,6 +288,7 @@ export default {
                     this.electronSwitchToChromiumFetch = false
                 }
             }
+
             if(savedDisableIframeSandbox) {
                 try {
                     this.disableIframeSandbox = JSON.parse(savedDisableIframeSandbox)
@@ -285,6 +296,7 @@ export default {
                     this.disableIframeSandbox = false
                 }
             }
+
             if(savedDisableAutoUpdate) {
                 try {
                     this.disableAutoUpdate = JSON.parse(savedDisableAutoUpdate)
@@ -292,14 +304,21 @@ export default {
                     this.disableAutoUpdate = false
                 }
             }
+
             if(savedGlobalUserAgent) {
                 this.globalUserAgent = savedGlobalUserAgent
             }
+
             if(savedIndentSize) {
                 this.indentSize = savedIndentSize
             }
+
             if(savedShowTabs) {
-                this.showTabs = savedShowTabs
+                try {
+                    this.showTabs = JSON.parse(savedShowTabs)
+                } catch (e) {
+                    this.showTabs = true
+                }
             }
         },
         getCurrentUserAgent() {
