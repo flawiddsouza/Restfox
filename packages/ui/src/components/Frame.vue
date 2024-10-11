@@ -154,6 +154,7 @@ header {
     border-bottom: 1px solid var(--default-border-color);
     width: 100%;
     overflow: auto;
+    background: var(--sidebar-item-active-color);
 }
 
 .sidebar {

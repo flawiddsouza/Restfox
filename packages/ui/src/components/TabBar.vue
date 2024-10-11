@@ -243,10 +243,11 @@ export default {
     padding-bottom: 0.5rem;
     padding-left: 0.7rem;
     padding-right: 0.7rem;
+    margin-top: 5px;
     border-right: 1px solid var(--default-border-color);
     border-top: 1px solid transparent;
-    border-bottom: 1px solid transparent;
     white-space: nowrap;
+    background-color: var(--sidebar-item-active-color);
 }
 
 .tab-bar .tab.disable-pointer-events * {
@@ -254,8 +255,9 @@ export default {
 }
 
 .tab-bar .tab-active {
+    margin-top: 5px;
     border-top: 1px solid red;
-    border-bottom: 1px solid transparent;
+    background-color: var(--background-color);
 }
 
 .tab-bar .tab-add {
