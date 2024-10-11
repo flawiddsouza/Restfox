@@ -145,7 +145,7 @@ export default {
             if(!this.activeWorkspace) {
                 return []
             }
-            return this.$store.state.plugins.workspace.filter(plugin => plugin.workspaceId === this.activeWorkspace._id)
+            return this.$store.state.plugins.workspace.filter(plugin => plugin.workspaceId === this.activeWorkspace._id && plugin.collectionId === null)
         },
         activeWorkspace() {
             return this.$store.state.activeWorkspace

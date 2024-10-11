@@ -427,7 +427,7 @@ export async function getWorkspacePlugins(workspaceId: string) {
     const collectionItemPlugins = await db.plugins.where('collectionId').anyOf(collectionIds).toArray()
 
     return [
-        ...workspacePlugins,
+        ...workspacePlugins.filter(plugin => plugin.collectionId === null),
         ...collectionItemPlugins
     ]
 }

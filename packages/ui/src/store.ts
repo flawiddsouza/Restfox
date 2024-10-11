@@ -1101,7 +1101,7 @@ export const store = createStore<State>({
                     globalPlugins.push(enabledPlugin)
                 }
 
-                if(context.state.activeWorkspace !== null && enabledPlugin.workspaceId === context.state.activeWorkspace._id) {
+                if(context.state.activeWorkspace !== null && enabledPlugin.workspaceId === context.state.activeWorkspace._id && enabledPlugin.collectionId === null) {
                     workspacePlugins.push(enabledPlugin)
                 }
 
