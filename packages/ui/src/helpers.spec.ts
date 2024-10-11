@@ -427,6 +427,7 @@ describe('scriptConversion', () => {
       pm.response.json();
       pm.response.code;
       pm.test("Test", function () {});
+      pm.response.text();
     `
 
         const expectedRestfoxScript = `
@@ -435,6 +436,7 @@ describe('scriptConversion', () => {
       rf.response.getBodyJSON();
       rf.response.getStatusCode();
       test("Test", function () {});
+      rf.response.getBodyText();
     `
 
         const result = scriptConversion(postmanScript, 'postmanToRestfox')
