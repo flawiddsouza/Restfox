@@ -118,7 +118,7 @@ async function handleSendRequest(data) {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
-            signal: abortController.signal,
+            signal: abortController[requestId].signal,
             dispatcher: getAgentForRequest(urlParsed, disableSSLVerification),
         })
 

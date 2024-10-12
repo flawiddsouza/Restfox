@@ -1,0 +1,10 @@
+[project]
+name = "test-api-request-cancellation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.31.1",
+]
