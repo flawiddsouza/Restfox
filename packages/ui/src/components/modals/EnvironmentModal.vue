@@ -31,6 +31,8 @@
                         v-model="environment"
                         lang="json"
                         :env-variables="envVariables"
+                        :autocompletions="tagAutocompletions"
+                        @tagClick="onTagClick"
                         style="overflow: auto;"
                         :key="currentEnvironment"
                     ></CodeMirrorEditor>
@@ -61,11 +63,18 @@
             </div>
         </template>
     </form>
+    <EditTagModal
+        v-if="editTagModalShow"
+        v-model:showModal="editTagModalShow"
+        :parsed-func="editTagParsedFunc"
+        :update-func="editTagUpdateFunc"
+    />
 </template>
 
 <script>
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
+import EditTagModal from '@/components/modals/EditTagModal.vue'
 import { nextTick } from 'vue'
 import { emitter } from '@/event-bus'
 import constants from '@/constants'
@@ -79,7 +88,8 @@ export default {
     },
     components: {
         Modal,
-        CodeMirrorEditor
+        CodeMirrorEditor,
+        EditTagModal,
     },
     data() {
         return {
@@ -93,6 +103,9 @@ export default {
                 y: ''
             },
             envVariables: {},
+            editTagModalShow: false,
+            editTagParsedFunc: null,
+            editTagUpdateFunc: null,
         }
     },
     computed: {
@@ -137,6 +150,9 @@ export default {
             }
 
             return undefined
+        },
+        tagAutocompletions() {
+            return constants.AUTOCOMPLETIONS.TAGS
         }
     },
     watch: {
@@ -514,7 +530,12 @@ export default {
             if(event === 'reloaded') {
                 this.loadEnvVariables()
             }
-        }
+        },
+        onTagClick(parsedFunc, updateFunc) {
+            this.editTagParsedFunc = parsedFunc
+            this.editTagUpdateFunc = updateFunc
+            this.editTagModalShow = true
+        },
     },
     created() {
         emitter.on('collectionItem', this.handleCollectionItemEvent)

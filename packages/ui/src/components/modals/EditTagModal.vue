@@ -88,7 +88,7 @@ const props = defineProps({
     },
     activeTab: {
         type: Object as PropType<CollectionItem>,
-        required: true
+        default: { _id: '' } as CollectionItem,
     },
 })
 
