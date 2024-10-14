@@ -1,6 +1,6 @@
 <template>
     <div v-if="showModalComp">
-        <modal :title="title" v-model="showModalComp">
+        <modal :title="title" v-model="showModalComp" height="70vh" width="55rem">
             <table style="table-layout: fixed">
                 <tr v-for="(log, index) in consoleLogs" :key="index">
                     <td>

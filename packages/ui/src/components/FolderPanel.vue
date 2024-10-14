@@ -1,5 +1,5 @@
 <template>
-    <div width="600px" style="margin-left: 1rem; margin-right: 1rem; margin-top: 1rem;" v-if="collectionItem">
+    <div style="margin-left: 1rem; margin-right: 1rem; margin-top: 1rem; max-width: 600px;" v-if="collectionItem">
         <div v-if="collectionItem._type === 'request_group'">
             <div style="padding-bottom: 1rem"></div>
             <div class="request-panel-tabs-context">
