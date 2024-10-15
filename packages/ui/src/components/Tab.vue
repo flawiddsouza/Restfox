@@ -77,6 +77,12 @@ watch(() => props.collectionItem, (newValue, oldValue) => {
     // having same id in oldValue & newValue means same object
     // has changed, so we need to save the object
     if(oldValue && newValue && oldValue._id === newValue._id) {
+        // all request_group changes are persisted in a different way
+        // they don't need to go through here
+        if (newValue._type === 'request_group') {
+            return
+        }
+
         store.commit('persistCollectionItem', newValue)
 
         // keep sidebarItem properties in sync with collectionItem
