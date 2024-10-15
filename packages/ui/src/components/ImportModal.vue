@@ -247,7 +247,14 @@ export default {
                 if(this.importFrom === 'Postman URL') {
                     const response = await fetch(this.urlToImport)
                     json = await response.json()
-                    collectionTree = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
+
+                    const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
+
+                    collectionTree = collection
+
+                    if(newPlugins.length > 0) {
+                        plugins = plugins.concat(newPlugins)
+                    }
                 } else if(this.importFrom === 'OpenAPI URL') {
                     const response = await fetch(this.urlToImport)
                     json = await response.text()
