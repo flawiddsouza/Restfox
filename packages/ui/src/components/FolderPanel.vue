@@ -5,7 +5,10 @@
             <div class="request-panel-tabs-context">
                 <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Headers</div>
                 <div>
-                    <RequestPanelHeaders :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelHeaders>
+                    <RequestPanelHeaders
+                        :collection-item="collectionItem"
+                        :collection-item-environment-resolved="envVariables"
+                    />
                 </div>
                 <InfoTip />
             </div>
@@ -15,7 +18,11 @@
             <div class="request-panel-tabs-context">
                 <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Auth</div>
                 <div>
-                    <RequestPanelAuth :collection-item="collectionItem" :collection-item-environment-resolved="envVariables"></RequestPanelAuth>
+                    <RequestPanelAuth
+                        :collection-item="collectionItem"
+                        :collection-item-environment-resolved="envVariables"
+                        :flags="flags"
+                    />
                 </div>
                 <InfoTip />
             </div>
@@ -55,6 +62,11 @@ export default {
         return {
             envVariables: {},
         }
+    },
+    computed: {
+        flags() {
+            return this.$store.state.flags
+        },
     },
     watch: {
         collectionItem: {

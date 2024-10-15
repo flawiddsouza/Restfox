@@ -110,6 +110,16 @@ export interface RequestFinalResponse {
     name?: string
 }
 
+export interface Flags {
+    hideBrowserRelatedResponsePanelErrors: boolean
+    browserExtensionEnabled: boolean
+    isBrowser: boolean
+    isWebStandalone: boolean
+    isElectron: boolean
+    disableSSLVerification: boolean
+    electronSwitchToChromiumFetch: boolean
+}
+
 export interface State {
     consoleLogs: string[]
     collection: CollectionItem[]
@@ -139,15 +149,7 @@ export interface State {
     theme: string
     githubStarCount: string
     sidebarItemTemporaryName: { [key: string]: string }
-    flags: {
-        hideBrowserRelatedResponsePanelErrors: boolean
-        browserExtensionEnabled: boolean
-        isBrowser: boolean
-        isWebStandalone: boolean
-        isElectron: boolean
-        disableSSLVerification: boolean
-        electronSwitchToChromiumFetch: boolean
-    }
+    flags: Flags
     openContextMenuElement: HTMLElement | null
     sockets: { [key: string]: WebSocket | null }
     tabEnvironmentResolved: any

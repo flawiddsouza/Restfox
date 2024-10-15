@@ -46,11 +46,11 @@
         "electron-context-menu": "^3.6.1",
         "electron-log": "^5.1.2",
         "electron-squirrel-startup": "^1.0.0",
-        "open": "^10.1.0",
-        "undici": "^6.19.2",
-        "update-electron-app": "^2.0.1",
         "jsonfile": "^4.0.0",
-        "mkdirp": "^0.5.1"
+        "mkdirp": "^0.5.1",
+        "open": "^10.1.0",
+        "undici": "^6.20.1",
+        "update-electron-app": "^2.0.1"
     },
     "config": {
         "forge": "./forge.config.js"

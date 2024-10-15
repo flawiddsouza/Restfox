@@ -360,6 +360,7 @@
                 <RequestPanelAuth
                     :collection-item="activeTab"
                     :collection-item-environment-resolved="collectionItemEnvironmentResolved"
+                    :flags="flags"
                     @tagClick="onTagClick"
                 />
             </template>
@@ -650,6 +651,9 @@ export default {
         },
         collectionItemEnvironmentResolved() {
             return this.$store.state.tabEnvironmentResolved[this.activeTab._id] ?? {}
+        },
+        flags() {
+            return this.$store.state.flags
         },
         scriptPlugin() {
             if(this.activeTab === null) {

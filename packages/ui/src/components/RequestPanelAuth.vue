@@ -276,7 +276,7 @@
 <script setup lang="ts">
 import { computed, PropType, ref } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
-import { CollectionItem } from '@/global'
+import { CollectionItem, Flags } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
 import { fetchWrapper, substituteEnvironmentVariables } from '@/helpers'
@@ -293,7 +293,11 @@ const props = defineProps({
     collectionItemEnvironmentResolved: {
         type: Object as PropType<any>,
         required: true
-    }
+    },
+    flags: {
+        type: Object as PropType<Flags>,
+        required: true
+    },
 })
 
 const emit = defineEmits(['tagClick'])
@@ -443,8 +447,8 @@ async function requestOAuthToken() {
             }
 
             const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
-                electronSwitchToChromiumFetch: false,
-                disableSSLVerification: false,
+                electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
+                disableSSLVerification: props.flags.disableSSLVerification,
             })
 
             if(response.status !== 200) {
@@ -493,8 +497,8 @@ async function refreshOAuthToken() {
                 }
 
                 const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
-                    electronSwitchToChromiumFetch: false,
-                    disableSSLVerification: false,
+                    electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
+                    disableSSLVerification: props.flags.disableSSLVerification,
                 })
 
                 if(response.status !== 200) {
