@@ -120,7 +120,9 @@ jobs:
           npm ci
           npm run build-snap
       - name: Install Snapcraft
-        run: sudo apt-get install snapd snapcraft
+        run: |
+          sudo apt-get install snapd
+          sudo snap install snapcraft --classic
       - name: Set up Snap Store credentials & publish snap package
         run: |
           echo "${{ secrets.SNAP_STORE_TOKEN }}" | base64 -d > credentials.snapcraft
