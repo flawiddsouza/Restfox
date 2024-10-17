@@ -103,8 +103,10 @@ const isConfirmingDelete = ref(false)
 // eslint-disable-next-line no-undef
 let confirmationTimeout: NodeJS.Timeout | null = null
 
+const valueAutocompleteOptions = Object.values(constants.MIME_TYPE)
+
 const tagAutocompletions = computed(() => {
-    return constants.AUTOCOMPLETIONS.TAGS
+    return [...constants.AUTOCOMPLETIONS.TAGS, ...valueAutocompleteOptions]
 })
 
 const toggleBulkEdit = () => {

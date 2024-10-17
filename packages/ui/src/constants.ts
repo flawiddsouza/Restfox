@@ -252,9 +252,11 @@ export default {
         FORM_DATA: 'multipart/form-data',
         TEXT_PLAIN: 'text/plain',
         JSON: 'application/json',
+        JAVASCRIPT: 'application/javascript',
         GRAPHQL: 'application/graphql',
         OCTET_STREAM: 'application/octet-stream',
-        XML: 'application/xml'
+        XML: 'application/xml',
+        TEXT_CSV: 'text/csv',
     },
     STATUS_CODE_TEXT_MAPPING: {
         '100': 'Continue',
