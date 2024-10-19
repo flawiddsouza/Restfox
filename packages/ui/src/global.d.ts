@@ -86,6 +86,8 @@ export interface RequestInitialResponse {
     mimeType: string
     buffer: ArrayBuffer
     timeTaken: number
+    headTimeTaken?: number
+    bodyTimeTaken?: number
 }
 
 export interface RequestFinalResponse {
@@ -98,6 +100,8 @@ export interface RequestFinalResponse {
     mimeType: string
     buffer: ArrayBuffer
     timeTaken: number
+    headTimeTaken?: number
+    bodyTimeTaken?: number
     request: {
       method: string
       query: string

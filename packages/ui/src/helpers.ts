@@ -287,17 +287,22 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         signal: abortControllerSignal
     })
 
-    const endTime = new Date()
+    const headEndTime = new Date()
 
     const status = response.status
     const statusText = response.statusText
     const responseHeaders = [...response.headers.entries()]
 
     const responseBlob = await response.blob()
+
+    const endTime = new Date()
+
     const mimeType = responseBlob.type
     const buffer = await responseBlob.arrayBuffer()
 
     const timeTaken = Number(endTime) - Number(startTime)
+    const headTimeTaken = Number(headEndTime) - Number(startTime)
+    const bodyTimeTaken = Number(endTime) - Number(headEndTime)
 
     return {
         status,
@@ -305,7 +310,9 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         headers: responseHeaders,
         mimeType,
         buffer,
-        timeTaken
+        timeTaken,
+        headTimeTaken,
+        bodyTimeTaken,
     }
 }
 
@@ -539,6 +546,8 @@ export async function handleRequest(
             mimeType: response.mimeType,
             buffer: response.buffer,
             timeTaken: response.timeTaken,
+            headTimeTaken: response.headTimeTaken,
+            bodyTimeTaken: response.bodyTimeTaken,
             request: {
                 method: request.method!,
                 query: url.search,

@@ -20,7 +20,7 @@
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText === '' ? getStatusText(response.status) : response.statusText }}
                 </div>
-                <div class="tag ml-0_6rem" v-if="response.timeTaken">{{ humanFriendlyTime(response.timeTaken) }}</div>
+                <div class="tag ml-0_6rem" v-if="response.timeTaken" v-tooltip="getFullTimeTaken(response)" :key="response._id">{{ humanFriendlyTime(response.timeTaken) }}</div>
                 <div class="tag ml-0_6rem" v-if="responseSize">{{ humanFriendlySize(responseSize) }}</div>
             </div>
             <div class="response-panel-address-bar-select-container">
@@ -189,6 +189,7 @@ import {
 import { emitter } from '@/event-bus'
 import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
 import constants from '@/constants'
+import { vTooltip } from '@/directives/vTooltip'
 
 export default {
     components: {
@@ -198,6 +199,9 @@ export default {
         ImageFromBuffer,
         IframeFromBuffer,
         ResponsePanelTimeline,
+    },
+    directives: {
+        tooltip: vTooltip
     },
     props: {
         activeTab: Object
@@ -600,6 +604,13 @@ export default {
                     value: item
                 }
             })
+        },
+        getFullTimeTaken(response) {
+            if (!response.headTimeTaken && !response.bodyTimeTaken) {
+                return humanFriendlyTime(response.timeTaken)
+            }
+
+            return `Head: ${humanFriendlyTime(response.headTimeTaken)} | Body: ${humanFriendlyTime(response.bodyTimeTaken)}`
         },
         bufferToJSONString,
         filterJSONResponse,

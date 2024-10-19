@@ -772,3 +772,14 @@ select {
     color: rgb(237, 39, 39);
     font-size: 0.6rem !important;
 }
+
+.tooltip {
+    position: fixed;
+    z-index: 3;
+    background-color: var(--sidebar-item-active-color);
+    top: 0;
+    left: 0;
+    padding: 0.5em;
+    border-radius: var(--default-border-radius);
+    border: 3px solid var(--default-border-color);
+}

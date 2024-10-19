@@ -142,17 +142,22 @@ async function handleSendRequest(message, sendResponse) {
             signal: abortController.get(eventId).signal
         })
 
-        const endTime = new Date()
+        const headEndTime = new Date()
 
         const status = response.status
         const statusText = response.statusText
         const responseHeaders = [...response.headers.entries()]
 
         const responseBlob = await response.blob()
+
+        const endTime = new Date()
+
         const mimeType = responseBlob.type
         const buffer = await responseBlob.arrayBuffer()
 
         const timeTaken = endTime - startTime
+        const headTimeTaken = headEndTime - startTime
+        const bodyTimeTaken = endTime - headEndTime
 
         const responseToSend = {
             status,
@@ -160,7 +165,9 @@ async function handleSendRequest(message, sendResponse) {
             headers: responseHeaders,
             mimeType,
             buffer: Array.from(new Uint8Array(buffer)),
-            timeTaken
+            timeTaken,
+            headTimeTaken,
+            bodyTimeTaken,
         }
 
         sendResponse({
