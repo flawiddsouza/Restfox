@@ -15,7 +15,7 @@
                     class="tag"
                     :class="responseStatusColorMapping(response)"
                     style="max-width: 15rem; text-overflow: ellipsis; overflow: hidden;"
-                    :title="response.statusText === '' ? getStatusText(response.status) : response.statusText"
+                    :title="response.statusText === '' ? getStatusDescription(response.status) : response.statusText"
                 >
                     <span class="bold">{{ response.status }}</span>
                     {{ response.statusText === '' ? getStatusText(response.status) : response.statusText }}
@@ -179,6 +179,7 @@ import {
     getStatusText,
     timeAgo,
     responseStatusColorMapping,
+    getStatusDescription,
 } from '@/helpers'
 import {
     bufferToJSONString,
@@ -443,6 +444,7 @@ export default {
         }
     },
     methods: {
+        getStatusDescription,
         timeAgo,
         cancelRequest() {
             this.requestAbortController.abort()
