@@ -218,6 +218,14 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
                 const header = headers.find((header: RequestInitialResponseHeader) => header[0].toLowerCase() == headerName.toLowerCase())
                 return header ? header[1] : undefined
             },
+            setHeader(headerName: string, value: string) {
+                const headerIndex = headers.findIndex((header: RequestInitialResponseHeader) => header[0].toLowerCase() === headerName.toLowerCase())
+                if (headerIndex >= 0) {
+                    headers[headerIndex][1] = value
+                } else {
+                    headers.push([headerName, value])
+                }
+            },
             getStatusCode() {
                 return statusCode
             },

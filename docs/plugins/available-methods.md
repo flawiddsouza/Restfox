@@ -37,6 +37,7 @@
 | `rf.response.getURL()` | Retrieves the URL from the response. |
 | `rf.response.getHeader(name)` | Gets a specific header's value by name from the response. |
 | `rf.response.getHeaders()` | Gets all the headers from the response. |
+| `rf.response.setHeader(name, value)` | Sets a specific header's value for the response. |
 | `rf.response.getBody()` | Retrieves the response body as an ArrayBuffer. |
 | `rf.response.setBody(body)` | Sets the response body with the provided ArrayBuffer. |
 | `rf.response.getBodyText()` | Returns the response body as text. |

@@ -201,6 +201,12 @@ export default {
                     info: 'Gets all the headers from the response'
                 },
                 {
+                    label: 'rf.response.setHeader(name, value)',
+                    type: 'function',
+                    info: 'Sets a specific header value for the response',
+                    apply: snippet('rf.response.setHeader(${name}, ${value})')
+                },
+                {
                     label: 'rf.response.getBody()',
                     type: 'function',
                     info: 'Gets the body of the response as an ArrayBuffer'

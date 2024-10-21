@@ -234,6 +234,11 @@ export default defineComponent ({
             },
             {
                 type: 'option',
+                label: 'Sets a specific header\'s value for the response',
+                value: 'rf.response.setHeader(name, value)'
+            },
+            {
+                type: 'option',
                 label: 'Retrieves the response body as an ArrayBuffer',
                 value: 'rf.response.getBody()' },
             {
