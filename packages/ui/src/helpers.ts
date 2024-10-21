@@ -1392,7 +1392,13 @@ export function uriParse(urlString: string): {
 export function getStatusText(statusCode: number): string {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()]
+    return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()].title
+}
+
+export function getStatusDescription(statusCode: number): string {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()].description
 }
 
 export function timeAgo(timestamp: number) {
