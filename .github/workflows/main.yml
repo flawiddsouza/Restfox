@@ -13,6 +13,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  NODE_VERSION: 20
 
 jobs:
   build-electron-linux:
@@ -22,10 +23,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Node 20
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -48,10 +49,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Node 20
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -74,10 +75,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Node 20
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -105,10 +106,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Node 20
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -162,10 +163,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Node 20
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
       - name: Generate & Update Release Notes
         run: |
           node scripts/update-release-notes.js
