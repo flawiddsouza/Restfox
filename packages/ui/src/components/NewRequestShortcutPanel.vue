@@ -8,7 +8,7 @@
             <div class="create-request">
                 <p>Create a new request</p>
                 <div class="icons">
-                    <img :src="`/images/${constants.REQUESTS[key].type}-icon.png`" :alt="constants.REQUESTS[key].alt" :title="constants.REQUESTS[key].title" @click="createRequest(constants.REQUESTS[key].type)" v-for="key in Object.keys(constants.REQUESTS)">
+                    <img :src="`images/${constants.REQUESTS[key].type}-icon.png`" :alt="constants.REQUESTS[key].alt" :title="constants.REQUESTS[key].title" @click="createRequest(constants.REQUESTS[key].type)" v-for="key in Object.keys(constants.REQUESTS)">
                 </div>
             </div>
         </div>
