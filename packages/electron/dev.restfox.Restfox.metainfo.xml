@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.restfox.Restfox</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Restfox</name>
+  <summary>A powerful minimalistic HTTP client</summary>
+  <description>
+    <p>
+      Restfox is an HTTP client application that allows users to test and interact with RESTful
+      APIs. It provides a user-friendly interface for making HTTP requests, viewing responses, and
+      managing API endpoints. Restfox is designed to help developers and testers streamline their
+      API development and testing processes.
+    </p>
+    <p>
+      Additionally, Restfox offers plugin support to help developers modify request data before a
+      request is sent, adjust response data after a response is received, set environment variables
+      using the response data, and perform testing.
+    </p>
+  </description>
+  <launchable type="desktop-id">dev.restfox.Restfox.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/flawiddsouza/Restfox/f3ba5b090146feb708256e9d0d00971307533917/screenshots/1.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/flawiddsouza/Restfox/f3ba5b090146feb708256e9d0d00971307533917/screenshots/2.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/flawiddsouza/Restfox/f3ba5b090146feb708256e9d0d00971307533917/screenshots/3.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/flawiddsouza/Restfox/f3ba5b090146feb708256e9d0d00971307533917/screenshots/5.png</image>
+    </screenshot>
+  </screenshots>
+  <url type="bugtracker">https://github.com/flawiddsouza/Restfox/issues/</url>
+  <url type="help">https://docs.restfox.dev/support.html</url>
+  <url type="homepage">https://docs.restfox.dev</url>
+  <developer_name>Flawid D'Souza</developer_name>
+  <update_contact>me_at_flawiddsouza_dot_com</update_contact>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.29.0" date="2024-10-22" />
+  </releases>
+</component>
