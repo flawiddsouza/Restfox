@@ -3,6 +3,7 @@ const path = require('path')
 const chokidar = require('chokidar')
 const dotenv = require('dotenv')
 const dbHelpers = require('./db-helpers')
+const helpers = require('./helpers')
 const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
@@ -154,6 +155,11 @@ async function getCollectionForWorkspace(workspace, type) {
 
             fsLog.length = 0
             idMapBeforeClear = new Map(idMap)
+            // loop through idMapBeforeClear and remove prefix from values
+            // as the idMap needed for the ui and electron is not the same
+            for (const [key, value] of idMapBeforeClear) {
+                idMapBeforeClear.set(key, helpers.removePrefixFromString(value, workspace.location))
+            }
             idMap.clear()
 
             await dbHelpers.ensureRestfoxCollection(workspace)
@@ -221,8 +227,9 @@ function getCollectionById(workspace, collectionId) {
     })
 
     const collectionPath = idMap.get(collectionId)
+    const collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
 
-    return dbHelpers.getCollectionItem(fsLog, workspace, collectionPath)
+    return dbHelpers.getCollectionItem(fsLog, workspace, collectionPath, collectionPathWithoutWorkspaceLocation)
 }
 
 async function createCollection(workspace, collection) {
@@ -238,6 +245,7 @@ async function createCollection(workspace, collection) {
 
     try {
         let collectionPath = ''
+        let collectionPathWithoutWorkspaceLocation = ''
 
         if (collection._type === 'request_group') {
             if (collection.parentId) {
@@ -246,7 +254,10 @@ async function createCollection(workspace, collection) {
                 collectionPath = path.join(workspace.location, collectionName)
             }
             await fileUtils.mkdir(collectionPath, fsLog, 'Create collection item folder')
-            idMap.set(collectionPath, collectionPath)
+
+            collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
+            idMap.set(collectionPathWithoutWorkspaceLocation, collectionPath)
+
             console.log(`Created directory: ${collectionPath}`)
 
             const collectionToSave = {}
@@ -292,14 +303,17 @@ async function createCollection(workspace, collection) {
             }
 
             await fileUtils.writeFileJsonNewOnly(collectionPath, collection, fsLog, `Create collection item of type ${collection._type}`)
-            idMap.set(collectionPath, collectionPath)
+
+            collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
+            idMap.set(collectionPathWithoutWorkspaceLocation, collectionPath)
+
             console.log(`Created file: ${collectionPath}`)
         }
 
         return {
             error: null,
             oldCollectionId,
-            newCollectionId: collectionPath,
+            newCollectionId: collectionPathWithoutWorkspaceLocation,
         }
     } catch (err) {
         if (err.code === 'EEXIST') {
@@ -873,6 +887,11 @@ async function deleteResponsesByCollectionIds(workspace, collectionIds) {
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
 
+        if (!collectionPath) {
+            console.log(`Skipping deleting responses for collection: ${collectionId} as it does not exist`)
+            continue
+        }
+
         const stats = await fs.stat(collectionPath)
 
         if (stats.isDirectory()) {
@@ -1109,6 +1128,12 @@ async function deletePluginsByCollectionIds(workspace, collectionIds) {
 
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
+
+        if (!collectionPath) {
+            console.log(`Skipping deleting plugins for collection: ${collectionId} as it does not exist`)
+            continue
+        }
+
         const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
 
         try {

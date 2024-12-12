@@ -2,12 +2,14 @@
 const fs = require('fs').promises
 const path = require('path')
 const fileUtils = require('./file-utils')
+const helpers = require('./helpers')
 const constants = require('./constants')
 
-async function getCollectionItem(fsLog, workspace, fullPath) {
+async function getCollectionItem(fsLog, workspace, fullPath, idForCollectionitem) {
     const isFolder = fullPath.endsWith('.json') === false
     const fileOrFolderName = path.basename(fullPath)
     const dir = path.dirname(fullPath)
+    const parentIdForCollectionItem = dir === workspace.location ? null : helpers.removePrefixFromString(dir, workspace.location)
 
     if (isFolder) {
         const collapsed = await fileUtils.pathExists(path.join(fullPath, constants.FILES.COLLAPSED))
@@ -15,10 +17,10 @@ async function getCollectionItem(fsLog, workspace, fullPath) {
         const collectionName = fileOrFolderName
 
         let collectionItem = {
-            _id: fullPath,
+            _id: idForCollectionitem,
             _type: 'request_group',
             name: fileUtils.decodeFilename(collectionName),
-            parentId: dir === workspace.location ? null : dir,
+            parentId: parentIdForCollectionItem,
             children: [],
             workspaceId: workspace._id,
             collapsed,
@@ -70,8 +72,8 @@ async function getCollectionItem(fsLog, workspace, fullPath) {
 
             collectionItem = {
                 ...collectionItem,
-                _id: fullPath,
-                parentId: dir === workspace.location ? null : dir,
+                _id: idForCollectionitem,
+                parentId: parentIdForCollectionItem,
                 name: fileUtils.decodeFilename(collectionName),
                 workspaceId: workspace._id,
             }
@@ -108,9 +110,10 @@ async function getCollection(idMap, fsLog, workspace, dir = workspace.location) 
             }
 
             const fullPath = path.join(dir, fileOrFolder.name)
+            const fullPathWithoutWorkspaceLocation = helpers.removePrefixFromString(fullPath, workspace.location)
 
             if (fileOrFolder.isDirectory()) {
-                const collection = await getCollectionItem(fsLog, workspace, fullPath)
+                const collection = await getCollectionItem(fsLog, workspace, fullPath, fullPathWithoutWorkspaceLocation)
 
                 if(collection) {
                     items.push(collection)
@@ -120,13 +123,14 @@ async function getCollection(idMap, fsLog, workspace, dir = workspace.location) 
                     items = items.concat(nestedItems)
                 }
             } else {
-                const collectionItem = await getCollectionItem(fsLog, workspace, fullPath)
+                const collectionItem = await getCollectionItem(fsLog, workspace, fullPath, fullPathWithoutWorkspaceLocation)
 
                 if(collectionItem) {
                     items.push(collectionItem)
                 }
             }
-            idMap.set(fullPath, fullPath)
+
+            idMap.set(fullPathWithoutWorkspaceLocation, fullPath)
         }
     } catch (err) {
         console.error(err)

@@ -69,8 +69,16 @@ async function readFile(filePath, workspaceLocation = null) {
     }
 }
 
+function removePrefixFromString(str, prefix) {
+    if (str.startsWith(prefix)) {
+        return str.slice(prefix.length)
+    }
+    return str
+}
+
 module.exports = {
     openFolderSelectionDialog,
     openFolder,
     readFile,
+    removePrefixFromString,
 }
