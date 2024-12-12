@@ -507,6 +507,7 @@ export const store = createStore<State>({
                 state.tabs = []
                 state.activeTab = null
                 state.plugins.workspace = []
+                state.idMap = null
             }
         },
         async loadWorkspacePlugins(state) {
