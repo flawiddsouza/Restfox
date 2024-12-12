@@ -82,7 +82,9 @@ export default {
         collectionItemToEdit: {
             deep: true,
             handler() {
-                this.updateCollectionItem(this.collectionItemToEdit)
+                if(this.collectionItemToEdit) {
+                    this.updateCollectionItem(this.collectionItemToEdit)
+                }
             }
         }
     },
