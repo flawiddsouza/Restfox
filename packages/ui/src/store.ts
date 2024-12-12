@@ -1580,8 +1580,15 @@ export const store = createStore<State>({
 
                 await context.dispatch('refreshWorkspace')
             } else {
+                console.log('folder collectionItem headers and authentication updated')
                 collectionItem.headers = headers
                 collectionItem.authentication = authentication
+
+                // keep tab properties in tabs in sync with collectionItem
+                const tab = store.state.tabs.find(tab => tab._id === collectionItem._id)
+                if(tab) {
+                    Object.assign(tab, collectionItem)
+                }
             }
 
             return {
