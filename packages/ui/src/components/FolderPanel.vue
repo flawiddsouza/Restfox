@@ -8,6 +8,7 @@
                     <RequestPanelHeaders
                         :collection-item="collectionItemToEdit"
                         :collection-item-environment-resolved="envVariables"
+                        @tagClick="onTagClick"
                     />
                 </div>
                 <InfoTip />
@@ -22,6 +23,7 @@
                         :collection-item="collectionItemToEdit"
                         :collection-item-environment-resolved="envVariables"
                         :flags="flags"
+                        @tagClick="onTagClick"
                     />
                 </div>
                 <InfoTip />
@@ -29,12 +31,20 @@
         </div>
 
         <div style="padding-bottom: 1rem"></div>
+
+        <EditTagModal
+            v-if="editTagModalShow"
+            v-model:showModal="editTagModalShow"
+            :parsed-func="editTagParsedFunc"
+            :update-func="editTagUpdateFunc"
+        />
     </div>
 </template>
 
 <script>
-import RequestPanelHeaders from '../../src/components/RequestPanelHeaders.vue'
-import RequestPanelAuth from '../../src/components/RequestPanelAuth.vue'
+import RequestPanelHeaders from '@/components/RequestPanelHeaders.vue'
+import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
+import EditTagModal from '@/components/modals/EditTagModal.vue'
 import { deepClone } from '@/helpers'
 import { toRaw } from 'vue'
 
@@ -52,6 +62,7 @@ export default {
     components: {
         RequestPanelHeaders,
         RequestPanelAuth,
+        EditTagModal,
         InfoTip: {
             template: `
               <div style="margin-top: 0.5rem; color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;">
@@ -64,6 +75,9 @@ export default {
         return {
             envVariables: {},
             collectionItemToEdit: null,
+            editTagModalShow: false,
+            editTagParsedFunc: null,
+            editTagUpdateFunc: null,
         }
     },
     computed: {
@@ -112,6 +126,11 @@ export default {
             if(result.error) {
                 return
             }
+        },
+        onTagClick(parsedFunc, updateFunc) {
+            this.editTagParsedFunc = parsedFunc
+            this.editTagUpdateFunc = updateFunc
+            this.editTagModalShow = true
         },
     }
 }
