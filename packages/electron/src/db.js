@@ -942,6 +942,7 @@ async function getWorkspacePlugins(workspace) {
         const workspacePluginsData = JSON.parse(await fs.readFile(workspacePluginsPath, 'utf8'))
         workspacePluginsData.forEach((plugin) => {
             plugin.workspaceId = workspace._id
+            plugin.collectionId = null
         })
         items.push(...workspacePluginsData)
     } catch (err) {
