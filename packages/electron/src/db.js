@@ -951,8 +951,9 @@ async function getWorkspacePlugins(workspace) {
     // Collection and Folder Plugins
     const collectionItems = await dbHelpers.getCollection(idMap, fsLog, workspace)
     for (const item of collectionItems) {
+        const collectionPath = idMap.get(item._id)
         if (item._type === 'request_group') {
-            const collectionPluginsPath = path.join(item._id, constants.FILES.FOLDER_PLUGINS)
+            const collectionPluginsPath = path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
             try {
                 const collectionPluginsData = JSON.parse(await fs.readFile(collectionPluginsPath, 'utf8'))
                 collectionPluginsData.forEach((plugin) => {
@@ -963,7 +964,7 @@ async function getWorkspacePlugins(workspace) {
                 // If there is no plugins file for a collection, it's fine, just continue
             }
         } else {
-            const itemPluginsPath = item._id.replace('.json', constants.FILES.PLUGINS)
+            const itemPluginsPath = collectionPath.replace('.json', constants.FILES.PLUGINS)
             try {
                 const itemPluginsData = JSON.parse(await fs.readFile(itemPluginsPath, 'utf8'))
                 itemPluginsData.forEach((plugin) => {
