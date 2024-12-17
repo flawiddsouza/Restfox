@@ -446,7 +446,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
             }
         }
 
-        await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`)
+        await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`, workspaceWatcher)
         idMap.set(collectionId, renameTo)
 
         if (renameFrom.endsWith('.json')) {

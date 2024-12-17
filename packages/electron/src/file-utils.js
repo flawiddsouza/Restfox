@@ -1,4 +1,5 @@
 const fs = require('fs').promises
+const fse = require('fs-extra')
 const pathLib = require('path')
 
 async function readdirIgnoreError(path) {
@@ -131,7 +132,20 @@ async function mkdir(path, fsLog, fsLogReason)
     }
 }
 
-async function renameFileOrFolder(oldPath, newPath, fsLog, fsLogReason) {
+async function hasSubFolders(dir) {
+    const files = await fs.readdir(dir)
+    for (const file of files) {
+        const stats = await fs.stat(pathLib.join(dir, file))
+        if (stats.isDirectory()) {
+            return true
+        }
+    }
+    return false
+}
+
+async function renameFileOrFolder(oldPath, newPath, fsLog, fsLogReason, workspaceWatcher = null) {
+    console.log('Renaming', oldPath, 'to', newPath)
+
     const id = Date.now()
     const isDirectory = (await fs.stat(oldPath)).isDirectory()
 
@@ -143,7 +157,18 @@ async function renameFileOrFolder(oldPath, newPath, fsLog, fsLogReason) {
     }
 
     try {
-        await fs.rename(oldPath, newPath)
+        if (process.platform === 'win32' && isDirectory && await hasSubFolders(oldPath)) {
+            console.log('Copying and deleting directory due to Windows rename issue')
+            if (workspaceWatcher) {
+                const oldPathGlob = pathLib.join(oldPath, '**', '*')
+                console.log(    `Unwatching ${oldPathGlob}`)
+                workspaceWatcher.unwatch(oldPathGlob)
+            }
+            await fse.copy(oldPath, newPath)
+            await fs.rm(oldPath, { recursive: true })
+        } else {
+            await fs.rename(oldPath, newPath)
+        }
     } catch (e) {
         fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
         throw e
