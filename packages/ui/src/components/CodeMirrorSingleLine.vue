@@ -6,9 +6,13 @@
 import { EditorView, keymap, placeholder, drawSelection } from '@codemirror/view'
 import { EditorState, StateEffect } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { autocompletion, completeFromList } from '@codemirror/autocomplete'
+import { closeBrackets, autocompletion, completeFromList } from '@codemirror/autocomplete'
 import { envVarDecoration } from '@/utils/codemirror-extensions'
 import { tags } from '@/codemirror-extensions/tags'
+import { json } from '@codemirror/lang-json'
+import { codeMirrorSyntaxHighlighting, getEditorConfig, getSpaces } from '@/helpers'
+import { syntaxHighlighting } from '@codemirror/language'
+import { indentOnInput, indentUnit, bracketMatching, syntaxHighlighting } from '@codemirror/language'
 import type { ParsedResult } from '@/parsers/tag'
 
 function getExtensions(vueInstance) {
@@ -64,7 +68,20 @@ function getExtensions(vueInstance) {
         vueInstance.$emit('tag-click', parsedFunc, updateFunc)
     }
 
+    const languageExtensions = []
+
+    if (vueInstance.lang === 'json') {
+        languageExtensions.push(json())
+        const highlightStyle = codeMirrorSyntaxHighlighting()
+        languageExtensions.push(syntaxHighlighting(highlightStyle, { fallback: true }))
+        languageExtensions.push(indentOnInput())
+        languageExtensions.push(indentUnit.of(getSpaces(getEditorConfig().indentSize)))
+        languageExtensions.push(bracketMatching())
+        languageExtensions.push(closeBrackets()) // auto close flower brackets, close double quotes
+    }
+
     const extensions = [
+        ...languageExtensions,
         history(),
         EditorView.updateListener.of(v => {
             if(v.docChanged) {
@@ -180,6 +197,10 @@ export default {
         autocompletions: {
             type: Array,
             default: () => []
+        },
+        lang: {
+            type: String,
+            required: false,
         },
     },
     data() {

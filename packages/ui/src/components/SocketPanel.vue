@@ -110,6 +110,7 @@
                                 :env-variables="collectionItemEnvironmentResolved"
                                 :input-text-compatible="true"
                                 :allow-multiple-lines="true"
+                                lang="json"
                                 class="w-100p mt-0_5rem input o-a"
                                 style="height: 5.8rem; resize: vertical; margin-bottom: 0.2rem;"
                             />
