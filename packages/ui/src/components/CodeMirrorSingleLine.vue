@@ -119,11 +119,15 @@ function getExtensions(vueInstance) {
 
                                 // get 3 characters before from or all characters before from if from < 3
                                 const before = text.slice(from - (from < 3 ? from : 3), from)
+                                // get 3 characters after to or all characters after to if to + 3 exceeds text length
+                                const after = text.slice(to, to + 3)
 
                                 let completionText = completion.label
 
                                 const condition1 = before.endsWith('{{')
                                 const condition2 = before.endsWith('{{ ')
+                                const condition3 = after.startsWith('}}')
+                                const condition4 = after.startsWith(' }}')
 
                                 if(condition1) {
                                     completionText = completionText + '}}'
@@ -135,6 +139,14 @@ function getExtensions(vueInstance) {
 
                                 if(!condition1 && !condition2) {
                                     completionText = '{{' + completionText + '}}'
+                                }
+
+                                if(condition3) {
+                                    completionText = completionText.slice(0, -2)
+                                }
+
+                                if(condition4) {
+                                    completionText = completionText.slice(0, -3)
                                 }
 
                                 view.dispatch({

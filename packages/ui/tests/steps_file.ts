@@ -36,6 +36,12 @@ export = function() {
             }
 
             this.type(url)
-        }
+        },
+
+        setDefaultEnvironment(obj: any) {
+            this.click('.navbar-item > a')
+            this.fillField('.code-mirror-editor .cm-content', JSON.stringify(obj))
+            this.click('Done')
+        },
     })
 }

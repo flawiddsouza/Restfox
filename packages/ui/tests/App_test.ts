@@ -75,3 +75,47 @@ Scenario('Send GET request', async() => {
     I.expectContain(text, `* Preparing request to ${host}${path}${queryString}`)
     I.expectContain(text, `GET ${path}${queryString}`)
 })
+
+Scenario('Test env var autocompletion', async() => {
+    I.setDefaultEnvironment({
+        cat: 'dog'
+    })
+
+    I.createRequest('Env Auto Completion Test')
+
+    const addressBarInput = '.request-panel-address-bar .code-mirror-single-line .cm-content'
+
+    const clearAddressBar = async() => {
+        I.typeInRequestPanelAddressBar('', true)
+        I.expectEqual(await I.grabTextFrom(addressBarInput), 'Enter request URL')
+    }
+
+    const checkAutocomplete = async(value: string, expected: string) => {
+        I.typeInRequestPanelAddressBar(value)
+        I.wait(0.5)
+        I.pressKey('Enter')
+        I.expectEqual(await I.grabTextFrom(addressBarInput), expected)
+        await clearAddressBar()
+    }
+
+    const checkAutocompleteInBetween = async(initialValue: string, moveCursorToAfter: string, addCharacter: string, expected: string) => {
+        I.typeInRequestPanelAddressBar(initialValue)
+        I.pressKey('Home')
+        for(let i = 0; i < moveCursorToAfter.length; i++) {
+            I.pressKey('ArrowRight')
+        }
+        I.type(addCharacter)
+        I.wait(0.5)
+        I.pressKey('Enter')
+        I.expectEqual(await I.grabTextFrom(addressBarInput), expected)
+        await clearAddressBar()
+    }
+
+    await checkAutocomplete('other-content/c', 'other-content/{{cat}}')
+    await checkAutocomplete('other-content/{{ca', 'other-content/{{cat}}')
+    await checkAutocomplete('other-content/{{ ca', 'other-content/{{ cat }}')
+    await checkAutocompleteInBetween('other-content/{{c}}/something', 'other-content/{{c', 'a', 'other-content/{{cat}}/something')
+    await checkAutocompleteInBetween('other-content/{{ c }}/something', 'other-content/{{ c', 'a', 'other-content/{{ cat }}/something')
+    await checkAutocompleteInBetween('{{ca}}', '{{ca', 't', '{{cat}}')
+    await checkAutocompleteInBetween('ca}}', 'ca', 't', '{{cat}}')
+})
