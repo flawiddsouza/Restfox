@@ -11,7 +11,6 @@ import { envVarDecoration } from '@/utils/codemirror-extensions'
 import { tags } from '@/codemirror-extensions/tags'
 import { json } from '@codemirror/lang-json'
 import { codeMirrorSyntaxHighlighting, getEditorConfig, getSpaces } from '@/helpers'
-import { syntaxHighlighting } from '@codemirror/language'
 import { indentOnInput, indentUnit, bracketMatching, syntaxHighlighting } from '@codemirror/language'
 import type { ParsedResult } from '@/parsers/tag'
 
