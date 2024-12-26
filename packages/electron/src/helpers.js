@@ -2,6 +2,7 @@ const { dialog, shell } = require('electron')
 const fileUtils = require('./file-utils')
 const fs = require('fs').promises
 const path = require('path')
+const { platform } = require('os')
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []
@@ -71,8 +72,17 @@ async function readFile(filePath, workspaceLocation = null) {
 
 function removePrefixFromString(str, prefix) {
     if (str.startsWith(prefix)) {
-        return str.slice(prefix.length)
+        let returnStr = str.slice(prefix.length)
+
+        // normalize path separators, so that they are always posix, just for ids
+        // makes response tags work cross platform
+        if (platform() === 'win32') {
+            returnStr = returnStr.replaceAll(path.win32.sep, path.posix.sep)
+        }
+
+        return returnStr
     }
+
     return str
 }
 
