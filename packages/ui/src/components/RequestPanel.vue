@@ -249,9 +249,9 @@
                                 <template v-if="activeTab.body.fileName">{{ activeTab.body.fileName.name }}</template>
                                 <template v-else>No File Selected</template>
                             </span>
-                            <span style="border: 1px solid lightgrey; padding: 1px 5px; white-space: nowrap; margin-left: auto;" @click.prevent="activeTab.body.fileName = null" v-show="activeTab.body.fileName">x</span>
+                            <span style="border: 1px solid lightgrey; padding: 1px 5px; white-space: nowrap; margin-left: auto;" @click.prevent="activeTab.body.fileName = null; $refs.binaryFileInput.value = '';" v-show="activeTab.body.fileName">x</span>
                         </div>
-                        <input type="file" @change="activeTab.body.fileName = $event.target.files[0]" style="display: none;">
+                        <input type="file" ref="binaryFileInput" @change="activeTab.body.fileName = $event.target.files[0]" style="display: none;">
                     </label>
                 </div>
             </div>
