@@ -211,6 +211,18 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             })
         })
 
+        const pathParameters: RequestParam[] = []
+
+        const pathParams = 'url' in request.request && typeof request.request.url !== 'string' && 'variable' in request.request.url ? request.request.url.variable : []
+        pathParams.forEach((pathParam: any) => {
+            pathParameters.push({
+                name: pathParam.key,
+                value: pathParam.value,
+                description: pathParam.description,
+                disabled: pathParam.disabled
+            })
+        })
+
         let url = ''
 
         if('url' in request.request) {
@@ -258,6 +270,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             body,
             headers,
             parameters,
+            pathParameters: pathParameters.length > 0 ? pathParameters : undefined,
             authentication,
             description: 'description' in request.request ? request.request.description : undefined,
             parentId,

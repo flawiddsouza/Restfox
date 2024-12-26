@@ -7,9 +7,11 @@ import { convertPostmanExportToRestfoxCollection } from './postman'
 import { addSortOrderToTree, flattenTree } from '@/helpers'
 
 test('importPostmanV2.0', async() => {
-    const currentFolder = path.dirname(new URL(import.meta.url).pathname)
+    const currentFolder = process.cwd()
 
-    const testDataFolder = path.join(currentFolder, '..', '..', 'test-data', 'postman-import-v2')
+    const testDataFolder = path.resolve(path.join(currentFolder,'test-data', 'postman-import-v2'))
+
+    console.log('testDataFolder', testDataFolder)
 
     const inputFile = await readFile(path.join(testDataFolder, 'Argos.API.postman_collection.v2.0.json'), 'utf-8')
     const input = JSON.parse(inputFile)
@@ -49,9 +51,9 @@ test('importPostmanV2.0', async() => {
 })
 
 test('importPostmanV2.1', async() => {
-    const currentFolder = path.dirname(new URL(import.meta.url).pathname)
+    const currentFolder = process.cwd()
 
-    const testDataFolder = path.join(currentFolder, '..', '..', 'test-data', 'postman-import-v2')
+    const testDataFolder = path.join(currentFolder, 'test-data', 'postman-import-v2')
 
     const inputFile = await readFile(path.join(testDataFolder, 'Argos.API.postman_collection.v2.1.json'), 'utf-8')
     const input = JSON.parse(inputFile)

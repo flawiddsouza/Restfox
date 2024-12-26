@@ -186,6 +186,13 @@
       }
     ],
     "parameters": [],
+    "pathParameters": [
+      {
+        "name": "buildId",
+        "value": "<string>",
+        "description": "(Required) A unique identifier for the build"
+      }
+    ],
     "authentication": {
       "type": "No Auth"
     },
