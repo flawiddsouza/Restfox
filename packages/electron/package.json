@@ -23,7 +23,7 @@
         "@typescript-eslint/parser": "^5.4.0",
         "electron": "^29.1.6",
         "electron-builder": "^24.13.3",
-        "electron-devtools-installer": "^3.2.0",
+        "electron-devtools-installer": "^4.0.0",
         "eslint": "^8.2.0",
         "eslint-plugin-vue": "^8.0.3",
         "nodemon": "^3.1.0",
