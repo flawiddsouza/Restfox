@@ -50,7 +50,7 @@
         "jsonfile": "^4.0.0",
         "mkdirp": "^0.5.1",
         "open": "^10.1.0",
-        "undici": "^6.20.1",
+        "undici": "^7.2.0",
         "update-electron-app": "^2.0.1"
     },
     "config": {
