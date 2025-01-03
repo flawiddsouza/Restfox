@@ -61,6 +61,7 @@ function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0, width = nu
 import { nextTick } from 'vue'
 
 export default {
+    emits: ['click', 'update:show'],
     props: {
         options: {
             type: Array,
