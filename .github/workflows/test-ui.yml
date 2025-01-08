@@ -18,10 +18,10 @@ jobs:
           working-directory: ./packages/ui
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js 19
+    - name: Use Node.js 22
       uses: actions/setup-node@v3
       with:
-        node-version: 19
+        node-version: 22
         cache: 'npm'
         cache-dependency-path: './packages/ui/package-lock.json'
     - run: npm i
