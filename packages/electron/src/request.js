@@ -1,5 +1,5 @@
 const { File } = require('node:buffer')
-const { fetch, Agent } = require('undici')
+const { fetch, Agent, FormData } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 
