@@ -34,7 +34,9 @@
     </section>
 
     <section class="request-response-panels" v-if="collectionItem && collectionItem._type === 'socket'">
-        <SocketPanel :key="collectionItem._id" :active-tab="collectionItem" />
+        <KeepAlive>
+            <SocketPanel :key="collectionItem._id" :active-tab="collectionItem" />
+        </KeepAlive>
     </section>
 
     <section class="request-response-panels" v-show="collectionItem && collectionItem._type === 'request_group'">

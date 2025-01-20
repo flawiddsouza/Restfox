@@ -112,7 +112,8 @@
                                 :allow-multiple-lines="true"
                                 lang="json"
                                 class="w-100p mt-0_5rem input o-a"
-                                style="height: 5.8rem; resize: vertical; margin-bottom: 0.2rem;"
+                                style="resize: vertical; margin-bottom: 0.2rem;"
+                                v-initial-height
                             />
                             <div class="d-f flex-jc-sb">
                                 <button
@@ -725,6 +726,14 @@ async function setSelectedTextAsEnvironmentVariable() {
     $toast.success(`Environment variable set: ${environmentVariableName}`)
 }
 
+const vInitialHeight = {
+    mounted(el: HTMLElement) {
+        if(!el.style.height) {
+            el.style.height = '5.8rem'
+        }
+    }
+}
+
 // Lifecycle Events
 
 onBeforeMount(async() => {
@@ -938,7 +947,6 @@ button.icon > svg {
     display: block;
 }
 
-textarea,
 input,
 select,
 .input {
@@ -948,10 +956,6 @@ select,
     padding: 0.5rem;
     font: inherit;
     background-color: var(--background-color);
-}
-
-textarea {
-    resize: vertical;
 }
 
 input:disabled, .input.disabled {
