@@ -114,6 +114,11 @@ export default {
                 return this.showModal
             },
             set(value) {
+                if (this.parseError) {
+                    this.$toast.error('Invalid JSON. Please fix the error before closing the editor.')
+                    return
+                }
+
                 this.$emit('update:showModal', value)
             }
         },
