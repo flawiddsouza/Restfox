@@ -3,6 +3,7 @@
 import { ControlOperator, parse, ParseEntry } from 'shell-quote'
 import { Converter, ImportRequest, Parameter, PostData } from './curl.types'
 import constants from '@/constants'
+import { convertCurlCmdToBash } from '@/utils/curl-cmd-to-bash'
 
 export const id = 'curl'
 export const name = 'cURL'
@@ -47,7 +48,12 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
 
     // Start at 1 so we can skip the ^curl part
     for (let i = 1; i < parseEntries.length; i++) {
-        const parseEntry = parseEntries[i]
+        let parseEntry = parseEntries[i]
+        // trim leading spaces between parsed entries
+        // regex won't match otherwise (e.g.    -H 'Content-Type: application/json')
+        if (typeof parseEntry === 'string') {
+            parseEntry = parseEntry.trim()
+        }
 
         if (typeof parseEntry === 'string' && parseEntry.match(/^-{1,2}[\w-]+/)) {
             const isSingleDash = parseEntry[0] === '-' && parseEntry[1] !== '-'
@@ -221,7 +227,17 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
                 text: bodyData,
             }
         } else {
-            body.text = dataParameters.map (parameter => `${parameter.name}${parameter.value}`).join ('&')
+            body.text = dataParameters.map (parameter => {
+                const addEqual = parameter.name && parameter.value ? '=' : ''
+                return `${parameter.name}${addEqual}${parameter.value}`
+            }).join ('&')
+
+            // check if body is json
+            try {
+                JSON.parse(body.text)
+                mimeType = 'application/json'
+            } catch {}
+
             body.mimeType = mimeType || ''
         }
     } else if (formDataParams.length) {
@@ -380,8 +396,11 @@ export const convert: Converter = rawData => {
         return null
     }
 
+    const cleanedRawData = convertCurlCmdToBash(rawData)
+        .replace(/\n/g, ' ')
+
     // Parse the whole thing into one big tokenized list
-    const parseEntries = parse(rawData.replace(/\n/g, ' '))
+    const parseEntries = parse(cleanedRawData)
 
     // ~~~~~~~~~~~~~~~~~~~~~~ //
     // Aggregate the commands //

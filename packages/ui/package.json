@@ -50,7 +50,7 @@
         "nanoid": "^3.1.30",
         "quickjs-emscripten-core": "^0.29.1",
         "sass": "^1.43.4",
-        "shell-quote": "^1.8.1",
+        "shell-quote": "^1.8.2",
         "socket.io-client-v2": "npm:socket.io-client@^2.5.0",
         "socket.io-client-v3": "npm:socket.io-client@^3.1.3",
         "socket.io-client-v4": "npm:socket.io-client@^4.7.4",

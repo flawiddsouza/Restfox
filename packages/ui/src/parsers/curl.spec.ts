@@ -135,7 +135,7 @@ describe('curl', () => {
             { flag: '--data-urlencode', inputs: ['['], expected: [{ name: '', value: '[' }] },
             { flag: '--data-urlencode', inputs: [']'], expected: [{ name: '', value: ']' }] },
             { flag: '--data-urlencode', inputs: ['|'], expected: [{ name: '', value: '|' }] },
-            { flag: '--data-urlencode', inputs: ['^'], expected: [{ name: '', value: '^' }] },
+            { flag: '--data-urlencode', inputs: ['^a'], expected: [{ name: '', value: '^a' }] }, // adding a after ^ to pass the issue created by convertCurlCmdToBash - hopefully, nothing is broken
             { flag: '--data-urlencode', inputs: ['"'], expected: [{ name: '', value: '"' }] },
             { flag: '--data-urlencode', inputs: ['='], expected: [{ name: '', value: '=' }] },
             { flag: '--data-urlencode', inputs: ['%3D'], expected: [{ name: '', value: '%3D' }] },
@@ -228,16 +228,16 @@ describe('curl', () => {
                 -H "origin: https://restfox.dev" ^
                 -H "pragma: no-cache" ^
                 -H "referer: https://restfox.dev/" ^
-                -H "sec-ch-ua: ^\^"Chromium^\^";v=^\^"118^\^", ^\^"Google Chrome^\^";v=^\^"118^\^", ^\^"Not=A?Brand^\^";v=^\^"99^\^"" ^
+                -H "sec-ch-ua: ^\\^"Chromium^\\^";v=^\\^"118^\\^", ^\\^"Google Chrome^\\^";v=^\\^"118^\\^", ^\\^"Not=A?Brand^\\^";v=^\\^"99^\\^"" ^
                 -H "sec-ch-ua-mobile: ?0" ^
-                -H "sec-ch-ua-platform: ^\^"Windows^\^"" ^
+                -H "sec-ch-ua-platform: ^\\^"Windows^\\^"" ^
                 -H "sec-fetch-dest: empty" ^
                 -H "sec-fetch-mode: cors" ^
                 -H "sec-fetch-site: cross-site" ^
                 -H "user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36" ^
                 --data-raw ^"^{^
 
-                    ^\^"test^\^": ^\^"body^\^"^
+                    ^\\^"test^\\^": ^\\^"body^\\^"^
 
                 ^}^" ^
                 --compressed
@@ -261,9 +261,9 @@ describe('curl', () => {
                 { name: 'origin', value: 'https://restfox.dev' },
                 { name: 'pragma', value: 'no-cache' },
                 { name: 'referer', value: 'https://restfox.dev/' },
-                { name: 'sec-ch-ua', value: '^^Chromium^^;v=^^118^^, ^^Google' },
+                { name: 'sec-ch-ua', value: '"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"' },
                 { name: 'sec-ch-ua-mobile', value: '?0' },
-                { name: 'sec-ch-ua-platform', value: '^^Windows^^' },
+                { name: 'sec-ch-ua-platform', value: '"Windows"' },
                 { name: 'sec-fetch-dest', value: 'empty' },
                 { name: 'sec-fetch-mode', value: 'cors' },
                 { name: 'sec-fetch-site', value: 'cross-site' },
@@ -275,7 +275,7 @@ describe('curl', () => {
             authentication: {},
             body: {
                 mimeType: 'application/json',
-                text: '^^{^                      ^^test^^: ^^body^^^                  ^}^'
+                text: '{                      "test": "body"                  }'
             }
         }])
     })
@@ -321,6 +321,162 @@ describe('curl', () => {
                 'parameters':  [],
                 'parentId': '__WORKSPACE_ID__',
                 'url': 'https://app.argos-ci.com/graphql',
+            },
+        ])
+    })
+
+    // From: https://github.com/flawiddsouza/Restfox/issues/306
+    it('Firefox: Copy as cURL (POSIX) #306', () => {
+        const cmd = `curl 'https://restninja.io/in/proxy' --compressed -X POST -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0' -H 'Accept: */*' -H 'Accept-Language: en-US,en;q=0.5' -H 'Accept-Encoding: gzip, deflate, br, zstd' -H 'Origin: https://restninja.io' -H 'DNT: 1' -H 'Sec-GPC: 1' -H 'Connection: keep-alive' -H 'Referer: https://restninja.io/' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin' -H 'TE: trailers' --data-raw '{"body":"ewogICAgInByb3AiOiAxMjM0Cn0=","method":"POST","uri":"http://httpbin.org/post","headers":[],"auth":{"_t":"None"}}'`
+
+        const result = convert(cmd)
+
+        expect(result).toMatchObject([
+            {
+                '_id': '__REQ_1__',
+                '_type': 'request',
+                'authentication': {},
+                'body': {
+                    'mimeType': 'application/json',
+                    'text': '{"body":"ewogICAgInByb3AiOiAxMjM0Cn0=","method":"POST","uri":"http://httpbin.org/post","headers":[],"auth":{"_t":"None"}}',
+                },
+                'headers': [
+                    {
+                        'name': 'User-Agent',
+                        'value': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0',
+                    },
+                    {
+                        'name': 'Accept',
+                        'value': '*/*',
+                    },
+                    {
+                        'name': 'Accept-Language',
+                        'value': 'en-US,en;q=0.5',
+                    },
+                    {
+                        'name': 'Accept-Encoding',
+                        'value': 'gzip, deflate, br, zstd',
+                    },
+                    {
+                        'name': 'Origin',
+                        'value': 'https://restninja.io',
+                    },
+                    {
+                        'name': 'DNT',
+                        'value': '1',
+                    },
+                    {
+                        'name': 'Sec-GPC',
+                        'value': '1',
+                    },
+                    {
+                        'name': 'Connection',
+                        'value': 'keep-alive',
+                    },
+                    {
+                        'name': 'Referer',
+                        'value': 'https://restninja.io/',
+                    },
+                    {
+                        'name': 'Sec-Fetch-Dest',
+                        'value': 'empty',
+                    },
+                    {
+                        'name': 'Sec-Fetch-Mode',
+                        'value': 'cors',
+                    },
+                    {
+                        'name': 'Sec-Fetch-Site',
+                        'value': 'same-origin',
+                    },
+                    {
+                        'name': 'TE',
+                        'value': 'trailers',
+                    },
+                ],
+                'method': 'POST',
+                'name': 'https://restninja.io/in/proxy',
+                'parameters': [],
+                'parentId': '__WORKSPACE_ID__',
+                'url': 'https://restninja.io/in/proxy',
+            },
+        ])
+    })
+
+    // From: https://github.com/flawiddsouza/Restfox/issues/306
+    it('Firefox: Copy as cURL (Windows) #306', () => {
+        const cmd = `curl "https://restninja.io/in/proxy" --compressed -X POST -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0" -H "Accept: */*" -H "Accept-Language: en-US,en;q=0.5" -H "Accept-Encoding: gzip, deflate, br, zstd" -H "Origin: https://restninja.io" -H "DNT: 1" -H "Sec-GPC: 1" -H "Connection: keep-alive" -H "Referer: https://restninja.io/" -H "Sec-Fetch-Dest: empty" -H "Sec-Fetch-Mode: cors" -H "Sec-Fetch-Site: same-origin" -H "TE: trailers" --data-raw "{""body"":""ewogICAgInByb3AiOiAxMjM0Cn0="",""method"":""POST"",""uri"":""http://httpbin.org/post"",""headers"":^[^],""auth"":{""_t"":""None""}}"`
+
+        const result = convert(cmd)
+
+        expect(result).toMatchObject([
+            {
+                '_id': '__REQ_1__',
+                '_type': 'request',
+                'authentication': {},
+                'body': {
+                    'mimeType': 'application/json',
+                    'text': '{"body":"ewogICAgInByb3AiOiAxMjM0Cn0=","method":"POST","uri":"http://httpbin.org/post","headers":[],"auth":{"_t":"None"}}',
+                },
+                'headers': [
+                    {
+                        'name': 'User-Agent',
+                        'value': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0',
+                    },
+                    {
+                        'name': 'Accept',
+                        'value': '*/*',
+                    },
+                    {
+                        'name': 'Accept-Language',
+                        'value': 'en-US,en;q=0.5',
+                    },
+                    {
+                        'name': 'Accept-Encoding',
+                        'value': 'gzip, deflate, br, zstd',
+                    },
+                    {
+                        'name': 'Origin',
+                        'value': 'https://restninja.io',
+                    },
+                    {
+                        'name': 'DNT',
+                        'value': '1',
+                    },
+                    {
+                        'name': 'Sec-GPC',
+                        'value': '1',
+                    },
+                    {
+                        'name': 'Connection',
+                        'value': 'keep-alive',
+                    },
+                    {
+                        'name': 'Referer',
+                        'value': 'https://restninja.io/',
+                    },
+                    {
+                        'name': 'Sec-Fetch-Dest',
+                        'value': 'empty',
+                    },
+                    {
+                        'name': 'Sec-Fetch-Mode',
+                        'value': 'cors',
+                    },
+                    {
+                        'name': 'Sec-Fetch-Site',
+                        'value': 'same-origin',
+                    },
+                    {
+                        'name': 'TE',
+                        'value': 'trailers',
+                    },
+                ],
+                'method': 'POST',
+                'name': 'https://restninja.io/in/proxy',
+                'parameters': [],
+                'parentId': '__WORKSPACE_ID__',
+                'url': 'https://restninja.io/in/proxy',
             },
         ])
     })

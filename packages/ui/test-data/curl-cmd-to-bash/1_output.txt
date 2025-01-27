@@ -1,0 +1,15 @@
+curl "https://restninja.io/in/proxy" \
+  -H 'accept: */*' \
+  -H 'accept-language: en-GB,en-US;q=0.9,en;q=0.8' \
+  -H 'cookie: _ga_JQXWSK7VEK=GS1.1.1737824556.1.0.1737824556.0.0.0; _ga=GA1.2.1794086968.1737824556; _gid=GA1.2.153220846.1737824556; _gat_gtag_UA_2652919_3=1; sc_is_visitor_unique=rx12865986.1737824557.1C3356BE17DF4F6388E6554EAA9543B9.1.1.1.1.1.1.1.1.1; fpestid=3Imo-s_4xCEdLlYgqpeayp6LlH8U4osgsUAbVTyYQ80YPaSwWEFnWTzrMZxbHMt9_KYqGg; _cc_id=a1405834f5b8d0b9a8df31d04c7d3efa; panoramaId_expiry=1737910958742; twk_idm_key=ObU2AdTki0GszXdOE6vTr; TawkConnectionTime=0; twk_uuid_5ae071e9227d3d7edc24b9dc=%7B%22uuid%22%3A%221.Sww8kNgHf8PApt3jZYdkqIw4OsdAnahoHwG87OOngSx4mxhxCPCkebftcqiMlatJizLVutKb6wyWRBUgYBtWbrIKUszZPFUHiNoocPlgVJRCxRXM38DG0%22%2C%22version%22%3A3%2C%22domain%22%3A%22restninja.io%22%2C%22ts%22%3A1737824561436%7D' \
+  -H 'origin: https://restninja.io' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://restninja.io/' \
+  -H 'sec-ch-ua: "Chromium";v="125", "Not.A/Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Windows"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' \
+  --data-raw '{"body":"eyJ0ZXN0IjogMTIzNH0=","method":"POST","uri":"http://httpbin.org/post","headers":[],"auth":{"_t":"None"}}'
