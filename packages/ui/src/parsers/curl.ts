@@ -109,6 +109,10 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
         }))
 
         url = href.replace(search, '').replace(/\/$/, '')
+
+        if (urlValue.endsWith('/')) {
+            url += '/'
+        }
     } catch (error) {}
 
     /// /////// Authentication //////////
