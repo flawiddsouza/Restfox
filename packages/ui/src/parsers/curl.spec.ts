@@ -480,4 +480,15 @@ describe('curl', () => {
             },
         ])
     })
+
+    it('Trailing slash retention #307', () => {
+        const cmd1 = `curl https://httpbin.org/post/`
+        const result1 = convert(cmd1)
+
+        const cmd2 = `curl https://httpbin.org/post`
+        const result2 = convert(cmd2)
+
+        expect(result1).toHaveProperty('0.url', 'https://httpbin.org/post/')
+        expect(result2).toHaveProperty('0.url', 'https://httpbin.org/post')
+    })
 })
