@@ -70,6 +70,7 @@
                 v-model="inputString"
                 placeholder="Paste curl request here"
                 style="min-height: 20rem;"
+                spellcheck="false"
             />
 
             <p v-if="inputString && !startsWithCurl">
@@ -384,10 +385,10 @@ export default {
                             type: 'request',
                             name: 'New request',
                             method: result[0].method,
-                            mimeType: result[0].body.mimeType,
                             parentId: this.selectedRequestGroupId,
                             headers: result[0].headers,
                             url: result[0].url,
+                            body: result[0].body,
                         })
 
                         this.$toast.success('Imported successfully')

@@ -875,7 +875,7 @@ export const store = createStore<State>({
                     _type: 'request',
                     name: payload.name,
                     method: payload.method,
-                    body: {
+                    body: payload.body ? payload.body : {
                         mimeType: payload.mimeType
                     },
                     parentId: payload.parentId,
