@@ -491,4 +491,19 @@ describe('curl', () => {
         expect(result1).toHaveProperty('0.url', 'https://httpbin.org/post/')
         expect(result2).toHaveProperty('0.url', 'https://httpbin.org/post')
     })
+
+    it('Body not imported #307', () => {
+        const cmd = `curl -X POST https://desec.io/api/v1/domains/{name}/rrsets/ \\
+            --header "Authorization: Token {secret}" \\
+            --header "Content-Type: application/json" --data \\
+            '{"subname": "www", "type": "A", "ttl": 3600, "records": ["127.0.0.1", "127.0.0.2"]}'
+        `
+
+        const result = convert(cmd)
+
+        expect(result).toHaveProperty(
+            '0.body.text',
+            `{"subname": "www", "type": "A", "ttl": 3600, "records": ["127.0.0.1", "127.0.0.2"]}`
+        )
+    })
 })

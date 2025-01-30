@@ -40,6 +40,20 @@ interface PairsByName {
 }
 
 const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
+    // fixes test case "Body not imported #307" {
+    let index = -1
+    parseEntries = parseEntries.filter(entry => {
+        index++
+
+        const nextEntry = parseEntries[index + 1]
+        if(typeof nextEntry === 'string' && typeof entry === 'string' && entry.trim() === '' && nextEntry.trim().startsWith('-') == false) {
+            return false
+        }
+
+        return true
+    })
+    // }
+
     // ~~~~~~~~~~~~~~~~~~~~~ //
     // Collect all the flags //
     // ~~~~~~~~~~~~~~~~~~~~~ //
