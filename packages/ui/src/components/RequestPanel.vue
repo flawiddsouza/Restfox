@@ -650,6 +650,9 @@ export default {
             return this.$store.state.activeWorkspace
         },
         collectionItemEnvironmentResolved() {
+            if (this.activeTab === null) {
+                return {}
+            }
             return this.$store.state.tabEnvironmentResolved[this.activeTab._id] ?? {}
         },
         flags() {
@@ -710,6 +713,9 @@ export default {
                 this.getUrlPreview()
             },
             deep: true
+        },
+        collectionItemEnvironmentResolved() {
+            this.getUrlPreview()
         },
         graphql: {
             handler() {
