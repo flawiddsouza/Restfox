@@ -131,6 +131,9 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
     const plugins: Plugin[] = []
 
     postmanCollectionItem.item.forEach((request: any) => {
+        if(!request) {
+            return
+        }
         const requestId = request.id ?? nanoid()
         if('item' in request) {
             const { convertedRequests, plugins: newPlugins } = handlePostmanV2CollectionItem(request, requestId, workspaceId)

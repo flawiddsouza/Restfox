@@ -1784,7 +1784,7 @@ function convertRestfoxAuthToInsomniaAuth(auth: any) {
 export function convertPostmanAuthToRestfoxAuth(request: any) {
     let authentication: RequestAuthentication = { type: 'No Auth' }
 
-    if('auth' in request) {
+    if('auth' in request && request.auth) {
         const authType = request.auth.type
 
         if(authType === 'bearer' && request.auth.bearer) {
