@@ -230,6 +230,20 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
 
         if('url' in request.request) {
             url = typeof request.request.url === 'string' ? request.request.url : request.request.url.raw
+
+            if (request.request.url && url === undefined) {
+                if(request.request.url && request.request.url.host) {
+                    url = request.request.url.host
+
+                    if(request.request.url.path && request.request.url.path.length > 0) {
+                        url += '/' + request.request.url.path.join('/')
+                    }
+
+                    if(request.request.url.query && request.request.url.query.length > 0) {
+                        url += '?' + request.request.url.query.filter((item: any) => !item.disabled).map((query: any) => `${query.key}=${query.value}`).join('&')
+                    }
+                }
+            }
         }
 
         const authentication: RequestAuthentication = convertPostmanAuthToRestfoxAuth(request.request)
@@ -264,6 +278,16 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             })
         }
 
+        let description = undefined
+
+        if('description' in request.request) {
+            if(typeof request.request.description !== 'string' && 'content' in request.request.description) {
+                description = request.request.description.content
+            } else {
+                description = request.request.description
+            }
+        }
+
         requests.push({
             _id: requestId,
             _type: 'request',
@@ -275,7 +299,7 @@ function handlePostmanV2CollectionItem(postmanCollectionItem: any, parentId: str
             parameters,
             pathParameters: pathParameters.length > 0 ? pathParameters : undefined,
             authentication,
-            description: 'description' in request.request ? request.request.description : undefined,
+            description,
             parentId,
             workspaceId
         })
