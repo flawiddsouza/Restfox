@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { tagRegex, parseFunction, toFunctionString } from './tag'
+import { tagRegex, parseFunction, toFunctionString, handleTags, ParsedResult } from './tag'
 
 const sumInput = 'sum(a=1, b=2)'
 const sumParsedResult = {
@@ -66,4 +66,28 @@ test('tagRegex', async() => {
     const flattenedMatches = matchesArray.flat()
 
     expect(flattenedMatches).toEqual(expectedMatches)
+})
+
+test('handleTags: #311', async() => {
+    const input = `{
+        "a": "{% response(attribute='body', behavior='never', maxAge=60, request='JB-6w6Kp0YXPBU72__o2W', path='b64::YXJncy5h') %}",
+        "b": "{% response(attribute='body', behavior='never', maxAge=60, request='JB-6w6Kp0YXPBU72__o2W', path='b64::YXJncy5i') %}"
+    }`
+
+    const expectedOutput = `{
+        "a": "10",
+        "b": "20"
+    }`
+
+    const handleResponseTag = async(parsedResult: ParsedResult) => {
+        if (parsedResult.parameters.path === 'args.a') {
+            return '10'
+        }
+
+        if (parsedResult.parameters.path === 'args.b') {
+            return '20'
+        }
+    }
+
+    expect(await handleTags(handleResponseTag, input, false, undefined, true)).toEqual(expectedOutput)
 })

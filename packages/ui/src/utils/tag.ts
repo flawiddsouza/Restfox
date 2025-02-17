@@ -63,7 +63,7 @@ async function getResponseForRequest(
     return latestResponse
 }
 
-async function handleResponseTag(parsedTag: tagParser.ParsedResult, tagTrigger: boolean, cacheId: string | undefined) {
+export async function handleResponseTag(parsedTag: tagParser.ParsedResult, tagTrigger: boolean, cacheId: string | undefined) {
     let returnValue = undefined
 
     const cacheKey = cacheId + JSON.stringify(parsedTag)
@@ -123,41 +123,4 @@ async function handleResponseTag(parsedTag: tagParser.ParsedResult, tagTrigger: 
     }
 
     return returnValue
-}
-
-export async function handleTags(string: string, tagTrigger: boolean, cacheId: string | undefined, noError: boolean) {
-    const regex = tagParser.tagRegex
-    const matches = [...string.matchAll(regex)]
-
-    for(const match of matches) {
-        const fullMatch = match[0]
-        const start = match.index!
-        const end = start + fullMatch.length
-
-        // console.log(`Match: ${fullMatch}, Start: ${start}, End: ${end}`)
-
-        const parsedTag = tagParser.parseFunction(match[1], true)
-
-        let replacement = undefined
-
-        if (parsedTag.functionName === 'response') {
-            replacement = await handleResponseTag(parsedTag, tagTrigger, cacheId)
-        }
-
-        if (replacement === undefined) {
-            if (noError) {
-                replacement = '<no value found>'
-            } else {
-                const at = `${string.slice(0, start)}━>${parsedTag.functionName}(...)<━${string.slice(end)}`
-
-                throw new Error(`Could not resolve tag\n\n${tagParser.toFunctionString(parsedTag)}\n\nat ${at}`, {
-                    cause: 'display-error'
-                })
-            }
-        }
-
-        string = string.slice(0, start) + replacement + string.slice(end)
-    }
-
-    return string
 }

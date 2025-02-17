@@ -24,7 +24,8 @@ import {
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
 import constants from '@/constants'
-import { handleTags } from '@/utils/tag'
+import { handleResponseTag } from '@/utils/tag'
+import { handleTags } from '@/parsers/tag'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -101,7 +102,7 @@ export async function substituteEnvironmentVariables(
         substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
 
-    substitutedString = await handleTags(substitutedString, tagTrigger, cacheId, noError)
+    substitutedString = await handleTags(handleResponseTag, substitutedString, tagTrigger, cacheId, noError)
 
     return substitutedString
 }
