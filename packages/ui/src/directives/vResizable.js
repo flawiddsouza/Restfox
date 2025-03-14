@@ -25,7 +25,7 @@ const vResizable = {
                     document.body.style.cursor = !topBottom ? 'ew-resize' : 'ns-resize'
                     activeResizer.setAttribute('data-resizing', '')
 
-                    iframe = document.querySelector('.response-panel-tabs-context iframe')
+                    iframe = document.querySelector('.response-panel-tabs-context iframe, .response-panel-tabs-context object')
 
                     if(iframe) {
                         iframe.style.pointerEvents = 'none'
