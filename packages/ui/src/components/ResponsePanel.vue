@@ -52,6 +52,9 @@
                         <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
                             <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
                         </div>
+                        <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('application/pdf')">
+                            <PdfFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%;" />
+                        </div>
                         <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
                             <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
                         </div>
@@ -168,6 +171,7 @@ import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue
 import ContextMenu from './ContextMenu.vue'
 import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
+import PdfFromBuffer from './PdfFromBuffer.vue'
 import ResponsePanelTimeline from './ResponsePanelTimeline.vue'
 import {
     dateFormat,
@@ -199,6 +203,7 @@ export default {
         ContextMenu,
         ImageFromBuffer,
         IframeFromBuffer,
+        PdfFromBuffer,
         ResponsePanelTimeline,
     },
     directives: {

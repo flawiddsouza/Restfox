@@ -58,6 +58,11 @@ app.get('/image-with-content-disposition-2', (req, res) => {
     res.send(readFileSync('files/photo.jpg'))
 })
 
+app.get('/pdf', (req, res) => {
+    res.setHeader('Content-Type', 'application/pdf')
+    res.send(readFileSync('files/document.pdf'))
+})
+
 const jwtSecret = 'secret_key'
 
 app.post('/auth-token', (req, res) => {
