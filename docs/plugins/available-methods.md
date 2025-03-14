@@ -30,6 +30,8 @@
 | `rf.request.setBody(body)` | Sets the request body with the provided object. |
 | `rf.request.getQueryParams()` | Retrieves query parameters from the request. |
 | `rf.request.setQueryParams(queryParams)` | Sets or replaces query parameters with the provided array. |
+| `rf.request.getPathParams()` | Retrieves path parameters from the request. |
+| `rf.request.setPathParams(pathParams)` | Sets or replaces path parameters with the provided array. |
 
 ### Post Request
 | Method | Description |

@@ -207,6 +207,16 @@ export default defineComponent ({
                 type: 'option',
                 label: 'Sets or replaces query parameters with the provided array',
                 value: 'rf.request.setQueryParams(queryParams)'
+            },
+            {
+                type: 'option',
+                label: 'Retrieves path parameters from the request',
+                value: 'rf.request.getPathParams()'
+            },
+            {
+                type: 'option',
+                label: 'Sets or replaces path parameters with the provided array',
+                value: 'rf.request.setPathParams(pathParams)'
             }
         ]
 

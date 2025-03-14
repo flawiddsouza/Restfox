@@ -345,6 +345,7 @@ export async function createRequestData(
             headers: expose.context.request.getHeaders(),
             body: expose.context.request.getBody(),
             parameters: expose.context.request.getQueryParams(),
+            pathParameters: expose.context.request.getPathParams(),
         }
     }
 

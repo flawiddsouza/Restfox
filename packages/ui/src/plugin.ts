@@ -131,6 +131,12 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
             setQueryParams(queryParams: CollectionItem['parameters']) {
                 state.parameters = queryParams
             },
+            getPathParams() {
+                return state.pathParameters ?? []
+            },
+            setPathParams(pathParams: CollectionItem['pathParameters']) {
+                state.pathParameters = pathParams
+            },
             getHeaders() {
                 return state.headers
             },
@@ -482,6 +488,13 @@ export async function usePlugin(expose: PluginExpose, plugin: { name: string, co
             expose.rf.request.setQueryParams(queryParams)
         }).consume(func => {
             setDeepProperty(vm, 'rf.request.setQueryParams', func)
+        })
+
+        vm.newFunction('rf.request.setPathParams', (pathParamsHandle) => {
+            const pathParams = vm.dump(pathParamsHandle)
+            expose.rf.request.setPathParams(pathParams)
+        }).consume(func => {
+            setDeepProperty(vm, 'rf.request.setPathParams', func)
         })
     }
 
