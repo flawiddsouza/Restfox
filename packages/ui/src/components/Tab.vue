@@ -93,6 +93,12 @@ watch(() => props.collectionItem, (newValue, oldValue) => {
             Object.assign(sidebarItem, props.collectionItem)
         }
 
+        // keep state.collection item properties in sync with collectionItem
+        const collectionItem = store.state.collection.find(item => item._id === props.collectionItem._id)
+        if(collectionItem) {
+            Object.assign(collectionItem, props.collectionItem)
+        }
+
         // keep tab properties in tabs in sync with collectionItem
         const tab = store.state.tabs.find(tab => tab._id === props.collectionItem._id)
         if(tab) {
