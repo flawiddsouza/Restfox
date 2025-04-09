@@ -31,6 +31,7 @@ export default {
         GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
         INDENT_SIZE: 'Restfox-IndentSize',
         SHOW_TABS: 'Restfox-ShowTabs',
+        HIDE_PASSWORD_FIELDS: 'Restfox-HidePasswordFields',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

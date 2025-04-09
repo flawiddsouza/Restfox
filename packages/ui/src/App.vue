@@ -337,6 +337,7 @@ export default {
         const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
         const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
         const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
+        const savedHidePasswordFields = localStorage.getItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -409,6 +410,14 @@ export default {
                 this.$store.state.flags.showTabs = JSON.parse(savedShowTabs)
             } catch(e) {
                 this.$store.state.flags.showTabs = true
+            }
+        }
+
+        if(savedHidePasswordFields) {
+            try {
+                this.$store.state.flags.hidePasswordFields = JSON.parse(savedHidePasswordFields)
+            } catch(e) {
+                this.$store.state.flags.hidePasswordFields = false
             }
         }
 

@@ -62,6 +62,12 @@
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Un-ticking this will not show tabs when clicking on either request or folder.</div>
             </div>
+            <div>
+                <label style="padding-top: 1rem; display: flex;">
+                    <input type="checkbox" v-model="hidePasswordFields"> <div style="margin-left: 0.5rem;">Hide Password Fields</div> <div style="margin-left: 0.5rem;"></div>
+                </label>
+                <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will mask password input fields in the application for better security.</div>
+            </div>
             <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
                 <div>
@@ -124,6 +130,7 @@ export default {
             globalUserAgent: '',
             indentSize: constants.EDITOR_CONFIG.indent_size,
             showTabs: false,
+            hidePasswordFields: false,
         }
     },
     computed: {
@@ -178,6 +185,10 @@ export default {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS, this.showTabs)
             this.$store.state.flags.showTabs = this.showTabs
         },
+        hidePasswordFields() {
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS, this.hidePasswordFields)
+            this.$store.state.flags.hidePasswordFields = this.hidePasswordFields
+        },
     },
     methods: {
         getVersion,
@@ -216,6 +227,10 @@ export default {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
             this.showTabs = true
         },
+        resetHidePasswordFields() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS)
+            this.hidePasswordFields = false
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -237,6 +252,7 @@ export default {
             this.resetGlobalUserAgent()
             this.resetIndentSize()
             this.resetShowTabs()
+            this.resetHidePasswordFields()
 
             document.location.reload()
         },
@@ -252,6 +268,7 @@ export default {
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
             const savedIndentSize = localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4
             const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) || true
+            const savedHidePasswordFields = localStorage.getItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS) || false
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -318,6 +335,14 @@ export default {
                     this.showTabs = JSON.parse(savedShowTabs)
                 } catch (e) {
                     this.showTabs = true
+                }
+            }
+
+            if(savedHidePasswordFields) {
+                try {
+                    this.hidePasswordFields = JSON.parse(savedHidePasswordFields)
+                } catch (e) {
+                    this.hidePasswordFields = false
                 }
             }
         },

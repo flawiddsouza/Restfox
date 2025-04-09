@@ -45,6 +45,7 @@
                     </td>
                     <td class="full-width">
                         <CodeMirrorSingleLine
+                            v-if="!flags.hidePasswordFields"
                             v-model="collectionItem.authentication.password"
                             :env-variables="collectionItemEnvironmentResolved"
                             :autocompletions="tagAutocompletions"
@@ -53,6 +54,12 @@
                             :disabled="collectionItem.authentication.disabled"
                             :key="'basic-auth-password'"
                         />
+                        <input
+                            v-else
+                            type="password"
+                            v-model="collectionItem.authentication.password"
+                            :disabled="collectionItem.authentication.disabled"
+                        >
                     </td>
                 </tr>
             </template>
@@ -122,6 +129,7 @@
                     </td>
                     <td class="full-width">
                         <CodeMirrorSingleLine
+                            v-if="!flags.hidePasswordFields"
                             v-model="collectionItem.authentication.clientSecret"
                             :env-variables="collectionItemEnvironmentResolved"
                             :autocompletions="tagAutocompletions"
@@ -130,6 +138,12 @@
                             :disabled="collectionItem.authentication.disabled"
                             :key="'oauth-client-secret'"
                         />
+                        <input
+                            v-else
+                            type="password"
+                            v-model="collectionItem.authentication.clientSecret"
+                            :disabled="collectionItem.authentication.disabled"
+                        >
                     </td>
                 </tr>
                 <tr>
@@ -210,6 +224,7 @@
                         </td>
                         <td class="full-width">
                             <CodeMirrorSingleLine
+                                v-if="!flags.hidePasswordFields"
                                 v-model="collectionItem.authentication.password"
                                 :env-variables="collectionItemEnvironmentResolved"
                                 :autocompletions="tagAutocompletions"
@@ -218,6 +233,12 @@
                                 :disabled="collectionItem.authentication.disabled"
                                 :key="'oauth-password'"
                             />
+                            <input
+                                v-else
+                                type="password"
+                                v-model="collectionItem.authentication.password"
+                                :disabled="collectionItem.authentication.disabled"
+                            >
                         </td>
                     </tr>
                 </template>

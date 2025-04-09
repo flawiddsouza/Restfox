@@ -122,6 +122,7 @@ export interface Flags {
     isElectron: boolean
     disableSSLVerification: boolean
     electronSwitchToChromiumFetch: boolean
+    hidePasswordFields: boolean
 }
 
 export interface State {
