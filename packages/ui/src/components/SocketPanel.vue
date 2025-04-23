@@ -466,6 +466,10 @@ async function clientMessageHandler(client: Client, receivedMessage: string) {
 }
 
 function addClientMessage(client: Client, clientMessage: ClientMessage) {
+    if (!Array.isArray(client.messages)) {
+        client.messages = []
+    }
+
     client.messages.push(clientMessage)
 
     // keep only last 100 messages to avoid crashing the application
