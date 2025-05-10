@@ -31,9 +31,28 @@
             </div>
         </div>
         <div class="response-panel-tabs">
-            <div class="response-panel-tab" :class="{ 'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name }" @click="activeResponsePanelTab = responsePanelTab.name" v-for="responsePanelTab in responsePanelTabs">
+            <div
+                class="response-panel-tab"
+                :class="{
+                    'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name,
+                    'custom-dropdown': responsePanelTab.name === 'Preview'
+                }"
+                @click="handleTabClick(responsePanelTab, $event)"
+                v-for="responsePanelTab in responsePanelTabs"
+            >
                 {{ responsePanelTab.label }}
                 <i :class="`fa fa-circle ${ allTestsPassed ? 'passed-tests' : 'failed-tests' }`" v-if="responsePanelTab.name === 'Tests' && response.testResults && response.testResults.length > 0" style="margin-left: 0.2rem"></i>
+                <i v-if="responsePanelTab.name === 'Preview'" class="fa fa-caret-down space-right" style="margin-left: 0.2rem"></i>
+                <ContextMenu
+                    v-if="responsePanelTab.name === 'Preview'"
+                    :options="previewModeOptions"
+                    :element="previewModeDropdownState.element"
+                    :x="previewModeDropdownState.contextMenuX"
+                    :y="previewModeDropdownState.contextMenuY"
+                    v-model:show="previewModeDropdownState.visible"
+                    :selected-option="previewMode"
+                    @click="selectPreviewMode"
+                />
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
@@ -46,26 +65,33 @@
             <template v-if="activeResponsePanelTab === 'Preview'">
                 <section style="height: 100%; overflow: auto;" ref="scrollableArea">
                     <template v-if="response.statusText !== 'Error'">
-                        <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
-                            <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
-                        </div>
-                        <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
-                            <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
-                        </div>
-                        <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('application/pdf')">
-                            <PdfFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%;" />
-                        </div>
-                        <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
-                            <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
-                        </div>
-                        <template v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml')">
-                            <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
-                        </template>
-                        <template v-else-if="responseContentType.startsWith('application/json')">
-                            <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
-                        </template>
-                        <template v-else>
+                        <!-- Raw mode - always show raw text for any content type -->
+                        <template v-if="previewMode === 'raw'">
                             <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
+                        </template>
+                        <!-- Rendered mode - different display based on content type -->
+                        <template v-else>
+                            <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
+                                <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
+                            </div>
+                            <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
+                                <ImageFromBuffer :buffer="response.buffer" style="max-width: 100%; max-height: 100%;" />
+                            </div>
+                            <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('application/pdf')">
+                                <PdfFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%;" />
+                            </div>
+                            <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
+                                <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
+                            </div>
+                            <template v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml')">
+                                <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                            </template>
+                            <template v-else-if="responseContentType.startsWith('application/json')">
+                                <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                            </template>
+                            <template v-else>
+                                <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
+                            </template>
                         </template>
                     </template>
                     <div class="content-box" v-else>
@@ -93,7 +119,7 @@
                         </div>
                     </div>
                 </section>
-                <section class="sticky-section">
+                <section class="sticky-section" v-if="previewMode !== 'raw'">
                     <div class="row" v-if="responseContentType.startsWith('application/json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
@@ -215,6 +241,13 @@ export default {
     data() {
         return {
             activeResponsePanelTab: 'Preview',
+            previewMode: 'rendered',
+            previewModeDropdownState: {
+                element: null,
+                contextMenuX: null,
+                contextMenuY: null,
+                visible: false
+            },
             responseHistoryContextMenuElement: null,
             responseHistoryContextMenuX: null,
             responseHistoryContextMenuY: null,
@@ -230,6 +263,20 @@ export default {
         }
     },
     computed: {
+        previewModeOptions() {
+            return [
+                {
+                    type: 'option',
+                    label: 'Rendered',
+                    value: 'rendered',
+                },
+                {
+                    type: 'option',
+                    label: 'Raw',
+                    value: 'raw',
+                }
+            ]
+        },
         responsePanelTabs() {
             let tabs = [
                 {
@@ -618,6 +665,28 @@ export default {
             }
 
             return `Head: ${humanFriendlyTime(response.headTimeTaken)} | Body: ${humanFriendlyTime(response.bodyTimeTaken)}`
+        },
+        togglePreviewModeDropdown(event) {
+            const containerElement = event.target.closest('.custom-dropdown')
+            this.previewModeDropdownState.element = containerElement
+            this.previewModeDropdownState.contextMenuX = containerElement.getBoundingClientRect().left
+            this.previewModeDropdownState.contextMenuY = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+            this.previewModeDropdownState.visible = true
+        },
+        handleTabClick(responsePanelTab: { name: string }, event: any) {
+            // If it's not the Preview tab, or we're not already on the Preview tab, just switch to it
+            if (responsePanelTab.name !== 'Preview' || this.activeResponsePanelTab !== 'Preview') {
+                this.activeResponsePanelTab = responsePanelTab.name
+                return
+            }
+
+            // If we're already on the Preview tab, show the dropdown (for any content type)
+            if (this.activeResponsePanelTab === 'Preview' && responsePanelTab.name === 'Preview') {
+                this.togglePreviewModeDropdown(event)
+            }
+        },
+        selectPreviewMode(mode: string) {
+            this.previewMode = mode
         },
         bufferToJSONString,
         filterJSONResponse,
