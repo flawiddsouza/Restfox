@@ -182,6 +182,17 @@ export default {
                     type: 'function',
                     info: 'Sets the query parameters of the request',
                     apply: snippet('rf.request.setQueryParams(${queryParams})')
+                },
+                {
+                    label: 'rf.request.getPathParams()',
+                    type: 'function',
+                    info: 'Gets the path parameters of the request'
+                },
+                {
+                    label: 'rf.request.setPathParams(pathParams)',
+                    type: 'function',
+                    info: 'Sets or replaces path parameters with the provided array',
+                    apply: snippet('rf.request.setPathParams(${pathParams})')
                 }
             ],
             RESPONSE_METHODS: [
