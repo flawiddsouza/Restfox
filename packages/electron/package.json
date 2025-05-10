@@ -59,10 +59,10 @@
     "build": {
         "linux": {
             "category": "Development",
-            "icon": "ui/favicon.png"
+            "icon": "ui/public/favicon.png"
         },
         "win": {
-            "icon": "ui/favicon.png"
+            "icon": "ui/public/favicon.png"
         },
         "appx": {
             "identityName": "57520Artelin.RestfoxApp",

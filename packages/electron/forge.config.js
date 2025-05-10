@@ -1,7 +1,7 @@
 module.exports = {
     packagerConfig: {
         name: 'Restfox',
-        icon: 'ui/favicon',
+        icon: 'ui/public/favicon',
         osxSign: {
             entitlements: 'entitlements.plist',
             'entitlements-inherit': 'entitlements.plist',
@@ -22,7 +22,7 @@ module.exports = {
             config: {
                 name: 'Restfox',
                 iconUrl: 'https://restfox.dev/favicon.ico',
-                setupIcon: 'ui/favicon.ico'
+                setupIcon: 'ui/public/favicon.ico'
             }
         },
         {
@@ -39,7 +39,7 @@ module.exports = {
                     // From https://github.com/electron/forge/issues/3235#issuecomment-1710830667
                     // fixes https://github.com/flawiddsouza/Restfox/issues/85
                     compression: 'gzip',
-                    icon: 'ui/favicon.png',
+                    icon: 'ui/public/favicon.png',
                 }
             }
         },
