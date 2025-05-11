@@ -379,7 +379,7 @@ export default {
             this.enableOptionsForEmptyContextMenu = true
             this.showContextMenu = true
         },
-        dragStart(event) {
+        dragStart(event) {//asd
             if(this.collectionFilter) { // disable drag functionality if collection is being filtered
                 return
             }
@@ -398,34 +398,53 @@ export default {
             this.draggedSidebarElement.style.opacity = ''
             this.draggedSidebarElement = null
         },
+
         dragOver(event) {
             if(!this.draggedSidebarElement) {
                 return
             }
-            const sidebarItemToDropOn = event.target.closest('.sidebar-item')
-            if(!sidebarItemToDropOn) {
+            let container
+            const sidebarItem = event.target.closest('.sidebar-item')
+            const sidebarListContainer = event.target.closest('.sidebar-list-container')
+            if (sidebarItem) {
+                container = {
+                    type: 'sidebar-item',
+                    element: sidebarItem
+                }
+            } else if (sidebarListContainer) {
+                const innerList = sidebarListContainer.querySelector('.sidebar-list')
+                if (!innerList) {
+                    return
+                }
+                container = {
+                    type: 'sidebar-list',
+                    element: innerList
+                }
+            } else {
                 return
             }
-            const rect = sidebarItemToDropOn.getBoundingClientRect()
+
+            const elementToDropOn = container.element
+            const rect = elementToDropOn.getBoundingClientRect()
             const offset = rect.top + document.body.scrollTop
-            const elementHeight = parseFloat(getComputedStyle(sidebarItemToDropOn, null).height.replace('px', ''))
+            const elementHeight = parseFloat(getComputedStyle(elementToDropOn, null).height.replace('px', ''))
             const y = event.pageY
             const location = Math.abs(offset - y)
             if (location < (elementHeight / 2)) {
                 this.sidebarItemCursorPosition = 'top'
-                sidebarItemToDropOn.style.borderTop = '1px dashed var(--text-color)'
-                sidebarItemToDropOn.style.borderBottom = ''
-                sidebarItemToDropOn.style.backgroundColor = ''
+                elementToDropOn.style.borderTop = '1px dashed var(--text-color)'
+                elementToDropOn.style.borderBottom = ''
+                elementToDropOn.style.backgroundColor = ''
             } else {
                 this.sidebarItemCursorPosition = 'bottom'
-                if(sidebarItemToDropOn.dataset.type === 'request_group') {
-                    sidebarItemToDropOn.style.borderTop = ''
-                    sidebarItemToDropOn.style.borderBottom = ''
-                    sidebarItemToDropOn.style.backgroundColor = 'var(--drop-target-background-color)'
+                if(elementToDropOn.dataset.type === 'request_group') {
+                    elementToDropOn.style.borderTop = ''
+                    elementToDropOn.style.borderBottom = ''
+                    elementToDropOn.style.backgroundColor = 'var(--drop-target-background-color)'
                 } else {
-                    sidebarItemToDropOn.style.borderTop = ''
-                    sidebarItemToDropOn.style.borderBottom = '1px dashed var(--text-color)'
-                    sidebarItemToDropOn.style.backgroundColor = ''
+                    elementToDropOn.style.borderTop = ''
+                    elementToDropOn.style.borderBottom = '1px dashed var(--text-color)'
+                    elementToDropOn.style.backgroundColor = ''
                 }
             }
             event.preventDefault()
@@ -434,11 +453,31 @@ export default {
             if(!this.draggedSidebarElement) {
                 return
             }
-            const sidebarItemToDropOn = event.target.closest('.sidebar-item')
-            if(sidebarItemToDropOn) {
-                sidebarItemToDropOn.style.borderBottom = ''
-                sidebarItemToDropOn.style.borderTop = ''
-                sidebarItemToDropOn.style.backgroundColor = ''
+            let container
+            const sidebarItem = event.target.closest('.sidebar-item')
+            const sidebarListContainer = event.target.closest('.sidebar-list-container')
+            if(sidebarItem) {
+                container = {
+                    type: 'sidebar-item',
+                    element: sidebarItem
+                }
+            } else if(sidebarListContainer) {
+                const innerList = sidebarListContainer.querySelector('.sidebar-list')
+                if (!innerList) {
+                    return
+                }
+                container = {
+                    type: 'sidebar-list',
+                    element: innerList
+                }
+            } else {
+                return
+            }
+            const elementToDropOn = container.element
+            if(elementToDropOn) {
+                elementToDropOn.style.borderBottom = ''
+                elementToDropOn.style.borderTop = ''
+                elementToDropOn.style.backgroundColor = ''
             }
         },
         drop(event) {
@@ -446,24 +485,86 @@ export default {
                 return
             }
             event.preventDefault()
-            const sidebarItemToDropOn = event.target.closest('.sidebar-item')
-            if(sidebarItemToDropOn) {
-                sidebarItemToDropOn.style.borderTop = ''
-                sidebarItemToDropOn.style.borderBottom = ''
-                sidebarItemToDropOn.style.backgroundColor = ''
+            let container
+            const sidebarItem = event.target.closest('.sidebar-item')
+            const sidebarListContainer = event.target.closest('.sidebar-list-container')
+            if (sidebarItem) {
+                container = {
+                    type: 'sidebar-item',
+                    element: sidebarItem
+                }
+            } else if (sidebarListContainer) {
+                const innerList = sidebarListContainer.querySelector('.sidebar-list')
+                if (!innerList) {
+                    return
+                }
+                container = {
+                    type: 'sidebar-list',
+                    element: innerList
+                }
+            } else {
+                return
+            }
 
-                this.$store.dispatch('reorderCollectionItem', {
-                    from: {
-                        parentId: this.draggedSidebarElement.dataset.parentId,
-                        id: this.draggedSidebarElement.dataset.id
-                    },
-                    to: {
-                        parentId: sidebarItemToDropOn.dataset.parentId,
-                        id: sidebarItemToDropOn.dataset.id,
-                        type: sidebarItemToDropOn.dataset.type,
-                        cursorPosition: this.sidebarItemCursorPosition
+            const elementToDropOn = container.element
+            if(elementToDropOn) {
+                elementToDropOn.style.borderTop = ''
+                elementToDropOn.style.borderBottom = ''
+                elementToDropOn.style.backgroundColor = ''
+
+                let lastFirstLevelChildInList
+                if(container.type === 'sidebar-list') {
+                    lastFirstLevelChildInList = Array.from(elementToDropOn.children)
+                        .filter(child => child.classList.contains('sidebar-item'))
+                        .pop()
+                }
+                if(container.type === 'sidebar-item') {
+                    this.$store.dispatch('reorderCollectionItem', {
+                        from: {
+                            parentId: this.draggedSidebarElement.dataset.parentId,
+                            id: this.draggedSidebarElement.dataset.id
+                        },
+                        to: {
+                            parentId: elementToDropOn.dataset.parentId,
+                            id: elementToDropOn.dataset.id,
+                            type: elementToDropOn.dataset.type,
+                            cursorPosition: this.sidebarItemCursorPosition
+                        }
+                    })
+                } else {
+                    const isInsideLastListItem = lastFirstLevelChildInList.dataset.id === this.draggedSidebarElement.dataset.parentId
+                    if(isInsideLastListItem) {
+                        console.log('DEBUG isInsideLastListItem')
+                        this.$store.dispatch('reorderCollectionItem', {
+                            from: {
+                                parentId: this.draggedSidebarElement.dataset.parentId,
+                                id: this.draggedSidebarElement.dataset.id
+                            },
+                            to: {
+                                parentId: elementToDropOn.dataset.parentId,
+                                id: elementToDropOn.dataset.id,
+                                type: elementToDropOn.dataset.type,
+                                cursorPosition: this.sidebarItemCursorPosition
+                            }
+                        })
+                    } else {
+                        console.log('DEBUG Not isInsideLastListItem')
+                        this.$store.dispatch('reorderCollectionItem', {
+                            from: {
+                                parentId: lastFirstLevelChildInList.dataset.parentId,
+                                id: lastFirstLevelChildInList.dataset.id
+                            },
+                            to: {
+                                parentId: this.draggedSidebarElement.dataset.parentId,
+                                id: this.draggedSidebarElement.dataset.id,
+                                type: this.draggedSidebarElement.dataset.type,
+                                cursorPosition: isInsideLastListItem ? 'top' : 'below'
+                            }
+                        })
                     }
-                })
+
+                }
+
 
                 this.draggedSidebarElement.style.backgroundColor = ''
                 this.draggedSidebarElement.style.opacity = ''
@@ -575,6 +676,7 @@ export default {
 </script>
 
 <style>
+
 .sidebar .sidebar-filter {
     display: flex;
     border-bottom: 1px solid var(--default-border-color);
