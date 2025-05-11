@@ -512,59 +512,18 @@ export default {
                 elementToDropOn.style.borderBottom = ''
                 elementToDropOn.style.backgroundColor = ''
 
-                let lastFirstLevelChildInList
-                if(container.type === 'sidebar-list') {
-                    lastFirstLevelChildInList = Array.from(elementToDropOn.children)
-                        .filter(child => child.classList.contains('sidebar-item'))
-                        .pop()
-                }
-                if(container.type === 'sidebar-item') {
-                    this.$store.dispatch('reorderCollectionItem', {
-                        from: {
-                            parentId: this.draggedSidebarElement.dataset.parentId,
-                            id: this.draggedSidebarElement.dataset.id
-                        },
-                        to: {
-                            parentId: elementToDropOn.dataset.parentId,
-                            id: elementToDropOn.dataset.id,
-                            type: elementToDropOn.dataset.type,
-                            cursorPosition: this.sidebarItemCursorPosition
-                        }
-                    })
-                } else {
-                    const isInsideLastListItem = lastFirstLevelChildInList.dataset.id === this.draggedSidebarElement.dataset.parentId
-                    if(isInsideLastListItem) {
-                        console.log('DEBUG isInsideLastListItem')
-                        this.$store.dispatch('reorderCollectionItem', {
-                            from: {
-                                parentId: this.draggedSidebarElement.dataset.parentId,
-                                id: this.draggedSidebarElement.dataset.id
-                            },
-                            to: {
-                                parentId: elementToDropOn.dataset.parentId,
-                                id: elementToDropOn.dataset.id,
-                                type: elementToDropOn.dataset.type,
-                                cursorPosition: this.sidebarItemCursorPosition
-                            }
-                        })
-                    } else {
-                        console.log('DEBUG Not isInsideLastListItem')
-                        this.$store.dispatch('reorderCollectionItem', {
-                            from: {
-                                parentId: lastFirstLevelChildInList.dataset.parentId,
-                                id: lastFirstLevelChildInList.dataset.id
-                            },
-                            to: {
-                                parentId: this.draggedSidebarElement.dataset.parentId,
-                                id: this.draggedSidebarElement.dataset.id,
-                                type: this.draggedSidebarElement.dataset.type,
-                                cursorPosition: isInsideLastListItem ? 'top' : 'below'
-                            }
-                        })
+                this.$store.dispatch('reorderCollectionItem', {
+                    from: {
+                        parentId: this.draggedSidebarElement.dataset.parentId,
+                        id: this.draggedSidebarElement.dataset.id
+                    },
+                    to: {
+                        parentId: elementToDropOn.dataset.parentId,
+                        id: elementToDropOn.dataset.id,
+                        type: elementToDropOn.dataset.type ?? container.type,
+                        cursorPosition: this.sidebarItemCursorPosition
                     }
-
-                }
-
+                })
 
                 this.draggedSidebarElement.style.backgroundColor = ''
                 this.draggedSidebarElement.style.opacity = ''
