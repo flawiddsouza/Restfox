@@ -379,6 +379,29 @@ export default {
             this.enableOptionsForEmptyContextMenu = true
             this.showContextMenu = true
         },
+        getDropTargetElementContainer(event) {
+            let container
+            const sidebarItem = event.target.closest('.sidebar-item')
+            const sidebarListContainer = event.target.closest('.sidebar-list-container')
+            if (sidebarItem) {
+                container = {
+                    type: 'sidebar-item',
+                    element: sidebarItem
+                }
+            } else if (sidebarListContainer) {
+                const innerList = sidebarListContainer.querySelector('.sidebar-list')
+                if (!innerList) {
+                    return
+                }
+                container = {
+                    type: 'sidebar-list',
+                    element: innerList
+                }
+            } else {
+                return null
+            }
+            return container
+        },
         dragStart(event) {//asd
             if(this.collectionFilter) { // disable drag functionality if collection is being filtered
                 return
@@ -403,24 +426,8 @@ export default {
             if(!this.draggedSidebarElement) {
                 return
             }
-            let container
-            const sidebarItem = event.target.closest('.sidebar-item')
-            const sidebarListContainer = event.target.closest('.sidebar-list-container')
-            if (sidebarItem) {
-                container = {
-                    type: 'sidebar-item',
-                    element: sidebarItem
-                }
-            } else if (sidebarListContainer) {
-                const innerList = sidebarListContainer.querySelector('.sidebar-list')
-                if (!innerList) {
-                    return
-                }
-                container = {
-                    type: 'sidebar-list',
-                    element: innerList
-                }
-            } else {
+            const container = this.getDropTargetElementContainer(event)
+            if(!container) {
                 return
             }
 
@@ -453,24 +460,8 @@ export default {
             if(!this.draggedSidebarElement) {
                 return
             }
-            let container
-            const sidebarItem = event.target.closest('.sidebar-item')
-            const sidebarListContainer = event.target.closest('.sidebar-list-container')
-            if(sidebarItem) {
-                container = {
-                    type: 'sidebar-item',
-                    element: sidebarItem
-                }
-            } else if(sidebarListContainer) {
-                const innerList = sidebarListContainer.querySelector('.sidebar-list')
-                if (!innerList) {
-                    return
-                }
-                container = {
-                    type: 'sidebar-list',
-                    element: innerList
-                }
-            } else {
+            const container = this.getDropTargetElementContainer(event)
+            if(!container) {
                 return
             }
             const elementToDropOn = container.element
@@ -485,24 +476,8 @@ export default {
                 return
             }
             event.preventDefault()
-            let container
-            const sidebarItem = event.target.closest('.sidebar-item')
-            const sidebarListContainer = event.target.closest('.sidebar-list-container')
-            if (sidebarItem) {
-                container = {
-                    type: 'sidebar-item',
-                    element: sidebarItem
-                }
-            } else if (sidebarListContainer) {
-                const innerList = sidebarListContainer.querySelector('.sidebar-list')
-                if (!innerList) {
-                    return
-                }
-                container = {
-                    type: 'sidebar-list',
-                    element: innerList
-                }
-            } else {
+            const container = this.getDropTargetElementContainer(event)
+            if(!container) {
                 return
             }
 
