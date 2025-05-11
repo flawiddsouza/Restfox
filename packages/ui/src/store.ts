@@ -1008,6 +1008,9 @@ export const store = createStore<State>({
             if(payload.to.type === 'request' && payload.to.cursorPosition === 'bottom') {
                 targetIndex++
             }
+            if(payload.to.type === 'sidebar-list' && payload.to.cursorPosition === 'bottom') {
+                targetIndex = targetParentCollection.length
+            }
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
             const result = await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
