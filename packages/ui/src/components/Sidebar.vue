@@ -379,7 +379,7 @@ export default {
             this.enableOptionsForEmptyContextMenu = true
             this.showContextMenu = true
         },
-        dragStart(event) {
+        dragStart(event) {//asd
             if(this.collectionFilter) { // disable drag functionality if collection is being filtered
                 return
             }
