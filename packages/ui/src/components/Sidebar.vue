@@ -402,7 +402,7 @@ export default {
             }
             return container
         },
-        dragStart(event) {//asd
+        dragStart(event) {
             if(this.collectionFilter) { // disable drag functionality if collection is being filtered
                 return
             }
