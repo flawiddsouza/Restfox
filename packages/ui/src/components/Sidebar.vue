@@ -610,7 +610,6 @@ export default {
 </script>
 
 <style>
-
 .sidebar .sidebar-filter {
     display: flex;
     border-bottom: 1px solid var(--default-border-color);
