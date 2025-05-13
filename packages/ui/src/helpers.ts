@@ -430,23 +430,7 @@ export async function createRequestData(
 
     const headers: Record<string, string | any> = {}
 
-    for (const header of Object.keys(parentHeaders)) {
-        const headerName = (await substituteEnvironmentVariables(environment, header.toLowerCase(), { cacheId })).toLowerCase()
-        const headerValues = parentHeaders[header]
-        for(let headerValue of headerValues) {
-            headerValue = await substituteEnvironmentVariables(environment, headerValue, { cacheId })
-            if(headerValue.includes(',')) {
-            //interpret value as continues string (ignoring the inner comma) | https://www.rfc-editor.org/rfc/rfc9110.html#quoted.strings
-                headerValue = `"${headerValue}"`
-            }
-            if(headerName in headers) {
-            //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
-                headers[headerName] += `, ${headerValue}`
-            } else {
-                headers[headerName] = headerValue
-            }
-        }
-    }
+
 
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
@@ -477,6 +461,21 @@ export async function createRequestData(
                 }
             }
         }
+    }
+
+    // eslint-disable-next-line prefer-const
+    for(let [headerName, headerValues] of Object.entries(parentHeaders)) {
+        headerName = (await substituteEnvironmentVariables(environment, headerName.toLowerCase(), { cacheId })).toLowerCase()
+        if(headerName in headers) {
+            continue //ignore parent headers
+        }
+        const buffer = []
+        for(const value of headerValues) {
+            const headerValue = await substituteEnvironmentVariables(environment, value, { cacheId })
+            buffer.push(headerValue.includes(',') ? `"${headerValue}"` : headerValue)
+        }
+        const mergedValues = buffer.join(', ')
+        headers[headerName] = mergedValues
     }
 
     const setAuthentication = async(authentication: RequestAuthentication) => {
