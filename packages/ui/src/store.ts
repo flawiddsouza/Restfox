@@ -163,7 +163,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
         environment = JSON.parse(await substituteEnvironmentVariables(environment, JSON.stringify(environment)))
     }
 
-    const headers: Record<string, string> = {}
+    const headers: Record<string, string[]> = {}
     let authentication: RequestAuthentication | undefined = undefined
 
     for(const parent of requestParentArray) {
@@ -179,9 +179,13 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
         }
 
         if(parent.headers) {
-            const parentHeadersObject: Record<string, string> = {}
+            const parentHeadersObject: Record<string, string[]> = {}
             parent.headers.filter(header => !header.disabled).forEach(header => {
-                parentHeadersObject[header.name] = header.value
+                if(parentHeadersObject[header.name]) {
+                    parentHeadersObject[header.name].push(header.value)
+                } else {
+                    parentHeadersObject[header.name] = [header.value]
+                }
             })
             Object.assign(headers, parentHeadersObject)
         }
@@ -1040,7 +1044,7 @@ export const store = createStore<State>({
         },
         async getEnvironmentForRequest(context, { collectionItem, includeSelf = false }): Promise<{
             environment: any,
-            parentHeaders: Record<string, string>,
+            parentHeaders: Record<string, string[]>,
             parentAuthentication?: RequestAuthentication,
             requestParentArray: CollectionItem[]
         }> {
@@ -1086,7 +1090,7 @@ export const store = createStore<State>({
 
             const { environment, parentHeaders, parentAuthentication, requestParentArray }: {
                 environment: any,
-                parentHeaders: Record<string, string>,
+                parentHeaders: Record<string, string[]>,
                 parentAuthentication: RequestAuthentication | undefined,
                 requestParentArray: CollectionItem[]
             } = await context.dispatch('getEnvironmentForRequest', { collectionItem: activeTab })

@@ -14,7 +14,7 @@ export function getAvailableTargets() {
 export async function generateCode(
     request: CollectionItem,
     environment: any,
-    parentHeaders: Record<string, string>,
+    parentHeaders: Record<string, string[]>,
     parentAuthentication: RequestAuthentication | undefined,
     target: 'shell',
     clientId: 'curl'
