@@ -442,17 +442,13 @@ export async function createRequestData(
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
             const headerName = (await substituteEnvironmentVariables(environment, header.name, { cacheId })).toLowerCase()
-            let headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
+            const headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
 
             if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
                 continue
             }
 
             if(headerName !== '') {
-                if(headerValue.includes(',')) {
-                    //interpret value as continues string (ignoring the inner comma) | https://www.rfc-editor.org/rfc/rfc9110.html#quoted.strings
-                    headerValue = `"${headerValue}"`
-                }
                 if(headerName in headers) {
                     //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
                     headers[headerName] += `, ${headerValue}`
@@ -472,7 +468,7 @@ export async function createRequestData(
         const buffer = []
         for(const value of headerValues) {
             const headerValue = await substituteEnvironmentVariables(environment, value, { cacheId })
-            buffer.push(headerValue.includes(',') ? `"${headerValue}"` : headerValue)
+            buffer.push(headerValue)
         }
         const mergedValues = buffer.join(', ')
         headers[headerName] = mergedValues
