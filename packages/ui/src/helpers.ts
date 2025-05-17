@@ -321,7 +321,7 @@ export async function createRequestData(
     state: HandleRequestState,
     request: CollectionItem,
     environment: any,
-    parentHeaders: Record<string, string>,
+    parentHeaders: Record<string, string[]>,
     parentAuthentication: RequestAuthentication | undefined,
     setEnvironmentVariable: ((name: string, value: string) => void) | null,
     plugins: Plugin[],
@@ -430,9 +430,7 @@ export async function createRequestData(
 
     const headers: Record<string, string | any> = {}
 
-    for (const header of Object.keys(parentHeaders)) {
-        headers[await substituteEnvironmentVariables(environment, header.toLowerCase(), { cacheId })] = await substituteEnvironmentVariables(environment, parentHeaders[header], { cacheId })
-    }
+
 
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
@@ -443,7 +441,7 @@ export async function createRequestData(
     if('headers' in request && request.headers !== undefined) {
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
-            const headerName = await substituteEnvironmentVariables(environment, header.name.toLowerCase(), { cacheId })
+            const headerName = (await substituteEnvironmentVariables(environment, header.name, { cacheId })).toLowerCase()
             const headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
 
             if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
@@ -451,9 +449,29 @@ export async function createRequestData(
             }
 
             if(headerName !== '') {
-                headers[headerName] = headerValue
+                if(headerName in headers) {
+                    //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
+                    headers[headerName] += `, ${headerValue}`
+                } else {
+                    headers[headerName] = headerValue
+                }
             }
         }
+    }
+
+    // eslint-disable-next-line prefer-const
+    for(let [headerName, headerValues] of Object.entries(parentHeaders)) {
+        headerName = (await substituteEnvironmentVariables(environment, headerName.toLowerCase(), { cacheId })).toLowerCase()
+        if(headerName in headers) {
+            continue //ignore parent headers
+        }
+        const buffer = []
+        for(const value of headerValues) {
+            const headerValue = await substituteEnvironmentVariables(environment, value, { cacheId })
+            buffer.push(headerValue)
+        }
+        const mergedValues = buffer.join(', ')
+        headers[headerName] = mergedValues
     }
 
     const setAuthentication = async(authentication: RequestAuthentication) => {
@@ -478,7 +496,7 @@ export async function createRequestData(
 export async function handleRequest(
     request: CollectionItem,
     environment: any,
-    parentHeaders: Record<string, string>,
+    parentHeaders: Record<string, string[]>,
     parentAuthentication: RequestAuthentication | undefined,
     setEnvironmentVariable: (name: string, value: string) => void,
     plugins: Plugin[],
