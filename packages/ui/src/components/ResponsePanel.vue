@@ -63,7 +63,19 @@
         </div>
         <div class="response-panel-tabs-context">
             <template v-if="activeResponsePanelTab === 'Preview'">
-                <section style="height: 100%; overflow: auto;" ref="scrollableArea">
+                <template v-if="shouldShowLargeResponseWarning">
+                    <div class="content-box" style="text-align: center; padding: 2rem;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: orange; margin-bottom: 1rem;"></i>
+                        <h3>Large Response Warning</h3>
+                        <p>This response is {{ humanFriendlySize(responseSize) }} in size.</p>
+                        <p>Loading large responses may slow down the interface.</p>
+                        <div style="margin-top: 1rem;">
+                            <button class="button" @click="largeResponseConfirmed = true">Load Response</button>
+                        </div>
+                    </div>
+                </template>
+
+                <section v-else style="height: 100%; overflow: auto;" ref="scrollableArea">
                     <template v-if="response.statusText !== 'Error'">
                         <!-- Raw mode - always show raw text for any content type -->
                         <template v-if="previewMode === 'raw'">
@@ -119,7 +131,8 @@
                         </div>
                     </div>
                 </section>
-                <section class="sticky-section" v-if="previewMode !== 'raw'">
+
+                <section class="sticky-section" v-if="previewMode !== 'raw' && !shouldShowLargeResponseWarning">
                     <div class="row" v-if="responseContentType.startsWith('application/json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
@@ -260,6 +273,8 @@ export default {
             responseFilter: '',
             scrollableAreaEventListenerAttached: false,
             scrollableAreaScrollTop: null,
+            largeResponseConfirmed: false,
+            LARGE_RESPONSE_THRESHOLD: 3 * 1024 * 1024, // 3MB threshold
         }
     },
     computed: {
@@ -470,29 +485,40 @@ export default {
         isTestResultsAvailable() {
             return this.response && 'testResults' in this.response
         },
+        shouldShowLargeResponseWarning() {
+            return this.responseSize && this.responseSize > this.LARGE_RESPONSE_THRESHOLD && !this.largeResponseConfirmed
+        },
     },
     watch: {
-        response() {
-            if(this.responsePanelTabs.length === 2 && (this.activeResponsePanelTab === 'Request' || this.activeResponsePanelTab === 'Tests' || this.activeResponsePanelTab === 'Timeline')) {
-                this.activeResponsePanelTab = 'Preview'
-            }
+        response: {
+            handler(newResponse, oldResponse) {
+                if(this.responsePanelTabs.length === 2 && (this.activeResponsePanelTab === 'Request' || this.activeResponsePanelTab === 'Tests' || this.activeResponsePanelTab === 'Timeline')) {
+                    this.activeResponsePanelTab = 'Preview'
+                }
 
-            if(this.response && this.response.statusText === 'Error') {
-                this.activeResponsePanelTab = 'Preview'
-            }
+                if(this.response && this.response.statusText === 'Error') {
+                    this.activeResponsePanelTab = 'Preview'
+                }
 
-            this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) || this.responseContentType.startsWith('text/xml') ? true : false
+                this.isXmlResponse = this.responseContentType.startsWith(constants.MIME_TYPE.XML) || this.responseContentType.startsWith('text/xml') ? true : false
 
-            if(this.$refs.scrollableArea) {
-                this.$refs.scrollableArea.scrollTop = 0
-            }
+                if(this.$refs.scrollableArea) {
+                    this.$refs.scrollableArea.scrollTop = 0
+                }
 
-            if(!this.scrollableAreaEventListenerAttached) {
-                nextTick(() => {
-                    this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
-                    this.scrollableAreaEventListenerAttached = true
-                })
-            }
+                if(!this.scrollableAreaEventListenerAttached) {
+                    nextTick(() => {
+                        this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
+                        this.scrollableAreaEventListenerAttached = true
+                    })
+                }
+
+                // Reset confirmation for new responses
+                if(newResponse && oldResponse && newResponse._id !== oldResponse._id) {
+                    this.largeResponseConfirmed = false
+                }
+            },
+            immediate: true
         }
     },
     methods: {
