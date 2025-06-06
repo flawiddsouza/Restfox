@@ -66,9 +66,12 @@
                 <template v-if="shouldShowLargeResponseWarning">
                     <div class="content-box" style="text-align: center; padding: 2rem;">
                         <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: orange; margin-bottom: 1rem;"></i>
-                        <h3>Large Response Warning</h3>
-                        <p>This response is {{ humanFriendlySize(responseSize) }} in size.</p>
-                        <p>Loading large responses may slow down the interface.</p>
+                        <h3 v-if="isBinaryResponse && responseSize && responseSize > LARGE_RESPONSE_THRESHOLD">Large Binary Response Warning</h3>
+                        <h3 v-else-if="isBinaryResponse">Binary Response Warning</h3>
+                        <h3 v-else>Large Response Warning</h3>
+                        <p v-if="responseSize">This response is {{ humanFriendlySize(responseSize) }} in size.</p>
+                        <p v-if="isBinaryResponse">This is a binary response that may not display correctly in the preview.</p>
+                        <p v-if="!isBinaryResponse">Loading large responses may slow down the interface.</p>
                         <div style="margin-top: 1rem;">
                             <button class="button" @click="largeResponseConfirmed = true">Load Response</button>
                         </div>
@@ -469,6 +472,34 @@ export default {
         responseContentType() {
             return getResponseContentType(this.response)
         },
+        isBinaryResponse() {
+            if (!this.responseContentType) {
+                return false
+            }
+
+            const supportedContentTypes = [
+                // Text (covers text/html, text/css, text/javascript, text/xml, text/yaml, etc.)
+                'text/',
+                // JSON
+                'application/json',
+                // XML
+                'application/xml',
+                // Images
+                'image/',
+                // PDF
+                'application/pdf',
+                // JavaScript
+                'application/javascript',
+                // YAML
+                'application/yaml'
+            ]
+
+            const isSupported = supportedContentTypes.some(type =>
+                this.responseContentType.startsWith(type)
+            )
+
+            return !isSupported
+        },
         passedTestCases() {
             if(this.isTestResultsAvailable) {
                 return this.response.testResults.filter(item => item.passed).length
@@ -486,7 +517,7 @@ export default {
             return this.response && 'testResults' in this.response
         },
         shouldShowLargeResponseWarning() {
-            return this.responseSize && this.responseSize > this.LARGE_RESPONSE_THRESHOLD && !this.largeResponseConfirmed
+            return (this.responseSize && this.responseSize > this.LARGE_RESPONSE_THRESHOLD || this.isBinaryResponse) && !this.largeResponseConfirmed
         },
     },
     watch: {
