@@ -43,10 +43,28 @@
                 v-else
             >
         </div>
+        <div
+            v-if="shouldShowEnvironmentQuickSwitcher(sidebarItem) && !showInputToRenameRequest"
+            class="folder-env-switcher"
+            @click.stop="toggleFolderEnvSwitcher($event, sidebarItem)"
+            :title="`Environment: ${currentEnvironment.name}`"
+        >
+            <i
+                class="fa fa-circle"
+                :style="{ color: currentEnvironment.color }"
+            ></i>
+        </div>
         <div class="clickable-context-menu" v-if="!showInputToRenameRequest">
             <i class="fa fa-ellipsis-v" @click.stop="handleContextMenu(sidebarItem, $event)"></i>
         </div>
     </div>
+    <ContextMenu
+        :options="environmentOptions"
+        :element="envSwitcherTarget?.element"
+        v-model:show="showEnvSwitcher"
+        :selected-option="currentEnvironment.name"
+        @click="selectFolderEnv"
+    />
     <div class="sidebar-list" v-if="'children' in sidebarItem && sidebarItem.children.length && getSidebarItemExpandedState(sidebarItem)">
         <template v-for="sidebarItem1 in sidebarItem.children" :key="sidebarItem1._id">
             <SidebarItem :sidebar-item="sidebarItem1" />
@@ -56,9 +74,14 @@
 
 <script>
 import { findItemInTreeById } from '../helpers'
+import ContextMenu from './ContextMenu.vue'
+import constants from '@/constants'
 
 export default {
     name: 'SidebarItem',
+    components: {
+        ContextMenu
+    },
     directives: {
         focus: {
             mounted(element) {
@@ -76,7 +99,9 @@ export default {
     data() {
         return {
             showInputToRenameRequest: false,
-            newSidebarItemName: null
+            newSidebarItemName: null,
+            showEnvSwitcher: false,
+            envSwitcherTarget: null
         }
     },
     computed: {
@@ -85,6 +110,31 @@ export default {
         },
         collectionFilter() {
             return this.$store.state.collectionFilter
+        },
+        currentEnvironment() {
+            const envName = this.sidebarItem.currentEnvironment || constants.DEFAULT_ENVIRONMENT.name
+            return this.sidebarItem.environments?.find(env => env.name === envName) || constants.DEFAULT_ENVIRONMENT
+        },
+        environmentOptions() {
+            if (!this.sidebarItem.environments?.length) {
+                return []
+            }
+
+            return [
+                {
+                    type: 'option',
+                    label: 'Environment',
+                    icon: 'fa fa-globe',
+                    disabled: true,
+                    class: 'text-with-line'
+                },
+                ...this.sidebarItem.environments.map(env => ({
+                    type: 'option',
+                    label: `<i class="fa fa-circle" style="color:${env.color}"></i>&nbsp;&nbsp;${env.name}`,
+                    value: env.name,
+                    class: 'context-menu-item-with-left-padding'
+                }))
+            ]
         }
     },
     methods: {
@@ -176,7 +226,78 @@ export default {
         },
         isGqlRequest(request) {
             return request.body.mimeType === 'application/graphql'
+        },
+        shouldShowEnvironmentQuickSwitcher(sidebarItem) {
+            return sidebarItem._type === 'request_group' && sidebarItem.environments?.length >= 2
+        },
+        toggleFolderEnvSwitcher(event, sidebarItem) {
+            this.showEnvSwitcher = !this.showEnvSwitcher
+            this.envSwitcherTarget = this.showEnvSwitcher
+                ? { element: event.target.closest('.folder-env-switcher'), sidebarItem }
+                : null
+        },
+        selectFolderEnv(envName) {
+            if (!this.envSwitcherTarget) {
+                return
+            }
+
+            const { sidebarItem } = this.envSwitcherTarget
+            const selectedEnv = sidebarItem.environments.find(env => env.name === envName)
+
+            // Update local state
+            sidebarItem.currentEnvironment = envName
+            if (selectedEnv) {
+                sidebarItem.environment = selectedEnv.environment
+            }
+
+            // Update store
+            this.$store.commit('updateCollectionItemCurrentEnvironment', {
+                collectionId: sidebarItem._id,
+                currentEnvironment: envName
+            })
+
+            if (selectedEnv) {
+                this.$store.commit('updateCollectionItemEnvironment', {
+                    collectionId: sidebarItem._id,
+                    environment: selectedEnv.environment
+                })
+            }
+
+            this.$store.dispatch('reloadTabEnvironmentResolved')
+
+            // Reset state
+            this.showEnvSwitcher = false
+            this.envSwitcherTarget = null
         }
     }
 }
 </script>
+
+<style scoped>
+.folder-env-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 2.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    padding: 0.2rem 0.3rem;
+    border-radius: 3px;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    z-index: 2;
+    background-color: transparent;
+    transition: background-color 0.1s ease;
+}
+
+.folder-env-switcher:hover {
+    background-color: var(--sidebar-item-active-color);
+}
+
+.sidebar-item .folder-env-switcher i {
+    pointer-events: auto;
+    line-height: 1;
+}
+</style>
