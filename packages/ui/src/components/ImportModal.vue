@@ -92,7 +92,8 @@ import {
     convertRestfoxExportToRestfoxCollection,
     convertOpenAPIExportToRestfoxCollection,
     generateNewIdsForTree,
-    convertCurlCommandToRestfoxCollection
+    convertCurlCommandToRestfoxCollection,
+    fetchWrapper
 } from '@/helpers'
 import { convertPostmanExportToRestfoxCollection } from '@/parsers/postman'
 import Modal from '@/components/Modal.vue'
@@ -235,6 +236,32 @@ export default {
             }
         },
 
+        async fetchUrl(url, responseType = 'json') {
+            const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
+            const flags = {
+                electronSwitchToChromiumFetch: false,
+                disableSSLVerification: savedDisableSSLVerification === 'true' ? true : false,
+            }
+
+            const abortController = new AbortController()
+            const response = await fetchWrapper(
+                new URL(url),
+                'GET',
+                {},
+                null,
+                abortController.signal,
+                flags
+            )
+
+            if (responseType === 'json') {
+                return JSON.parse(new TextDecoder().decode(response.buffer))
+            } else if (responseType === 'text') {
+                return new TextDecoder().decode(response.buffer)
+            } else {
+                return response
+            }
+        },
+
         async importFile() {
             this.importing = true
 
@@ -246,8 +273,7 @@ export default {
                 let plugins = []
 
                 if(this.importFrom === 'Postman URL') {
-                    const response = await fetch(this.urlToImport)
-                    json = await response.json()
+                    json = await this.fetchUrl(this.urlToImport, 'json')
 
                     const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
 
@@ -257,8 +283,7 @@ export default {
                         plugins = plugins.concat(newPlugins)
                     }
                 } else if(this.importFrom === 'OpenAPI URL') {
-                    const response = await fetch(this.urlToImport)
-                    json = await response.text()
+                    json = await this.fetchUrl(this.urlToImport, 'text')
                     collectionTree = await convertOpenAPIExportToRestfoxCollection(json, this.activeWorkspace._id)
                 } else {
                     for(const fileToImport of this.filesToImport) {
