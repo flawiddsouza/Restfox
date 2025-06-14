@@ -537,19 +537,33 @@ export default {
                     this.$refs.scrollableArea.scrollTop = 0
                 }
 
-                if(!this.scrollableAreaEventListenerAttached) {
+                if(!this.scrollableAreaEventListenerAttached && !this.shouldShowLargeResponseWarning) {
                     nextTick(() => {
-                        this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
-                        this.scrollableAreaEventListenerAttached = true
+                        if(this.$refs.scrollableArea) {
+                            this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
+                            this.scrollableAreaEventListenerAttached = true
+                        }
                     })
                 }
 
                 // Reset confirmation for new responses
                 if(newResponse && oldResponse && newResponse._id !== oldResponse._id) {
                     this.largeResponseConfirmed = false
+                    this.scrollableAreaEventListenerAttached = false
                 }
-            },
-            immediate: true
+            }
+        },
+        largeResponseConfirmed: {
+            handler(confirmed) {
+                if(confirmed && !this.scrollableAreaEventListenerAttached) {
+                    nextTick(() => {
+                        if(this.$refs.scrollableArea) {
+                            this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
+                            this.scrollableAreaEventListenerAttached = true
+                        }
+                    })
+                }
+            }
         }
     },
     methods: {
