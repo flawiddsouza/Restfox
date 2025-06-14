@@ -71,6 +71,7 @@
                 placeholder="Paste curl request here"
                 style="min-height: 20rem;"
                 spellcheck="false"
+                v-focus
             />
 
             <p v-if="inputString && !startsWithCurl">
@@ -106,6 +107,14 @@ import constants from '@/constants'
 export default {
     components: {
         Modal
+    },
+    directives: {
+        focus: {
+            mounted(element) {
+                element.focus()
+                element.select()
+            }
+        }
     },
     data() {
         return {

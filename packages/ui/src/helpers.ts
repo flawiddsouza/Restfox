@@ -672,7 +672,7 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                 mimeType: 'No Body'
             }
 
-            if(item.body.mimeType === 'application/x-www-form-urlencoded') {
+            if(item.body.mimeType === 'application/x-www-form-urlencoded' || item.body.mimeType === 'multipart/form-data') {
                 body = {
                     mimeType: item.body.mimeType,
                     params: 'params' in item.body ? item.body.params.map((parameter: RequestParam) => ({
@@ -681,6 +681,12 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                         description: parameter.description,
                         disabled: parameter.disabled
                     })) : []
+                }
+
+                if (item.body.mimeType === 'multipart/form-data') {
+                    body.params.forEach((param: RequestParam) => {
+                        param.type = 'text'
+                    })
                 }
             }
 

@@ -506,4 +506,40 @@ describe('curl', () => {
             `{"subname": "www", "type": "A", "ttl": 3600, "records": ["127.0.0.1", "127.0.0.2"]}`
         )
     })
+
+    it('Handles multipart form data with --form flags #335', () => {
+        const cmd = `curl --request POST \\
+            --url https://login.microsoftonline.com/ten/oauth2/v2.0/token \\
+            --header 'Content-Type: multipart/form-data' \\
+            --form client_id=uuid \\
+            --form scope=https://graph.microsoft.com/.default \\
+            --form 'client_secret=secret' \\
+            --form grant_type=client_credentials
+        `
+
+        const result = convert(cmd)
+
+        expect(result).toMatchObject([{
+            _id: '__REQ_1__',
+            _type: 'request',
+            parentId: '__WORKSPACE_ID__',
+            name: 'https://login.microsoftonline.com/ten/oauth2/v2.0/token',
+            parameters: [],
+            url: 'https://login.microsoftonline.com/ten/oauth2/v2.0/token',
+            method: 'POST',
+            headers: [
+                { name: 'Content-Type', value: 'multipart/form-data' }
+            ],
+            authentication: {},
+            body: {
+                mimeType: 'multipart/form-data',
+                params: [
+                    { name: 'client_id', value: 'uuid', type: 'text' },
+                    { name: 'scope', value: 'https://graph.microsoft.com/.default', type: 'text' },
+                    { name: 'client_secret', value: 'secret', type: 'text' },
+                    { name: 'grant_type', value: 'client_credentials', type: 'text' }
+                ]
+            }
+        }])
+    })
 })
