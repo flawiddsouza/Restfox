@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import 'dexie-export-import'
+import '@flawiddsouza/dexie-export-import'
 import {
     CollectionItem,
     FileObject,
