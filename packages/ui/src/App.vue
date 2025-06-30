@@ -338,6 +338,7 @@ export default {
         const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
         const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
         const savedHidePasswordFields = localStorage.getItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS)
+        const savedCustomResponseFormats = localStorage.getItem(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -418,6 +419,14 @@ export default {
                 this.$store.state.flags.hidePasswordFields = JSON.parse(savedHidePasswordFields)
             } catch(e) {
                 this.$store.state.flags.hidePasswordFields = false
+            }
+        }
+
+        if(savedCustomResponseFormats) {
+            try {
+                this.$store.state.settings.customResponseFormats = JSON.parse(savedCustomResponseFormats)
+            } catch(e) {
+                this.$store.state.settings.customResponseFormats = []
             }
         }
 

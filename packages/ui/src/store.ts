@@ -353,6 +353,9 @@ export const store = createStore<State>({
                 showTabs: true,
                 hidePasswordFields: false,
             },
+            settings: {
+                customResponseFormats: [],
+            },
             openContextMenuElement: null,
             sockets: {},
             tabEnvironmentResolved: {},

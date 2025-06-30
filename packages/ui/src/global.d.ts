@@ -125,6 +125,10 @@ export interface Flags {
     hidePasswordFields: boolean
 }
 
+export interface Settings {
+    customResponseFormats: string[]
+}
+
 export interface State {
     consoleLogs: string[]
     collection: CollectionItem[]
@@ -155,6 +159,7 @@ export interface State {
     githubStarCount: string
     sidebarItemTemporaryName: { [key: string]: string }
     flags: Flags
+    settings: Settings
     openContextMenuElement: HTMLElement | null
     sockets: { [key: string]: WebSocket | null }
     tabEnvironmentResolved: any

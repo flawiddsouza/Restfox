@@ -204,6 +204,21 @@ app.get('/query-params-test', (req, res) => {
     })
 })
 
+app.get('/custom-content-type', (req, res) => {
+    const contentType = req.query.value || 'application/json'
+
+    const randomData = {
+        id: Math.floor(Math.random() * 1000) + 1,
+        message: 'Random response data',
+        timestamp: new Date().toISOString(),
+        randomNumber: Math.floor(Math.random() * 100),
+        status: 'success'
+    }
+
+    res.setHeader('Content-Type', contentType)
+    res.send(randomData)
+})
+
 const args = process.argv.slice(2)
 const ENABLE_SSL = args.includes('--ssl')
 

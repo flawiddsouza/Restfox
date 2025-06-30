@@ -472,6 +472,9 @@ export default {
         responseContentType() {
             return getResponseContentType(this.response)
         },
+        customResponseFormats() {
+            return this.$store.state.settings.customResponseFormats || []
+        },
         isBinaryResponse() {
             if (!this.responseContentType) {
                 return false
@@ -491,7 +494,9 @@ export default {
                 // JavaScript
                 'application/javascript',
                 // YAML
-                'application/yaml'
+                'application/yaml',
+                // Custom formats
+                ...this.customResponseFormats
             ]
 
             const isSupported = supportedContentTypes.some(type =>

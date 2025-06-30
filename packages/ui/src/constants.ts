@@ -32,6 +32,7 @@ export default {
         INDENT_SIZE: 'Restfox-IndentSize',
         SHOW_TABS: 'Restfox-ShowTabs',
         HIDE_PASSWORD_FIELDS: 'Restfox-HidePasswordFields',
+        CUSTOM_RESPONSE_FORMATS: 'Restfox-CustomResponseFormats',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

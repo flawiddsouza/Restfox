@@ -68,6 +68,30 @@
                 </label>
                 <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will mask password input fields in the application for better security.</div>
             </div>
+            <div>
+                <div style="padding-top: 1rem;">
+                    <div style="margin-bottom: var(--label-margin-bottom);">Custom Response Formats</div>
+                    <div style="margin-bottom: 0.5rem;">Add additional content types to be recognized as supported formats in the response panel (to bypass the binary response warning):</div>
+                    <div style="display: flex; margin-bottom: 0.5rem;">
+                        <input
+                            type="text"
+                            v-model="newCustomFormat"
+                            class="full-width-input"
+                            placeholder="e.g., application/protobuf"
+                            @keyup.enter="addCustomFormat"
+                            style="margin-right: 0.5rem;"
+                        />
+                        <button class="button" @click="addCustomFormat" :disabled="!newCustomFormat.trim()">Add</button>
+                    </div>
+                    <div v-if="customResponseFormats.length > 0" style="border: 1px solid var(--default-border-color); border-radius: var(--default-border-radius); padding: 0.5rem; display: flex; row-gap: 0.25rem; flex-direction: column;">
+                        <div v-for="(format, index) in customResponseFormats" :key="index" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>{{ format }}</span>
+                            <button class="button" @click="removeCustomFormat(index)" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Remove</button>
+                        </div>
+                    </div>
+                    <div v-else style="color: var(--text-color); opacity: 0.7; font-style: italic;">No custom formats added</div>
+                </div>
+            </div>
             <template v-if="flags.isElectron || flags.isWebStandalone">
                 <div style="padding-top: 1rem"></div>
                 <div>
@@ -131,6 +155,8 @@ export default {
             indentSize: constants.EDITOR_CONFIG.indent_size,
             showTabs: false,
             hidePasswordFields: false,
+            customResponseFormats: [],
+            newCustomFormat: '',
         }
     },
     computed: {
@@ -189,9 +215,35 @@ export default {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS, this.hidePasswordFields)
             this.$store.state.flags.hidePasswordFields = this.hidePasswordFields
         },
+        customResponseFormats: {
+            handler(newFormats) {
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS, JSON.stringify(newFormats))
+                this.$store.state.settings.customResponseFormats = newFormats
+            },
+            deep: true
+        },
     },
     methods: {
         getVersion,
+        getStoredJSON(key, defaultValue = []) {
+            try {
+                const stored = localStorage.getItem(key)
+                return stored ? JSON.parse(stored) : defaultValue
+            } catch (error) {
+                console.error(`Error parsing stored JSON for key ${key}:`, error)
+                return defaultValue
+            }
+        },
+        addCustomFormat() {
+            const format = this.newCustomFormat.trim()
+            if (format && !this.customResponseFormats.includes(format)) {
+                this.customResponseFormats.push(format)
+                this.newCustomFormat = ''
+            }
+        },
+        removeCustomFormat(index) {
+            this.customResponseFormats.splice(index, 1)
+        },
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
@@ -231,6 +283,10 @@ export default {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS)
             this.hidePasswordFields = false
         },
+        resetCustomResponseFormats() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS)
+            this.customResponseFormats = []
+        },
         resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
@@ -253,6 +309,7 @@ export default {
             this.resetIndentSize()
             this.resetShowTabs()
             this.resetHidePasswordFields()
+            this.resetCustomResponseFormats()
 
             document.location.reload()
         },
@@ -339,12 +396,11 @@ export default {
             }
 
             if(savedHidePasswordFields) {
-                try {
-                    this.hidePasswordFields = JSON.parse(savedHidePasswordFields)
-                } catch (e) {
-                    this.hidePasswordFields = false
-                }
+                this.hidePasswordFields = this.getStoredJSON(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS, false)
             }
+
+            this.customResponseFormats = this.getStoredJSON(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS)
+            this.$store.state.settings.customResponseFormats = this.customResponseFormats
         },
         getCurrentUserAgent() {
             this.globalUserAgent = navigator.userAgent
