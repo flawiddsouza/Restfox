@@ -1489,6 +1489,7 @@ export const store = createStore<State>({
         async refreshWorkspace(context) {
             await context.dispatch('refreshWorkspaceCollection')
             await context.dispatch('refreshWorkspaceTabs')
+            context.commit('loadWorkspacePlugins')
         },
         async updateCollectionItemName(context, collectionItem) {
             if(context.state.activeWorkspace === null) {

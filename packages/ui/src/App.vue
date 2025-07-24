@@ -439,7 +439,6 @@ export default {
             }
             const refreshWorkspace = debounce(() => {
                 this.$store.dispatch('refreshWorkspace')
-                this.$store.commit('loadWorkspacePlugins')
             }, 500)
             window.electronIPC.workspaceChanged((...args) => this.onWorkspaceChanged(refreshWorkspace, ...args))
         }
