@@ -5,7 +5,8 @@
 | `console.log(...)` | Logs information to the console. |
 | `alert(message)` | Shows an alert dialog with the specified message. |
 | `rf.getEnvVar(name)` | Retrieves the value of the specified environment variable. |
-| `rf.setEnvVar(name, value)` | Sets the specified environment variable to the given value. |
+| `rf.setEnvVar(name, value)` | Sets the specified environment variable to the given value in the workspace. |
+| `rf.setParentEnvVar(name, value)` | Sets the specified environment variable to the given value in the parent folder scope. |
 | `rf.arrayBuffer.toString(buffer)` | Converts an `ArrayBuffer` to a `string`. |
 | `rf.arrayBuffer.fromString(string)` | Converts a `string` to an `ArrayBuffer`. |
 | `rf.base64.toUint8Array(base64)` | Converts a base64 encoded `string` to a `Uint8Array`. |

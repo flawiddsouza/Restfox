@@ -123,8 +123,13 @@ export default defineComponent ({
             },
             {
                 type: 'option',
-                label: 'Set an environment variable',
+                label: 'Set an environment variable in the workspace',
                 value: 'rf.setEnvVar(name, value)',
+            },
+            {
+                type: 'option',
+                label: 'Set a parent environment variable',
+                value: 'rf.setParentEnvVar(name, value)',
             },
             {
                 type: 'option',

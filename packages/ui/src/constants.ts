@@ -93,8 +93,14 @@ export default {
                 {
                     label: `rf.setEnvVar(name, value)`,
                     type: 'function',
-                    info: 'Sets the value of an environment variable',
+                    info: 'Sets the value of an environment variable in the workspace',
                     apply: snippet(`rf.setEnvVar($\{name}, $\{value})`)
+                },
+                {
+                    label: `rf.setParentEnvVar(name, value)`,
+                    type: 'function',
+                    info: 'Sets the value of an environment variable in the parent folder',
+                    apply: snippet(`rf.setParentEnvVar($\{name}, $\{value})`)
                 },
                 {
                     label: 'rf.arrayBuffer.toString(buffer)',

@@ -14,6 +14,7 @@ import {
     RequestInitialResponseHeader,
     RequestFinalResponse,
     PluginExposeContext,
+    SetEnvironmentVariableFunction,
 } from './global'
 import constants from './constants'
 
@@ -61,7 +62,7 @@ const generalContextMethodsBase = {
     },
 }
 
-export async function createRequestContextForPlugin(cacheId: string, request: CollectionItem, environment: any, setEnvironmentVariable: ((name: string, value: string) => void) | null, testResults: PluginTestResult[]): Promise<{ expose: PluginExpose }> {
+export async function createRequestContextForPlugin(cacheId: string, request: CollectionItem, environment: any, setEnvironmentVariable: SetEnvironmentVariableFunction | null, testResults: PluginTestResult[]): Promise<{ expose: PluginExpose }> {
     const state: CollectionItem = JSON.parse(JSON.stringify(request))
 
     if(state.body === undefined) {
@@ -96,6 +97,11 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
         setEnvVar(objectPath: string, value: string) {
             if(setEnvironmentVariable) {
                 setEnvironmentVariable(objectPath, value)
+            }
+        },
+        setParentEnvVar(objectPath: string, value: string) {
+            if(setEnvironmentVariable) {
+                setEnvironmentVariable(objectPath, value, 'folder')
             }
         },
     }
@@ -176,7 +182,7 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
     }
 }
 
-export function createResponseContextForPlugin(response: RequestFinalResponse, environment: any, setEnvironmentVariable: (name: string, value: string) => void, testResults: PluginTestResult[]): { expose: PluginExpose } {
+export function createResponseContextForPlugin(response: RequestFinalResponse, environment: any, setEnvironmentVariable: SetEnvironmentVariableFunction, testResults: PluginTestResult[]): { expose: PluginExpose } {
     let bufferCopy = response.buffer.slice(0)
     const headers = response.headers
     const statusCode = response.status
@@ -189,6 +195,9 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
         },
         setEnvVar(objectPath: string, value: string) {
             setEnvironmentVariable(objectPath, value)
+        },
+        setParentEnvVar(objectPath: string, value: string) {
+            setEnvironmentVariable(objectPath, value, 'folder')
         },
     }
 

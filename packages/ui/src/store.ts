@@ -16,6 +16,7 @@ import {
     generateNewIdsForTree,
     substituteEnvironmentVariables,
     setEnvironmentVariable,
+    setParentEnvironmentVariable,
     setObjectPathValue,
 } from './helpers'
 import {
@@ -1098,9 +1099,14 @@ export const store = createStore<State>({
                 requestParentArray: CollectionItem[]
             } = await context.dispatch('getEnvironmentForRequest', { collectionItem: activeTab })
 
-            const setEnvironmentVariableWrapper = (objectPath: string, value: string) => {
-                setEnvironmentVariable(context, objectPath, value)
-                setObjectPathValue(environment, objectPath, value)
+            const setEnvironmentVariableWrapper = (objectPath: string, value: string, scope: 'workspace' | 'folder' = 'workspace') => {
+                if (scope === 'folder') {
+                    setParentEnvironmentVariable(context, objectPath, value, activeTab)
+                    setObjectPathValue(environment, objectPath, value)
+                } else {
+                    setEnvironmentVariable(context, objectPath, value)
+                    setObjectPathValue(environment, objectPath, value)
+                }
             }
 
             const globalPlugins: Plugin[] = []

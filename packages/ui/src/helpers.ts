@@ -20,6 +20,7 @@ import {
     State,
     OpenApiSpecPathParams,
     EditorConfig,
+    SetEnvironmentVariableFunction,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -323,7 +324,7 @@ export async function createRequestData(
     environment: any,
     parentHeaders: Record<string, string[]>,
     parentAuthentication: RequestAuthentication | undefined,
-    setEnvironmentVariable: ((name: string, value: string) => void) | null,
+    setEnvironmentVariable: SetEnvironmentVariableFunction | null,
     plugins: Plugin[],
     workspaceLocation: string | null
 ): Promise<CreateRequestDataReturn> {
@@ -498,7 +499,7 @@ export async function handleRequest(
     environment: any,
     parentHeaders: Record<string, string[]>,
     parentAuthentication: RequestAuthentication | undefined,
-    setEnvironmentVariable: (name: string, value: string) => void,
+    setEnvironmentVariable: SetEnvironmentVariableFunction,
     plugins: Plugin[],
     workspaceLocation: string | null,
     abortControllerSignal: AbortSignal,
@@ -1364,6 +1365,63 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
     } catch(e) {
         console.error('Failed to set environment variable:')
         console.error(e)
+    }
+}
+
+export function setParentEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string, currentCollectionItem: CollectionItem) {
+    try {
+        if(store.state.activeWorkspace === null) {
+            throw new Error('activeWorkspace is null')
+        }
+
+        // Find the target folder (parent folder of the current item)
+        let targetFolderId: string | null = null
+
+        if(currentCollectionItem.parentId) {
+            // If it has a parent, use the parent folder (works for both requests and folders)
+            targetFolderId = currentCollectionItem.parentId
+        } else {
+            // If there's no parent, fall back to global environment
+            setEnvironmentVariable(store, objectPath, value)
+            return
+        }
+
+        const targetFolder = findItemInTreeById(store.state.collectionTree, targetFolderId)
+
+        if(!targetFolder || targetFolder._type !== 'request_group') {
+            // If folder not found, fall back to global environment
+            setEnvironmentVariable(store, objectPath, value)
+            return
+        }
+
+        const folderEnvironment = targetFolder.environment ?? {}
+        setObjectPathValue(folderEnvironment, objectPath, value)
+        targetFolder.environment = folderEnvironment
+
+        store.commit('updateCollectionItemEnvironment', {
+            collectionId: targetFolderId,
+            environment: folderEnvironment
+        })
+
+        if(targetFolder.environments) {
+            const currentEnvironmentName = targetFolder.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
+            const currentEnvironment = targetFolder.environments.find((env: any) => env.name === currentEnvironmentName) as any
+            if(currentEnvironment) {
+                currentEnvironment.environment = folderEnvironment
+                store.commit('updateCollectionItemEnvironments', {
+                    collectionId: targetFolderId,
+                    environments: targetFolder.environments
+                })
+            }
+        }
+
+        store.dispatch('reloadTabEnvironmentResolved')
+
+    } catch(e) {
+        console.error('Failed to set folder environment variable:')
+        console.error(e)
+        // Fall back to global environment on error
+        setEnvironmentVariable(store, objectPath, value)
     }
 }
 

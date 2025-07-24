@@ -238,6 +238,7 @@ export interface PluginExposeContext {
     },
     getEnvVar: (objectPath: string) => any
     setEnvVar: (objectPath: string, value: string) => void
+    setParentEnvVar: (objectPath: string, value: string) => void
     request?: any
     response?: any
 }
@@ -267,3 +268,5 @@ export interface OpenApiSpecPathParams {
 export interface EditorConfig {
     indentSize: number
 }
+
+export type SetEnvironmentVariableFunction = (name: string, value: string, scope?: 'workspace' | 'folder') => void
