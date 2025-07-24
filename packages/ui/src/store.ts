@@ -1099,9 +1099,16 @@ export const store = createStore<State>({
                 requestParentArray: CollectionItem[]
             } = await context.dispatch('getEnvironmentForRequest', { collectionItem: activeTab })
 
-            const setEnvironmentVariableWrapper = (objectPath: string, value: string, scope: 'workspace' | 'folder' = 'workspace') => {
+            const setEnvironmentVariableWrapper = (objectPath: string, value: string, scope: 'workspace' | 'folder' = 'workspace', pluginCollectionId?: string | null) => {
                 if (scope === 'folder') {
-                    setParentEnvironmentVariable(context, objectPath, value, activeTab)
+                    let contextItem = activeTab
+                    if (pluginCollectionId) {
+                        const pluginContextItem = findItemInTreeById(context.state.collectionTree, pluginCollectionId)
+                        if (pluginContextItem) {
+                            contextItem = pluginContextItem
+                        }
+                    }
+                    setParentEnvironmentVariable(context, objectPath, value, contextItem)
                     setObjectPathValue(environment, objectPath, value)
                 } else {
                     setEnvironmentVariable(context, objectPath, value)

@@ -269,4 +269,4 @@ export interface EditorConfig {
     indentSize: number
 }
 
-export type SetEnvironmentVariableFunction = (name: string, value: string, scope?: 'workspace' | 'folder') => void
+export type SetEnvironmentVariableFunction = (name: string, value: string, scope?: 'workspace' | 'folder', pluginCollectionId?: string | null) => void

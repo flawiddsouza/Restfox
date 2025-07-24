@@ -331,7 +331,7 @@ export async function createRequestData(
     const cacheId = nanoid()
 
     for(const plugin of plugins) {
-        const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults)
+        const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults, plugin.collectionId)
 
         state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : `${plugin.name} (Pre Request)`
 
@@ -600,7 +600,7 @@ export async function handleRequest(
         }
 
         for(const plugin of plugins) {
-            const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults)
+            const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults, plugin.collectionId)
 
             state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : `${plugin.name} (Post Request)`
 

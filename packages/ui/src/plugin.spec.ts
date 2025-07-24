@@ -24,7 +24,7 @@ async function createExpose({ parameters = [] }: { parameters?: RequestParam[] }
 
     const cacheId = nanoid()
 
-    const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults)
+    const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults, null)
 
     return { expose, environment }
 }
@@ -54,7 +54,7 @@ function createResponseExpose(responseBuffer: ArrayBuffer) {
         testResults: [],
     }
 
-    const { expose } = createResponseContextForPlugin(response, environment, setEnvironmentVariable, state.testResults)
+    const { expose } = createResponseContextForPlugin(response, environment, setEnvironmentVariable, state.testResults, null)
 
     return { expose, environment }
 }
