@@ -66,11 +66,13 @@
                 <template v-if="shouldShowLargeResponseWarning">
                     <div class="content-box" style="text-align: center; padding: 2rem;">
                         <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: orange; margin-bottom: 1rem;"></i>
-                        <h3 v-if="isBinaryResponse && responseSize && responseSize > LARGE_RESPONSE_THRESHOLD">Large Binary Response Warning</h3>
-                        <h3 v-else-if="isBinaryResponse">Binary Response Warning</h3>
+                        <h3 v-if="isBinaryResponse && responseSize && responseSize > LARGE_RESPONSE_THRESHOLD">Large Unknown Media Type Warning</h3>
+                        <h3 v-else-if="isBinaryResponse">Unknown Media Type Warning</h3>
                         <h3 v-else>Large Response Warning</h3>
                         <p v-if="responseSize">This response is {{ humanFriendlySize(responseSize) }} in size.</p>
-                        <p v-if="isBinaryResponse">This is a binary response that may not display correctly in the preview.</p>
+                        <p v-if="isBinaryResponse">
+                            This response has media type <code style="background: var(--sidebar-item-active-color); padding: 2px 4px; border-radius: 3px;">{{ responseContentType }}</code> which is not recognized by Restfox and may not display correctly in the preview.
+                        </p>
                         <p v-if="!isBinaryResponse">Loading large responses may slow down the interface.</p>
                         <div style="margin-top: 1rem;">
                             <button class="button" @click="largeResponseConfirmed = true">Load Response</button>
@@ -98,10 +100,10 @@
                             <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
                                 <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
                             </div>
-                            <template v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml')">
+                            <template v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml') || responseContentType.startsWith('application/problem+xml')">
                                 <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
-                            <template v-else-if="responseContentType.startsWith('application/json')">
+                            <template v-else-if="responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
                                 <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
                             <template v-else>
@@ -136,11 +138,11 @@
                 </section>
 
                 <section class="sticky-section" v-if="previewMode !== 'raw' && !shouldShowLargeResponseWarning">
-                    <div class="row" v-if="responseContentType.startsWith('application/json')">
+                    <div class="row" v-if="responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
-                    <div class="row" v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml')">
+                    <div class="row" v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml') || responseContentType.startsWith('application/problem+xml')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="/store/books/author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
                     </div>
@@ -485,8 +487,12 @@ export default {
                 'text/',
                 // JSON
                 'application/json',
+                // Problem JSON (RFC 9457)
+                'application/problem+json',
                 // XML
                 'application/xml',
+                // Problem XML (RFC 9457)
+                'application/problem+xml',
                 // Images
                 'image/',
                 // PDF
@@ -925,7 +931,7 @@ export default {
 
 .response-panel-tabs-context .content-box {
     padding: 1rem;
-    word-break: break-all;
+    word-break: break-word;
 }
 
 .response-panel-tabs-context table {
