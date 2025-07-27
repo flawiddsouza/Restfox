@@ -1,7 +1,7 @@
 {
     "name": "Restfox",
     "description": "Minimalistic HTTP Client for API Development and Testing",
-    "version": "1.0.644",
+    "version": "1.0.645",
     "manifest_version": 3,
     "icons": {
         "512": "icons/favicon.png"
