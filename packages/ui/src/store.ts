@@ -1021,6 +1021,11 @@ export const store = createStore<State>({
             }
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
+            const collectionItemIndex = context.state.collection.findIndex(item => item._id === sourceItem._id)
+            if (collectionItemIndex !== -1) {
+                context.state.collection[collectionItemIndex].parentId = sourceItem.parentId
+            }
+
             const result = await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
 
             if(result.error) {
