@@ -97,13 +97,13 @@
                             <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('application/pdf')">
                                 <PdfFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%;" />
                             </div>
-                            <div style="height: 100%; overflow: hidden;" v-else-if="responseContentType.startsWith('text/html')">
+                            <div style="height: 100%; overflow: hidden;" v-else-if="previewMode === 'html' || responseContentType.startsWith('text/html')">
                                 <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
                             </div>
-                            <template v-else-if="responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml') || responseContentType.startsWith('application/problem+xml')">
+                            <template v-else-if="previewMode === 'xml' || responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml') || responseContentType.startsWith('application/problem+xml')">
                                 <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
-                            <template v-else-if="responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
+                            <template v-else-if="previewMode === 'json' || responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
                                 <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
                             <template v-else>
@@ -137,7 +137,7 @@
                     </div>
                 </section>
 
-                <section class="sticky-section" v-if="previewMode !== 'raw' && !shouldShowLargeResponseWarning">
+                <section class="sticky-section" v-if="(previewMode === 'rendered' || previewMode === 'json' || previewMode === 'xml') && !shouldShowLargeResponseWarning">
                     <div class="row" v-if="responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
@@ -294,6 +294,21 @@ export default {
                     type: 'option',
                     label: 'Raw',
                     value: 'raw',
+                },
+                {
+                    type: 'option',
+                    label: 'JSON',
+                    value: 'json',
+                },
+                {
+                    type: 'option',
+                    label: 'HTML',
+                    value: 'html',
+                },
+                {
+                    type: 'option',
+                    label: 'XML',
+                    value: 'xml',
                 }
             ]
         },
