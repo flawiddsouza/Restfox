@@ -110,7 +110,7 @@ export default {
             this.appLoaded = true
             this.activeWorkspaceLoaded = true
 
-            if(collections.length > 0) {
+            if(collections.length >= 0) {
                 this.$store.commit('setCollection', collections)
             }
 
