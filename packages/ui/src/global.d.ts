@@ -48,6 +48,12 @@ export interface RequestAuthentication {
     password?: string
     disabled?: boolean
     accessTokenUrl?: string
+    redirectUri?: string
+    state?: string
+    authorizationCode?: string
+    authorizationUrl?: string
+    usePKCE?: boolean
+    codeVerifier?: string
     scope?: string
     clientId?: string
     clientSecret?: string
