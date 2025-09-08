@@ -362,6 +362,7 @@ export default {
         'password_credentials': 'password',
         'client_credentials': 'client_credentials',
         'refresh_token': 'refresh_token',
+        'authorization_code': 'authorization_code',
     },
     REQUESTS: {
         http: {
