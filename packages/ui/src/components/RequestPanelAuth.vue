@@ -603,7 +603,7 @@ async function openAuthorizationUrl() {
             const redirectUri: string = await substituteEnvironmentVariables(env, auth.redirectUri)
             const scope: string = auth.scope ? await substituteEnvironmentVariables(env, auth.scope) : ''
 
-            if (!clientId || !authorizationUrl || !redirectUri) {
+            if (isMissing(clientId) || isMissing(authorizationUrl) || isMissing(redirectUri)) {
                 toast.error('Please provide Client ID, Authorization URL, and Redirect URI.')
                 return
             }
@@ -694,7 +694,7 @@ async function requestOAuthToken() {
             const authorizationCode: string = await substituteEnvironmentVariables(env, auth.authorizationCode)
             const redirectUri: string = await substituteEnvironmentVariables(env, auth.redirectUri)
 
-            if (!authorizationCode || !redirectUri) {
+            if ( isMissing(authorizationCode) || isMissing(redirectUri)) {
                 toast.error('Please provide Authorization Code and Redirect URI.')
                 return
             }
@@ -823,6 +823,10 @@ function oath2Precheck(clientId: string, clientSecret: string, accessTokenUrl: s
 
 function onTagClick(...args: any) {
     emit('tagClick', ...args)
+}
+
+function isMissing(value: any) {
+    return value === undefined || value === null || value === '' || value === 'undefined'
 }
 </script>
 
