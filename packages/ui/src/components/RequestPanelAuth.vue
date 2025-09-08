@@ -694,7 +694,7 @@ async function requestOAuthToken() {
             const authorizationCode: string = await substituteEnvironmentVariables(env, auth.authorizationCode)
             const redirectUri: string = await substituteEnvironmentVariables(env, auth.redirectUri)
 
-            if ( isMissing(authorizationCode) || isMissing(redirectUri)) {
+            if (isMissing(authorizationCode) || isMissing(redirectUri)) {
                 toast.error('Please provide Authorization Code and Redirect URI.')
                 return
             }
