@@ -114,7 +114,10 @@ export function generateBasicAuthString(username: string, password: string) {
 
 export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
     electronSwitchToChromiumFetch: boolean,
-    disableSSLVerification: boolean
+    disableSSLVerification: boolean,
+    proxyEnabled?: boolean,
+    proxyHost?: string,
+    proxyPort?: number,
 }): Promise<RequestInitialResponse> {
     if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
         let bodyHint: any = null
@@ -195,6 +198,13 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
             'x-proxy-req-method': method
         }
 
+        // Add proxy configuration headers
+        if (flags.proxyEnabled && flags.proxyHost && flags.proxyPort) {
+            proxyHeaders['x-proxy-flag-use-proxy'] = 'true'
+            proxyHeaders['x-proxy-host'] = flags.proxyHost
+            proxyHeaders['x-proxy-port'] = flags.proxyPort.toString()
+        }
+
         Object.keys(headers).forEach(header => {
             proxyHeaders[`x-proxy-req-header-${header}`] = headers[header]
         })
@@ -265,6 +275,9 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 body,
                 bodyHint,
                 disableSSLVerification: flags.disableSSLVerification,
+                proxyEnabled: flags.proxyEnabled ?? false,
+                proxyHost: flags.proxyHost ?? '127.0.0.1',
+                proxyPort: flags.proxyPort ?? 8080,
             }).then((data: any) => {
                 if(data.event === 'response') {
                     data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
@@ -505,7 +518,10 @@ export async function handleRequest(
     abortControllerSignal: AbortSignal,
     flags: {
         electronSwitchToChromiumFetch: boolean,
-        disableSSLVerification: boolean
+        disableSSLVerification: boolean,
+        proxyEnabled?: boolean,
+        proxyHost?: string,
+        proxyPort?: number,
     }
 ) {
     const state: HandleRequestState = {

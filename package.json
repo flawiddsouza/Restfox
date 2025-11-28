@@ -1,6 +1,6 @@
 {
     "private": true,
-    "name": "restfox",
+    "name": "Restfox",
     "version": "0.40.0",
     "productName": "Restfox",
     "description": "Offline-first web HTTP client",
@@ -8,8 +8,8 @@
     "repository": "github:flawiddsouza/Restfox",
     "main": "src/app.js",
     "author": {
-        "name": "Restfox",
-        "email": "restfox@example.com"
+        "name": "Flawid D'Souza",
+        "url": "https://github.com/flawiddsouza"
     },
     "devDependencies": {
         "@electron-forge/cli": "^7.4.0",
@@ -57,19 +57,25 @@
         "forge": "./forge.config.js"
     },
     "build": {
-        "appId": "com.restfox.app",
-        "productName": "Restfox",
         "linux": {
-            "target": [
-                {
-                    "target": "deb",
-                    "arch": [
-                        "x64"
-                    ]
-                }
-            ],
             "category": "Development",
-            "maintainer": "Flawid D'Souza <flawiddsouza@gmail.com>"
-        }
+            "icon": "ui/favicon.png"
+        },
+        "win": {
+            "icon": "ui/favicon.png"
+        },
+        "appx": {
+            "identityName": "57520Artelin.RestfoxApp",
+            "publisher": "CN=C01B6C7C-C0E3-4A87-B162-83B3296CA0E6",
+            "publisherDisplayName": "Artelin",
+            "applicationId": "Artelin.Restfox"
+        },
+        "snap": {
+            "allowNativeWayland": true
+        },
+        "files": [
+            "**/*",
+            "!out"
+        ]
     }
 }

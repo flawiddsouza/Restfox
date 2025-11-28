@@ -115,6 +115,44 @@
                         </div>
                         <div v-else style="color: var(--text-color); opacity: 0.7; font-style: italic;">No custom formats added</div>
                     </div>
+
+                    <!-- Proxy Settings Section -->
+                    <template v-if="flags.isElectron || flags.isWebStandalone">
+                        <div style="padding-top: 1rem; border-top: 1px solid var(--default-border-color); margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem;">Proxy Settings</h4>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" v-model="proxyEnabled" @change="updateProxySetting('enabled')">
+                                <div style="margin-left: 0.5rem;">Enable Proxy</div>
+                            </label>
+                            <div style="margin-left: 1.5rem; margin-top: 0.3rem; font-size: 0.9em; opacity: 0.7;">
+                                Route all requests through a proxy server for interception and debugging.
+                            </div>
+                        </div>
+                        <div v-if="proxyEnabled" style="padding-top: 1rem; padding-left: 1.5rem;">
+                            <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                                <div style="flex: 2;">
+                                    <div style="margin-bottom: 0.3rem;">Proxy Host</div>
+                                    <input 
+                                        type="text" 
+                                        v-model="proxyHost" 
+                                        @change="updateProxySetting('host')"
+                                        class="full-width-input" 
+                                        placeholder="127.0.0.1"
+                                    >
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="margin-bottom: 0.3rem;">Proxy Port</div>
+                                    <input 
+                                        type="number" 
+                                        v-model.number="proxyPort" 
+                                        @change="updateProxySetting('port')"
+                                        class="full-width-input" 
+                                        placeholder="8080"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
                 <div v-show="activeTab === 'advanced'" class="tab-panel">
@@ -157,6 +195,7 @@
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
 import { getVersion } from '@/helpers'
+import { ref, watch, onMounted } from 'vue'
 
 export default {
     props: {
@@ -187,6 +226,12 @@ export default {
             hidePasswordFields: false,
             customResponseFormats: [],
             newCustomFormat: '',
+
+            // Proxy settings refs
+            // Change from ref() to plain values for Options API
+            proxyEnabled: false,
+            proxyHost: '127.0.0.1',
+            proxyPort: 8080,
         }
     },
     computed: {
@@ -251,6 +296,27 @@ export default {
                 this.$store.state.settings.customResponseFormats = newFormats
             },
             deep: true
+        },
+        proxyEnabled: {
+            handler(newValue) {
+                this.$store.state.flags.proxyEnabled = newValue
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_ENABLED, newValue)
+            },
+            immediate: true
+        },
+        proxyHost: {
+            handler(newValue) {
+                this.$store.state.flags.proxyHost = newValue
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_HOST, newValue)
+            },
+            immediate: true
+        },
+        proxyPort: {
+            handler(newValue) {
+                this.$store.state.flags.proxyPort = newValue
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_PORT, newValue)
+            },
+            immediate: true
         },
     },
     methods: {
@@ -356,6 +422,9 @@ export default {
             const savedIndentSize = localStorage.getItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE) || 4
             const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS) || true
             const savedHidePasswordFields = localStorage.getItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS) || false
+            const savedProxyEnabled = localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY_ENABLED)
+            const savedProxyHost = localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY_HOST)
+            const savedProxyPort = localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY_PORT)
 
             if(savedSidebarWidth) {
                 this.sidebarWidth = savedSidebarWidth
@@ -431,10 +500,61 @@ export default {
 
             this.customResponseFormats = this.getStoredJSON(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS)
             this.$store.state.settings.customResponseFormats = this.customResponseFormats
+
+            if (savedProxyEnabled !== null) {
+                this.proxyEnabled = savedProxyEnabled === 'true'
+                this.$store.state.flags.proxyEnabled = this.proxyEnabled
+            }
+            if (savedProxyHost) {
+                this.proxyHost = savedProxyHost
+                this.$store.state.flags.proxyHost = this.proxyHost
+            }
+            if (savedProxyPort) {
+                this.proxyPort = parseInt(savedProxyPort, 10)
+                this.$store.state.flags.proxyPort = this.proxyPort
+            }
         },
         getCurrentUserAgent() {
             this.globalUserAgent = navigator.userAgent
-        }
+        },
+        updateProxySettings() {
+            this.$store.state.flags.proxyEnabled = this.proxyEnabled
+            this.$store.state.flags.proxyHost = this.proxyHost
+            this.$store.state.flags.proxyPort = this.proxyPort
+
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_ENABLED, this.proxyEnabled)
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_HOST, this.proxyHost)
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_PORT, this.proxyPort)
+        },
+        loadProxySettings() {
+            const savedEnabled = localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY_ENABLED)
+            const savedHost = localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY_HOST)
+            const savedPort = localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY_PORT)
+
+            this.proxyEnabled = savedEnabled === 'true'
+            this.proxyHost = savedHost || '127.0.0.1'
+            this.proxyPort = savedPort ? parseInt(savedPort, 10) : 8080
+
+            this.$store.state.flags.proxyEnabled = this.proxyEnabled
+            this.$store.state.flags.proxyHost = this.proxyHost
+            this.$store.state.flags.proxyPort = this.proxyPort
+        },
+
+        updateProxySetting(type) {
+            if (type === 'enabled') {
+                this.$store.state.flags.proxyEnabled = this.proxyEnabled
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_ENABLED, this.proxyEnabled.toString())
+            } else if (type === 'host') {
+                this.$store.state.flags.proxyHost = this.proxyHost
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_HOST, this.proxyHost)
+            } else if (type === 'port') {
+                this.$store.state.flags.proxyPort = this.proxyPort
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY_PORT, this.proxyPort.toString())
+            }
+        },
+    },
+    mounted() {
+        this.loadProxySettings()
     }
 }
 </script>
@@ -473,4 +593,7 @@ export default {
     overflow-y: auto;
     min-height: 45svh;
 }
+
+/* Remove the settings-group, setting-row, checkbox-label, text-input styles 
+   that were added at the bottom since we're using existing styles now */
 </style>

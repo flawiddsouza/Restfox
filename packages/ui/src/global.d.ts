@@ -128,7 +128,13 @@ export interface Flags {
     isElectron: boolean
     disableSSLVerification: boolean
     electronSwitchToChromiumFetch: boolean
+    disableIframeSandbox: boolean
+    disableAutoUpdate: boolean
+    showTabs: boolean
     hidePasswordFields: boolean
+    proxyEnabled: boolean
+    proxyHost: string
+    proxyPort: number
 }
 
 export interface Settings {

@@ -12,7 +12,7 @@ if(import.meta.env.MODE === 'desktop-electron') {
     })
 }
 
-export default {
+const constants = {
     LOCAL_STORAGE_KEY: {
         ACTIVE_WORKSPACE_ID: 'Restfox-ActiveWorkspaceId',
         SIDEBAR_WIDTH: 'Restfox-SidebarWidth',
@@ -33,6 +33,9 @@ export default {
         SHOW_TABS: 'Restfox-ShowTabs',
         HIDE_PASSWORD_FIELDS: 'Restfox-HidePasswordFields',
         CUSTOM_RESPONSE_FORMATS: 'Restfox-CustomResponseFormats',
+        PROXY_ENABLED: 'Restfox-Proxy-Enabled',
+        PROXY_HOST: 'Restfox-Proxy-Host',
+        PROXY_PORT: 'Restfox-Proxy-Port',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',
@@ -382,3 +385,5 @@ export default {
         }
     }
 }
+
+export default constants

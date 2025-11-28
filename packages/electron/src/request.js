@@ -1,5 +1,5 @@
 const { File } = require('node:buffer')
-const { fetch, Agent, FormData } = require('undici')
+const { fetch, Agent, FormData, ProxyAgent } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 
@@ -29,6 +29,7 @@ const localhostTds = [
 ]
 
 const agents = new Map()
+const proxyAgents = new Map()
 
 function getAgentForRequest(urlParsed, disableSSLVerification) {
     const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}`
@@ -86,9 +87,25 @@ function getAgentForRequest(urlParsed, disableSSLVerification) {
     return agents.get(key)
 }
 
+function getProxyAgent(proxyHost, proxyPort, disableSSLVerification) {
+    const key = `${proxyHost}:${proxyPort}:${disableSSLVerification}`
+
+    if (!proxyAgents.has(key)) {
+        const proxyAgent = new ProxyAgent({
+            uri: `http://${proxyHost}:${proxyPort}`,
+            requestTls: {
+                rejectUnauthorized: disableSSLVerification ? false : true,
+            },
+        })
+        proxyAgents.set(key, proxyAgent)
+    }
+
+    return proxyAgents.get(key)
+}
+
 async function handleSendRequest(data) {
     try {
-        const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
+        const { requestId, url, method, headers, bodyHint, disableSSLVerification, proxyEnabled, proxyHost, proxyPort } = data
         let { body } = data
 
         abortController[requestId] = new AbortController()
@@ -111,15 +128,27 @@ async function handleSendRequest(data) {
         const urlParsed = new URL(url)
 
         console.log({
-            disableSSLVerification
+            disableSSLVerification,
+            proxyEnabled,
+            proxyHost,
+            proxyPort,
         })
+
+        // Determine which dispatcher to use (proxy or direct)
+        let dispatcher
+        if (proxyEnabled && proxyHost && proxyPort) {
+            console.log(`Using proxy: ${proxyHost}:${proxyPort}`)
+            dispatcher = getProxyAgent(proxyHost, proxyPort, disableSSLVerification)
+        } else {
+            dispatcher = getAgentForRequest(urlParsed, disableSSLVerification)
+        }
 
         const response = await fetch(url, {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
             signal: abortController[requestId].signal,
-            dispatcher: getAgentForRequest(urlParsed, disableSSLVerification),
+            dispatcher,
         })
 
         const headEndTime = new Date()
