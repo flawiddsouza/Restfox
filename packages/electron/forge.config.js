@@ -1,7 +1,24 @@
+const path = require('path')
+const fs = require('fs-extra')
+
 module.exports = {
     packagerConfig: {
         name: 'Restfox',
-        icon: 'ui/favicon',
+        executableName: 'restfox',
+        icon: path.join(__dirname, 'ui', 'favicon'),
+        asar: true,
+        prune: true,
+        ignore: [
+            /^\/dist$/,
+            /^\/out$/,
+            /^\/\.gitignore$/,
+            /^\/\.eslintrc\.js$/,
+            /^\/tsconfig\.json$/,
+            /^\/vitest\.config\.ts$/,
+            /^\/dev\.restfox\.Restfox\.metainfo\.xml$/,
+            /^\/entitlements\.plist$/,
+            /^\/forge\.config\.js$/,
+        ],
         osxSign: {
             entitlements: 'entitlements.plist',
             'entitlements-inherit': 'entitlements.plist',
@@ -14,73 +31,43 @@ module.exports = {
             appleId: process.env.APPLE_ID,
             appleIdPassword: process.env.APPLE_ID_PASSWORD,
             teamId: process.env.APPLE_TEAM_ID
-        }
+        },
     },
+    rebuildConfig: {},
     makers: [
-        {
-            name: '@electron-forge/maker-squirrel',
-            config: {
-                name: 'Restfox',
-                iconUrl: 'https://restfox.dev/favicon.ico',
-                setupIcon: 'ui/favicon.ico'
-            }
-        },
-        {
-            name: '@electron-forge/maker-zip',
-            platforms: [
-                'darwin',
-                "win32",
-            ]
-        },
         {
             name: '@electron-forge/maker-deb',
             config: {
                 options: {
-                    // From https://github.com/electron/forge/issues/3235#issuecomment-1710830667
-                    // fixes https://github.com/flawiddsouza/Restfox/issues/85
-                    compression: 'gzip',
-                    icon: 'ui/favicon.png',
-                }
-            }
-        },
-        {
-            name: '@electron-forge/maker-rpm',
-            config: {}
-        },
-        // {
-        //     name: '@electron-forge/maker-flatpak',
-        //     config: {
-        //         options: {
-        //             categories: [
-        //                 'Utility',
-        //                 'Development'
-        //             ]
-        //         },
-        //         modules: [
-        //             {
-        //                 name: "zypak",
-        //                 sources: [
-        //                     {
-        //                         type: "git",
-        //                         url: "https://github.com/refi64/zypak",
-        //                         tag: "v2022.03"
-        //                     }
-        //                 ]
-        //             }
-        //         ]
-        //     }
-        // },
-    ],
-    publishers: [
-        {
-            name: '@electron-forge/publisher-github',
-            config: {
-                repository: {
-                    'owner': 'flawiddsouza',
-                    'name': 'Restfox'
+                    maintainer: 'Restfox <restfox@example.com>',
+                    homepage: 'https://restfox.dev',
+                    icon: path.join(__dirname, 'ui', 'favicon.png'),
                 },
-                prerelease: true
+            },
+        },
+        {
+            name: '@electron-forge/maker-squirrel',
+            config: {},
+        },
+        {
+            name: '@electron-forge/maker-zip',
+            platforms: ['darwin'],
+        },
+    ],
+    hooks: {
+        packageAfterCopy: async (config, buildPath, electronVersion, platform, arch) => {
+            const uiDistPath = path.join(__dirname, '..', 'ui', 'dist')
+            const destPath = path.join(buildPath, 'ui')
+            
+            console.log(`Copying UI from ${uiDistPath} to ${destPath}`)
+            
+            if (fs.existsSync(uiDistPath)) {
+                await fs.copy(uiDistPath, destPath)
+                console.log('UI files copied successfully')
+            } else {
+                console.error('ERROR: UI dist folder not found!')
+                throw new Error('UI dist folder not found')
             }
-        }
-    ]
+        },
+    },
 }

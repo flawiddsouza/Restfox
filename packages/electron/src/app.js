@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron')
-const { resolve } = require('path')
+const path = require('path')
+const { resolve } = path
 const contextMenu = require('electron-context-menu')
 const log = require('electron-log/main')
 const open = import('open')
@@ -63,7 +64,8 @@ function createWindow() {
         win.webContents.openDevTools()
         win.loadURL('http://localhost:5173')
     } else {
-        win.loadURL(`file://${resolve(__dirname, '../ui/index.html')}`)
+        // Load the UI from the correct path (ui folder is copied by forge hook)
+        win.loadFile(resolve(__dirname, '..', 'ui', 'index.html'))
     }
 
     // open links with target="_blank" in an external browser instead of in the app

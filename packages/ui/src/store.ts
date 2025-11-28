@@ -353,6 +353,9 @@ export const store = createStore<State>({
                 disableAutoUpdate: false,
                 showTabs: true,
                 hidePasswordFields: false,
+                proxyEnabled: false,
+                proxyHost: '127.0.0.1',
+                proxyPort: 8080,
             },
             settings: {
                 customResponseFormats: [],
