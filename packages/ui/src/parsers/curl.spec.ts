@@ -542,4 +542,32 @@ describe('curl', () => {
             }
         }])
     })
+
+    it('Correctly handles @ symbol in JSON body (email addresses, etc) #366', () => {
+        const cmd = `curl --request POST \\
+            --url http://localhost:8080/user/login \\
+            --header 'content-type: application/json' \\
+            --data '{"email": "user@example.com", "password": "secret"}'
+        `
+
+        const result = convert(cmd)
+
+        expect(result).toMatchObject([{
+            _id: '__REQ_1__',
+            _type: 'request',
+            parentId: '__WORKSPACE_ID__',
+            name: 'http://localhost:8080/user/login',
+            parameters: [],
+            url: 'http://localhost:8080/user/login',
+            method: 'POST',
+            headers: [
+                { name: 'content-type', value: 'application/json' }
+            ],
+            authentication: {},
+            body: {
+                mimeType: 'application/json',
+                text: '{"email": "user@example.com", "password": "secret"}'
+            }
+        }])
+    })
 })

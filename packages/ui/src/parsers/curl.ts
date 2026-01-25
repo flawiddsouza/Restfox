@@ -379,9 +379,20 @@ const pairToParameters = (pair: Pair, allowFiles = false): Parameter[] => {
     }
 
     return pair.split('&').map(pair => {
-        if (pair.includes('@') && allowFiles) {
-            const [name, fileName] = pair.split('@')
-            return { name, fileName, type: 'file' }
+        // Check for file references: @filename or name@filename
+        // But only if the pair doesn't contain '=' (which indicates a key=value pair)
+        // and doesn't look like JSON data
+        const looksLikeJson = pair.trim().startsWith('{') || pair.trim().startsWith('[')
+        if (pair.includes('@') && allowFiles && !pair.includes('=') && !looksLikeJson) {
+            if (pair.startsWith('@')) {
+                // @filename format
+                const fileName = pair.slice(1)
+                return { name: '', fileName, type: 'file' }
+            } else {
+                // name@filename format
+                const [name, fileName] = pair.split('@')
+                return { name, fileName, type: 'file' }
+            }
         }
 
         const [name, value] = pair.split('=')
