@@ -1425,6 +1425,28 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
     }
 }
 
+export function getParentPath(collection: CollectionItem[], itemId: string): string {
+    const parents: string[] = []
+
+    function findParents(items: CollectionItem[], targetId: string, currentPath: string[] = []): boolean {
+        for (const item of items) {
+            if (item._id === targetId) {
+                parents.push(...currentPath)
+                return true
+            }
+            if (item.children) {
+                if (findParents(item.children, targetId, [...currentPath, item.name])) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    findParents(collection, itemId)
+    return parents.join(' / ')
+}
+
 export function prependParentTitleToChildTitle(array: CollectionItem[], prepend = '') {
     array.forEach(item => {
         item.name = `${prepend ? prepend + ' ' : ''}${item.name}`
@@ -1943,4 +1965,21 @@ export function getSpaces(value: string | number): string {
 
 export function deepClone(obj: any) {
     return JSON.parse(JSON.stringify(obj))
+}
+
+export function getAllHttpRequestsInFolder(folder: CollectionItem): CollectionItem[] {
+    const requests: CollectionItem[] = []
+
+    function traverse(item: CollectionItem) {
+        if (item._type === 'request') {
+            requests.push(item)
+        }
+
+        if (item.children && item.children.length > 0) {
+            item.children.forEach(child => traverse(child))
+        }
+    }
+
+    traverse(folder)
+    return requests
 }

@@ -135,6 +135,38 @@ export interface Settings {
     customResponseFormats: string[]
 }
 
+export interface CollectionRunnerResult {
+    requestId: string
+    requestName: string
+    method?: string
+    parentPath?: string
+    iteration: number
+    status: 'pending' | 'running' | 'success' | 'error'
+    error?: string
+    timeTaken?: number
+    testResults?: PluginTestResult[]
+    statusCode?: number
+    url?: string
+    responseSize?: number
+}
+
+export interface CollectionRunnerState {
+    isRunning: boolean
+    sourceId: string | null
+    sourceName: string | null
+    allRequests: CollectionItem[]
+    selectedRequests: CollectionItem[]
+    currentRequestIndex: number
+    currentIteration: number
+    totalIterations: number
+    delayMs: number
+    results: CollectionRunnerResult[]
+    abortController: AbortController | null
+    continueOnError: boolean
+    startTime: number | null
+    currentRequestId: string | null
+}
+
 export interface State {
     consoleLogs: string[]
     collection: CollectionItem[]
@@ -171,6 +203,7 @@ export interface State {
     tabEnvironmentResolved: any
     idMap: Map<string, string> | null
     skipPersistingActiveTab: boolean
+    collectionRunner: CollectionRunnerState
 }
 
 export interface Plugin {

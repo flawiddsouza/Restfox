@@ -18,6 +18,8 @@ import {
     setEnvironmentVariable,
     setParentEnvironmentVariable,
     setObjectPathValue,
+    getAllHttpRequestsInFolder,
+    getParentPath,
 } from './helpers'
 import {
     getResponsesByCollectionId,
@@ -61,6 +63,8 @@ import {
     Workspace,
     RequestFinalResponse,
     RequestAuthentication,
+    CollectionRunnerResult,
+    PluginTestResult,
 } from './global'
 import * as queryParamsSync from '@/utils/query-params-sync'
 
@@ -363,6 +367,22 @@ export const store = createStore<State>({
             idMap: null,
             skipPersistingActiveTab: false,
             consoleLogs: [],
+            collectionRunner: {
+                isRunning: false,
+                sourceId: null,
+                sourceName: null,
+                allRequests: [],
+                selectedRequests: [],
+                currentRequestIndex: 0,
+                currentIteration: 1,
+                totalIterations: 1,
+                delayMs: 0,
+                results: [],
+                abortController: null,
+                continueOnError: true,
+                startTime: null,
+                currentRequestId: null
+            }
         }
     },
     getters: {
@@ -673,6 +693,74 @@ export const store = createStore<State>({
         },
         clearConsoleLogs(state) {
             state.consoleLogs = []
+        },
+        completeCollectionRunner(state) {
+            state.collectionRunner.isRunning = false
+        },
+        abortCollectionRunner(state) {
+            state.collectionRunner.isRunning = false
+            state.collectionRunner.results.forEach(result => {
+                if (result.status === 'pending' || result.status === 'running') {
+                    result.status = 'error'
+                    result.error = 'Cancelled'
+                }
+            })
+        },
+        resetCollectionRunner(state) {
+            state.collectionRunner = {
+                isRunning: false,
+                sourceId: null,
+                sourceName: null,
+                allRequests: [],
+                selectedRequests: [],
+                currentRequestIndex: 0,
+                currentIteration: 1,
+                totalIterations: 1,
+                delayMs: 0,
+                results: [],
+                abortController: null,
+                continueOnError: true,
+                startTime: null,
+                currentRequestId: null
+            }
+        },
+        advanceCollectionRunnerProgress(state, payload: { requestIndex: number, iteration: number }) {
+            state.collectionRunner.currentRequestIndex = payload.requestIndex
+            state.collectionRunner.currentIteration = payload.iteration
+        },
+        startCollectionRunnerRequest(state, payload: { resultIndex: number, requestId: string }) {
+            state.collectionRunner.results[payload.resultIndex].status = 'running'
+            state.collectionRunner.currentRequestId = payload.requestId
+        },
+        completeCollectionRunnerRequest(state, payload: {
+            resultIndex: number,
+            status: 'success' | 'error',
+            timeTaken: number,
+            statusCode?: number,
+            url?: string,
+            responseSize?: number,
+            testResults?: any[],
+            error?: string
+        }) {
+            const result = state.collectionRunner.results[payload.resultIndex]
+            result.status = payload.status
+            result.timeTaken = payload.timeTaken
+            if (payload.statusCode !== undefined) {
+                result.statusCode = payload.statusCode
+            }
+            if (payload.url !== undefined) {
+                result.url = payload.url
+            }
+            if (payload.responseSize !== undefined) {
+                result.responseSize = payload.responseSize
+            }
+            if (payload.testResults !== undefined) {
+                result.testResults = payload.testResults
+            }
+            if (payload.error !== undefined) {
+                result.error = payload.error
+            }
+            state.collectionRunner.currentRequestId = null
         },
     },
     actions: {
@@ -1643,6 +1731,189 @@ export const store = createStore<State>({
             }
 
             loadWorkspaceTabs(context)
+        },
+        async startCollectionRunner(context, { source, selectedRequests, iterations, delayMs, continueOnError }: {
+            source: any,
+            selectedRequests: CollectionItem[],
+            iterations: number,
+            delayMs: number,
+            continueOnError: boolean
+        }) {
+            if (context.state.collectionRunner.isRunning) {
+                throw new Error('A collection run is already in progress')
+            }
+
+            if (selectedRequests.length === 0) {
+                throw new Error('No requests selected')
+            }
+
+            // Initialize runner state
+            const results: CollectionRunnerResult[] = []
+            const collectionTree = context.state.collectionTree
+            for (let i = 1; i <= iterations; i++) {
+                selectedRequests.forEach(req => {
+                    results.push({
+                        requestId: req._id,
+                        requestName: req.name,
+                        method: req.method,
+                        parentPath: getParentPath(collectionTree, req._id),
+                        iteration: i,
+                        status: 'pending',
+                    })
+                })
+            }
+
+            context.state.collectionRunner = {
+                isRunning: true,
+                sourceId: source._id,
+                sourceName: source.name,
+                allRequests: source._type === 'collection' ? getAllHttpRequestsInFolder({ children: source.children } as any) : getAllHttpRequestsInFolder(source),
+                selectedRequests,
+                currentRequestIndex: 0,
+                currentIteration: 1,
+                totalIterations: iterations,
+                delayMs,
+                results,
+                abortController: new AbortController(),
+                continueOnError,
+                startTime: Date.now(),
+                currentRequestId: null
+            }
+
+            // Don't await - let it run in background so modal can show immediately
+            context.dispatch('executeCollectionRunnerNext')
+        },
+        async executeCollectionRunnerNext(context) {
+            const runner = context.state.collectionRunner
+
+            if (!runner.isRunning) {
+                return
+            }
+
+            // Check if current iteration complete
+            if (runner.currentRequestIndex >= runner.selectedRequests.length) {
+                // Check if this was the last iteration
+                if (runner.currentIteration >= runner.totalIterations) {
+                    context.commit('completeCollectionRunner')
+                    return
+                }
+                context.commit('advanceCollectionRunnerProgress', {
+                    requestIndex: 0,
+                    iteration: runner.currentIteration + 1
+                })
+                await context.dispatch('executeCollectionRunnerNext')
+                return
+            }
+
+            // Check if aborted
+            if (runner.abortController?.signal.aborted) {
+                context.commit('abortCollectionRunner')
+                return
+            }
+
+            const currentRequest = runner.selectedRequests[runner.currentRequestIndex]
+            const resultIndex = (runner.currentIteration - 1) * runner.selectedRequests.length + runner.currentRequestIndex
+
+            // Set status to running and track current request
+            context.commit('startCollectionRunnerRequest', {
+                resultIndex,
+                requestId: currentRequest._id
+            })
+
+            const startTime = Date.now()
+            await context.dispatch('sendRequest', currentRequest)
+            const timeTaken = Date.now() - startTime
+
+            // Check if request succeeded or failed by examining the response
+            const response = context.state.requestResponses[currentRequest._id]
+
+            // Check for failure: either response error OR any failed tests
+            const hasResponseError = response && response.error
+            const hasFailedTests = response && response.testResults && response.testResults.some((test: PluginTestResult) => !test.passed)
+
+            if (hasResponseError || hasFailedTests) {
+                // Request failed - determine error message
+                let errorMessage: string
+                if (hasResponseError) {
+                    errorMessage = response.error
+                } else {
+                    const failedCount = response.testResults.filter((test: PluginTestResult) => !test.passed).length
+                    errorMessage = `${failedCount} test(s) failed`
+                }
+
+                context.commit('completeCollectionRunnerRequest', {
+                    resultIndex,
+                    status: 'error',
+                    timeTaken,
+                    statusCode: response?.status,
+                    url: response?.url,
+                    responseSize: response?.buffer?.byteLength,
+                    testResults: response?.testResults,
+                    error: errorMessage
+                })
+
+                if (runner.continueOnError) {
+                    // Delay before next request
+                    if (runner.delayMs > 0) {
+                        await new Promise<void>((resolve) => {
+                            const timeout = setTimeout(resolve, runner.delayMs)
+                            runner.abortController?.signal.addEventListener('abort', () => {
+                                clearTimeout(timeout)
+                                resolve()
+                            }, { once: true })
+                        })
+                    }
+                    context.commit('advanceCollectionRunnerProgress', {
+                        requestIndex: runner.currentRequestIndex + 1,
+                        iteration: runner.currentIteration
+                    })
+                    await context.dispatch('executeCollectionRunnerNext')
+                } else {
+                    context.commit('completeCollectionRunner')
+                }
+            } else {
+                // Request succeeded
+                context.commit('completeCollectionRunnerRequest', {
+                    resultIndex,
+                    status: 'success',
+                    timeTaken,
+                    statusCode: response?.status,
+                    url: response?.url,
+                    responseSize: response?.buffer?.byteLength,
+                    testResults: response?.testResults
+                })
+
+                // Delay before next request
+                if (runner.delayMs > 0) {
+                    await new Promise<void>((resolve) => {
+                        const timeout = setTimeout(resolve, runner.delayMs)
+                        runner.abortController?.signal.addEventListener('abort', () => {
+                            clearTimeout(timeout)
+                            resolve()
+                        }, { once: true })
+                    })
+                }
+
+                context.commit('advanceCollectionRunnerProgress', {
+                    requestIndex: runner.currentRequestIndex + 1,
+                    iteration: runner.currentIteration
+                })
+                await context.dispatch('executeCollectionRunnerNext')
+            }
+        },
+        cancelCollectionRunner(context) {
+            // Abort the currently running request if any
+            const currentRequestId = context.state.collectionRunner.currentRequestId
+            if (currentRequestId && context.state.requestAbortController[currentRequestId]) {
+                context.state.requestAbortController[currentRequestId].abort()
+            }
+
+            // Abort the runner's abort controller to stop future iterations
+            if (context.state.collectionRunner.abortController) {
+                context.state.collectionRunner.abortController.abort()
+            }
+
+            context.commit('abortCollectionRunner')
         },
     }
 })

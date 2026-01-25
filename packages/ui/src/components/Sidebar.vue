@@ -34,6 +34,8 @@
     <SettingsModal :show-modal="settingsModalShow" :collection-item="settingsModalCollectionItem" @update:collection-item="updateCollectionItem" />
     <DuplicateCollectionItemModal v-model:showModal="showDuplicateCollectionItemModal" :collection-item-to-duplicate="collectionItemToDuplicate" />
     <GenerateCodeModal v-model:showModal="generateCodeModalShow" :collection-item="generateCodeModalCollectionItem" />
+    <CollectionRunnerModal v-model:showModal="collectionRunnerModalShow" :source="collectionRunnerModalSource" @started="collectionRunnerProgressShow = true" />
+    <CollectionRunnerProgressModal v-model:showModal="collectionRunnerProgressShow" />
 </template>
 
 <script>
@@ -48,6 +50,8 @@ import PluginManagerModal from './modals/PluginManagerModal.vue'
 import SettingsModal from './modals/SidebarSettingsModal.vue'
 import DuplicateCollectionItemModal from './modals/DuplicateCollectionItemModal.vue'
 import GenerateCodeModal from './modals/GenerateCodeModal.vue'
+import CollectionRunnerModal from './modals/CollectionRunnerModal.vue'
+import CollectionRunnerProgressModal from './modals/CollectionRunnerProgressModal.vue'
 import { mapState } from 'vuex'
 import { flattenTree, exportRestfoxCollection, generateNewIdsForTree, deepClone } from '@/helpers'
 import { generateCode } from '@/utils/generate-code'
@@ -66,6 +70,8 @@ export default {
         SettingsModal,
         DuplicateCollectionItemModal,
         GenerateCodeModal,
+        CollectionRunnerModal,
+        CollectionRunnerProgressModal,
     },
     data() {
         return {
@@ -92,6 +98,9 @@ export default {
             pluginManagerShow: false,
             generateCodeModalCollectionItem: null,
             generateCodeModalShow: false,
+            collectionRunnerModalShow: false,
+            collectionRunnerModalSource: null,
+            collectionRunnerProgressShow: false,
             createNewList: [
                 {
                     'type': 'option',
@@ -161,7 +170,30 @@ export default {
         ...mapState(['activeSidebarItemForContextMenu', 'sidebarContextMenuElement']),
         options() {
             if(this.enableOptionsForEmptyContextMenu) {
-                return [...this.createNewList,
+                const menuItems = [...this.createNewList]
+
+                // Add Run Collection if there are any requests
+                const hasRequests = this.$store.state.collection.some(item => item._type === 'request')
+                if(hasRequests) {
+                    menuItems.push(
+                        {
+                            'type': 'option',
+                            'label': 'Actions',
+                            'icon': 'fa fa-cog',
+                            'disabled': true,
+                            'class': 'text-with-line'
+                        },
+                        {
+                            'type': 'option',
+                            'label': 'Run Collection',
+                            'value': 'Run Collection',
+                            'icon': 'fa fa-play',
+                            'class': 'context-menu-item-with-left-padding'
+                        }
+                    )
+                }
+
+                menuItems.push(
                     {
                         'type': 'option',
                         'label': 'Import',
@@ -183,7 +215,9 @@ export default {
                         'icon': 'fa fa-terminal',
                         'class': 'context-menu-item-with-left-padding'
                     }
-                ]
+                )
+
+                return menuItems
             }
 
             if(this.activeSidebarItemForContextMenu === null) {
@@ -356,6 +390,21 @@ export default {
             if(clickedSidebarItem === 'Properties') {
                 this.settingsModalCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
                 this.settingsModalShow = true
+            }
+
+            if(clickedSidebarItem === 'Run Folder') {
+                this.collectionRunnerModalSource = deepClone(this.activeSidebarItemForContextMenu)
+                this.collectionRunnerModalShow = true
+            }
+
+            if(clickedSidebarItem === 'Run Collection') {
+                this.collectionRunnerModalSource = {
+                    _id: this.$store.state.activeWorkspace._id,
+                    _type: 'collection',
+                    name: this.$store.state.activeWorkspace.name,
+                    children: this.$store.state.collectionTree
+                }
+                this.collectionRunnerModalShow = true
             }
 
             this.showContextMenu = false
@@ -567,6 +616,13 @@ export default {
 
             if(type === 'request_group'){
                 commonActions.splice(startIndex, 0,{
+                    'type': 'option',
+                    'label': 'Run Folder',
+                    'value': 'Run Folder',
+                    'icon': 'fa fa-play',
+                    'class': contextMenuItemClass
+                })
+                commonActions.splice(startIndex + 1, 0,{
                     'type': 'option',
                     'label': 'Environment',
                     'value': 'Environment',
