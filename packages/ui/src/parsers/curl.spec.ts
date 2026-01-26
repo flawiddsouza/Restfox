@@ -4,6 +4,8 @@
 
 import { describe, it, expect } from 'vitest'
 import { quote } from 'shell-quote'
+import * as fs from 'fs'
+import * as path from 'path'
 
 import { Parameter } from './curl.types'
 import { convert } from './curl'
@@ -492,21 +494,6 @@ describe('curl', () => {
         expect(result2).toHaveProperty('0.url', 'https://httpbin.org/post')
     })
 
-    it('Body not imported #307', () => {
-        const cmd = `curl -X POST https://desec.io/api/v1/domains/{name}/rrsets/ \\
-            --header "Authorization: Token {secret}" \\
-            --header "Content-Type: application/json" --data \\
-            '{"subname": "www", "type": "A", "ttl": 3600, "records": ["127.0.0.1", "127.0.0.2"]}'
-        `
-
-        const result = convert(cmd)
-
-        expect(result).toHaveProperty(
-            '0.body.text',
-            `{"subname": "www", "type": "A", "ttl": 3600, "records": ["127.0.0.1", "127.0.0.2"]}`
-        )
-    })
-
     it('Handles multipart form data with --form flags #335', () => {
         const cmd = `curl --request POST \\
             --url https://login.microsoftonline.com/ten/oauth2/v2.0/token \\
@@ -543,31 +530,28 @@ describe('curl', () => {
         }])
     })
 
-    it('Correctly handles @ symbol in JSON body (email addresses, etc) #366', () => {
-        const cmd = `curl --request POST \\
-            --url http://localhost:8080/user/login \\
-            --header 'content-type: application/json' \\
-            --data '{"email": "user@example.com", "password": "secret"}'
-        `
+    describe('Real-world curl commands from fixtures', () => {
+        const fixturesDir = path.join(__dirname, '../../test-data/curl-import-fixtures')
+        const testDirs = fs.readdirSync(fixturesDir, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => d.name)
 
-        const result = convert(cmd)
+        testDirs.forEach(testDir => {
+            const namePath = path.join(fixturesDir, testDir, 'name.txt')
+            const testName = fs.existsSync(namePath)
+                ? fs.readFileSync(namePath, 'utf8').trim()
+                : testDir
 
-        expect(result).toMatchObject([{
-            _id: '__REQ_1__',
-            _type: 'request',
-            parentId: '__WORKSPACE_ID__',
-            name: 'http://localhost:8080/user/login',
-            parameters: [],
-            url: 'http://localhost:8080/user/login',
-            method: 'POST',
-            headers: [
-                { name: 'content-type', value: 'application/json' }
-            ],
-            authentication: {},
-            body: {
-                mimeType: 'application/json',
-                text: '{"email": "user@example.com", "password": "secret"}'
-            }
-        }])
+            it(testName, () => {
+                const inputPath = path.join(fixturesDir, testDir, 'input.txt')
+                const expectedPath = path.join(fixturesDir, testDir, 'expected.json')
+
+                const input = fs.readFileSync(inputPath, 'utf8')
+                const expected = JSON.parse(fs.readFileSync(expectedPath, 'utf8'))
+
+                const result = convert(input)
+                expect(result).toEqual([expected])
+            })
+        })
     })
 })

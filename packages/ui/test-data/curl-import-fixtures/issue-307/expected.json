@@ -1,0 +1,24 @@
+{
+  "_id": "__REQ_1__",
+  "_type": "request",
+  "parentId": "__WORKSPACE_ID__",
+  "name": "https://desec.io/api/v1/domains/%7Bname%7D/rrsets/",
+  "parameters": [],
+  "url": "https://desec.io/api/v1/domains/%7Bname%7D/rrsets/",
+  "method": "POST",
+  "headers": [
+    {
+      "name": "Authorization",
+      "value": "Token {secret}"
+    },
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  "authentication": {},
+  "body": {
+    "mimeType": "application/json",
+    "text": "{\"subname\": \"www\", \"type\": \"A\", \"ttl\": 3600, \"records\": [\"127.0.0.1\", \"127.0.0.2\"]}"
+  }
+}

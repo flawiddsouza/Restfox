@@ -1,0 +1,4 @@
+curl -X POST https://desec.io/api/v1/domains/{name}/rrsets/ \
+            --header "Authorization: Token {secret}" \
+            --header "Content-Type: application/json" --data \
+            '{"subname": "www", "type": "A", "ttl": 3600, "records": ["127.0.0.1", "127.0.0.2"]}'

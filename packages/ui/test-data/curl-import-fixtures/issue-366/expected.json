@@ -1,0 +1,20 @@
+{
+  "_id": "__REQ_1__",
+  "_type": "request",
+  "parentId": "__WORKSPACE_ID__",
+  "name": "http://localhost:8080/user/login",
+  "parameters": [],
+  "url": "http://localhost:8080/user/login",
+  "method": "POST",
+  "headers": [
+    {
+      "name": "content-type",
+      "value": "application/json"
+    }
+  ],
+  "authentication": {},
+  "body": {
+    "mimeType": "application/json",
+    "text": "{\"email\": \"user@example.com\", \"password\": \"secret\"}"
+  }
+}

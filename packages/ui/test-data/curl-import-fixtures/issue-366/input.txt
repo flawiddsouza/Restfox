@@ -1,0 +1,4 @@
+curl --request POST \
+    --url http://localhost:8080/user/login \
+    --header 'content-type: application/json' \
+    --data '{"email": "user@example.com", "password": "secret"}'
