@@ -11,7 +11,7 @@
                         <button type="button" class="button" @click="deselectAll">Deselect All</button>
                     </div>
                     <div v-for="item in treeItems" :key="item._id">
-                        <TreeItem :item="item" :selected-ids="selectedRequestIds" @toggle="toggleRequest" />
+                        <CollectionRunnerTreeItem :item="item" :selected-ids="selectedRequestIds" @toggle="toggleRequest" />
                     </div>
                 </div>
                 <p style="margin-top: 0.5rem; font-size: 0.9em; color: var(--text-color-secondary);">
@@ -47,66 +47,11 @@
 
 <script>
 import Modal from '@/components/Modal.vue'
+import CollectionRunnerTreeItem from '@/components/modals/CollectionRunnerTreeItem.vue'
 import { getAllHttpRequestsInFolder } from '@/helpers'
 
-const TreeItem = {
-    name: 'TreeItem',
-    props: ['item', 'selectedIds'],
-    data() {
-        return {
-            collapsed: false
-        }
-    },
-    computed: {
-        isFolder() {
-            return this.item._type === 'request_group'
-        },
-        isRequest() {
-            return this.item._type === 'request'
-        },
-        isChecked() {
-            return this.selectedIds.includes(this.item._id)
-        },
-        hasChildren() {
-            return this.item.children && this.item.children.length > 0
-        }
-    },
-    methods: {
-        toggle() {
-            if (this.isRequest) {
-                this.$emit('toggle', this.item._id)
-            }
-        },
-        toggleCollapse() {
-            this.collapsed = !this.collapsed
-        }
-    },
-    template: `
-        <div>
-            <div style="display: flex; align-items: center; padding: 0.25rem 0;">
-                <span v-if="isFolder" @click="toggleCollapse" style="cursor: pointer; margin-right: 0.25rem;">
-                    <i class="fa fa-caret-down" v-if="!collapsed && hasChildren"></i>
-                    <i class="fa fa-caret-right" v-if="collapsed && hasChildren"></i>
-                    <i class="fa fa-folder" style="margin-left: 0.25rem;"></i>
-                </span>
-                <label v-if="isRequest" style="display: flex; align-items: center; cursor: pointer; margin: 0;">
-                    <input type="checkbox" :checked="isChecked" @change="toggle">
-                    <span :class="'request-method--' + (item.method || 'GET')" style="margin-left: 0.5rem; margin-right: 0.5rem; font-size: 0.75rem;">
-                        {{ item.method || 'GET' }}
-                    </span>
-                    <span>{{ item.name }}</span>
-                </label>
-                <span v-if="isFolder" @click="toggleCollapse" style="margin-left: 0.5rem; cursor: pointer;">{{ item.name }}</span>
-            </div>
-            <div v-if="isFolder && !collapsed && hasChildren" style="margin-left: 1.5rem;">
-                <TreeItem v-for="child in item.children" :key="child._id" :item="child" :selected-ids="selectedIds" @toggle="$emit('toggle', $event)" />
-            </div>
-        </div>
-    `
-}
-
 export default {
-    components: { Modal, TreeItem },
+    components: { Modal, CollectionRunnerTreeItem },
     props: {
         showModal: Boolean,
         source: Object
