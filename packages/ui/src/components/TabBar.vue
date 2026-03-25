@@ -9,7 +9,8 @@
             :class="{ 'tab-active': activeTab && activeTab._id === tab._id }"
             v-for="tab in tabs"
             @click="setActiveTab(tab)"
-            @mousedown.middle.prevent="closeTab(tab)"
+            @mousedown.middle.prevent.stop
+            @mouseup.middle.prevent.stop="closeTab(tab)"
             :data-id="tab._id"
             draggable="true"
             @contextmenu.prevent="handleTabContextMenu($event, tab)"

@@ -119,3 +119,24 @@ Scenario('Test env var autocompletion', async() => {
     await checkAutocompleteInBetween('{{ca}}', '{{ca', 't', '{{cat}}')
     await checkAutocompleteInBetween('ca}}', 'ca', 't', '{{cat}}')
 })
+
+Scenario('Middle clicking a tab should not paste clipboard text into focused body', async ({ I }) => {
+    const bodyTab = '[data-testid="request-panel-tab-Body"]';
+
+    I.createRequest('Tab1');
+    I.click(bodyTab);
+
+    I.createGraphQLRequest('Tab2');
+    I.fillRequestBody
+
+    await I.fillRequestBody('Tab2 text');
+
+    I.click('.code-mirror-editor .cm-content');
+
+    await I.middleClickTab('Tab1');
+
+    I.dontSee('Tab1', '.tab');
+
+    const currentText = await I.getRequestBodyText();
+    I.expectEqual(currentText.trim() === 'Tab2 text', true);
+});

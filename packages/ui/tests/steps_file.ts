@@ -43,5 +43,28 @@ export = function() {
             this.fillField('.code-mirror-editor .cm-content', JSON.stringify(obj))
             this.click('Done')
         },
+
+        async middleClickTab(name: string) {
+            await this.usePlaywrightTo('middle click tab', async ({ page }) => {
+                await page.locator('.tab').filter({ hasText: name }).click({ button: 'middle' });
+            });
+        },
+
+        async fillRequestBody(text: string) {
+            this.click('.code-mirror-editor .cm-content')
+            this.pressKey(['CommandOrControl', 'A'])
+            this.pressKey('Backspace')
+            this.type(text)
+        },
+
+        async getRequestBodyText() {
+            return await this.grabTextFrom('.code-mirror-editor .cm-content')
+        },
+
+        async selectAllAndCopy() {
+            this.click('.code-mirror-editor .cm-content')
+            this.pressKey(['CommandOrControl', 'A'])
+            this.pressKey(['CommandOrControl', 'C'])
+        },
     })
 }
