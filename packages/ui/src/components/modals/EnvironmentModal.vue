@@ -20,18 +20,12 @@
                             @click="changeEnvironment(environment)" 
                             :ref="'environment-' + environment.name"
                             draggable="true"
-                            @mousedown="onMouseDown"
                             @dragstart="onDragStart(index, $event)"
                             @dragover.prevent
                             @dragenter.prevent
                             @drop="onDrop(index)"
                             @dragend="onDragEnd">
                             <div style="display: flex; align-items: center;">
-                                <div class="drag-handle" style="display: flex; align-items: center; margin-right: 0.3rem;" @mouseenter="dragEnabledIndex = index" @mouseleave="dragEnabledIndex = null">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" style="fill: var(--text-color);">
-                                        <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
-                                    </svg>
-                                </div>
                                 <i class="fa fa-circle" :style="{ color: environment.color, marginRight: '0.5rem' }"></i>{{ environment.name }}
                             </div>
                            
@@ -125,8 +119,7 @@ export default {
             editTagModalShow: false,
             editTagParsedFunc: null,
             editTagUpdateFunc: null,
-            draggedEnvironmentIndex: null,
-            isHandleClicked: false
+            draggedEnvironmentIndex: null
         }
     },
     computed: {
@@ -327,15 +320,7 @@ export default {
                 this.saveEnvironment()
             }
         },
-        onMouseDown(event) {
-            this.isHandleClicked = !!event.target.closest('.drag-handle')
-        },
         onDragStart(index, event) {
-            if (!this.isHandleClicked) {
-                event.preventDefault()
-                return
-            }
-
             this.draggedEnvironmentIndex = index
             if (event.dataTransfer) {
                 event.dataTransfer.effectAllowed = 'move'
@@ -654,24 +639,6 @@ export default {
 .environment-sidebar-item:not(.environment-sidebar-item-selected) > .environment-sidebar-item-menu:hover,
 .environment-sidebar-item:not(.environment-sidebar-item-selected) > .environment-sidebar-item-menu.environment-sidebar-item-menu-disable-hide {
     background-color: rgb(108 194 197 / 20%);
-}
-
-.environment-sidebar-item .drag-handle {
-    opacity: 0;
-    cursor: grab;
-    transition: opacity 0.1s ease-in-out;
-}
-
-.environment-sidebar-item:hover .drag-handle {
-    opacity: 0.5;
-}
-
-.environment-sidebar-item .drag-handle:hover {
-    opacity: 1;
-}
-
-.environment-sidebar-item .drag-handle:active {
-    cursor: grabbing;
 }
 
 .context-menu-background-overlay {
