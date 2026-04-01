@@ -14,21 +14,23 @@
                 <div class="env-sidebar-col">
                     <button class="button" type="button" style="margin-bottom: 0.5rem; margin-right: 0.5rem;" @click="addEnvironment()">Add Environment</button>
                     <div style="overflow-y: auto;" class="environment-sidebar">
-                        <div v-for="(environment, index) in environments" :key="environment.name" 
-                            class="environment-sidebar-item" 
-                            :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }" 
-                            @click="changeEnvironment(environment)" 
+                        <div
+                            v-for="(environment, index) in environments" :key="environment.name"
+                            class="environment-sidebar-item"
+                            :class="{ 'environment-sidebar-item-active': environment.name === currentEnvironment }"
+                            @click="changeEnvironment(environment)"
                             :ref="'environment-' + environment.name"
                             draggable="true"
                             @dragstart="onDragStart(index, $event)"
                             @dragover.prevent
                             @dragenter.prevent
                             @drop="onDrop(index)"
-                            @dragend="onDragEnd">
+                            @dragend="onDragEnd"
+                        >
                             <div style="display: flex; align-items: center;">
                                 <i class="fa fa-circle" :style="{ color: environment.color, marginRight: '0.5rem' }"></i>{{ environment.name }}
                             </div>
-                           
+
                             <div class="environment-sidebar-item-menu" :class="{ 'environment-sidebar-item-menu-disable-hide': environment.name === clickedContextMenuEnvironment.name && showEnvironmentContextMenuPopup === true }" @click.stop="showEnvironmentContextMenu($event, environment)">
                                 <svg viewBox="0 0 24 24" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
                                     <g>
