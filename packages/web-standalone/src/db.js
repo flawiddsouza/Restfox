@@ -267,8 +267,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         updatedFields.name = fileUtils.encodeFilename(updatedFields.name)
         const renameFrom = collectionPath
         let renameTo = path.join(path.dirname(collectionPath), updatedFields.name)
-        const extension = path.extname(renameFrom)
-        if (extension) { renameTo += extension }
+        if (renameFrom.endsWith('.json')) { renameTo += '.json' }
         if (renameFrom === renameTo) { return { error: null } }
         if(await fileUtils.pathExists(renameTo)) { return { error: `An item of the same name already exists in the destination folder. Please rename the item and try again.` } }
         await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`, null)

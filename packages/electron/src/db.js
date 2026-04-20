@@ -427,10 +427,8 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         const renameFrom = collectionPath
         let renameTo = path.join(path.dirname(collectionPath), updatedFields.name)
 
-        const extension = path.extname(renameFrom)
-
-        if (extension) {
-            renameTo += extension
+        if (renameFrom.endsWith('.json')) {
+            renameTo += '.json'
         }
 
         if (renameFrom === renameTo) {
