@@ -75,6 +75,12 @@
                         </div>
                     </div>
 
+                    <div style="padding-top: 1rem">
+                        <div style="margin-bottom: var(--label-margin-bottom);">Request Timeout (ms)</div>
+                        <input type="number" min="0" step="1000" v-model.number="requestTimeout" class="full-width-input" placeholder="0">
+                        <div style="margin-top: 0.3rem;">Abort a request if it does not complete within this many milliseconds. Set to <strong>0</strong> for no timeout (unlimited).</div>
+                    </div>
+
                     <template v-if="flags.isElectron || flags.isWebStandalone">
                         <div style="padding-top: 1rem">
                             <label style="display: flex;">
@@ -179,6 +185,7 @@ export default {
             disablePageViewAnalyticsTracking: false,
             disableSSLVerification: false,
             electronSwitchToChromiumFetch: false,
+            requestTimeout: 0,
             disableIframeSandbox: false,
             disableAutoUpdate: false,
             globalUserAgent: '',
@@ -222,6 +229,11 @@ export default {
         electronSwitchToChromiumFetch() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH, this.electronSwitchToChromiumFetch)
             this.$store.state.flags.electronSwitchToChromiumFetch = this.electronSwitchToChromiumFetch
+        },
+        requestTimeout() {
+            const value = Number.isFinite(this.requestTimeout) && this.requestTimeout > 0 ? Math.floor(this.requestTimeout) : 0
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT, value.toString())
+            this.$store.state.flags.requestTimeout = value
         },
         disableIframeSandbox() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX, this.disableIframeSandbox)
@@ -291,6 +303,10 @@ export default {
         resetElectronSwitchToChromiumFetch() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
         },
+        resetRequestTimeout() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT)
+            this.requestTimeout = 0
+        },
         resetDisableIframeSandbox() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
         },
@@ -333,6 +349,7 @@ export default {
             this.resetDisablePageViewAnalyticsTracking()
             this.resetDisableSSLVerification()
             this.resetElectronSwitchToChromiumFetch()
+            this.resetRequestTimeout()
             this.resetDisableIframeSandbox()
             this.resetDisableAutoUpdate()
             this.resetGlobalUserAgent()
@@ -350,6 +367,7 @@ export default {
             const savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
             const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
+            const savedRequestTimeout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT)
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
@@ -391,6 +409,13 @@ export default {
                 } catch (e) {
                     this.electronSwitchToChromiumFetch = false
                 }
+            }
+
+            if(savedRequestTimeout) {
+                const parsedRequestTimeout = Number(savedRequestTimeout)
+                this.requestTimeout = Number.isFinite(parsedRequestTimeout) && parsedRequestTimeout > 0 ? parsedRequestTimeout : 0
+            } else {
+                this.requestTimeout = 0
             }
 
             if(savedDisableIframeSandbox) {

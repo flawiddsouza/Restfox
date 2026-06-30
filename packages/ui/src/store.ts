@@ -352,6 +352,7 @@ export const store = createStore<State>({
                 isElectron: false,
                 disableSSLVerification: false,
                 electronSwitchToChromiumFetch: false,
+                requestTimeout: 0,
                 disableIframeSandbox: false,
                 disableAutoUpdate: false,
                 showTabs: true,

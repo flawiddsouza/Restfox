@@ -130,6 +130,7 @@ export interface Flags {
     disableSSLVerification: boolean
     electronSwitchToChromiumFetch: boolean
     hidePasswordFields: boolean
+    requestTimeout: number
 }
 
 export interface Settings {

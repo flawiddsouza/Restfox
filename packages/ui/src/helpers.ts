@@ -112,7 +112,7 @@ export function generateBasicAuthString(username: string, password: string) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
+async function fetchRequestInternal(url: URL, method: string, headers: Record<string, string>, body: any, signal: AbortSignal, flags: {
     electronSwitchToChromiumFetch: boolean,
     disableSSLVerification: boolean
 }): Promise<RequestInitialResponse> {
@@ -177,7 +177,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
             window.addEventListener('message',  messageHandler)
 
-            abortControllerSignal.onabort = () => {
+            signal.onabort = () => {
                 window.postMessage({
                     event: 'cancelRequest',
                     eventId,
@@ -203,7 +203,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
             method: 'POST',
             headers: proxyHeaders,
             body: method !== 'GET' ? body : undefined,
-            signal: abortControllerSignal
+            signal
         })
 
         const responseBody = await response.json()
@@ -252,7 +252,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         return new Promise((resolve, reject) => {
             const requestId = nanoid()
 
-            abortControllerSignal.onabort = () => {
+            signal.onabort = () => {
                 window.electronIPC.cancelRequest(requestId)
                 reject(new DOMException('The user aborted a request.', 'AbortError'))
             }
@@ -286,7 +286,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         method,
         headers,
         body: method !== 'GET' ? body : undefined,
-        signal: abortControllerSignal
+        signal
     })
 
     const headEndTime = new Date()
@@ -315,6 +315,51 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         timeTaken,
         headTimeTaken,
         bodyTimeTaken,
+    }
+}
+
+export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
+    electronSwitchToChromiumFetch: boolean,
+    disableSSLVerification: boolean,
+    requestTimeout?: number
+}): Promise<RequestInitialResponse> {
+    // A requestTimeout of 0 (or unset) means no timeout / unlimited.
+    const requestTimeout = flags.requestTimeout ?? 0
+    let timedOut = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let signal = abortControllerSignal
+
+    if(requestTimeout > 0) {
+        // Combine the caller's abort signal with a timeout so all request paths
+        // (extension, web-standalone proxy, electron IPC, browser fetch) abort uniformly.
+        const timeoutController = new AbortController()
+        const onCallerAbort = () => timeoutController.abort()
+
+        if(abortControllerSignal.aborted) {
+            timeoutController.abort()
+        } else {
+            abortControllerSignal.addEventListener('abort', onCallerAbort, { once: true })
+        }
+
+        timeoutId = setTimeout(() => {
+            timedOut = true
+            timeoutController.abort()
+        }, requestTimeout)
+
+        signal = timeoutController.signal
+    }
+
+    try {
+        return await fetchRequestInternal(url, method, headers, body, signal, flags)
+    } catch(e) {
+        if(timedOut) {
+            throw new Error(`Request timed out after ${requestTimeout} ms`)
+        }
+        throw e
+    } finally {
+        if(timeoutId !== undefined) {
+            clearTimeout(timeoutId)
+        }
     }
 }
 
@@ -505,7 +550,8 @@ export async function handleRequest(
     abortControllerSignal: AbortSignal,
     flags: {
         electronSwitchToChromiumFetch: boolean,
-        disableSSLVerification: boolean
+        disableSSLVerification: boolean,
+        requestTimeout?: number
     }
 ) {
     const state: HandleRequestState = {
