@@ -162,7 +162,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import { getVersion } from '@/helpers'
+import { getSavedRequestTimeout, getVersion } from '@/helpers'
 
 export default {
     props: {
@@ -367,7 +367,6 @@ export default {
             const savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
             const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
             const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
-            const savedRequestTimeout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT)
             const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
             const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
             const savedGlobalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
@@ -411,12 +410,7 @@ export default {
                 }
             }
 
-            if(savedRequestTimeout) {
-                const parsedRequestTimeout = Number(savedRequestTimeout)
-                this.requestTimeout = Number.isFinite(parsedRequestTimeout) && parsedRequestTimeout > 0 ? parsedRequestTimeout : 0
-            } else {
-                this.requestTimeout = 0
-            }
+            this.requestTimeout = getSavedRequestTimeout()
 
             if(savedDisableIframeSandbox) {
                 try {

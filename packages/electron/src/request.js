@@ -4,6 +4,7 @@ const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 
 let abortController = {}
+let cancelledRequestIds = new Set()
 
 async function checkReachability(host, port) {
     return new Promise((resolve) => {
@@ -93,7 +94,13 @@ async function handleSendRequest(data) {
         const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
         let { body } = data
 
-        abortController[requestId] = new AbortController()
+        const requestAbortController = new AbortController()
+        abortController[requestId] = requestAbortController
+
+        if(cancelledRequestIds.has(requestId)) {
+            requestAbortController.abort()
+            cancelledRequestIds.delete(requestId)
+        }
 
         if(bodyHint === 'FormData') {
             const formData = new FormData()
@@ -120,7 +127,7 @@ async function handleSendRequest(data) {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
-            signal: abortController[requestId].signal,
+            signal: requestAbortController.signal,
             dispatcher: getAgentForRequest(urlParsed, disableSSLVerification),
         })
 
@@ -163,6 +170,7 @@ async function handleSendRequest(data) {
         }
     } finally {
         delete abortController[data.requestId]
+        cancelledRequestIds.delete(data.requestId)
     }
 }
 
@@ -170,6 +178,8 @@ function cancelRequest(requestId) {
     if(abortController[requestId]) {
         abortController[requestId].abort()
         delete abortController[requestId]
+    } else {
+        cancelledRequestIds.add(requestId)
     }
 }
 

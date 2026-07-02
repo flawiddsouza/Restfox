@@ -112,210 +112,10 @@ export function generateBasicAuthString(username: string, password: string) {
     return 'Basic ' + window.btoa(unescape(encodeURIComponent(username)) + ':' + unescape(encodeURIComponent(password)))
 }
 
-async function fetchRequestInternal(url: URL, method: string, headers: Record<string, string>, body: any, signal: AbortSignal, flags: {
-    electronSwitchToChromiumFetch: boolean,
-    disableSSLVerification: boolean
-}): Promise<RequestInitialResponse> {
-    if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
-        let bodyHint: any = null
-
-        if(body instanceof FormData) {
-            bodyHint = 'FormData'
-            body = Array.from(body.entries())
-            let i = 0
-            for(const item of body) {
-                if(item[1] instanceof File) {
-                    body[i][1] = {
-                        name: item[1].name,
-                        type: item[1].type,
-                        buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
-                    }
-                }
-                i++
-            }
-        }
-
-        if(body instanceof File) {
-            bodyHint = 'File'
-            body = {
-                name: body.name,
-                type: body.type,
-                buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            const eventId = generateId()
-
-            window.postMessage({
-                event: 'sendRequest',
-                eventId,
-                eventData: {
-                    url: url.toString(),
-                    method,
-                    headers,
-                    body,
-                    bodyHint
-                }
-            })
-
-            const messageHandler = (message: any) => {
-                if (message.data.eventId !== undefined && message.data.eventId !== eventId) {
-                    return
-                }
-
-                if(message.data.event === 'response') {
-                    resolve(message.data.eventData)
-                    window.removeEventListener('message',  messageHandler)
-                }
-
-                if(message.data.event === 'responseError') {
-                    reject(message.data.eventData)
-                    window.removeEventListener('message',  messageHandler)
-                }
-            }
-
-            window.addEventListener('message',  messageHandler)
-
-            signal.onabort = () => {
-                window.postMessage({
-                    event: 'cancelRequest',
-                    eventId,
-                })
-                reject(new DOMException('The user aborted a request.', 'AbortError'))
-                window.removeEventListener('message',  messageHandler)
-            }
-        })
-    }
-
-    if(import.meta.env.MODE === 'web-standalone') {
-        const proxyHeaders: Record<string, string> = {
-            'x-proxy-flag-disable-ssl-verification': flags.disableSSLVerification.toString(),
-            'x-proxy-req-url': url.toString(),
-            'x-proxy-req-method': method
-        }
-
-        Object.keys(headers).forEach(header => {
-            proxyHeaders[`x-proxy-req-header-${header}`] = headers[header]
-        })
-
-        const response = await fetch('/proxy', {
-            method: 'POST',
-            headers: proxyHeaders,
-            body: method !== 'GET' ? body : undefined,
-            signal
-        })
-
-        const responseBody = await response.json()
-
-        return new Promise((resolve, reject) => {
-            if(responseBody.event === 'response') {
-                responseBody.eventData.buffer = new Uint8Array(responseBody.eventData.buffer).buffer
-                resolve(responseBody.eventData)
-            }
-
-            if(responseBody.event === 'responseError') {
-                responseBody.eventData = new Error(responseBody.eventData)
-                reject(responseBody.eventData)
-            }
-        })
-    }
-
-    if (import.meta.env.MODE === 'desktop-electron' && !flags.electronSwitchToChromiumFetch) {
-        let bodyHint: any = null
-
-        if(body instanceof FormData) {
-            bodyHint = 'FormData'
-            body = Array.from(body.entries())
-            let i = 0
-            for(const item of body) {
-                if(item[1] instanceof File) {
-                    body[i][1] = {
-                        name: item[1].name,
-                        type: item[1].type,
-                        buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
-                    }
-                }
-                i++
-            }
-        }
-
-        if(body instanceof File) {
-            bodyHint = 'File'
-            body = {
-                name: body.name,
-                type: body.type,
-                buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            const requestId = nanoid()
-
-            signal.onabort = () => {
-                window.electronIPC.cancelRequest(requestId)
-                reject(new DOMException('The user aborted a request.', 'AbortError'))
-            }
-
-            window.electronIPC.sendRequest({
-                requestId,
-                url: url.toString(),
-                method,
-                headers,
-                body,
-                bodyHint,
-                disableSSLVerification: flags.disableSSLVerification,
-            }).then((data: any) => {
-                if(data.event === 'response') {
-                    data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
-                    resolve(data.eventData)
-                }
-
-                if(data.event === 'responseError') {
-                    reject(new Error(data.eventData))
-                }
-            }).catch((error: any) => {
-                reject(error)
-            })
-        })
-    }
-
-    const startTime = new Date()
-
-    const response = await fetch(url, {
-        method,
-        headers,
-        body: method !== 'GET' ? body : undefined,
-        signal
-    })
-
-    const headEndTime = new Date()
-
-    const status = response.status
-    const statusText = response.statusText
-    const responseHeaders = [...response.headers.entries()]
-
-    const responseBlob = await response.blob()
-
-    const endTime = new Date()
-
-    const mimeType = responseBlob.type
-    const buffer = await responseBlob.arrayBuffer()
-
-    const timeTaken = Number(endTime) - Number(startTime)
-    const headTimeTaken = Number(headEndTime) - Number(startTime)
-    const bodyTimeTaken = Number(endTime) - Number(headEndTime)
-
-    return {
-        status,
-        statusText,
-        headers: responseHeaders,
-        mimeType,
-        buffer,
-        timeTaken,
-        headTimeTaken,
-        bodyTimeTaken,
-    }
+export function getSavedRequestTimeout() {
+    const savedRequestTimeout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT)
+    const requestTimeout = Number(savedRequestTimeout)
+    return Number.isFinite(requestTimeout) && requestTimeout > 0 ? Math.floor(requestTimeout) : 0
 }
 
 export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
@@ -323,17 +123,16 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     disableSSLVerification: boolean,
     requestTimeout?: number
 }): Promise<RequestInitialResponse> {
-    // A requestTimeout of 0 (or unset) means no timeout / unlimited.
-    const requestTimeout = flags.requestTimeout ?? 0
+    const requestTimeoutRaw = flags.requestTimeout ?? 0
+    const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
     let timedOut = false
     let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let onCallerAbort: (() => void) | undefined
     let signal = abortControllerSignal
 
     if(requestTimeout > 0) {
-        // Combine the caller's abort signal with a timeout so all request paths
-        // (extension, web-standalone proxy, electron IPC, browser fetch) abort uniformly.
         const timeoutController = new AbortController()
-        const onCallerAbort = () => timeoutController.abort()
+        onCallerAbort = () => timeoutController.abort()
 
         if(abortControllerSignal.aborted) {
             timeoutController.abort()
@@ -350,15 +149,228 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     }
 
     try {
-        return await fetchRequestInternal(url, method, headers, body, signal, flags)
+        if('__EXTENSION_HOOK__' in window && window.__EXTENSION_HOOK__ === 'Restfox CORS Helper Enabled') {
+            let bodyHint: any = null
+
+            if(body instanceof FormData) {
+                bodyHint = 'FormData'
+                body = Array.from(body.entries())
+                let i = 0
+                for(const item of body) {
+                    if(item[1] instanceof File) {
+                        body[i][1] = {
+                            name: item[1].name,
+                            type: item[1].type,
+                            buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
+                        }
+                    }
+                    i++
+                }
+            }
+
+            if(body instanceof File) {
+                bodyHint = 'File'
+                body = {
+                    name: body.name,
+                    type: body.type,
+                    buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
+                }
+            }
+
+            if(signal.aborted) {
+                throw new DOMException('The user aborted a request.', 'AbortError')
+            }
+
+            return await new Promise((resolve, reject) => {
+                const eventId = generateId()
+
+                window.postMessage({
+                    event: 'sendRequest',
+                    eventId,
+                    eventData: {
+                        url: url.toString(),
+                        method,
+                        headers,
+                        body,
+                        bodyHint
+                    }
+                })
+
+                const messageHandler = (message: any) => {
+                    if (message.data.eventId !== undefined && message.data.eventId !== eventId) {
+                        return
+                    }
+
+                    if(message.data.event === 'response') {
+                        resolve(message.data.eventData)
+                        window.removeEventListener('message',  messageHandler)
+                    }
+
+                    if(message.data.event === 'responseError') {
+                        reject(message.data.eventData)
+                        window.removeEventListener('message',  messageHandler)
+                    }
+                }
+
+                window.addEventListener('message',  messageHandler)
+
+                signal.onabort = () => {
+                    window.postMessage({
+                        event: 'cancelRequest',
+                        eventId,
+                    })
+                    reject(new DOMException('The user aborted a request.', 'AbortError'))
+                    window.removeEventListener('message',  messageHandler)
+                }
+            })
+        }
+
+        if(import.meta.env.MODE === 'web-standalone') {
+            const proxyHeaders: Record<string, string> = {
+                'x-proxy-flag-disable-ssl-verification': flags.disableSSLVerification.toString(),
+                'x-proxy-req-url': url.toString(),
+                'x-proxy-req-method': method,
+                'x-proxy-flag-timeout': requestTimeout.toString(),
+            }
+
+            Object.keys(headers).forEach(header => {
+                proxyHeaders[`x-proxy-req-header-${header}`] = headers[header]
+            })
+
+            const response = await fetch('/proxy', {
+                method: 'POST',
+                headers: proxyHeaders,
+                body: method !== 'GET' ? body : undefined,
+                signal
+            })
+
+            const responseBody = await response.json()
+
+            return await new Promise((resolve, reject) => {
+                if(responseBody.event === 'response') {
+                    responseBody.eventData.buffer = new Uint8Array(responseBody.eventData.buffer).buffer
+                    resolve(responseBody.eventData)
+                }
+
+                if(responseBody.event === 'responseError') {
+                    responseBody.eventData = new Error(responseBody.eventData)
+                    reject(responseBody.eventData)
+                }
+            })
+        }
+
+        if (import.meta.env.MODE === 'desktop-electron' && !flags.electronSwitchToChromiumFetch) {
+            let bodyHint: any = null
+
+            if(body instanceof FormData) {
+                bodyHint = 'FormData'
+                body = Array.from(body.entries())
+                let i = 0
+                for(const item of body) {
+                    if(item[1] instanceof File) {
+                        body[i][1] = {
+                            name: item[1].name,
+                            type: item[1].type,
+                            buffer: Array.from(new Uint8Array(await item[1].arrayBuffer()))
+                        }
+                    }
+                    i++
+                }
+            }
+
+            if(body instanceof File) {
+                bodyHint = 'File'
+                body = {
+                    name: body.name,
+                    type: body.type,
+                    buffer: Array.from(new Uint8Array(await body.arrayBuffer()))
+                }
+            }
+
+            if(signal.aborted) {
+                throw new DOMException('The user aborted a request.', 'AbortError')
+            }
+
+            return await new Promise((resolve, reject) => {
+                const requestId = nanoid()
+
+                signal.onabort = () => {
+                    window.electronIPC.cancelRequest(requestId)
+                    reject(new DOMException('The user aborted a request.', 'AbortError'))
+                }
+
+                window.electronIPC.sendRequest({
+                    requestId,
+                    url: url.toString(),
+                    method,
+                    headers,
+                    body,
+                    bodyHint,
+                    disableSSLVerification: flags.disableSSLVerification,
+                }).then((data: any) => {
+                    if(data.event === 'response') {
+                        data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
+                        resolve(data.eventData)
+                    }
+
+                    if(data.event === 'responseError') {
+                        reject(new Error(data.eventData))
+                    }
+                }).catch((error: any) => {
+                    reject(error)
+                })
+            })
+        }
+
+        const startTime = new Date()
+
+        const response = await fetch(url, {
+            method,
+            headers,
+            body: method !== 'GET' ? body : undefined,
+            signal
+        })
+
+        const headEndTime = new Date()
+
+        const status = response.status
+        const statusText = response.statusText
+        const responseHeaders = [...response.headers.entries()]
+
+        const responseBlob = await response.blob()
+
+        const endTime = new Date()
+
+        const mimeType = responseBlob.type
+        const buffer = await responseBlob.arrayBuffer()
+
+        const timeTaken = Number(endTime) - Number(startTime)
+        const headTimeTaken = Number(headEndTime) - Number(startTime)
+        const bodyTimeTaken = Number(endTime) - Number(headEndTime)
+
+        return {
+            status,
+            statusText,
+            headers: responseHeaders,
+            mimeType,
+            buffer,
+            timeTaken,
+            headTimeTaken,
+            bodyTimeTaken,
+        }
     } catch(e) {
         if(timedOut) {
-            throw new Error(`Request timed out after ${requestTimeout} ms`)
+            const error = new Error(`Request timed out after ${requestTimeout} ms`)
+            error.name = 'TimeoutError'
+            throw error
         }
         throw e
     } finally {
         if(timeoutId !== undefined) {
             clearTimeout(timeoutId)
+        }
+        if(onCallerAbort !== undefined) {
+            abortControllerSignal.removeEventListener('abort', onCallerAbort)
         }
     }
 }
@@ -670,6 +682,10 @@ export async function handleRequest(
         if(typeof e !== 'string')  {
             if(e.message.includes('Invalid URL')) {
                 error = 'Error: Invalid URL'
+            }
+
+            if(e.name === 'TimeoutError') {
+                error = 'Error: Request Timed Out'
             }
 
             if(e.name === 'AbortError') {

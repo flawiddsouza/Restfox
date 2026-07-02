@@ -94,7 +94,8 @@ import {
     convertOpenAPIExportToRestfoxCollection,
     generateNewIdsForTree,
     convertCurlCommandToRestfoxCollection,
-    fetchWrapper
+    fetchWrapper,
+    getSavedRequestTimeout
 } from '@/helpers'
 import { convertPostmanExportToRestfoxCollection } from '@/parsers/postman'
 import Modal from '@/components/Modal.vue'
@@ -250,6 +251,7 @@ export default {
             const flags = {
                 electronSwitchToChromiumFetch: false,
                 disableSSLVerification: savedDisableSSLVerification === 'true' ? true : false,
+                requestTimeout: getSavedRequestTimeout(),
             }
 
             const abortController = new AbortController()

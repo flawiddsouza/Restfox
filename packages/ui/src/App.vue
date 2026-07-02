@@ -19,6 +19,7 @@ import {
     applyTheme,
     debounce,
     initStoragePersistence,
+    getSavedRequestTimeout,
 } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
@@ -334,7 +335,6 @@ export default {
         let savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
         const savedDisableSSLVerification = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
         const savedElectronSwitchToChromiumFetch = localStorage.getItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
-        const savedRequestTimeout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT)
         const savedDisableIframeSandbox = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_IFRAME_SANDBOX)
         const savedDisableAutoUpdate = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_AUTO_UPDATE)
         const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
@@ -391,10 +391,7 @@ export default {
             }
         }
 
-        if(savedRequestTimeout) {
-            const parsedRequestTimeout = Number(savedRequestTimeout)
-            this.$store.state.flags.requestTimeout = Number.isFinite(parsedRequestTimeout) && parsedRequestTimeout > 0 ? parsedRequestTimeout : 0
-        }
+        this.$store.state.flags.requestTimeout = getSavedRequestTimeout()
 
         if(savedDisableIframeSandbox) {
             try {

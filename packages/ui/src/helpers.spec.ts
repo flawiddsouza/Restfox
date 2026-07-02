@@ -1,14 +1,51 @@
 // @vitest-environment edge-runtime
 
-import { assert, test, describe, expect } from 'vitest'
+import { assert, test, describe, expect, vi, afterEach, beforeEach } from 'vitest'
 import {
     substituteEnvironmentVariables,
     parseContentDispositionHeaderAndGetFileName,
     convertPostmanAuthToRestfoxAuth,
     scriptConversion,
     toTree,
-    getSpaces
+    getSpaces,
+    getSavedRequestTimeout,
+    fetchWrapper,
+    handleRequest
 } from './helpers'
+import type { CollectionItem } from './global'
+
+type FetchInitWithSignal = {
+    signal: AbortSignal
+}
+
+type WindowWithExtensionHook = Window & {
+    __EXTENSION_HOOK__?: string
+}
+
+beforeEach(() => {
+    const store: Record<string, string> = {}
+    vi.stubGlobal('localStorage', {
+        getItem: vi.fn((key: string) => store[key] ?? null),
+        setItem: vi.fn((key: string, value: string) => {
+            store[key] = value
+        }),
+        removeItem: vi.fn((key: string) => {
+            delete store[key]
+        }),
+        clear: vi.fn(() => {
+            Object.keys(store).forEach(key => {
+                delete store[key]
+            })
+        }),
+    })
+})
+
+afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+    delete (window as WindowWithExtensionHook).__EXTENSION_HOOK__
+    localStorage.clear()
+})
 
 describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
@@ -313,6 +350,154 @@ describe(`Function: ${parseContentDispositionHeaderAndGetFileName.name}`, () => 
         const input = `attachment; filename=annacerrato_vbb_ritratti-02056.jpg; filename*=UTF-8''annacerrato_vbb_ritratti-02056.jpg`
         const expectedOutput = 'annacerrato_vbb_ritratti-02056.jpg'
         assert.equal(parseContentDispositionHeaderAndGetFileName(input, 'fallbackFileName'), expectedOutput)
+    })
+})
+
+describe('Function: getSavedRequestTimeout', () => {
+    test('returns saved positive timeout as an integer', () => {
+        localStorage.setItem('Restfox-RequestTimeout', '1500.9')
+
+        expect(getSavedRequestTimeout()).toBe(1500)
+    })
+
+    test('returns 0 for missing or invalid timeout values', () => {
+        expect(getSavedRequestTimeout()).toBe(0)
+
+        localStorage.setItem('Restfox-RequestTimeout', '-1')
+        expect(getSavedRequestTimeout()).toBe(0)
+
+        localStorage.setItem('Restfox-RequestTimeout', 'abc')
+        expect(getSavedRequestTimeout()).toBe(0)
+    })
+})
+
+describe(`Function: ${fetchWrapper.name}`, () => {
+    test('throws TimeoutError when requestTimeout elapses before response', async() => {
+        vi.useFakeTimers()
+        vi.stubGlobal('fetch', (_url: string, init: FetchInitWithSignal) => new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+        }))
+
+        const abortController = new AbortController()
+        const promise = fetchWrapper(
+            new URL('https://example.com'),
+            'GET',
+            {},
+            null,
+            abortController.signal,
+            {
+                electronSwitchToChromiumFetch: false,
+                disableSSLVerification: false,
+                requestTimeout: 10,
+            }
+        )
+        const expectation = expect(promise).rejects.toMatchObject({ name: 'TimeoutError' })
+
+        await vi.advanceTimersByTimeAsync(10)
+
+        await expectation
+    })
+
+    test('propagates AbortError when user cancels before timeout', async() => {
+        vi.useFakeTimers()
+        vi.stubGlobal('fetch', (_url: string, init: FetchInitWithSignal) => new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+        }))
+
+        const abortController = new AbortController()
+        const promise = fetchWrapper(
+            new URL('https://example.com'),
+            'GET',
+            {},
+            null,
+            abortController.signal,
+            {
+                electronSwitchToChromiumFetch: false,
+                disableSSLVerification: false,
+                requestTimeout: 1000,
+            }
+        )
+        const expectation = expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+
+        abortController.abort()
+
+        await expectation
+    })
+
+    test('does not send extension request when file serialization finishes after timeout', async() => {
+        vi.useFakeTimers()
+        ;(window as WindowWithExtensionHook).__EXTENSION_HOOK__ = 'Restfox CORS Helper Enabled'
+
+        let resolveArrayBuffer: (value: ArrayBuffer) => void = () => {
+            throw new Error('arrayBuffer resolver was not set')
+        }
+        const body = new File(['body'], 'body.txt')
+        vi.spyOn(body, 'arrayBuffer').mockImplementation(() => new Promise<ArrayBuffer>(resolve => {
+            resolveArrayBuffer = resolve
+        }))
+        const postMessage = vi.spyOn(window, 'postMessage').mockImplementation(() => undefined)
+
+        const abortController = new AbortController()
+        fetchWrapper(
+            new URL('https://example.com'),
+            'POST',
+            {},
+            body,
+            abortController.signal,
+            {
+                electronSwitchToChromiumFetch: false,
+                disableSSLVerification: false,
+                requestTimeout: 10,
+            }
+        ).catch(() => undefined)
+
+        await vi.advanceTimersByTimeAsync(10)
+        resolveArrayBuffer(new ArrayBuffer(0))
+        await Promise.resolve()
+        await Promise.resolve()
+
+        expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+            event: 'sendRequest'
+        }))
+    })
+})
+
+describe(`Function: ${handleRequest.name}`, () => {
+    test('returns timeout error when requestTimeout elapses', async() => {
+        vi.useFakeTimers()
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.stubGlobal('fetch', (_url: string, init: FetchInitWithSignal) => new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+        }))
+
+        const abortController = new AbortController()
+        const promise = handleRequest(
+            {
+                _id: 'request-id',
+                _type: 'request',
+                name: 'Request',
+                parentId: null,
+                workspaceId: 'workspace-id',
+                url: 'https://example.com',
+                method: 'GET',
+            } as CollectionItem,
+            {},
+            {},
+            undefined,
+            async() => undefined,
+            [],
+            null,
+            abortController.signal,
+            {
+                electronSwitchToChromiumFetch: false,
+                disableSSLVerification: false,
+                requestTimeout: 10,
+            }
+        )
+
+        await vi.advanceTimersByTimeAsync(10)
+
+        await expect(promise).resolves.toMatchObject({ error: 'Error: Request Timed Out' })
     })
 })
 

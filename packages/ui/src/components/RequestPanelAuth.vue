@@ -426,7 +426,7 @@ import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem, Flags } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
-import { fetchWrapper, substituteEnvironmentVariables } from '@/helpers'
+import { fetchWrapper, getSavedRequestTimeout, substituteEnvironmentVariables } from '@/helpers'
 import { useToast } from 'vue-toast-notification'
 import { bufferToString } from '@/utils/response'
 
@@ -718,6 +718,7 @@ async function requestOAuthToken() {
             const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
                 electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
                 disableSSLVerification: props.flags.disableSSLVerification,
+                requestTimeout: getSavedRequestTimeout(),
             })
 
             if(response.status !== 200) {
@@ -768,6 +769,7 @@ async function refreshOAuthToken() {
                 const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
                     electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
                     disableSSLVerification: props.flags.disableSSLVerification,
+                    requestTimeout: getSavedRequestTimeout(),
                 })
 
                 if(response.status !== 200) {

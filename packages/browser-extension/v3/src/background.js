@@ -90,6 +90,7 @@ async function handleAction() {
 }
 
 let abortController = new Map()
+let cancelledRequestIds = new Set()
 
 async function handleSendRequest(message, sendResponse) {
     const { eventId } = message
@@ -98,7 +99,13 @@ async function handleSendRequest(message, sendResponse) {
         const { url, method, headers, bodyHint } = message.eventData
         let { body } = message.eventData
 
-        abortController.set(eventId, new AbortController())
+        const requestAbortController = new AbortController()
+        abortController.set(eventId, requestAbortController)
+
+        if(cancelledRequestIds.has(eventId)) {
+            requestAbortController.abort()
+            cancelledRequestIds.delete(eventId)
+        }
 
         if(bodyHint === 'FormData') {
             const formData = new FormData()
@@ -119,7 +126,7 @@ async function handleSendRequest(message, sendResponse) {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
-            signal: abortController.get(eventId).signal
+            signal: requestAbortController.signal
         })
 
         const headEndTime = new Date()
@@ -161,6 +168,9 @@ async function handleSendRequest(message, sendResponse) {
             eventId,
             eventData: e.message
         })
+    } finally {
+        abortController.delete(eventId)
+        cancelledRequestIds.delete(eventId)
     }
 }
 
@@ -170,7 +180,12 @@ function messageHandler(message, _sender, sendResponse) {
     }
 
     if(message.event === 'cancelRequest') {
-        abortController.get(message.eventId).abort()
+        const requestAbortController = abortController.get(message.eventId)
+        if(requestAbortController) {
+            requestAbortController.abort()
+        } else {
+            cancelledRequestIds.add(message.eventId)
+        }
     }
 
     if(message.event === 'ping') {

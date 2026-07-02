@@ -5,7 +5,7 @@ const QuickJS = await newQuickJSAsyncWASMModuleFromVariant(variant)
 import { Arena } from '@flawiddsouza/quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
-import { fetchWrapper, substituteEnvironmentVariables } from './helpers'
+import { fetchWrapper, getSavedRequestTimeout, substituteEnvironmentVariables } from './helpers'
 import { fileIPC } from './db'
 import {
     CollectionItem,
@@ -329,6 +329,7 @@ function addFetchSyncToVM(vm: QuickJSAsyncContext) {
         const flags = {
             electronSwitchToChromiumFetch: false,
             disableSSLVerification: savedDisableSSLVerification === 'true' ? true : false,
+            requestTimeout: getSavedRequestTimeout(),
         }
         const emptyHeaders: Record<string, string> = {}
         const response = await fetchWrapper(

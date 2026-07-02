@@ -1,6 +1,7 @@
 import express from 'express'
 import { fetch, Agent } from 'undici'
 import { Readable } from 'stream'
+import { pathToFileURL } from 'url'
 import * as db from './src/db.js'
 import * as helpers from './src/helpers.js'
 import TaskQueue from './src/task-queue.js'
@@ -52,6 +53,8 @@ app.post('/proxy', async(req, res) => {
     const disableSSLVerification = req.headers['x-proxy-flag-disable-ssl-verification'] === 'true'
     const url = req.headers['x-proxy-req-url']
     const method = req.headers['x-proxy-req-method']
+    const requestTimeoutRaw = Number(req.headers['x-proxy-flag-timeout'] ?? 0)
+    const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
     const headers = {}
 
     const agent = getAgentForRequest(new URL(url), disableSSLVerification)
@@ -69,9 +72,27 @@ app.post('/proxy', async(req, res) => {
         headers['content-type'] = req.headers['content-type']
     }
 
-    // Stream the request body directly to the target — no in-memory buffering.
+    // Stream the request body directly to the target. No in-memory buffering.
     // This allows large file uploads without loading the file into RAM.
     const body = method !== 'GET' ? Readable.toWeb(req) : undefined
+    const abortController = new AbortController()
+    const abortUpstreamRequest = () => abortController.abort()
+    let timedOut = false
+    let timeoutId
+
+    req.on('aborted', abortUpstreamRequest)
+    res.on('close', () => {
+        if(!res.writableEnded) {
+            abortUpstreamRequest()
+        }
+    })
+
+    if(requestTimeout > 0) {
+        timeoutId = setTimeout(() => {
+            timedOut = true
+            abortUpstreamRequest()
+        }, requestTimeout)
+    }
 
     try {
         const startTime = new Date()
@@ -82,6 +103,7 @@ app.post('/proxy', async(req, res) => {
             headers,
             body,
             duplex: 'half',
+            signal: abortController.signal,
         })
 
         const headEndTime = new Date()
@@ -112,16 +134,26 @@ app.post('/proxy', async(req, res) => {
             bodyTimeTaken,
         }
 
-        res.send({
-            event: 'response',
-            eventData: responseToSend
-        })
+        if(!res.writableEnded && !res.destroyed) {
+            res.send({
+                event: 'response',
+                eventData: responseToSend
+            })
+        }
     } catch(e) {
-        console.error('proxy error:', e)
-        res.send({
-            event: 'responseError',
-            eventData: e.message
-        })
+        if(!abortController.signal.aborted) {
+            console.error('proxy error:', e)
+        }
+        if(!res.writableEnded && !res.destroyed) {
+            res.send({
+                event: 'responseError',
+                eventData: timedOut ? `Request timed out after ${requestTimeout} ms` : e.message
+            })
+        }
+    } finally {
+        if(timeoutId !== undefined) {
+            clearTimeout(timeoutId)
+        }
     }
 })
 
@@ -169,6 +201,10 @@ app.get('/api/browse', async (req, res) => {
     }
 })
 
-app.listen(port, () => {
-    console.log(`Restfox running on port http://localhost:${port}`)
-})
+if(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    app.listen(port, () => {
+        console.log(`Restfox running on port http://localhost:${port}`)
+    })
+}
+
+export default app
