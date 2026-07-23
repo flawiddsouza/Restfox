@@ -1160,6 +1160,65 @@ export const store = createStore<State>({
         async loadGlobalPlugins(context) {
             context.state.plugins.global = await getGlobalPlugins()
         },
+        async saveRequestScript(context, { collectionId, code }: {
+            collectionId: string,
+            code: { pre_request: string, post_request: string }
+        }) {
+            if(context.state.activeWorkspace === null) {
+                throw new Error('activeWorkspace is null')
+            }
+
+            const workspaceId = context.state.activeWorkspace._id
+            const scriptPlugins = context.state.plugins.workspace.filter(plugin => {
+                return plugin.collectionId === collectionId && plugin.type === 'script'
+            })
+            const [scriptPlugin, ...duplicateScriptPlugins] = scriptPlugins
+
+            if(duplicateScriptPlugins.length > 0) {
+                const duplicateIds = new Set(duplicateScriptPlugins.map(plugin => plugin._id))
+                context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => !duplicateIds.has(plugin._id))
+            }
+
+            const scriptCode = {
+                pre_request: code.pre_request,
+                post_request: code.post_request,
+            }
+            const updatedAt = new Date().getTime()
+
+            if(scriptPlugin) {
+                scriptPlugin.name = null
+                scriptPlugin.code = scriptCode
+                scriptPlugin.updatedAt = updatedAt
+
+                await updatePlugin(scriptPlugin._id, {
+                    name: null,
+                    code: scriptCode,
+                    workspaceId: scriptPlugin.workspaceId,
+                    updatedAt,
+                }, workspaceId, collectionId)
+            } else {
+                const newPlugin: Plugin = {
+                    _id: nanoid(),
+                    type: 'script',
+                    name: null,
+                    code: scriptCode,
+                    workspaceId: null,
+                    collectionId,
+                    enabled: true,
+                    createdAt: updatedAt,
+                    updatedAt,
+                }
+
+                // Reserve the script plugin before persistence so another edit cannot create a
+                // second plugin while the filesystem write is still in progress.
+                context.state.plugins.workspace.push(newPlugin)
+                await createPlugin(newPlugin, workspaceId)
+            }
+
+            for(const duplicatePlugin of duplicateScriptPlugins) {
+                await deletePlugin(duplicatePlugin._id, workspaceId, collectionId)
+            }
+        },
         async getEnvironmentForRequest(context, { collectionItem, includeSelf = false }): Promise<{
             environment: any,
             parentHeaders: Record<string, string[]>,
