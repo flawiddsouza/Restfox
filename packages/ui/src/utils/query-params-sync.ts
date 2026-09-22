@@ -11,10 +11,9 @@ function newTextToNewJsonQueryParams(newText: string) {
     return newJson
 }
 
-function newTextToNewJsonPathParams(newText: string, pathParameters: RequestParam[]) {
-    const activeTabPathParameters = pathParameters.filter(param => !param.disabled)
-
-    const urlPathParametersSplit = (newText ?? '').split('/')
+// the path parameter names in the url, in order, each once
+function pathParameterNamesInUrl(newText: string): string[] {
+    const names = (newText ?? '').split('/')
         .map(part => {
             let paramType = 'default'
             const param = splitAtFirstMatch(part, ':')
@@ -37,14 +36,72 @@ function newTextToNewJsonPathParams(newText: string, pathParameters: RequestPara
                 return
             }
 
-            return {
-                name: param[1],
-                value: activeTabPathParameters.find(p => p.name === param[1])?.value ?? '',
-            }
+            return param[1]
         })
-        .filter(Boolean)
+        .filter((name): name is string => name !== undefined)
 
-    return urlPathParametersSplit
+    return [...new Set(names)]
+}
+
+function valueReferencesPathParameter(value: string, name: string) {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`:${escapedName}(?![\\w-])|\\{${escapedName}\\}`).test(value)
+}
+
+// a url edit never deletes a row: a row whose name is gone from the url is unchecked, a row whose name comes back is
+// checked again, rows referenced from the value of a checked row (`:lat` or `{lat}` inside the value of `:start`)
+// count as present so nested parameters survive, and alternate rows for one name are kept as they are (#287, #337)
+function syncPathParameters(pathParameters: RequestParam[], namesInUrl: string[]): RequestParam[] {
+    const parameters: RequestParam[] = JSON.parse(JSON.stringify(pathParameters))
+    const namedParameters = parameters.filter(param => param.name !== '')
+
+    const referencedNames = new Set(namesInUrl)
+    let previousSize = -1
+
+    while(referencedNames.size !== previousSize) {
+        previousSize = referencedNames.size
+
+        for(const name of referencedNames) {
+            const rows = namedParameters.filter(param => param.name === name)
+            if(rows.length > 0 && rows.every(param => param.disabled)) {
+                delete rows[0].disabled
+            }
+        }
+
+        for(const param of namedParameters) {
+            if(param.disabled || !referencedNames.has(param.name)) {
+                continue
+            }
+
+            for(const other of namedParameters) {
+                if(valueReferencesPathParameter(param.value, other.name)) {
+                    referencedNames.add(other.name)
+                }
+            }
+        }
+    }
+
+    for(const param of namedParameters) {
+        if(!referencedNames.has(param.name)) {
+            param.disabled = true
+        }
+    }
+
+    // a new name gets an empty row after the rows of the name before it in the url
+    namesInUrl.forEach((name, index) => {
+        if(namedParameters.some(param => param.name === name)) {
+            return
+        }
+
+        const previousName = namesInUrl[index - 1]
+        const insertAt = previousName === undefined ? 0 : parameters.map(param => param.name).lastIndexOf(previousName) + 1
+        const row = { name, value: '' }
+
+        parameters.splice(insertAt, 0, row)
+        namedParameters.push(row)
+    })
+
+    return parameters
 }
 
 function updateJsonWithNewText(sourceJson: any, newJson: any[]) {
@@ -108,13 +165,9 @@ export function onUrlChange(activeTab: CollectionItem) {
 
     const urlParamsSplit = splitAtFirstMatch(activeTab.url ?? '', '?')
     const newJsonQueryParams = newTextToNewJsonQueryParams(urlParamsSplit[1])
-    const newJsonPathParams = newTextToNewJsonPathParams(urlParamsSplit[0], activeTab.pathParameters)
 
     activeTab.parameters = updateJsonWithNewText(JSON.parse(JSON.stringify(activeTab.parameters)), newJsonQueryParams)
-    const newPathParameters = updateJsonWithNewText(JSON.parse(JSON.stringify(activeTab.pathParameters)), newJsonPathParams)
-    const newPathParametersNames = newPathParameters.map(param => param.name)
-    // remove duplicate path parameters before setting
-    activeTab.pathParameters = newPathParameters.filter((param, index) => newPathParametersNames.indexOf(param.name) === index)
+    activeTab.pathParameters = syncPathParameters(activeTab.pathParameters, pathParameterNamesInUrl(urlParamsSplit[0]))
 
     return true
 }

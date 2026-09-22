@@ -1,6 +1,6 @@
 // From: https://github.com/Kong/insomnia/blob/6bd54b5b70259de0f65663eaa33418df0b3d6ebc/packages/insomnia/src/utils/importers/importers/curl.ts
 
-import { ControlOperator, parse, ParseEntry } from 'shell-quote'
+import { parse, ParseEntry } from 'shell-quote'
 import { Converter, ImportRequest, Parameter, PostData } from './curl.types'
 import constants from '@/constants'
 import { convertCurlCmdToBash } from '@/utils/curl-cmd-to-bash'
@@ -452,9 +452,8 @@ export const convert: Converter = rawData => {
             continue
         }
 
-        const { op } = parseEntry as
-      | { op: 'glob'; pattern: string }
-      | { op: ControlOperator }
+        // a control operator, 'glob' or a $'...' literal that shell-quote passes through as an op
+        const { op } = parseEntry as { op: string }
 
         // `;` separates commands
         if (op === ';') {

@@ -2,7 +2,6 @@ import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import dayjs from 'dayjs'
 import getObjectPathValue from 'lodash.get'
-import setObjectPathValueLodash from 'lodash.set'
 import { toRaw } from 'vue'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
@@ -457,7 +456,13 @@ export async function createRequestData(
         }
     }
 
-    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, request.url!, { cacheId })
+    // the query text typed into the url is mirrored in the Query table, so the url is sent without it and the table rows
+    // are added back below; a query string that an environment variable resolves to only exists after substitution,
+    // so it is kept and the table rows go after it
+    const requestUrl = request.url!
+    const requestUrlWithoutQuery = request.parameters ? requestUrl.split('?')[0] : requestUrl
+
+    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, requestUrlWithoutQuery, { cacheId })
 
     if(request.pathParameters) {
         for (const pathParameter of request.pathParameters.filter(item => !item.disabled)) {
@@ -472,17 +477,23 @@ export async function createRequestData(
 
     const url = new URL(urlWithEnvironmentVariablesSubstituted)
 
-    if('parameters' in request && request.parameters) {
-        url.search = ''
+    if(request.parameters) {
+        const enabledParams = request.parameters.filter(item => !item.disabled)
+        const queryParams = new URLSearchParams()
 
-        for (const param of request.parameters.filter(item => !item.disabled)) {
+        for (const param of enabledParams) {
             const paramName = await substituteEnvironmentVariables(environment, param.name, { cacheId })
             const paramValue = await substituteEnvironmentVariables(environment, param.value, { cacheId })
 
-            url.searchParams.append(
+            queryParams.append(
                 paramName,
                 decodeURIComponent(paramValue)
             )
+        }
+
+        // appended as text instead of through url.searchParams, which would re-encode the query the variable resolved to
+        if(enabledParams.length > 0) {
+            url.search = url.search + (url.search ? '&' : '?') + queryParams.toString()
         }
     }
 
@@ -583,6 +594,7 @@ export async function handleRequest(
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
+        const headersSent = response.requestHeadersSent ?? undefined
 
         // From: https://fetch.spec.whatwg.org/#forbidden-header-name
         const forbiddenHeaders = [
@@ -609,9 +621,12 @@ export async function handleRequest(
             'Via',
         ]
 
-        forbiddenHeaders.forEach(forbiddenHeader => {
-            delete headersToSave[forbiddenHeader.toLowerCase()]
-        })
+        // a browser fetch drops these, so they are removed only when the configured headers stand in for the sent ones
+        if(!headersSent) {
+            forbiddenHeaders.forEach(forbiddenHeader => {
+                delete headersToSave[forbiddenHeader.toLowerCase()]
+            })
+        }
 
         const originRequestBodyToSave = structuredClone(toRaw(request.body))
 
@@ -631,6 +646,7 @@ export async function handleRequest(
                 method: request.method!,
                 query: url.search,
                 headers: headersToSave,
+                headersSent,
                 body: request.method !== 'GET' && request.body && request.body.mimeType === 'multipart/form-data' === false ? body : null,
                 original: {
                     url: request.url,
@@ -797,9 +813,10 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
     return toTree(collection)
 }
 
-function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
+function importRestfoxV1(collections: CollectionItem[], workspaceId: string, workspacePlugins: Plugin[] = []) {
     const collection: CollectionItem[] = []
-    const plugins: Plugin[] = []
+    // scripts belong to the workspace they are imported into, whatever workspace they were exported from
+    const plugins: Plugin[] = workspacePlugins.map(plugin => ({ ...plugin, workspaceId, collectionId: null }))
 
     collections.forEach(item => {
         if(item._type === 'request_group') {
@@ -810,6 +827,9 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
                 environment: item.environment,
                 environments: item.environments,
                 currentEnvironment: item.currentEnvironment,
+                headers: item.headers,
+                authentication: item.authentication,
+                description: item.description,
                 parentId: item.parentId,
                 workspaceId,
                 sortOrder: item.sortOrder
@@ -840,7 +860,14 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
                         description: parameter.description,
                         disabled: parameter.disabled
                     })) : [],
+                    pathParameters: item.pathParameters ? item.pathParameters.map(parameter => ({
+                        name: parameter.name,
+                        value: parameter.value,
+                        description: parameter.description,
+                        disabled: parameter.disabled
+                    })) : [],
                     authentication: item.authentication && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
+                    description: item.description,
                     parentId: item.parentId,
                     workspaceId,
                     sortOrder: item.sortOrder
@@ -849,7 +876,7 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
         }
 
         if(item.plugins) {
-            plugins.push(...item.plugins)
+            plugins.push(...item.plugins.map((plugin: Plugin) => ({ ...plugin, workspaceId })))
         }
     })
 
@@ -865,7 +892,7 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
 export function convertRestfoxExportToRestfoxCollection(json: any, workspaceId: string) {
     if('exportedFrom' in json) {
         if(json.exportedFrom === 'Restfox-1.0.0') {
-            return importRestfoxV1(json.collection, workspaceId)
+            return importRestfoxV1(json.collection, workspaceId, json.plugins ?? [])
         }
     }
 
@@ -1231,11 +1258,37 @@ export function getObjectPaths(object: object): string[] {
     return paths
 }
 
-export function exportRestfoxCollection(collection: CollectionItem[], environments = undefined) {
+// the items with their scripts attached for an export, ids regenerated when asked so the file paths a file workspace
+// uses as ids do not leak, with the scripts following their item through the regeneration
+export function prepareCollectionForExport(collectionItems: CollectionItem[], plugins: Plugin[], regenerateIds: boolean): CollectionItem[] {
+    let collection: CollectionItem[] = deepClone(collectionItems)
+
+    for(const item of collection) {
+        item.plugins = deepClone(plugins.filter(plugin => plugin.collectionId === item._id))
+    }
+
+    if(regenerateIds) {
+        const collectionTree = toTree(collection)
+        const oldIdNewIdMapping = generateNewIdsForTree(collectionTree)
+        collection = flattenTree(collectionTree)
+
+        for(const item of collection) {
+            for(const plugin of item.plugins) {
+                plugin.collectionId = oldIdNewIdMapping[plugin.collectionId]
+            }
+        }
+    }
+
+    return collection
+}
+
+// plugins are the workspace-level scripts, the scripts of an item travel on the item itself
+export function exportRestfoxCollection(collection: CollectionItem[], environments = undefined, plugins: Plugin[] | undefined = undefined) {
     downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
         exportedFrom: 'Restfox-1.0.0',
         collection,
         environments,
+        plugins,
     })
 }
 
@@ -1315,8 +1368,32 @@ export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent)
     return hotkeyMatched
 }
 
-export function setObjectPathValue(object: any, path: string, value: string) {
-    setObjectPathValueLodash(object, path, value)
+// accepts the same paths as the lodash.get used for reading ('a.b', 'a[0].b', 'a["b.c"]') and creates the
+// missing levels on the way, an array when the next key is an index, but never touches the prototype chain
+export function setObjectPathValue(object: any, path: string, value: any) {
+    const keys = (path.match(/[^.[\]]+|\[(?:"[^"]*"|'[^']*'|[^\]]*)\]/g) ?? ['']).map(key => {
+        return key.startsWith('[') ? key.slice(1, -1).replace(/^(["'])(.*)\1$/, '$2') : key
+    })
+
+    if(keys.some(key => key === '__proto__' || key === 'constructor' || key === 'prototype')) {
+        console.warn(`setObjectPathValue: refusing to set "${path}"`)
+        return
+    }
+
+    let current = object
+
+    keys.forEach((key, index) => {
+        if(index === keys.length - 1) {
+            current[key] = value
+            return
+        }
+
+        if(typeof current[key] !== 'object' || current[key] === null) {
+            current[key] = /^\d+$/.test(keys[index + 1]) ? [] : {}
+        }
+
+        current = current[key]
+    })
 }
 
 export function applyTheme(themeName: 'light' | 'dark' | 'dracula', doc: Document = document) {

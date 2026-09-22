@@ -381,6 +381,7 @@ test('Path Params Sync - In Between Substitution Test 2', () => {
     const expectedPathParameters = [
         { name: 'cat', value: '1' },
         { name: 'cat2:cat3', value: '' },
+        { name: 'cat3', value: '3', disabled: true },
     ]
 
     assert.deepEqual(activeTab.pathParameters, expectedPathParameters)
@@ -392,13 +393,14 @@ test('Path Params Sync - In Between Substitution Test 2', () => {
     const expectedPathParameters2 = [
         { name: 'cat', value: '1' },
         { name: 'cat2', value: '' },
-        { name: 'cat3', value: '' },
+        { name: 'cat2:cat3', value: '', disabled: true },
+        { name: 'cat3', value: '3' },
     ]
 
     assert.deepEqual(activeTab.pathParameters, expectedPathParameters2)
 })
 
-test('Path Params Sync - Duplicate removal test', () => {
+test('Path Params Sync - a name repeated in the url gets one row, existing rows for it are kept', () => {
     const activeTab: CollectionItem = {
         _id: 'test',
         _type: 'request',
@@ -419,6 +421,8 @@ test('Path Params Sync - Duplicate removal test', () => {
 
     const expectedPathParameters = [
         { name: 'cat', value: '1' },
+        { name: 'cat', value: '2' },
+        { name: 'cat', value: '3', disabled: true },
     ]
 
     assert.deepEqual(activeTab.pathParameters, expectedPathParameters)
@@ -429,6 +433,8 @@ test('Path Params Sync - Duplicate removal test', () => {
 
     const expectedPathParameters2 = [
         { name: 'cat', value: '1' },
+        { name: 'cat', value: '2' },
+        { name: 'cat', value: '3', disabled: true },
         { name: 'bat', value: '' },
     ]
 
@@ -551,4 +557,110 @@ test('Path Params Sync - response tag should not be treated as a path param', ()
     assert.equal(onUrlChange(activeTab), true)
 
     assert.deepEqual(activeTab.pathParameters, [])
+})
+
+function tabWithPath(url: string, pathParameters: CollectionItem['pathParameters']): CollectionItem {
+    return { _id: 'test', _type: 'request', parentId: 'test', workspaceId: 'test', name: 'test', url, pathParameters }
+}
+
+test('Path Params Sync - 287 - a row whose name leaves the url is unchecked, not deleted, and checked again when the name returns', () => {
+    const activeTab = tabWithPath('https://example.test/users', [{ name: 'id', value: '123' }])
+
+    activeTab.url = 'https://example.test/users/:'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [{ name: 'id', value: '123', disabled: true }])
+
+    activeTab.url = 'https://example.test/users/:id'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [{ name: 'id', value: '123' }])
+})
+
+test('Path Params Sync - 287 - alternate values for one name survive a url edit', () => {
+    const activeTab = tabWithPath('https://example.test/users/:id', [
+        { name: 'id', value: '1' },
+        { name: 'id', value: '2', disabled: true },
+    ])
+
+    activeTab.url = 'https://example.test/users/:id/posts'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'id', value: '1' },
+        { name: 'id', value: '2', disabled: true },
+    ])
+})
+
+test('Path Params Sync - 337 - rows referenced from the value of another row survive a url edit', () => {
+    const nested = [
+        { name: 'start', value: ':lat,:lon' },
+        { name: 'lat', value: '10.76' },
+        { name: 'lon', value: '106.68' },
+        { name: 'end', value: '{lat2},{lon2}' },
+        { name: 'lat2', value: '10.77' },
+        { name: 'lon2', value: '106.69' },
+    ]
+    const activeTab = tabWithPath('https://example.test/path/:start/:end', JSON.parse(JSON.stringify(nested)))
+
+    activeTab.url = 'https://example.test/path/:start/:end/2'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, nested)
+
+    activeTab.url = 'https://example.test/path/:start/2'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'start', value: ':lat,:lon' },
+        { name: 'lat', value: '10.76' },
+        { name: 'lon', value: '106.68' },
+        { name: 'end', value: '{lat2},{lon2}', disabled: true },
+        { name: 'lat2', value: '10.77', disabled: true },
+        { name: 'lon2', value: '106.69', disabled: true },
+    ])
+
+    activeTab.url = 'https://example.test/path/:start/:end/2'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, nested)
+})
+
+test('Path Params Sync - 337 - an unchecked row does not keep the rows its value references', () => {
+    const activeTab = tabWithPath('https://example.test/:start', [
+        { name: 'start', value: ':lat', disabled: true },
+        { name: 'lat', value: '10' },
+    ])
+
+    activeTab.url = 'https://example.test/x'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'start', value: ':lat', disabled: true },
+        { name: 'lat', value: '10', disabled: true },
+    ])
+})
+
+test('Path Params Sync - a new name is inserted after the rows of the name before it in the url', () => {
+    const activeTab = tabWithPath('https://example.test/:a/:b', [
+        { name: 'a', value: '1' },
+        { name: 'a', value: '2', disabled: true },
+        { name: 'b', value: '3' },
+    ])
+
+    activeTab.url = 'https://example.test/:a/:c/:b'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'a', value: '1' },
+        { name: 'a', value: '2', disabled: true },
+        { name: 'c', value: '' },
+        { name: 'b', value: '3' },
+    ])
+})
+
+test('Path Params Sync - a row without a name is left alone', () => {
+    const activeTab = tabWithPath('https://example.test/:a', [
+        { name: 'a', value: '1' },
+        { name: '', value: '' },
+    ])
+
+    activeTab.url = 'https://example.test/:a/b'
+    assert.equal(onUrlChange(activeTab), true)
+    assert.deepEqual(activeTab.pathParameters, [
+        { name: 'a', value: '1' },
+        { name: '', value: '' },
+    ])
 })

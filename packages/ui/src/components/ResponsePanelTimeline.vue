@@ -29,11 +29,26 @@ export default {
                 const preparationInfo = `* Preparing request to ${ uri }\n* Current time is ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
                 const uriInfo = uriParse(uri)
 
-                let requestInfo = `> ${response.request.method} ${uriInfo.search !== '' ? uriInfo.pathname + uriInfo.search : uriInfo.pathname}\n> Host: ${uriInfo.host}\n`
+                let requestInfo = ''
 
-                for (const [key, value] of Object.entries(response.request.headers)) {
-                    if (key && value) {
-                        requestInfo += `> ${key}: ${value}\n`
+                if(!response.request.headersSent) {
+                    requestInfo += '* Request headers below are as configured, headers the transport adds or drops are not shown\n'
+                }
+
+                requestInfo += `> ${response.request.method} ${uriInfo.search !== '' ? uriInfo.pathname + uriInfo.search : uriInfo.pathname}\n`
+
+                if(response.request.headersSent) {
+                    // the transport reported the headers it put on the wire, host and anything it added are in this list
+                    for (const [name, value] of response.request.headersSent) {
+                        requestInfo += `> ${name}: ${value}\n`
+                    }
+                } else {
+                    requestInfo += `> Host: ${uriInfo.host}\n`
+
+                    for (const [key, value] of Object.entries(response.request.headers)) {
+                        if (key && value) {
+                            requestInfo += `> ${key}: ${value}\n`
+                        }
                     }
                 }
 
@@ -42,11 +57,12 @@ export default {
                 }
 
                 let responseInfo = `< ${response.status} ${response.statusText === '' ? getStatusText(response.status) : response.statusText}\n`
-                responseInfo += `< Date: ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
 
-                for (const [key, value] of Object.entries(response.headers)) {
-                    if (key && value) {
-                        responseInfo += `< ${value.toString().split(',').join(': ')}\n`
+                // response.headers is an array of [name, value] pairs, listed as received
+                // no Date line is added here, the server's own Date header shows up if it sent one
+                for (const [name, value] of response.headers) {
+                    if (name && value) {
+                        responseInfo += `< ${name}: ${value}\n`
                     }
                 }
 

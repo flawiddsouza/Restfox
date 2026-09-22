@@ -359,6 +359,17 @@ export default {
             this.saveEnvironments()
         },
         saveEnvironments() {
+            // a fresh workspace / folder has no environments array yet (missing or undefined), so the computed builds a temporary one;
+            // attach it before saving, otherwise the in-memory item stays without environments until reload
+            // and a following import merges against an empty list and overwrites the saved default environment
+            if(this.collectionItem && !this.collectionItem.environments) {
+                this.collectionItem.environments = this.environments
+            }
+
+            if(this.workspace && !this.workspace.environments) {
+                this.workspace.environments = this.environments
+            }
+
             if(this.collectionItem) {
                 this.$store.commit('updateCollectionItemEnvironments', { collectionId: this.collectionItem._id, environments: this.environments })
             }

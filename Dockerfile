@@ -1,5 +1,5 @@
 # Stage 1: Build the UI and web-standalone
-FROM node:19.8.1-alpine3.17 AS build
+FROM node:26-alpine AS build
 RUN apk add --no-cache git
 RUN mkdir /app
 ADD .git /app/.git
@@ -14,7 +14,7 @@ WORKDIR /app/web-standalone
 RUN npm ci
 
 # Stage 2: Copy the necessary files from the build stage and remove unnecessary files
-FROM node:19.8.1-alpine3.17
+FROM node:26-alpine
 RUN mkdir -p /app/web-standalone/public
 WORKDIR /app/web-standalone
 VOLUME /app/data

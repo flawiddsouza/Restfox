@@ -10,9 +10,14 @@ import {
     getSpaces,
     getSavedRequestTimeout,
     fetchWrapper,
-    handleRequest
+    handleRequest,
+    createRequestData,
+    setObjectPathValue,
+    prepareCollectionForExport,
+    convertRestfoxExportToRestfoxCollection,
+    deepClone
 } from './helpers'
-import type { CollectionItem } from './global'
+import type { CollectionItem, HandleRequestState } from './global'
 
 type FetchInitWithSignal = {
     signal: AbortSignal
@@ -793,5 +798,124 @@ describe('getSpaces', () => {
 
     test('should return 10 spaces when passed string "10"', () => {
         expect(getSpaces('10')).toBe('          ') // 10 spaces
+    })
+})
+
+describe(`Function: ${createRequestData.name}`, () => {
+    const prepare = (url: string, parameters: CollectionItem['parameters'], environment: Record<string, string> = {}) => {
+        const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'Request', method: 'GET', url, parameters } as CollectionItem
+        const state: HandleRequestState = { currentPlugin: null, testResults: [] }
+        return createRequestData(state, request, environment, {}, undefined, null, [], null)
+    }
+
+    test('sends the url as typed when the request has no Query table', async() => {
+        const result = await prepare('https://example.test/path?foo=bar', undefined)
+        expect(result.url.href).toBe('https://example.test/path?foo=bar')
+    })
+
+    test('keeps the query string of a url that an environment variable resolves to', async() => {
+        const result = await prepare('{{UPLOAD_URL}}', [], { UPLOAD_URL: 'https://example.test/upload?token=abc&part=1' })
+        expect(result.url.href).toBe('https://example.test/upload?token=abc&part=1')
+    })
+
+    test('appends enabled Query table rows after the query string the variable resolved to', async() => {
+        const result = await prepare('{{UPLOAD_URL}}?extra=1', [{ name: 'extra', value: '1' }, { name: 'off', value: '2', disabled: true }], { UPLOAD_URL: 'https://example.test/upload?token=abc' })
+        expect(result.url.href).toBe('https://example.test/upload?token=abc&extra=1')
+    })
+
+    test('does not duplicate query parameters typed in the url and mirrored in the Query table', async() => {
+        const result = await prepare('https://example.test/path?foo=bar', [{ name: 'foo', value: 'bar' }])
+        expect(result.url.href).toBe('https://example.test/path?foo=bar')
+    })
+
+    test('leaves the encoding of a signed url from a variable untouched when appending Query table rows', async() => {
+        const result = await prepare('{{SIGNED_URL}}?part=1', [{ name: 'part', value: '1' }], { SIGNED_URL: 'https://example.test/f?sig=a%2Fb%3D&name=x+y' })
+        expect(result.url.href).toBe('https://example.test/f?sig=a%2Fb%3D&name=x+y&part=1')
+    })
+})
+
+describe(`Function: ${setObjectPathValue.name}`, () => {
+    test('creates the missing levels of a dot path', () => {
+        const object: any = { keep: 1 }
+        setObjectPathValue(object, 'auth.token', 'abc')
+        expect(object).toEqual({ keep: 1, auth: { token: 'abc' } })
+    })
+
+    test('creates an array when the next key is an index and keeps siblings', () => {
+        const object: any = { list: [{ id: 1 }] }
+        setObjectPathValue(object, 'list[1].id', 2)
+        setObjectPathValue(object, 'fresh[0]', 'x')
+        expect(object).toEqual({ list: [{ id: 1 }, { id: 2 }], fresh: ['x'] })
+    })
+
+    test('keeps a dot inside a quoted bracket key', () => {
+        const object: any = {}
+        setObjectPathValue(object, 'headers["content.type"]', 'json')
+        expect(object).toEqual({ headers: { 'content.type': 'json' } })
+    })
+
+    test('refuses paths that would pollute Object.prototype', () => {
+        vi.spyOn(console, 'warn').mockReturnValue(undefined)
+        setObjectPathValue({}, '__proto__.polluted', 'yes')
+        setObjectPathValue({}, 'constructor.prototype.polluted', 'yes')
+        expect(({} as any).polluted).toBeUndefined()
+        expect(console.warn).toHaveBeenCalledTimes(2)
+    })
+})
+
+describe('Restfox export and import', () => {
+    const folder: CollectionItem = { _id: 'f', _type: 'request_group', parentId: null, workspaceId: 'w', name: 'Folder', headers: [{ name: 'X-Test', value: 'yes' }], authentication: { type: 'bearer', token: 'synthetic' }, description: 'folder docs', sortOrder: 0 }
+    const request: CollectionItem = { _id: 'r', _type: 'request', parentId: 'f', workspaceId: 'w', name: 'Request', method: 'GET', url: 'https://example.test/:id', pathParameters: [{ name: 'id', value: '1' }], description: 'request docs', sortOrder: 0 }
+    const requestScript = { _id: 'p1', name: 'request script', type: 'script' as const, code: { pre_request: 'a', post_request: 'b' }, workspaceId: 'w', collectionId: 'r', enabled: true, createdAt: 1, updatedAt: 1 }
+    const workspaceScript = { _id: 'p2', name: 'workspace script', type: 'script' as const, code: { pre_request: 'c', post_request: 'd' }, workspaceId: 'w', collectionId: null, enabled: true, createdAt: 1, updatedAt: 1 }
+    const importInto = (collection: any[], plugins?: any[]) => convertRestfoxExportToRestfoxCollection({ exportedFrom: 'Restfox-1.0.0', collection, plugins }, 'w2')
+
+    test('a folder keeps its headers, authentication and description', () => {
+        const { newCollectionTree } = importInto([folder])
+        expect(newCollectionTree[0]).toMatchObject({ headers: folder.headers, authentication: folder.authentication, description: 'folder docs' })
+    })
+
+    test('a request keeps its path parameters and description', () => {
+        const { newCollectionTree } = importInto([{ ...request, parentId: null }])
+        expect(newCollectionTree[0]).toMatchObject({ pathParameters: request.pathParameters, description: 'request docs' })
+    })
+
+    test('imported scripts belong to the workspace they are imported into', () => {
+        const { newPlugins } = importInto([{ ...request, parentId: null, plugins: [requestScript] }], [workspaceScript])
+        expect(newPlugins).toEqual([
+            { ...workspaceScript, workspaceId: 'w2', collectionId: null },
+            { ...requestScript, workspaceId: 'w2' },
+        ])
+    })
+
+    test('scripts follow their item when ids are regenerated for a file workspace export', () => {
+        const storePlugins = [deepClone(requestScript), deepClone(workspaceScript)]
+        const collection = prepareCollectionForExport([folder, request], storePlugins, true)
+        const exportedRequest = collection.find(item => item._type === 'request')!
+
+        expect(exportedRequest._id).not.toBe('r')
+        expect(exportedRequest.parentId).toBe(collection[0]._id)
+        expect(exportedRequest.plugins).toEqual([{ ...requestScript, collectionId: exportedRequest._id }])
+        expect(collection[0].plugins).toEqual([])
+        expect(storePlugins[0].collectionId).toBe('r')
+    })
+
+    test('ids stay as they are when not asked to regenerate them', () => {
+        const collection = prepareCollectionForExport([folder, request], [requestScript], false)
+        expect(collection.map(item => item._id)).toEqual(['f', 'r'])
+        expect(collection[1].plugins).toEqual([requestScript])
+    })
+
+    test('a file workspace export round trips with fields and scripts intact', () => {
+        const exported = prepareCollectionForExport([folder, request], [requestScript, workspaceScript], true)
+        const { newCollectionTree, newPlugins } = importInto(exported, [workspaceScript])
+        const importedRequest = newCollectionTree[0].children![0]
+
+        expect(newCollectionTree[0]).toMatchObject({ headers: folder.headers, authentication: folder.authentication, description: 'folder docs' })
+        expect(importedRequest).toMatchObject({ pathParameters: request.pathParameters, description: 'request docs' })
+        expect(newPlugins.map(plugin => [plugin.name, plugin.collectionId, plugin.workspaceId])).toEqual([
+            ['workspace script', null, 'w2'],
+            ['request script', importedRequest._id, 'w2'],
+        ])
     })
 })
