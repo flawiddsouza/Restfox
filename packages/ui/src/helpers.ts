@@ -2,7 +2,6 @@ import { nanoid } from 'nanoid'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import dayjs from 'dayjs'
 import getObjectPathValue from 'lodash.get'
-import setObjectPathValueLodash from 'lodash.set'
 import { toRaw } from 'vue'
 import { HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
@@ -1332,8 +1331,32 @@ export function checkHotkeyAgainstKeyEvent(hotkey: string, event: KeyboardEvent)
     return hotkeyMatched
 }
 
-export function setObjectPathValue(object: any, path: string, value: string) {
-    setObjectPathValueLodash(object, path, value)
+// accepts the same paths as the lodash.get used for reading ('a.b', 'a[0].b', 'a["b.c"]') and creates the
+// missing levels on the way, an array when the next key is an index, but never touches the prototype chain
+export function setObjectPathValue(object: any, path: string, value: any) {
+    const keys = (path.match(/[^.[\]]+|\[(?:"[^"]*"|'[^']*'|[^\]]*)\]/g) ?? ['']).map(key => {
+        return key.startsWith('[') ? key.slice(1, -1).replace(/^(["'])(.*)\1$/, '$2') : key
+    })
+
+    if(keys.some(key => key === '__proto__' || key === 'constructor' || key === 'prototype')) {
+        console.warn(`setObjectPathValue: refusing to set "${path}"`)
+        return
+    }
+
+    let current = object
+
+    keys.forEach((key, index) => {
+        if(index === keys.length - 1) {
+            current[key] = value
+            return
+        }
+
+        if(typeof current[key] !== 'object' || current[key] === null) {
+            current[key] = /^\d+$/.test(keys[index + 1]) ? [] : {}
+        }
+
+        current = current[key]
+    })
 }
 
 export function applyTheme(themeName: 'light' | 'dark' | 'dracula', doc: Document = document) {

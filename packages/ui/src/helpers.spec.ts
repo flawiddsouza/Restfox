@@ -11,7 +11,8 @@ import {
     getSavedRequestTimeout,
     fetchWrapper,
     handleRequest,
-    createRequestData
+    createRequestData,
+    setObjectPathValue
 } from './helpers'
 import type { CollectionItem, HandleRequestState } from './global'
 
@@ -827,5 +828,34 @@ describe(`Function: ${createRequestData.name}`, () => {
     test('leaves the encoding of a signed url from a variable untouched when appending Query table rows', async() => {
         const result = await prepare('{{SIGNED_URL}}?part=1', [{ name: 'part', value: '1' }], { SIGNED_URL: 'https://example.test/f?sig=a%2Fb%3D&name=x+y' })
         expect(result.url.href).toBe('https://example.test/f?sig=a%2Fb%3D&name=x+y&part=1')
+    })
+})
+
+describe(`Function: ${setObjectPathValue.name}`, () => {
+    test('creates the missing levels of a dot path', () => {
+        const object: any = { keep: 1 }
+        setObjectPathValue(object, 'auth.token', 'abc')
+        expect(object).toEqual({ keep: 1, auth: { token: 'abc' } })
+    })
+
+    test('creates an array when the next key is an index and keeps siblings', () => {
+        const object: any = { list: [{ id: 1 }] }
+        setObjectPathValue(object, 'list[1].id', 2)
+        setObjectPathValue(object, 'fresh[0]', 'x')
+        expect(object).toEqual({ list: [{ id: 1 }, { id: 2 }], fresh: ['x'] })
+    })
+
+    test('keeps a dot inside a quoted bracket key', () => {
+        const object: any = {}
+        setObjectPathValue(object, 'headers["content.type"]', 'json')
+        expect(object).toEqual({ headers: { 'content.type': 'json' } })
+    })
+
+    test('refuses paths that would pollute Object.prototype', () => {
+        vi.spyOn(console, 'warn').mockReturnValue(undefined)
+        setObjectPathValue({}, '__proto__.polluted', 'yes')
+        setObjectPathValue({}, 'constructor.prototype.polluted', 'yes')
+        expect(({} as any).polluted).toBeUndefined()
+        expect(console.warn).toHaveBeenCalledTimes(2)
     })
 })
