@@ -5,6 +5,7 @@ import { pathToFileURL } from 'url'
 import * as db from './src/db.js'
 import * as helpers from './src/helpers.js'
 import TaskQueue from './src/task-queue.js'
+import { withSentHeadersCapture } from './src/sent-headers-capture.js'
 
 const app = express()
 
@@ -97,14 +98,14 @@ app.post('/proxy', async(req, res) => {
     try {
         const startTime = new Date()
 
-        const response = await fetch(url, {
+        const { result: response, headersSent } = await withSentHeadersCapture(() => fetch(url, {
             dispatcher: agent,
             method,
             headers,
             body,
             duplex: 'half',
             signal: abortController.signal,
-        })
+        }))
 
         const headEndTime = new Date()
 
@@ -132,6 +133,7 @@ app.post('/proxy', async(req, res) => {
             timeTaken,
             headTimeTaken,
             bodyTimeTaken,
+            requestHeadersSent: headersSent,
         }
 
         if(!res.writableEnded && !res.destroyed) {

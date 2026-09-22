@@ -2,6 +2,7 @@ const { File } = require('node:buffer')
 const { fetch, Agent, FormData } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
+const { withSentHeadersCapture } = require('./sent-headers-capture.js')
 
 let abortController = {}
 let cancelledRequestIds = new Set()
@@ -123,13 +124,13 @@ async function handleSendRequest(data) {
             disableSSLVerification
         })
 
-        const response = await fetch(url, {
+        const { result: response, headersSent } = await withSentHeadersCapture(() => fetch(url, {
             method,
             headers,
             body: method !== 'GET' ? body : undefined,
             signal: requestAbortController.signal,
             dispatcher: getAgentForRequest(urlParsed, disableSSLVerification),
-        })
+        }))
 
         const headEndTime = new Date()
 
@@ -157,6 +158,7 @@ async function handleSendRequest(data) {
             timeTaken,
             headTimeTaken,
             bodyTimeTaken,
+            requestHeadersSent: headersSent,
         }
         return {
             event: 'response',

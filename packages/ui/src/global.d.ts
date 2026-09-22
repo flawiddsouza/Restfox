@@ -95,6 +95,8 @@ export interface RequestInitialResponse {
     timeTaken: number
     headTimeTaken?: number
     bodyTimeTaken?: number
+    // request headers as they went over the wire, null or absent when the transport cannot report them
+    requestHeadersSent?: RequestInitialResponseHeader[] | null
 }
 
 export interface RequestFinalResponse {
@@ -113,6 +115,7 @@ export interface RequestFinalResponse {
       method: string
       query: string
       headers: Record<string, string>
+      headersSent?: RequestInitialResponseHeader[]
       body: any
       original: CollectionItem
     }

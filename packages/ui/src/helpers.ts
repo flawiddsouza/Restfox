@@ -583,6 +583,7 @@ export async function handleRequest(
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
+        const headersSent = response.requestHeadersSent ?? undefined
 
         // From: https://fetch.spec.whatwg.org/#forbidden-header-name
         const forbiddenHeaders = [
@@ -609,9 +610,12 @@ export async function handleRequest(
             'Via',
         ]
 
-        forbiddenHeaders.forEach(forbiddenHeader => {
-            delete headersToSave[forbiddenHeader.toLowerCase()]
-        })
+        // a browser fetch drops these, so they are removed only when the configured headers stand in for the sent ones
+        if(!headersSent) {
+            forbiddenHeaders.forEach(forbiddenHeader => {
+                delete headersToSave[forbiddenHeader.toLowerCase()]
+            })
+        }
 
         const originRequestBodyToSave = structuredClone(toRaw(request.body))
 
@@ -631,6 +635,7 @@ export async function handleRequest(
                 method: request.method!,
                 query: url.search,
                 headers: headersToSave,
+                headersSent,
                 body: request.method !== 'GET' && request.body && request.body.mimeType === 'multipart/form-data' === false ? body : null,
                 original: {
                     url: request.url,
