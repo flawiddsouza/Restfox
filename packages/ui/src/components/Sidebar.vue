@@ -63,7 +63,7 @@ import GenerateCodeModal from './modals/GenerateCodeModal.vue'
 import CollectionRunnerModal from './modals/CollectionRunnerModal.vue'
 import CollectionRunnerProgressModal from './modals/CollectionRunnerProgressModal.vue'
 import { mapState } from 'vuex'
-import { flattenTree, exportRestfoxCollection, generateNewIdsForTree, deepClone } from '@/helpers'
+import { flattenTree, exportRestfoxCollection, prepareCollectionForExport, deepClone } from '@/helpers'
 import { resolveSidebarDropTarget } from '@/utils/sidebar-drop'
 import { generateCode } from '@/utils/generate-code'
 import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
@@ -347,22 +347,15 @@ export default {
             }
 
             if(clickedSidebarItem === 'Export') {
-                let collectionItemToExport = deepClone(this.activeSidebarItemForContextMenu)
+                const collectionItemToExport = deepClone(this.activeSidebarItemForContextMenu)
                 collectionItemToExport.parentId = null
 
-                collectionItemToExport = [collectionItemToExport]
-
-                // if the workspace is a file workspace, we need to generate new ids for the collection
-                // as ids are just file paths in the case of file workspaces
-                // we don't want to leak the file paths in the exported collection
-                if (this.$store.state.activeWorkspace._type === 'file') {
-                    generateNewIdsForTree(collectionItemToExport)
-                }
-
-                const collection = flattenTree(collectionItemToExport)
-                for(const item of collection) {
-                    item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
-                }
+                // ids are file paths in a file workspace, they must not leak into the export
+                const collection = prepareCollectionForExport(
+                    flattenTree([collectionItemToExport]),
+                    this.$store.state.plugins.workspace,
+                    this.$store.state.activeWorkspace._type === 'file'
+                )
                 exportRestfoxCollection(collection)
             }
 

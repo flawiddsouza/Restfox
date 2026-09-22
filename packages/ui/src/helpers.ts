@@ -813,9 +813,10 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
     return toTree(collection)
 }
 
-function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
+function importRestfoxV1(collections: CollectionItem[], workspaceId: string, workspacePlugins: Plugin[] = []) {
     const collection: CollectionItem[] = []
-    const plugins: Plugin[] = []
+    // scripts belong to the workspace they are imported into, whatever workspace they were exported from
+    const plugins: Plugin[] = workspacePlugins.map(plugin => ({ ...plugin, workspaceId, collectionId: null }))
 
     collections.forEach(item => {
         if(item._type === 'request_group') {
@@ -826,6 +827,9 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
                 environment: item.environment,
                 environments: item.environments,
                 currentEnvironment: item.currentEnvironment,
+                headers: item.headers,
+                authentication: item.authentication,
+                description: item.description,
                 parentId: item.parentId,
                 workspaceId,
                 sortOrder: item.sortOrder
@@ -856,7 +860,14 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
                         description: parameter.description,
                         disabled: parameter.disabled
                     })) : [],
+                    pathParameters: item.pathParameters ? item.pathParameters.map(parameter => ({
+                        name: parameter.name,
+                        value: parameter.value,
+                        description: parameter.description,
+                        disabled: parameter.disabled
+                    })) : [],
                     authentication: item.authentication && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
+                    description: item.description,
                     parentId: item.parentId,
                     workspaceId,
                     sortOrder: item.sortOrder
@@ -865,7 +876,7 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
         }
 
         if(item.plugins) {
-            plugins.push(...item.plugins)
+            plugins.push(...item.plugins.map((plugin: Plugin) => ({ ...plugin, workspaceId })))
         }
     })
 
@@ -881,7 +892,7 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string) {
 export function convertRestfoxExportToRestfoxCollection(json: any, workspaceId: string) {
     if('exportedFrom' in json) {
         if(json.exportedFrom === 'Restfox-1.0.0') {
-            return importRestfoxV1(json.collection, workspaceId)
+            return importRestfoxV1(json.collection, workspaceId, json.plugins ?? [])
         }
     }
 
@@ -1247,11 +1258,37 @@ export function getObjectPaths(object: object): string[] {
     return paths
 }
 
-export function exportRestfoxCollection(collection: CollectionItem[], environments = undefined) {
+// the items with their scripts attached for an export, ids regenerated when asked so the file paths a file workspace
+// uses as ids do not leak, with the scripts following their item through the regeneration
+export function prepareCollectionForExport(collectionItems: CollectionItem[], plugins: Plugin[], regenerateIds: boolean): CollectionItem[] {
+    let collection: CollectionItem[] = deepClone(collectionItems)
+
+    for(const item of collection) {
+        item.plugins = deepClone(plugins.filter(plugin => plugin.collectionId === item._id))
+    }
+
+    if(regenerateIds) {
+        const collectionTree = toTree(collection)
+        const oldIdNewIdMapping = generateNewIdsForTree(collectionTree)
+        collection = flattenTree(collectionTree)
+
+        for(const item of collection) {
+            for(const plugin of item.plugins) {
+                plugin.collectionId = oldIdNewIdMapping[plugin.collectionId]
+            }
+        }
+    }
+
+    return collection
+}
+
+// plugins are the workspace-level scripts, the scripts of an item travel on the item itself
+export function exportRestfoxCollection(collection: CollectionItem[], environments = undefined, plugins: Plugin[] | undefined = undefined) {
     downloadObjectAsJSON(`Restfox_${todayISODate()}.json`, {
         exportedFrom: 'Restfox-1.0.0',
         collection,
         environments,
+        plugins,
     })
 }
 

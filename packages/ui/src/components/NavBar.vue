@@ -127,9 +127,7 @@ import LogsModal from './modals/LogsModal.vue'
 import {
     exportRestfoxCollection,
     applyTheme,
-    generateNewIdsForTree,
-    toTree,
-    flattenTree,
+    prepareCollectionForExport,
     convertCollectionsFromRestfoxToPostman,
     convertCollectionsFromRestfoxToInsomnia,
     exportCollection,
@@ -296,22 +294,18 @@ export default {
     },
     methods: {
         async exportCollection(value) {
-            let { collection } = await getCollectionForWorkspace(this.activeWorkspace._id)
-            for(const item of collection) {
-                item.plugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === item._id)
-            }
+            const { collection: workspaceCollectionItems } = await getCollectionForWorkspace(this.activeWorkspace._id)
 
-            // if the workspace is a file workspace, we need to generate new ids for the collection
-            // as ids are just file paths in the case of file workspaces
-            // we don't want to leak the file paths in the exported collection
-            if(this.activeWorkspace._type === 'file') {
-                const collectionTree = toTree(collection)
-                generateNewIdsForTree(collectionTree)
-                collection = flattenTree(collectionTree)
-            }
+            // ids are file paths in a file workspace, they must not leak into the export
+            const collection = prepareCollectionForExport(
+                workspaceCollectionItems,
+                this.$store.state.plugins.workspace,
+                this.activeWorkspace._type === 'file'
+            )
 
             if (value === 'Restfox') {
-                exportRestfoxCollection(collection, this.activeWorkspace.environments)
+                const workspacePlugins = this.$store.state.plugins.workspace.filter(plugin => plugin.collectionId === null)
+                exportRestfoxCollection(collection, this.activeWorkspace.environments, workspacePlugins)
             }
 
             if (value === 'Postman') {

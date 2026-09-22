@@ -12,7 +12,10 @@ import {
     fetchWrapper,
     handleRequest,
     createRequestData,
-    setObjectPathValue
+    setObjectPathValue,
+    prepareCollectionForExport,
+    convertRestfoxExportToRestfoxCollection,
+    deepClone
 } from './helpers'
 import type { CollectionItem, HandleRequestState } from './global'
 
@@ -857,5 +860,62 @@ describe(`Function: ${setObjectPathValue.name}`, () => {
         setObjectPathValue({}, 'constructor.prototype.polluted', 'yes')
         expect(({} as any).polluted).toBeUndefined()
         expect(console.warn).toHaveBeenCalledTimes(2)
+    })
+})
+
+describe('Restfox export and import', () => {
+    const folder: CollectionItem = { _id: 'f', _type: 'request_group', parentId: null, workspaceId: 'w', name: 'Folder', headers: [{ name: 'X-Test', value: 'yes' }], authentication: { type: 'bearer', token: 'synthetic' }, description: 'folder docs', sortOrder: 0 }
+    const request: CollectionItem = { _id: 'r', _type: 'request', parentId: 'f', workspaceId: 'w', name: 'Request', method: 'GET', url: 'https://example.test/:id', pathParameters: [{ name: 'id', value: '1' }], description: 'request docs', sortOrder: 0 }
+    const requestScript = { _id: 'p1', name: 'request script', type: 'script' as const, code: { pre_request: 'a', post_request: 'b' }, workspaceId: 'w', collectionId: 'r', enabled: true, createdAt: 1, updatedAt: 1 }
+    const workspaceScript = { _id: 'p2', name: 'workspace script', type: 'script' as const, code: { pre_request: 'c', post_request: 'd' }, workspaceId: 'w', collectionId: null, enabled: true, createdAt: 1, updatedAt: 1 }
+    const importInto = (collection: any[], plugins?: any[]) => convertRestfoxExportToRestfoxCollection({ exportedFrom: 'Restfox-1.0.0', collection, plugins }, 'w2')
+
+    test('a folder keeps its headers, authentication and description', () => {
+        const { newCollectionTree } = importInto([folder])
+        expect(newCollectionTree[0]).toMatchObject({ headers: folder.headers, authentication: folder.authentication, description: 'folder docs' })
+    })
+
+    test('a request keeps its path parameters and description', () => {
+        const { newCollectionTree } = importInto([{ ...request, parentId: null }])
+        expect(newCollectionTree[0]).toMatchObject({ pathParameters: request.pathParameters, description: 'request docs' })
+    })
+
+    test('imported scripts belong to the workspace they are imported into', () => {
+        const { newPlugins } = importInto([{ ...request, parentId: null, plugins: [requestScript] }], [workspaceScript])
+        expect(newPlugins).toEqual([
+            { ...workspaceScript, workspaceId: 'w2', collectionId: null },
+            { ...requestScript, workspaceId: 'w2' },
+        ])
+    })
+
+    test('scripts follow their item when ids are regenerated for a file workspace export', () => {
+        const storePlugins = [deepClone(requestScript), deepClone(workspaceScript)]
+        const collection = prepareCollectionForExport([folder, request], storePlugins, true)
+        const exportedRequest = collection.find(item => item._type === 'request')!
+
+        expect(exportedRequest._id).not.toBe('r')
+        expect(exportedRequest.parentId).toBe(collection[0]._id)
+        expect(exportedRequest.plugins).toEqual([{ ...requestScript, collectionId: exportedRequest._id }])
+        expect(collection[0].plugins).toEqual([])
+        expect(storePlugins[0].collectionId).toBe('r')
+    })
+
+    test('ids stay as they are when not asked to regenerate them', () => {
+        const collection = prepareCollectionForExport([folder, request], [requestScript], false)
+        expect(collection.map(item => item._id)).toEqual(['f', 'r'])
+        expect(collection[1].plugins).toEqual([requestScript])
+    })
+
+    test('a file workspace export round trips with fields and scripts intact', () => {
+        const exported = prepareCollectionForExport([folder, request], [requestScript, workspaceScript], true)
+        const { newCollectionTree, newPlugins } = importInto(exported, [workspaceScript])
+        const importedRequest = newCollectionTree[0].children![0]
+
+        expect(newCollectionTree[0]).toMatchObject({ headers: folder.headers, authentication: folder.authentication, description: 'folder docs' })
+        expect(importedRequest).toMatchObject({ pathParameters: request.pathParameters, description: 'request docs' })
+        expect(newPlugins.map(plugin => [plugin.name, plugin.collectionId, plugin.workspaceId])).toEqual([
+            ['workspace script', null, 'w2'],
+            ['request script', importedRequest._id, 'w2'],
+        ])
     })
 })
