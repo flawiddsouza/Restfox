@@ -10,9 +10,10 @@ import {
     getSpaces,
     getSavedRequestTimeout,
     fetchWrapper,
-    handleRequest
+    handleRequest,
+    createRequestData
 } from './helpers'
-import type { CollectionItem } from './global'
+import type { CollectionItem, HandleRequestState } from './global'
 
 type FetchInitWithSignal = {
     signal: AbortSignal
@@ -793,5 +794,38 @@ describe('getSpaces', () => {
 
     test('should return 10 spaces when passed string "10"', () => {
         expect(getSpaces('10')).toBe('          ') // 10 spaces
+    })
+})
+
+describe(`Function: ${createRequestData.name}`, () => {
+    const prepare = (url: string, parameters: CollectionItem['parameters'], environment: Record<string, string> = {}) => {
+        const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'Request', method: 'GET', url, parameters } as CollectionItem
+        const state: HandleRequestState = { currentPlugin: null, testResults: [] }
+        return createRequestData(state, request, environment, {}, undefined, null, [], null)
+    }
+
+    test('sends the url as typed when the request has no Query table', async() => {
+        const result = await prepare('https://example.test/path?foo=bar', undefined)
+        expect(result.url.href).toBe('https://example.test/path?foo=bar')
+    })
+
+    test('keeps the query string of a url that an environment variable resolves to', async() => {
+        const result = await prepare('{{UPLOAD_URL}}', [], { UPLOAD_URL: 'https://example.test/upload?token=abc&part=1' })
+        expect(result.url.href).toBe('https://example.test/upload?token=abc&part=1')
+    })
+
+    test('appends enabled Query table rows after the query string the variable resolved to', async() => {
+        const result = await prepare('{{UPLOAD_URL}}?extra=1', [{ name: 'extra', value: '1' }, { name: 'off', value: '2', disabled: true }], { UPLOAD_URL: 'https://example.test/upload?token=abc' })
+        expect(result.url.href).toBe('https://example.test/upload?token=abc&extra=1')
+    })
+
+    test('does not duplicate query parameters typed in the url and mirrored in the Query table', async() => {
+        const result = await prepare('https://example.test/path?foo=bar', [{ name: 'foo', value: 'bar' }])
+        expect(result.url.href).toBe('https://example.test/path?foo=bar')
+    })
+
+    test('leaves the encoding of a signed url from a variable untouched when appending Query table rows', async() => {
+        const result = await prepare('{{SIGNED_URL}}?part=1', [{ name: 'part', value: '1' }], { SIGNED_URL: 'https://example.test/f?sig=a%2Fb%3D&name=x+y' })
+        expect(result.url.href).toBe('https://example.test/f?sig=a%2Fb%3D&name=x+y&part=1')
     })
 })

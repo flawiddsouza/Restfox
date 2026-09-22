@@ -457,7 +457,13 @@ export async function createRequestData(
         }
     }
 
-    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, request.url!, { cacheId })
+    // the query text typed into the url is mirrored in the Query table, so the url is sent without it and the table rows
+    // are added back below; a query string that an environment variable resolves to only exists after substitution,
+    // so it is kept and the table rows go after it
+    const requestUrl = request.url!
+    const requestUrlWithoutQuery = request.parameters ? requestUrl.split('?')[0] : requestUrl
+
+    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, requestUrlWithoutQuery, { cacheId })
 
     if(request.pathParameters) {
         for (const pathParameter of request.pathParameters.filter(item => !item.disabled)) {
@@ -472,17 +478,23 @@ export async function createRequestData(
 
     const url = new URL(urlWithEnvironmentVariablesSubstituted)
 
-    if('parameters' in request && request.parameters) {
-        url.search = ''
+    if(request.parameters) {
+        const enabledParams = request.parameters.filter(item => !item.disabled)
+        const queryParams = new URLSearchParams()
 
-        for (const param of request.parameters.filter(item => !item.disabled)) {
+        for (const param of enabledParams) {
             const paramName = await substituteEnvironmentVariables(environment, param.name, { cacheId })
             const paramValue = await substituteEnvironmentVariables(environment, param.value, { cacheId })
 
-            url.searchParams.append(
+            queryParams.append(
                 paramName,
                 decodeURIComponent(paramValue)
             )
+        }
+
+        // appended as text instead of through url.searchParams, which would re-encode the query the variable resolved to
+        if(enabledParams.length > 0) {
+            url.search = url.search + (url.search ? '&' : '?') + queryParams.toString()
         }
     }
 
