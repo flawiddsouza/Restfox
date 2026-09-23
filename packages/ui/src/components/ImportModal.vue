@@ -33,7 +33,7 @@
                             type="file"
                             ref="fileInput"
                             @change="onFileSelect"
-                            accept=".json, .zip, .yml, .yaml"
+                            accept=".json, .zip, .yml, .yaml, .postman_collection, .postman_environment, .postman_globals, .postman_dump"
                             multiple
                             :disabled="importing"
                             class="hidden-file-input"
@@ -97,7 +97,7 @@ import {
     fetchWrapper,
     getSavedRequestTimeout
 } from '@/helpers'
-import { convertPostmanExportToRestfoxCollection } from '@/parsers/postman'
+import { convertPostmanExportToRestfoxCollection, isPostmanDataDump, isPostmanVariablesFile, mergePostmanGlobals } from '@/parsers/postman'
 import yaml from 'js-yaml'
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
@@ -225,10 +225,10 @@ export default {
             this.filesToImport.forEach(async(file) => {
                 let jsonContent
                 try {
-                    if (file.name.endsWith('.json')) {
-                        jsonContent = await fileToJSON(file)
-                    } else if (/\.ya?ml$/i.test(file.name)) {
+                    if (/\.ya?ml$/i.test(file.name)) {
                         jsonContent = yaml.load(await file.text())
+                    } else if (!file.name.endsWith('.zip')) { // older Postman exports end in .postman_collection and the like
+                        jsonContent = await fileToJSON(file)
                     }
                 } catch {
                     // a file that does not parse is reported by the import itself
@@ -246,6 +246,8 @@ export default {
 
         detectFileType(jsonContent) {
             if (jsonContent.info && jsonContent.info.schema && (jsonContent.info.schema === constants.POSTMAN_SCHEMA['v2.0'] || jsonContent.info.schema === constants.POSTMAN_SCHEMA['v2.1'])) {
+                return 'Postman'
+            } else if (isPostmanDataDump(jsonContent) || isPostmanVariablesFile(jsonContent)) {
                 return 'Postman'
             } else if (jsonContent.__export_format || jsonContent.resources || /^(collection|spec)\.insomnia\.rest\/5/.test(jsonContent.type)) {
                 return 'Insomnia'
@@ -283,6 +285,42 @@ export default {
             }
         },
 
+        // an environment with the name of an existing one is merged into it, the imported values winning. A workspace
+        // without a list of environments has only the Default one, which is kept
+        importEnvironments(environments) {
+            const existingEnvironments = this.activeWorkspace.environments ?? [
+                {
+                    name: constants.DEFAULT_ENVIRONMENT.name,
+                    environment: this.activeWorkspace.environment ?? {},
+                    color: constants.DEFAULT_ENVIRONMENT.color
+                }
+            ]
+
+            this.activeWorkspace.environments = mergeArraysByProperty(existingEnvironments, environments, 'name')
+            this.$store.commit('updateWorkspaceEnvironments', {
+                workspaceId: this.activeWorkspace._id,
+                environments: this.activeWorkspace.environments
+            })
+
+            let foundEnvironment = this.activeWorkspace.environments.find(environment => environment.name === (this.activeWorkspace.currentEnvironment ?? 'Default'))
+
+            if(!foundEnvironment) {
+                foundEnvironment = this.activeWorkspace.environments[0]
+
+                this.activeWorkspace.currentEnvironment = foundEnvironment.name
+                this.$store.commit('updateWorkspaceCurrentEnvironment',  {
+                    workspaceId: this.activeWorkspace._id,
+                    currentEnvironment: this.activeWorkspace.currentEnvironment
+                })
+            }
+
+            this.activeWorkspace.environment = foundEnvironment.environment
+            this.$store.commit('updateWorkspaceEnvironment', {
+                workspaceId: this.activeWorkspace._id,
+                environment: this.activeWorkspace.environment,
+            })
+        },
+
         async importFile() {
             this.importing = true
 
@@ -292,13 +330,18 @@ export default {
                 let json = null
                 let collectionTree = []
                 let plugins = []
+                // Postman globals from one file apply to the environments from another file of the same import
+                let postmanEnvironments = []
+                let postmanGlobals = null
 
                 if(this.importFrom === 'Postman URL') {
                     json = await this.fetchUrl(this.urlToImport, 'json')
 
-                    const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
+                    const { collection, plugins: newPlugins, environments, globals } = await convertPostmanExportToRestfoxCollection(json, false, this.activeWorkspace._id)
 
                     collectionTree = collection
+                    postmanEnvironments = environments
+                    postmanGlobals = globals
 
                     if(newPlugins.length > 0) {
                         plugins = plugins.concat(newPlugins)
@@ -317,9 +360,21 @@ export default {
                         }
 
                         if(this.importFrom === 'Postman') {
-                            const { collection, plugins: newPlugins } = await convertPostmanExportToRestfoxCollection(json, fileToImport.name.endsWith('.zip'), this.activeWorkspace._id)
+                            const isZip = fileToImport.name.endsWith('.zip')
+
+                            // older Postman exports end in .postman_collection and the like
+                            if(!isZip && json instanceof File) {
+                                json = await fileToJSON(fileToImport)
+                            }
+
+                            const { collection, plugins: newPlugins, environments, globals } = await convertPostmanExportToRestfoxCollection(json, isZip, this.activeWorkspace._id)
 
                             collectionTree = collectionTree.concat(collection)
+                            postmanEnvironments = postmanEnvironments.concat(environments)
+
+                            if(globals !== null) {
+                                postmanGlobals = { ...postmanGlobals, ...globals }
+                            }
 
                             if(newPlugins.length > 0) {
                                 plugins = plugins.concat(newPlugins)
@@ -334,29 +389,7 @@ export default {
                             collectionTree = collectionTree.concat(newCollectionTree)
 
                             if(json.environments) {
-                                this.activeWorkspace.environments = mergeArraysByProperty(this.activeWorkspace.environments ?? [], json.environments, 'name')
-                                this.$store.commit('updateWorkspaceEnvironments', {
-                                    workspaceId: this.activeWorkspace._id,
-                                    environments: this.activeWorkspace.environments
-                                })
-
-                                let foundEnvironment = this.activeWorkspace.environments.find(environment => environment.name === (this.activeWorkspace.currentEnvironment ?? 'Default'))
-
-                                if(!foundEnvironment) {
-                                    foundEnvironment = this.activeWorkspace.environments[0]
-
-                                    this.activeWorkspace.currentEnvironment = foundEnvironment.name
-                                    this.$store.commit('updateWorkspaceCurrentEnvironment',  {
-                                        workspaceId: this.activeWorkspace._id,
-                                        currentEnvironment: this.activeWorkspace.currentEnvironment
-                                    })
-                                }
-
-                                this.activeWorkspace.environment = foundEnvironment.environment
-                                this.$store.commit('updateWorkspaceEnvironment', {
-                                    workspaceId: this.activeWorkspace._id,
-                                    environment: this.activeWorkspace.environment,
-                                })
+                                this.importEnvironments(json.environments)
                             }
 
                             if(newPlugins.length > 0) {
@@ -369,6 +402,12 @@ export default {
                             collectionTree = collectionTree.concat(await convertOpenAPIExportToRestfoxCollection(exportAsString, this.activeWorkspace._id))
                         }
                     }
+                }
+
+                const postmanEnvironmentsWithGlobals = mergePostmanGlobals(postmanEnvironments, postmanGlobals)
+
+                if(postmanEnvironmentsWithGlobals.length > 0) {
+                    this.importEnvironments(postmanEnvironmentsWithGlobals)
                 }
 
                 if(this.selectedRequestGroupId) {
