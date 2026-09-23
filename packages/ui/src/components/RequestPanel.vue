@@ -779,7 +779,15 @@ export default {
                     this.skipScriptUpdate = false
                     return
                 }
-                this.handleScriptSave(this)
+                if(this.activeTab) {
+                    this.handleScriptSave(this, {
+                        collectionId: this.activeTab._id,
+                        code: {
+                            pre_request: this.script.pre_request,
+                            post_request: this.script.post_request,
+                        },
+                    })
+                }
             },
             deep: true
         },
@@ -963,28 +971,8 @@ export default {
         renderMarkdown(markdown) {
             return marked.parse(markdown)
         },
-        handleScriptSave: debounce((_this) => {
-            if(_this.scriptPlugin) {
-                _this.$store.commit('updatePlugin', {
-                    _id: _this.scriptPlugin._id,
-                    name: null,
-                    code: {
-                        pre_request: _this.script.pre_request,
-                        post_request: _this.script.post_request,
-                    },
-                })
-            } else {
-                _this.$store.commit('addPlugin', {
-                    name: null,
-                    code: {
-                        pre_request: _this.script.pre_request,
-                        post_request: _this.script.post_request,
-                    },
-                    workspaceId: null,
-                    collectionId: _this.activeTab._id,
-                    type: 'script',
-                })
-            }
+        handleScriptSave: debounce((_this, script) => {
+            _this.$store.dispatch('saveRequestScript', script)
             console.log('Script saved')
         }, 500),
         toggleMethodSelectorDropdown(event) {
