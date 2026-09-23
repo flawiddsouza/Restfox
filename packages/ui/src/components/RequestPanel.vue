@@ -237,7 +237,7 @@
                                 @click="showGraphQLDocs"
                             />
                         </div>
-                        <GraphQLSchemaFetcher :is-visible="showGraphQLDocumentation" :endpoint="urlPreview ?? ''" @close="toggleSidebar" :collection-item="activeTab" :collection-item-environment-resolved="collectionItemEnvironmentResolved" :schema-action="schemaAction" />
+                        <GraphQLSchemaFetcher ref="graphqlSchemaFetcher" :is-visible="showGraphQLDocumentation" @close="toggleSidebar" :collection-item="activeTab" />
                         <button class="button" @click="beautifyGraphQL" style="margin-left: 0.5rem">Beautify</button>
                     </div>
                 </div>
@@ -639,7 +639,6 @@ export default {
             requestBodyWidth: null,
             httpMethodModalShow: false,
             showGraphQLDocumentation: false,
-            schemaAction: null,
             generateCodeModalCollectionItem: null,
             generateCodeModalShow: false,
             intervalRequestSending: null,
@@ -867,7 +866,7 @@ export default {
             } catch {} // catch all json parsing errors and ignore them
         },
         showGraphQLDocs(value){
-            this.schemaAction = value
+            this.$refs.graphqlSchemaFetcher.fetchSchema()
             if (value === 'show-documentation') {
                 this.showGraphQLDocumentation = true
             }

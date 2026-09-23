@@ -592,6 +592,16 @@ export async function createRequestData(
     }
 }
 
+function setDefaultUserAgent(headers: Record<string, string>) {
+    const globalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
+
+    const userAgentHeaderName = findHeaderName(headers, 'user-agent')
+
+    if (userAgentHeaderName === undefined || !headers[userAgentHeaderName]) {
+        headers[userAgentHeaderName ?? 'user-agent'] = globalUserAgent || `Restfox/${getVersion()}`
+    }
+}
+
 export async function handleRequest(
     request: CollectionItem,
     environment: any,
@@ -615,13 +625,7 @@ export async function handleRequest(
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation)
 
-        const globalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
-
-        const userAgentHeaderName = findHeaderName(headers, 'user-agent')
-
-        if (userAgentHeaderName === undefined || !headers[userAgentHeaderName]) {
-            headers[userAgentHeaderName ?? 'user-agent'] = globalUserAgent || `Restfox/${getVersion()}`
-        }
+        setDefaultUserAgent(headers)
 
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
 
@@ -758,6 +762,58 @@ export async function handleRequest(
             error
         }
     }
+}
+
+const GRAPHQL_SCHEMA_QUERY = '{ __schema { types { name kind description fields { name type { name kind } } } } }'
+
+// asks the request's url for its schema with the request's query parameters, headers and auth, inherited ones
+// included, through the transport Send uses, so it reaches whatever the request itself reaches. Scripts do not run
+export async function fetchGraphQLSchema(
+    request: CollectionItem,
+    environment: any,
+    parentHeaders: Record<string, string[]>,
+    parentAuthentication: RequestAuthentication | undefined,
+    abortControllerSignal: AbortSignal,
+    flags: {
+        electronSwitchToChromiumFetch: boolean,
+        disableSSLVerification: boolean,
+        requestTimeout?: number
+    }
+) {
+    const state: HandleRequestState = {
+        currentPlugin: null,
+        testResults: [],
+    }
+
+    const { url, headers } = await createRequestData(state, { ...request, body: undefined }, environment, parentHeaders, parentAuthentication, null, [], null)
+
+    setDefaultUserAgent(headers)
+
+    if(findHeaderName(headers, 'content-type') === undefined) {
+        headers['Content-Type'] = 'application/json'
+    }
+
+    const response = await fetchWrapper(url, 'POST', headers, JSON.stringify({ query: GRAPHQL_SCHEMA_QUERY }), abortControllerSignal, flags)
+
+    let result: any = null
+
+    try {
+        result = JSON.parse(new TextDecoder().decode(response.buffer))
+    } catch {}
+
+    if(Array.isArray(result?.errors) && result.errors.length > 0) {
+        throw new Error(result.errors.map((error: any) => error.message).join('\n'))
+    }
+
+    if(response.status < 200 || response.status > 299) {
+        throw new Error(`${response.status} ${response.statusText}`.trim())
+    }
+
+    if(!Array.isArray(result?.data?.__schema?.types)) {
+        throw new Error('The response has no schema')
+    }
+
+    return result.data.__schema.types
 }
 
 function convertInsomniaAuthToRestfoxAuth(insomniaAuthentication: any): RequestAuthentication {

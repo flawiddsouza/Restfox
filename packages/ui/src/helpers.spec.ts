@@ -22,7 +22,8 @@ import {
     createOAuthTokenRequest,
     describeOAuthTokenError,
     getMissingOAuthTokenFieldsMessage,
-    getSocketConnectionUrl
+    getSocketConnectionUrl,
+    fetchGraphQLSchema
 } from './helpers'
 import type { CollectionItem, HandleRequestState, RequestFinalResponse } from './global'
 import { readFile } from 'node:fs/promises'
@@ -1076,6 +1077,63 @@ describe('Header name casing', () => {
             const { response } = await send({ headers: [{ name: 'Cookie', value: 'a=1' }, { name: 'X-Kept', value: 'k' }] })
             expect(Object.keys((response as RequestFinalResponse).request.headers)).toEqual(['X-Kept', 'user-agent'])
         })
+    })
+})
+
+describe(`Function: ${fetchGraphQLSchema.name}`, () => {
+    const request = (fields: Partial<CollectionItem>) => ({ _id: 'r', _type: 'request', workspaceId: 'w', parentId: 'f', name: 'Request', method: 'POST', url: 'https://example.test/graphql', body: { mimeType: 'application/graphql', text: '{"query":"{ hello }"}' }, ...fields }) as CollectionItem
+    const types = [{ name: 'Query', kind: 'OBJECT', description: null, fields: [{ name: 'hello', type: { name: 'String', kind: 'SCALAR' } }] }]
+    const flags = { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 }
+
+    const fetchSchema = async(fields: Partial<CollectionItem>, { environment = {}, parentHeaders = {}, parentAuthentication, response = new Response(JSON.stringify({ data: { __schema: { types } } })) }: { environment?: Record<string, any>, parentHeaders?: Record<string, string[]>, parentAuthentication?: CollectionItem['authentication'], response?: Response } = {}) => {
+        const sent: { url?: string, method?: string, headers?: Record<string, string>, body?: string } = {}
+        vi.stubGlobal('fetch', async(url: URL, init: { method: string, headers: Record<string, string>, body: string }) => {
+            Object.assign(sent, { url: url.toString(), method: init.method, headers: init.headers, body: init.body })
+            return response
+        })
+        const result = fetchGraphQLSchema(request(fields), environment, parentHeaders, parentAuthentication, new AbortController().signal, flags)
+        return { sent, result }
+    }
+
+    test('sends the request\'s query parameters, headers, global headers and auth', async() => {
+        const { sent, result } = await fetchSchema({ parameters: [{ name: 'tenant', value: '{{TENANT}}' }], headers: [{ name: 'X-Api-Key', value: 'key' }], authentication: { type: 'bearer', token: '{{TOKEN}}' } }, { environment: { TENANT: 'acme', TOKEN: 't', GLOBAL_HEADERS: { 'X-Global': 'g' } } })
+        expect(await result).toEqual(types)
+        expect(sent.url).toBe('https://example.test/graphql?tenant=acme')
+        expect(sent.method).toBe('POST')
+        expect(sent.headers).toMatchObject({ 'X-Global': 'g', 'X-Api-Key': 'key', Authorization: 'Bearer t', 'Content-Type': 'application/json' })
+        expect(JSON.parse(sent.body!).query).toContain('__schema')
+    })
+
+    test('sends the folder\'s headers and auth when the request inherits them', async() => {
+        const { sent, result } = await fetchSchema({ authentication: { type: INHERITED_AUTHENTICATION_TYPE } }, { parentHeaders: { 'X-Folder': ['f'] }, parentAuthentication: { type: 'basic', username: 'u', password: 'p' } })
+        await result
+        expect(sent.headers).toMatchObject({ 'X-Folder': 'f', Authorization: 'Basic dTpw' })
+    })
+
+    test('keeps a typed Content-Type', async() => {
+        const { sent, result } = await fetchSchema({ headers: [{ name: 'content-type', value: 'application/json; charset=utf-8' }] })
+        await result
+        expect(Object.entries(sent.headers!).filter(([name]) => name.toLowerCase() === 'content-type')).toEqual([['content-type', 'application/json; charset=utf-8']])
+    })
+
+    test('fails with the server\'s GraphQL errors', async() => {
+        const { result } = await fetchSchema({}, { response: new Response(JSON.stringify({ errors: [{ message: 'Not authorised' }] }), { status: 401 }) })
+        await expect(result).rejects.toThrow('Not authorised')
+    })
+
+    test('fails with the status when the response is not GraphQL', async() => {
+        const { result } = await fetchSchema({}, { response: new Response('Forbidden', { status: 403, statusText: 'Forbidden' }) })
+        await expect(result).rejects.toThrow('403 Forbidden')
+    })
+
+    test('fails with the bare status when the transport gives no status text', async() => {
+        const { result } = await fetchSchema({}, { response: new Response('', { status: 401 }) })
+        await expect(result).rejects.toThrow(/^401$/)
+    })
+
+    test('fails when a successful response has no schema', async() => {
+        const { result } = await fetchSchema({}, { response: new Response(JSON.stringify({ data: {} })) })
+        await expect(result).rejects.toThrow('The response has no schema')
     })
 })
 

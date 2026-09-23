@@ -36,7 +36,6 @@
         "dedent": "^1.5.1",
         "dexie": "^3.2.0",
         "format-graphql": "^1.5.0",
-        "graphql-request": "^7.1.0",
         "httpsnippet-browser": "github:flawiddsouza/httpsnippet-browser#ed12aba",
         "insomnia-importers-browser": "github:flawiddsouza/insomnia-importers-browser",
         "js-base64": "^3.7.7",

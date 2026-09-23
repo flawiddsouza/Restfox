@@ -77,9 +77,9 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from 'vue'
-import { gql, GraphQLClient } from 'graphql-request'
-import { resolveAuthentication } from '@/helpers'
+import { ref, computed, onBeforeUnmount } from 'vue'
+import { useStore } from 'vuex'
+import { fetchGraphQLSchema } from '@/helpers'
 
 export default {
     name: 'SchemaSlideOut',
@@ -88,24 +88,13 @@ export default {
             type: Boolean,
             required: true,
         },
-        endpoint: {
-            type: String,
-            required: true,
-        },
         collectionItem: {
             type: Object,
             required: true
         },
-        collectionItemEnvironmentResolved: {
-            type: Object,
-            required: true
-        },
-        schemaAction: {
-            type: [null, String],
-            required: true,
-        },
     },
     setup(props) {
+        const store = useStore()
         const schema = ref(null)
         const loading = ref(false)
         const error = ref(null)
@@ -129,61 +118,36 @@ export default {
             searchQuery.value = ''
         }
 
+        let abortController = null
+
+        // a fetch started while another is running replaces it
         const fetchSchema = async() => {
+            abortController?.abort()
+            const currentAbortController = new AbortController()
+            abortController = currentAbortController
+
             loading.value = true
+            error.value = null
             try {
-
-                let headers = []
-
-                if(props.collectionItem.authentication) {
-                    headers['Authorization'] = resolveAuthentication(props.collectionItem.authentication, props.collectionItemEnvironmentResolved)
-                }
-
-                const graphQLClient = new GraphQLClient(props.endpoint, {
-                    headers,
-                })
-
-
-                const query = gql`
-          {
-            __schema {
-              types {
-                name
-                kind
-                description
-                fields {
-                  name
-                  type {
-                    name
-                    kind
-                  }
-                }
-              }
-            }
-          }
-        `
-                const data = await graphQLClient.request(query)
-                schema.value = data.__schema.types
-                error.value = null
+                const { environment, parentHeaders, parentAuthentication } = await store.dispatch('getEnvironmentForRequest', { collectionItem: props.collectionItem })
+                schema.value = await fetchGraphQLSchema(props.collectionItem, environment, parentHeaders, parentAuthentication, currentAbortController.signal, store.state.flags)
             } catch (err) {
-                error.value = `Error fetching schema: ${err.message}`
+                if(currentAbortController.signal.aborted) {
+                    return
+                }
+                // Electron's transport fails with the error's stack, only its message lines are shown
+                const message = err.message.split('\n').filter(line => !line.trim().startsWith('at ')).join(' - ')
+                error.value = `Error fetching schema: ${message}`
             } finally {
-                loading.value = false
+                if(abortController === currentAbortController) {
+                    loading.value = false
+                }
             }
         }
 
-        onMounted(() => {
-            fetchSchema()
+        onBeforeUnmount(() => {
+            abortController?.abort()
         })
-
-        watch(
-            () => props.schemaAction,
-            (action) => {
-                if (action === 'refresh-schema') {
-                    fetchSchema()
-                }
-            }
-        )
 
         const filteredTypes = computed(() =>
             schema.value?.filter((type) =>
@@ -229,6 +193,7 @@ export default {
         }
 
         return {
+            fetchSchema,
             schema,
             loading,
             error,
