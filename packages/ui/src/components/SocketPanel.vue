@@ -63,12 +63,12 @@
                             />
                             <div class="ml-0_5rem">
                                 <button
-                                    @click="connect(client)"
+                                    @click="isRepeatClick($event) || connect(client)"
                                     v-if="!isClientConnected(client)"
                                 >
                                     Connect
                                 </button>
-                                <button @click="disconnect(client)" v-else>
+                                <button @click="isRepeatClick($event) || disconnect(client)" v-else>
                                     Disconnect
                                 </button>
                             </div>
@@ -255,13 +255,14 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeMount, reactive, computed, inject, ref } from 'vue'
+import { nextTick, onBeforeMount, reactive, computed, inject, ref, toRaw } from 'vue'
 import { useMobile } from '@/composables/useMobile'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
 import {
     formatTimestamp,
     generateId,
     getObjectPaths,
+    getSocketConnectionUrl,
     getAlertConfirmPromptContainer,
     setEnvironmentVariable,
     jsonStringify,
@@ -299,12 +300,17 @@ const disconnectTriggered: { [key: string]: boolean } = reactive({})
 
 const clientUrlsEnvSubstituted: { [key: string]: string } = reactive({})
 
+// the client type and url of each connection attempt still waiting for its first answer. Connect shows until a socket
+// is connected, so a second click for the same attempt, such as a double click, is ignored instead of opening a second socket
+const pendingConnections: { [key: string]: string } = {}
+
 // Computed
 const store = useStore()
 const activeWorkspace = computed(() => store.state.activeWorkspace)
 const activeTab = computed(() => props.activeTab)
 const collectionItemEnvironmentResolved = computed(() => store.state.tabEnvironmentResolved[activeTab.value._id])
 const sockets = store.state.sockets
+const flags = computed(() => store.state.flags)
 const $toast: { success: (message: string) => void, error: (message: string) => void } = inject('$toast')
 
 // Methods
@@ -350,10 +356,25 @@ function toggleClientVisibility(client: Client) {
         !client.visibility || client.visibility === 'shown' ? 'hidden' : 'shown'
 }
 
+// Connect and Disconnect share a spot, so the second click of a double click lands on whichever replaced the first and
+// would disconnect a socket that connected in between. The browser counts clicks at one spot in detail
+function isRepeatClick(event: MouseEvent) {
+    return event.detail > 1
+}
+
 async function connect(client: Client) {
     if (client.url === '') {
         return
     }
+
+    const socketKey = activeTab.value._id + '-' + client.id
+    const connectionTarget = `${client.type ?? 'WebSocket'} ${client.url}`
+
+    if (pendingConnections[socketKey] === connectionTarget) {
+        return
+    }
+
+    pendingConnections[socketKey] = connectionTarget
 
     let clientUrlWithEnvironmentVariablesSubtituted = client.url
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
@@ -367,11 +388,26 @@ async function connect(client: Client) {
 
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
 
+    // a socket Connect is still showing for has failed or is still trying, such as a Socket.IO v2 client that
+    // reconnects on its own, it would otherwise stay open next to the new one with no way to disconnect it
+    const previousSocket = sockets[socketKey]
+
+    if (previousSocket) {
+        previousSocket.close()
+        sockets[socketKey] = null
+    }
+
     try {
         if (client.type === undefined) {
-            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(clientUrlWithEnvironmentVariablesSubtituted)
+            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(getSocketConnectionUrl(clientUrlWithEnvironmentVariablesSubtituted, flags.value))
         } else if (client.type.startsWith('Socket.IO')) {
-            const parsedUrl = new URL(clientUrlWithEnvironmentVariablesSubtituted)
+            const targetUrl = new URL(clientUrlWithEnvironmentVariablesSubtituted)
+
+            if(targetUrl.pathname === '/') {
+                targetUrl.pathname = '/socket.io/'
+            }
+
+            const parsedUrl = new URL(getSocketConnectionUrl(targetUrl.href, flags.value))
 
             let mainUrl = parsedUrl.origin
 
@@ -381,26 +417,27 @@ async function connect(client: Client) {
 
             if (client.type === 'Socket.IO-v2') {
                 sockets[activeTab.value._id + '-' + client.id] = ioV2(mainUrl, {
-                    path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
+                    path: parsedUrl.pathname,
                 })
             }
 
             if (client.type === 'Socket.IO-v3') {
                 sockets[activeTab.value._id + '-' + client.id] = ioV3(mainUrl, {
-                    path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
+                    path: parsedUrl.pathname,
                     reconnection: false,
                 })
             }
 
             if (client.type === 'Socket.IO') {
                 sockets[activeTab.value._id + '-' + client.id] = ioV4(mainUrl, {
-                    path: parsedUrl.pathname === '/' ? '/socket.io/' : parsedUrl.pathname,
+                    path: parsedUrl.pathname,
                     reconnection: false,
                 })
             }
         }
     } catch(e) {
         console.log(e)
+        delete pendingConnections[socketKey]
         $toast.error(`Invalid WebSocket URL: ${clientUrlWithEnvironmentVariablesSubtituted}`)
         return
     }
@@ -413,13 +450,65 @@ async function connect(client: Client) {
 
     const socket = sockets[activeTab.value._id + '-' + client.id]
 
+    // a later Connect replaced this socket and closed it, anything it still reports, such as the close of a socket that
+    // was connecting, is ignored so it cannot disconnect the socket that replaced it. Read from the store, which outlives
+    // this panel, and null after a Disconnect, when this socket still reports its own close
+    const isReplaced = () => {
+        const currentSocket = sockets[socketKey]
+        return currentSocket !== null && currentSocket !== undefined && toRaw(currentSocket) !== toRaw(socket)
+    }
+
+    // the attempt got its first answer, a Connect for the same client and url starts a new attempt from here on
+    function settleConnectionAttempt() {
+        if (pendingConnections[socketKey] === connectionTarget) {
+            delete pendingConnections[socketKey]
+        }
+    }
+
+    // says a connection failed, and why when the client knows, once per run of failed attempts
+    let connectionFailureReported = false
+
+    function reportConnectionFailure(reason?: string) {
+        settleConnectionAttempt()
+
+        if (connectionFailureReported) {
+            return
+        }
+
+        connectionFailureReported = true
+
+        let message = `Could not connect to ${clientUrlWithEnvironmentVariablesSubtituted}${reason ? `: ${reason}` : ''}`
+
+        // browsers do not say why a connection failed, a rejected certificate looks like any other failure
+        if ((flags.value.isElectron || flags.value.isWebStandalone) && !flags.value.disableSSLVerification && /^(wss|https):/i.test(clientUrlWithEnvironmentVariablesSubtituted)) {
+            message += '. If the server uses a self-signed certificate, tick Settings > Request / Response > Disable SSL Verification'
+        }
+
+        addClientMessage(client, {
+            timestamp: new Date().getTime(),
+            message,
+            type: 'INFO'
+        })
+    }
+
     if (socket instanceof WebSocket) {
+        let opened = false
+
         socket.addEventListener('open', async() => {
+            opened = true
+            settleConnectionAttempt()
+
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
                 message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
                 type: 'INFO'
             })
+        })
+
+        socket.addEventListener('error', () => {
+            if (!opened && !isReplaced()) {
+                reportConnectionFailure()
+            }
         })
 
         socket.addEventListener('message', async(e) => {
@@ -429,6 +518,10 @@ async function connect(client: Client) {
         })
 
         socket.addEventListener('close', async() => {
+            if (isReplaced()) {
+                return
+            }
+
             disconnect(client)
 
             addClientMessage(client, {
@@ -441,6 +534,10 @@ async function connect(client: Client) {
 
     if (socket.constructor.name.startsWith('Socket')) {
         socket.on('connect', async() => {
+            // v2 reconnects on its own, a later failure is reported again
+            connectionFailureReported = false
+            settleConnectionAttempt()
+
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
                 message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
@@ -448,7 +545,21 @@ async function connect(client: Client) {
             })
         })
 
+        // v3 and v4 stop after this, v2 keeps retrying and reports the first failure of each run of retries
+        socket.on('connect_error', (error: Error) => {
+            if (!isReplaced()) {
+                reportConnectionFailure(error.message)
+            }
+        })
+
         if (client.type === 'Socket.IO-v2') {
+            // a v2 server refusing the connection, such as from a middleware, sends its reason as an error
+            socket.on('error', (error: unknown) => {
+                if (!isReplaced()) {
+                    reportConnectionFailure(error instanceof Error ? error.message : String(error))
+                }
+            })
+
             const originalOnevent = socket.onevent
 
             socket.onevent = function(packet) {
@@ -468,7 +579,7 @@ async function connect(client: Client) {
         }
 
         socket.on('disconnect', async() => {
-            if (disconnectTriggered[client.id]) {
+            if (disconnectTriggered[client.id] || isReplaced()) {
                 return
             }
 
@@ -569,6 +680,7 @@ function disconnect(client: Client) {
     }
 
     disconnectTriggered[client.id] = true
+    delete pendingConnections[activeTab.value._id + '-' + client.id]
 
     if(socket instanceof WebSocket) {
         socket.close()

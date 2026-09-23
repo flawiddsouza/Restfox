@@ -1,6 +1,9 @@
 import express from 'express'
 import { fetch, Agent } from 'undici'
+import http from 'http'
+import https from 'https'
 import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 import { pathToFileURL } from 'url'
 import * as db from './src/db.js'
 import * as helpers from './src/helpers.js'
@@ -159,6 +162,154 @@ app.post('/proxy', async(req, res) => {
     }
 })
 
+// WebSocket and Socket.IO connections are made by the browser, which checks certificates itself, so with SSL verification
+// disabled the UI connects through here instead: /proxy-socket/<disable ssl verification>/<encoded target origin><target path>
+// Socket.IO starts with HTTP polling requests and then upgrades to a WebSocket, both come through this prefix
+const SOCKET_PROXY_PREFIX = '/proxy-socket/'
+
+// headers that describe the connection to this server or its origin rather than the target
+const SOCKET_PROXY_SKIPPED_REQUEST_HEADERS = ['host', 'cookie', 'connection', 'keep-alive', 'content-length', 'transfer-encoding', 'accept-encoding']
+const SOCKET_PROXY_SKIPPED_RESPONSE_HEADERS = ['set-cookie', 'connection', 'keep-alive', 'content-length', 'transfer-encoding', 'content-encoding']
+
+function parseSocketProxyUrl(requestUrl) {
+    if(!requestUrl.startsWith(SOCKET_PROXY_PREFIX)) {
+        return null
+    }
+
+    const [disableSSLVerification, encodedOrigin, ...rest] = requestUrl.slice(SOCKET_PROXY_PREFIX.length).split('/')
+
+    let targetOrigin
+    try {
+        targetOrigin = new URL(decodeURIComponent(encodedOrigin ?? ''))
+    } catch {
+        return null
+    }
+
+    if(!['http:', 'https:', 'ws:', 'wss:'].includes(targetOrigin.protocol)) {
+        return null
+    }
+
+    // a WebSocket url is requested and upgraded over its HTTP counterpart
+    const protocol = targetOrigin.protocol.replace(/^ws/, 'http')
+
+    return {
+        url: new URL(`${protocol}//${targetOrigin.host}/${rest.join('/')}`),
+        disableSSLVerification: disableSSLVerification === 'true',
+    }
+}
+
+function getSocketProxyRequestHeaders(incomingHeaders, skippedHeaders) {
+    const headers = {}
+
+    for(const [name, value] of Object.entries(incomingHeaders)) {
+        if(!skippedHeaders.includes(name)) {
+            headers[name] = value
+        }
+    }
+
+    return headers
+}
+
+app.all(`${SOCKET_PROXY_PREFIX}*`, async(req, res) => {
+    const target = parseSocketProxyUrl(req.originalUrl)
+
+    if(target === null) {
+        res.status(400).send('Invalid socket proxy url')
+        return
+    }
+
+    const abortController = new AbortController()
+    res.on('close', () => {
+        if(!res.writableEnded) {
+            abortController.abort()
+        }
+    })
+
+    try {
+        const response = await fetch(target.url, {
+            dispatcher: getAgentForRequest(target.url, target.disableSSLVerification),
+            method: req.method,
+            headers: getSocketProxyRequestHeaders(req.headers, SOCKET_PROXY_SKIPPED_REQUEST_HEADERS),
+            body: ['GET', 'HEAD'].includes(req.method) ? undefined : Readable.toWeb(req),
+            duplex: 'half',
+            redirect: 'manual',
+            signal: abortController.signal,
+        })
+
+        res.status(response.status)
+
+        for(const [name, value] of response.headers) {
+            if(!SOCKET_PROXY_SKIPPED_RESPONSE_HEADERS.includes(name)) {
+                res.setHeader(name, value)
+            }
+        }
+
+        // pipeline rather than pipe, a browser that goes away mid-body aborts the upstream body, and that error would
+        // otherwise have no listener and take the server down
+        if(response.body) {
+            await pipeline(Readable.fromWeb(response.body), res)
+        } else {
+            res.end()
+        }
+    } catch(e) {
+        if(!abortController.signal.aborted && !res.headersSent) {
+            res.status(502).send(e.cause?.message ?? e.message)
+        }
+    }
+})
+
+export function handleSocketProxyUpgrade(req, socket, head) {
+    const target = parseSocketProxyUrl(req.url)
+
+    if(target === null) {
+        socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n')
+        return
+    }
+
+    const upstreamRequest = (target.url.protocol === 'https:' ? https : http).request(target.url, {
+        method: req.method,
+        // the upgrade headers pass through as they are, so the browser and the target negotiate the protocol between them
+        headers: getSocketProxyRequestHeaders(req.headers, ['host', 'cookie']),
+        rejectUnauthorized: !target.disableSSLVerification,
+    })
+
+    upstreamRequest.on('upgrade', (upstreamResponse, upstreamSocket, upstreamHead) => {
+        const headerLines = []
+        for(let i = 0; i < upstreamResponse.rawHeaders.length; i += 2) {
+            headerLines.push(`${upstreamResponse.rawHeaders[i]}: ${upstreamResponse.rawHeaders[i + 1]}\r\n`)
+        }
+
+        socket.write(`HTTP/1.1 ${upstreamResponse.statusCode} ${upstreamResponse.statusMessage}\r\n${headerLines.join('')}\r\n`)
+
+        if(upstreamHead.length > 0) {
+            socket.write(upstreamHead)
+        }
+
+        if(head.length > 0) {
+            upstreamSocket.write(head)
+        }
+
+        upstreamSocket.on('error', () => socket.destroy())
+        socket.on('error', () => upstreamSocket.destroy())
+        upstreamSocket.pipe(socket).pipe(upstreamSocket)
+    })
+
+    // the target answered without upgrading, the browser gets its status and the connection closes
+    upstreamRequest.on('response', upstreamResponse => {
+        socket.end(`HTTP/1.1 ${upstreamResponse.statusCode} ${upstreamResponse.statusMessage}\r\nConnection: close\r\n\r\n`)
+        upstreamResponse.resume()
+    })
+
+    upstreamRequest.on('error', e => {
+        console.error('socket proxy error:', e.message)
+        socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n')
+    })
+
+    socket.on('error', () => upstreamRequest.destroy())
+
+    upstreamRequest.end()
+}
+
 // Workspace / collection routes
 app.post('/api/getWorkspaceAtLocation',           apiRoute(({ location, getEnvironments }) => db.getWorkspaceAtLocation(location, getEnvironments)))
 app.post('/api/updateWorkspace',                  apiRoute(({ workspace, updatedFields }) => db.updateWorkspace(workspace, updatedFields)))
@@ -204,9 +355,11 @@ app.get('/api/browse', async (req, res) => {
 })
 
 if(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
         console.log(`Restfox running on port http://localhost:${port}`)
     })
+
+    server.on('upgrade', handleSocketProxyUpgrade)
 }
 
 export default app

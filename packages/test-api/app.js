@@ -1,6 +1,7 @@
 import express from 'express'
 import { createServer } from 'http'
 import { createServer as createHttpsServer } from 'https'
+import SocketIOv2Server from 'socket.io-v2'
 import { Server as SocketIOv3Server } from 'socket.io-v3'
 import { Server as SocketIOv4Server } from 'socket.io-v4'
 import { WebSocketServer } from 'ws'
@@ -246,6 +247,24 @@ const server = ENABLE_SSL ? createHttpsServer({
     cert: readFileSync('files/localhost.crt'),
 }, app) : createServer(app)
 
+const ioV2 = SocketIOv2Server(server, {
+    path: '/socket.io-v2',
+})
+
+ioV2.on('connection', (socket) => {
+    console.log('Socket.IO v2 client connected')
+
+    // v2 has no onAny, a middleware sees every incoming event as [event, ...args]
+    socket.use((packet, next) => {
+        socket.emit(...packet)
+        next()
+    })
+
+    socket.on('disconnect', () => {
+        console.log('Socket.IO v2 client disconnected')
+    })
+})
+
 const ioV3 = new SocketIOv3Server(server, {
     path: '/socket.io-v3',
     cors: {
@@ -284,7 +303,14 @@ ioV4.on('connection', (socket) => {
     })
 })
 
-const webSocketServer = new WebSocketServer({ server, path: '/websocket' })
+// with the server option ws answers 400 on every other path's upgrade, which lands on Socket.IO's upgraded sockets
+const webSocketServer = new WebSocketServer({ noServer: true })
+
+server.on('upgrade', (req, socket, head) => {
+    if(new URL(req.url, 'http://localhost').pathname === '/websocket') {
+        webSocketServer.handleUpgrade(req, socket, head, (ws) => webSocketServer.emit('connection', ws, req))
+    }
+})
 
 webSocketServer.on('connection', (ws) => {
     console.log('WebSocket client connected')
@@ -301,6 +327,7 @@ webSocketServer.on('connection', (ws) => {
 
 server.listen(5605, '0.0.0.0', () => console.log(`
 ${ENABLE_SSL ? 'HTTPS' : 'HTTP'} at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605
+Socket.IO v2 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v2
 Socket.IO v3 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v3
 Socket.IO v4 at ${ENABLE_SSL ? 'https' : 'http'}://localhost:5605/socket.io-v4
 WebSocket at ws://localhost:5605/websocket

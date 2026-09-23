@@ -30,6 +30,7 @@ const ipcFunctions = [
     'openFolderSelectionDialog',
     'openFolder',
     'readFile',
+    'setDisableSSLVerification',
     'updateElectronApp',
 ]
 

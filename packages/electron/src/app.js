@@ -218,6 +218,10 @@ app.whenReady().then(async() => {
 
     ipcMain.handle('readFile', (_, ...args) => helpers.readFile(...args))
 
+    ipcMain.handle('setDisableSSLVerification', (_, ...args) => helpers.setDisableSSLVerification(...args))
+
+    app.on('certificate-error', helpers.handleCertificateError)
+
     ipcMain.handle('updateElectronApp', (_) => {
         console.log('ipcMain: updateElectronApp')
         updateElectronApp()

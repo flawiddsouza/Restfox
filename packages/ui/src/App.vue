@@ -66,6 +66,11 @@ export default {
             if(this.openContextMenuElement === null) {
                 this.currentlySelectedContextMenuItemIndex = -1
             }
+        },
+        '$store.state.flags.disableSSLVerification'() {
+            if(import.meta.env.MODE === 'desktop-electron') {
+                window.electronIPC.setDisableSSLVerification(this.$store.state.flags.disableSSLVerification)
+            }
         }
     },
     methods: {
@@ -436,6 +441,8 @@ export default {
         emitter.on('error', this.handleError)
 
         if(import.meta.env.MODE === 'desktop-electron') {
+            // the main process keeps the setting across page reloads, so the saved value is sent even when it is the default
+            window.electronIPC.setDisableSSLVerification(this.$store.state.flags.disableSSLVerification)
             if (!this.$store.state.flags.disableAutoUpdate) {
                 console.log('invoke updateElectronApp')
                 window.electronIPC.updateElectronApp()

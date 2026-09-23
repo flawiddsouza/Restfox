@@ -20,6 +20,7 @@ import {
     OpenApiSpecPathParams,
     EditorConfig,
     SetEnvironmentVariableFunction,
+    Flags,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -1723,6 +1724,30 @@ export function uriParse(urlString: string): {
 } {
     const { protocol, host, port, pathname, hash, search }  = new URL(urlString)
     return { protocol, host, port, pathname, hash, search }
+}
+
+// a browser checks a socket's certificate itself and cannot be told to skip that, so with SSL verification disabled
+// web-standalone connects a secure socket through its server, which skips the check the way /proxy does for requests
+export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebStandalone' | 'disableSSLVerification'>, serverLocation: Pick<Location, 'protocol' | 'host'> = window.location): string {
+    if(!flags.isWebStandalone || !flags.disableSSLVerification) {
+        return url
+    }
+
+    let parsedUrl: URL
+
+    try {
+        parsedUrl = new URL(url)
+    } catch {
+        return url
+    }
+
+    if(parsedUrl.protocol !== 'wss:' && parsedUrl.protocol !== 'https:') {
+        return url
+    }
+
+    const protocol = parsedUrl.protocol === 'wss:' ? (serverLocation.protocol === 'https:' ? 'wss:' : 'ws:') : serverLocation.protocol
+
+    return `${protocol}//${serverLocation.host}/proxy-socket/true/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
 }
 
 export function getStatusText(statusCode: number): string {

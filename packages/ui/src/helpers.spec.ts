@@ -21,7 +21,8 @@ import {
     INHERITED_AUTHENTICATION_TYPE,
     createOAuthTokenRequest,
     describeOAuthTokenError,
-    getMissingOAuthTokenFieldsMessage
+    getMissingOAuthTokenFieldsMessage,
+    getSocketConnectionUrl
 } from './helpers'
 import type { CollectionItem, HandleRequestState } from './global'
 import { readFile } from 'node:fs/promises'
@@ -1076,6 +1077,30 @@ describe(`Function: ${describeOAuthTokenError.name}`, () => {
     test('a long answer is cut to its start', () => {
         const message = describeOAuthTokenError(response(500, 'x'.repeat(300)), url)
         expect(message).toBe(`The token endpoint answered HTTP 500: ${'x'.repeat(120)}....`)
+    })
+})
+
+describe(`Function: ${getSocketConnectionUrl.name}`, () => {
+    const standaloneOnHttp = { protocol: 'http:', host: 'localhost:4004' }
+
+    test('web-standalone with SSL verification disabled connects a wss url through the server', () => {
+        expect(getSocketConnectionUrl('wss://localhost:5605/websocket?token=1', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp))
+            .toBe('ws://localhost:4004/proxy-socket/true/wss%3A%2F%2Flocalhost%3A5605/websocket?token=1')
+        expect(getSocketConnectionUrl('wss://example.com/ws', { isWebStandalone: true, disableSSLVerification: true }, { protocol: 'https:', host: 'restfox.example.com' }))
+            .toBe('wss://restfox.example.com/proxy-socket/true/wss%3A%2F%2Fexample.com/ws')
+    })
+
+    test('a Socket.IO https url keeps the path the client polls and upgrades on', () => {
+        expect(getSocketConnectionUrl('https://localhost:5605/socket.io-v4?room=a', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp))
+            .toBe('http://localhost:4004/proxy-socket/true/https%3A%2F%2Flocalhost%3A5605/socket.io-v4?room=a')
+    })
+
+    test('everything else connects directly as before', () => {
+        const url = 'wss://localhost:5605/websocket'
+        expect(getSocketConnectionUrl(url, { isWebStandalone: true, disableSSLVerification: false }, standaloneOnHttp)).toBe(url)
+        expect(getSocketConnectionUrl(url, { isWebStandalone: false, disableSSLVerification: true }, standaloneOnHttp)).toBe(url)
+        expect(getSocketConnectionUrl('ws://localhost:5605/websocket', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp)).toBe('ws://localhost:5605/websocket')
+        expect(getSocketConnectionUrl('not a url', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp)).toBe('not a url')
     })
 })
 
