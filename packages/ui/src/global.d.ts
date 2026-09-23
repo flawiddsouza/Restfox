@@ -57,6 +57,7 @@ export interface RequestAuthentication {
     scope?: string
     clientId?: string
     clientSecret?: string
+    clientAuthentication?: 'header' | 'body'
     grantType?: 'authorization_code' | 'password' | 'client_credentials' | string
     refreshToken?: string
 }

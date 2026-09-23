@@ -1,6 +1,7 @@
 import express from 'express'
 import querystring from 'node:querystring'
 import crypto from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 
 const CLIENT_ID = 'test-client-id'
 const CLIENT_SECRET = 'test-client-secret'
@@ -12,6 +13,63 @@ const tokens = {}
 const authorizationCodes = {}
 
 const generateToken = () => crypto.randomBytes(20).toString('hex')
+
+// where the token endpoint requires the client credentials: 'header', 'body' or 'any', read per request so a test can switch it
+const requiredClientAuthentication = () => process.env.CLIENT_AUTHENTICATION || 'any'
+
+// RFC 6749 section 2.3.1, the client sends its credentials either as a Basic Authorization header, id and secret each
+// urlencoded before the base64, or as client_id and client_secret in the form body
+const getClientCredentials = (req) => {
+    const authorization = req.headers['authorization']
+
+    if (authorization && authorization.startsWith('Basic ')) {
+        const decoded = Buffer.from(authorization.slice('Basic '.length), 'base64').toString()
+        const separator = decoded.indexOf(':')
+        try {
+            return {
+                client_id: decodeURIComponent(decoded.slice(0, separator)),
+                client_secret: decodeURIComponent(decoded.slice(separator + 1)),
+                sent_in: 'header',
+            }
+        } catch {
+            // a percent sequence that does not decode is not a valid client, not a server error
+            return { client_id: undefined, client_secret: undefined, sent_in: 'header' }
+        }
+    }
+
+    if (req.body.client_id !== undefined || req.body.client_secret !== undefined) {
+        return { client_id: req.body.client_id, client_secret: req.body.client_secret, sent_in: 'body' }
+    }
+
+    return { client_id: undefined, client_secret: undefined, sent_in: undefined }
+}
+
+const rejectClient = (res, sent_in, error_description) => {
+    // section 5.2, a client that authenticated through the header gets 401 with the challenge, everything else 400
+    if (sent_in === 'header') {
+        res.setHeader('WWW-Authenticate', 'Basic realm="token"')
+        return res.status(401).json({ error: 'invalid_client', error_description })
+    }
+    return res.status(400).json({ error: 'invalid_client', error_description })
+}
+
+// returns the credentials when the client may proceed, otherwise sends the error and returns null
+const authenticateClient = (req, res, { requireSecret = true } = {}) => {
+    const credentials = getClientCredentials(req)
+    const required = requiredClientAuthentication()
+
+    if (required !== 'any' && credentials.sent_in !== required) {
+        rejectClient(res, credentials.sent_in, `client credentials must be sent in the ${required}`)
+        return null
+    }
+
+    if (credentials.client_id !== CLIENT_ID || (requireSecret && credentials.client_secret !== CLIENT_SECRET)) {
+        rejectClient(res, credentials.sent_in)
+        return null
+    }
+
+    return credentials
+}
 
 // PKCE helper
 const verifyCodeChallenge = (code_verifier, code_challenge, method) => {
@@ -71,8 +129,10 @@ app.get('/authorize', (req, res) => {
 })
 
 // Token endpoint with PKCE verification
+// Token endpoint with PKCE verification. Every token response also says where the client credentials arrived,
+// client_authentication is 'header' or 'body', so a client can check which mode it used
 app.post('/token', (req, res) => {
-    const { grant_type, code, redirect_uri, client_id, client_secret, username, password, refresh_token, code_verifier } = req.body
+    const { grant_type, code, redirect_uri, username, password, refresh_token, code_verifier } = req.body
 
     if (grant_type === 'authorization_code') {
         const authCodeData = authorizationCodes[code]
@@ -81,7 +141,14 @@ app.post('/token', (req, res) => {
             return res.status(400).json({ error: 'invalid_grant' })
         }
 
-        if (authCodeData.client_id !== client_id || authCodeData.redirect_uri !== redirect_uri) {
+        // a PKCE client is public and proves itself with the code verifier instead of a secret
+        const client = authenticateClient(req, res, { requireSecret: !authCodeData.code_challenge })
+
+        if (!client) {
+            return
+        }
+
+        if (authCodeData.client_id !== client.client_id || authCodeData.redirect_uri !== redirect_uri) {
             return res.status(400).json({ error: 'invalid_grant' })
         }
 
@@ -92,11 +159,6 @@ app.post('/token', (req, res) => {
             }
             if (!verifyCodeChallenge(code_verifier, authCodeData.code_challenge, authCodeData.code_challenge_method)) {
                 return res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' })
-            }
-        } else {
-            // Fallback to client_secret validation (standard OAuth2)
-            if (client_secret !== CLIENT_SECRET) {
-                return res.status(400).json({ error: 'invalid_client' })
             }
         }
 
@@ -112,16 +174,16 @@ app.post('/token', (req, res) => {
             token_type: 'Bearer',
             expires_in: 3600,
             refresh_token: new_refresh_token,
+            client_authentication: client.sent_in,
         })
     }
 
     // Keep existing grant flows for password, client_credentials, refresh_token
     else if (grant_type === 'client_credentials') {
-        if (
-            client_id !== CLIENT_ID ||
-            client_secret !== CLIENT_SECRET
-        ) {
-            return res.status(400).json({ error: 'invalid_client' })
+        const client = authenticateClient(req, res)
+
+        if (!client) {
+            return
         }
 
         const access_token = generateToken()
@@ -131,13 +193,13 @@ app.post('/token', (req, res) => {
             access_token,
             token_type: 'Bearer',
             expires_in: 3600,
+            client_authentication: client.sent_in,
         })
     } else if (grant_type === 'password') {
-        if (
-            client_id !== CLIENT_ID ||
-            client_secret !== CLIENT_SECRET
-        ) {
-            return res.status(400).json({ error: 'invalid_client' })
+        const client = authenticateClient(req, res)
+
+        if (!client) {
+            return
         }
 
         if (
@@ -156,8 +218,15 @@ app.post('/token', (req, res) => {
             token_type: 'Bearer',
             expires_in: 3600,
             refresh_token: new_refresh_token,
+            client_authentication: client.sent_in,
         })
     } else if (grant_type === 'refresh_token') {
+        const client = authenticateClient(req, res)
+
+        if (!client) {
+            return
+        }
+
         const tokenEntry = Object.entries(tokens).find(
             ([_, value]) => value.refresh_token === refresh_token
         )
@@ -175,6 +244,7 @@ app.post('/token', (req, res) => {
             access_token: newAccessToken,
             token_type: 'Bearer',
             expires_in: 3600,
+            client_authentication: client.sent_in,
         })
     } else {
         res.status(400).json({ error: 'unsupported_grant_type' })
@@ -195,7 +265,12 @@ app.get('/resource', (req, res) => {
     })
 })
 
-const port = 8444
-app.listen(port, () => {
-    console.log(`OAuth2+PKCE test server listening on http://localhost:${port}`)
-})
+export default app
+
+// listen only when started directly, the test imports the app and picks its own port
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const port = 8444
+    app.listen(port, () => {
+        console.log(`OAuth2+PKCE test server listening on http://localhost:${port}, client credentials accepted in: ${requiredClientAuthentication()}`)
+    })
+}

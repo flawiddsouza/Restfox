@@ -89,7 +89,7 @@
 import {
     fileToJSON,
     fileToString,
-    convertInsomniaExportToRestfoxCollection,
+    convertInsomniaFileToRestfoxCollection,
     convertRestfoxExportToRestfoxCollection,
     convertOpenAPIExportToRestfoxCollection,
     generateNewIdsForTree,
@@ -98,6 +98,7 @@ import {
     getSavedRequestTimeout
 } from '@/helpers'
 import { convertPostmanExportToRestfoxCollection } from '@/parsers/postman'
+import yaml from 'js-yaml'
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
@@ -223,10 +224,19 @@ export default {
 
             this.filesToImport.forEach(async(file) => {
                 let jsonContent
-                if (file.name.endsWith('.json')) {
-                    jsonContent = await fileToJSON(file)
-                } else {
-                    jsonContent = file
+                try {
+                    if (file.name.endsWith('.json')) {
+                        jsonContent = await fileToJSON(file)
+                    } else if (/\.ya?ml$/i.test(file.name)) {
+                        jsonContent = yaml.load(await file.text())
+                    }
+                } catch {
+                    // a file that does not parse is reported by the import itself
+                }
+
+                // a zip or a file that is not an object gives nothing to detect from, the choice made stays
+                if (jsonContent === null || typeof jsonContent !== 'object') {
+                    return
                 }
 
                 const detectedType = this.detectFileType(jsonContent)
@@ -237,7 +247,7 @@ export default {
         detectFileType(jsonContent) {
             if (jsonContent.info && jsonContent.info.schema && (jsonContent.info.schema === constants.POSTMAN_SCHEMA['v2.0'] || jsonContent.info.schema === constants.POSTMAN_SCHEMA['v2.1'])) {
                 return 'Postman'
-            } else if (jsonContent.__export_format || jsonContent.resources) {
+            } else if (jsonContent.__export_format || jsonContent.resources || /^(collection|spec)\.insomnia\.rest\/5/.test(jsonContent.type)) {
                 return 'Insomnia'
             } else if (jsonContent.openapi || jsonContent.swagger) {
                 return 'OpenAPI'
@@ -316,7 +326,7 @@ export default {
                             }
 
                         } else if(this.importFrom === 'Insomnia') {
-                            collectionTree = collectionTree.concat(convertInsomniaExportToRestfoxCollection(json, this.activeWorkspace._id))
+                            collectionTree = collectionTree.concat(await convertInsomniaFileToRestfoxCollection(json, this.activeWorkspace._id))
 
                         } else if(this.importFrom === 'Restfox') {
                             const { newCollectionTree, newPlugins } = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)

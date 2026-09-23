@@ -723,12 +723,102 @@ export async function handleRequest(
     }
 }
 
+function convertInsomniaAuthToRestfoxAuth(insomniaAuthentication: any): RequestAuthentication {
+    if(!insomniaAuthentication || Object.keys(insomniaAuthentication).length === 0) {
+        return { type: INHERITED_AUTHENTICATION_TYPE }
+    }
+
+    if(insomniaAuthentication.type === 'oauth2') {
+        // Insomnia names these OAuth 2.0 fields differently, see AuthTypeOAuth2 in Insomnia's packages/insomnia-data/src/models/request.ts
+        const { redirectUrl, code, usePkce, tokenPrefix, accessToken, credentialsInBody, ...authentication } = insomniaAuthentication
+        const renamedFields: [string, keyof RequestAuthentication, unknown][] = [
+            ['redirectUrl', 'redirectUri', redirectUrl],
+            ['code', 'authorizationCode', code],
+            ['usePkce', 'usePKCE', usePkce],
+            ['tokenPrefix', 'prefix', tokenPrefix],
+            ['accessToken', 'token', accessToken],
+        ]
+
+        for(const [, restfoxKey, value] of renamedFields) {
+            if(value !== undefined && value !== '' && authentication[restfoxKey] === undefined) {
+                authentication[restfoxKey] = value
+            }
+        }
+
+        // Insomnia sends the OAuth 2.0 client credentials in the Basic Authorization header unless credentialsInBody is set
+        if(authentication.clientAuthentication === undefined) {
+            authentication.clientAuthentication = credentialsInBody ? 'body' : 'header'
+        }
+
+        return authentication
+    }
+
+    return insomniaAuthentication
+}
+
+function convertInsomniaHeaders(headers: any[] | undefined): RequestParam[] {
+    return (headers ?? []).map((header: RequestParam) => ({
+        name: header.name,
+        value: header.value,
+        description: header.description,
+        disabled: header.disabled
+    }))
+}
+
+// Insomnia 11 and later export v5 YAML, a nested tree of folders and requests. This flattens it into the v4 resources
+// list the importer reads, the way Insomnia's own importer does, see getCollection in packages/insomnia/src/common/insomnia-v5.ts
+function convertInsomniaV5ToV4Resources(file: any): any[] {
+    const workspaceId = file.meta?.id ?? nanoid()
+    const resources: any[] = [{ _id: workspaceId, _type: 'workspace', parentId: null, name: file.name, description: file.meta?.description }]
+
+    const walk = (items: any[] | undefined, parentId: string) => {
+        for(const item of items ?? []) {
+            const _id = item.meta?.id ?? nanoid()
+            const common = { _id, parentId, name: item.name, description: item.meta?.description }
+            const isFolder = !('method' in item) && !('url' in item) && !('reflectionApi' in item)
+
+            if(isFolder) {
+                resources.push({ ...common, _type: 'request_group', headers: item.headers, authentication: item.authentication, environment: item.environment })
+                walk(item.children, _id)
+            } else if('method' in item) {
+                resources.push({ ...common, _type: 'request', url: item.url, method: item.method, body: item.body ?? {}, parameters: item.parameters, headers: item.headers, authentication: item.authentication, pathParameters: item.pathParameters })
+            }
+            // gRPC, WebSocket and Socket.IO requests have nothing the importer maps them to and are left out
+        }
+    }
+
+    walk(file.collection, workspaceId)
+
+    return resources
+}
+
+// the Import dialog hands over a parsed .json file as an object and any other file as the File itself
+export async function convertInsomniaFileToRestfoxCollection(file: any, workspaceId: string) {
+    let data = file
+
+    if(typeof file?.text === 'function') {
+        // YAML is a superset of JSON, so this reads v4 JSON and YAML exports and v5 YAML exports alike
+        data = yaml.load(await file.text())
+    }
+
+    if(typeof data?.type === 'string' && (data.type.startsWith('collection.insomnia.rest/5') || data.type.startsWith('spec.insomnia.rest/5'))) {
+        data = { resources: convertInsomniaV5ToV4Resources(data) }
+    }
+
+    if(!Array.isArray(data?.resources)) {
+        throw new Error('Not an Insomnia export: expected an Insomnia collection or design document export')
+    }
+
+    return convertInsomniaExportToRestfoxCollection(data, workspaceId)
+}
+
 export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId: string) {
     const collection: CollectionItem[] = []
 
     const workspace = json.resources.find((item: any) => item._type === 'workspace')
 
-    json.resources.filter((item: any) => ['cookie_jar', 'api_spec', 'environment', 'proto_file', 'unit_test_suite'].includes(item._type) == false).forEach((item: any) => {
+    // other resource types, such as environments or gRPC and WebSocket requests, have nothing here they map to
+    json.resources.filter((item: any) => ['workspace', 'request_group', 'request'].includes(item._type)).forEach((item: any) => {
         if(item._type === 'workspace' || item._type === 'request_group') {
             let parentId = item.parentId
 
@@ -741,6 +831,9 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                 _type: 'request_group',
                 name: item.name,
                 environment: item.environment,
+                headers: convertInsomniaHeaders(item.headers),
+                authentication: convertInsomniaAuthToRestfoxAuth(item.authentication),
+                description: item.description || undefined,
                 parentId,
                 workspaceId
             })
@@ -800,7 +893,7 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                     disabled: parameter.disabled
                 })) : [],
                 pathParameters: item.pathParameters ?? [],
-                authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: INHERITED_AUTHENTICATION_TYPE },
+                authentication: convertInsomniaAuthToRestfoxAuth(item.authentication),
                 description: 'description' in item ? item.description : undefined,
                 parentId,
                 workspaceId
@@ -1762,6 +1855,134 @@ export function hasOwnAuthentication(authentication: RequestAuthentication): boo
     return authenticationType !== 'inherit' && authenticationType !== 'none' && !authentication.disabled
 }
 
+// RFC 6749 section 2.3.1, the client credentials go either in a Basic Authorization header, id and secret urlencoded
+// before the base64, or as client_id and client_secret in the form body. A config saved before the choice existed has no
+// clientAuthentication and keeps sending them in the body
+export function createOAuthTokenRequest(clientId: string, clientSecret: string, clientAuthentication: RequestAuthentication['clientAuthentication'], parameters: Record<string, string>) {
+    const headers: Record<string, string> = {
+        'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED
+    }
+    const body = new URLSearchParams(parameters)
+
+    if(clientAuthentication === 'header') {
+        headers['Authorization'] = generateBasicAuthString(encodeURIComponent(clientId), encodeURIComponent(clientSecret))
+    } else {
+        body.set('client_id', clientId)
+        body.set('client_secret', clientSecret)
+    }
+
+    return { headers, body: body.toString() }
+}
+
+export interface OAuthTokenFieldValues {
+    grantType?: string
+    accessTokenUrl: string
+    username?: string
+    authorizationCode?: string
+    redirectUri?: string
+}
+
+function isOAuthTokenFieldMissing(value: string | undefined) {
+    // a variable that resolves to nothing substitutes to the text 'undefined'
+    return value === undefined || value.trim() === '' || value === 'undefined'
+}
+
+// names the fields a token request cannot be sent without, RFC 6749 makes them required parameters. The client id and
+// secret are not among them, a public client has no secret and some servers take neither, so the server decides on those
+export function getMissingOAuthTokenFieldsMessage(purpose: 'get' | 'refresh', values: OAuthTokenFieldValues): string | null {
+    const missing: string[] = []
+
+    if(purpose === 'get' && isOAuthTokenFieldMissing(values.grantType)) {
+        missing.push('Grant Type')
+    }
+
+    if(isOAuthTokenFieldMissing(values.accessTokenUrl)) {
+        missing.push('Access Token URL')
+    }
+
+    if(purpose === 'get' && values.grantType === constants.GRANT_TYPES.password_credentials && isOAuthTokenFieldMissing(values.username)) {
+        missing.push('Username')
+    }
+
+    if(purpose === 'get' && values.grantType === constants.GRANT_TYPES.authorization_code) {
+        if(isOAuthTokenFieldMissing(values.authorizationCode)) {
+            missing.push('Authorization Code')
+        }
+        if(isOAuthTokenFieldMissing(values.redirectUri)) {
+            missing.push('Redirect URI')
+        }
+    }
+
+    if(missing.length === 0) {
+        return null
+    }
+
+    const list = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`
+    return `${list} ${missing.length === 1 ? 'is' : 'are'} required to ${purpose === 'get' ? 'get a token' : 'refresh the token'}.`
+}
+
+export function parseOAuthTokenResponse(buffer: ArrayBuffer | undefined): any {
+    try {
+        return JSON.parse(new TextDecoder().decode(buffer))
+    } catch {
+        return null
+    }
+}
+
+// the start of a non-JSON answer as readable text, an HTML error page loses its markup
+function getResponseTextSnippet(text: string) {
+    const readable = text
+        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    return readable.length > 120 ? readable.slice(0, 120) + '...' : readable
+}
+
+// says what went wrong with a token request and what to change, for every way it can fail: an HTTP error with or without
+// the RFC 6749 section 5.2 error body, a 200 without a token, a timeout, or a server that could not be reached
+export function describeOAuthTokenError(error: any, accessTokenUrl: string): string {
+    if(typeof error?.status === 'number') {
+        const text = error.buffer ? new TextDecoder().decode(error.buffer) : ''
+        const json = parseOAuthTokenResponse(error.buffer)
+        // an answer without the OAuth error field, such as an API gateway's own JSON, is shown as its text
+        const snippet = json && typeof json.error === 'string' ? '' : getResponseTextSnippet(text)
+        const statusLine = `HTTP ${error.status}${error.statusText ? ' ' + error.statusText : ''}`
+
+        if(json && typeof json.error === 'string') {
+            let message = `The token endpoint answered ${statusLine}: ${json.error}${json.error_description ? ', ' + json.error_description : ''}.`
+            if(json.error === 'invalid_client') {
+                message += ' It refused the client credentials. Check the Client ID and Client Secret, or switch Client Authentication between Basic Auth Header and Request Body.'
+            }
+            return message
+        }
+
+        if(error.status === 200) {
+            return json ? `The token endpoint answered HTTP 200 without an access_token: ${snippet}.` : `The token endpoint answered HTTP 200 with something other than JSON${snippet ? ': ' + snippet : ''}.`
+        }
+
+        let message = `The token endpoint answered ${statusLine}${snippet ? ': ' + snippet : ''}.`
+        if(error.status === 401 || error.status === 403) {
+            message += ' It refused the request. Check the Client ID and Client Secret, or switch Client Authentication between Basic Auth Header and Request Body.'
+        } else if(error.status === 404 || error.status === 405) {
+            message += ' Check the Access Token URL.'
+        }
+        return message
+    }
+
+    if(error?.name === 'TimeoutError') {
+        return `The token request to ${accessTokenUrl} timed out. Check that the server is running, or raise Request Timeout in Settings.`
+    }
+
+    const reason = error instanceof Error ? error.message : String(error)
+    let message = `Could not reach the token endpoint at ${accessTokenUrl}: ${reason}. Check the Access Token URL and that the server is running.`
+    if(reason === 'Failed to fetch') {
+        message += ' In the browser the server must also allow cross-origin requests, otherwise use the Restfox CORS Helper extension or the desktop app.'
+    }
+    return message
+}
+
 export async function resolveAuthentication(cacheId: string, authentication: RequestAuthentication, environment: any) {
     if(authentication.type === 'basic') {
         return generateBasicAuthString(
@@ -2084,13 +2305,37 @@ export function convertPostmanAuthToRestfoxAuth(request: any) {
             }
 
         } else if(authType === 'oauth2' && request.auth.oauth2) {
-            const grantType = request.auth.oauth2.find((item: any) => item.key === 'grant_type')?.value || ''
-            const username = request.auth.oauth2.find((item: any) => item.key === 'username')?.value || ''
-            const password = request.auth.oauth2.find((item: any) => item.key === 'password')?.value || ''
-            const clientId = request.auth.oauth2.find((item: any) => item.key === 'clientId')?.value || ''
-            const clientSecret = request.auth.oauth2.find((item: any) => item.key === 'clientSecret')?.value || ''
-            const accessTokenUrl = request.auth.oauth2.find((item: any) => item.key === 'accessTokenUrl')?.value || ''
-            const scope = request.auth.oauth2.find((item: any) => item.key === 'scope')?.value || ''
+            // Postman v2.1 stores the settings as a list of key and value, v2.0 as a plain object
+            const oauth2Entries: { key: string, value: any }[] = Array.isArray(request.auth.oauth2)
+                ? request.auth.oauth2
+                : Object.entries(request.auth.oauth2).map(([key, value]) => ({ key, value }))
+            // older Postman versions wrote some settings under other names, in both formats, see oAuth2 in
+            // postman-collection-transformer lib/util.js. The first name given with a value wins, the current one is first
+            const getOAuth2Value = (...keys: string[]) => {
+                for(const key of keys) {
+                    const value = oauth2Entries.find(item => item.key === key)?.value
+                    if(value !== undefined && value !== '') {
+                        return value
+                    }
+                }
+                return undefined
+            }
+
+            const postmanGrantType = getOAuth2Value('grant_type', 'grantType') || ''
+            const username = getOAuth2Value('username') || ''
+            const password = getOAuth2Value('password') || ''
+            const clientId = getOAuth2Value('clientId') || ''
+            const clientSecret = getOAuth2Value('clientSecret') || ''
+            const accessTokenUrl = getOAuth2Value('accessTokenUrl') || ''
+            const scope = getOAuth2Value('scope') || ''
+            const clientAuthentication = getOAuth2Value('client_authentication', 'clientAuth')
+
+            // Postman names two grant types differently from the grant_type they send, and marks PKCE on the grant type
+            // itself. Any other value, such as implicit which Restfox does not support, is kept so the selector shows it
+            const grantType = new Map([
+                ['password_credentials', constants.GRANT_TYPES.password_credentials],
+                ['authorization_code_with_pkce', constants.GRANT_TYPES.authorization_code],
+            ]).get(postmanGrantType) ?? postmanGrantType
 
             authentication = {
                 type: 'oauth2',
@@ -2101,6 +2346,33 @@ export function convertPostmanAuthToRestfoxAuth(request: any) {
                 clientSecret,
                 accessTokenUrl,
                 scope,
+            }
+
+            if(clientAuthentication === 'header' || clientAuthentication === 'body') {
+                authentication.clientAuthentication = clientAuthentication
+            }
+
+            if(postmanGrantType === 'authorization_code_with_pkce') {
+                authentication.usePKCE = true
+            }
+
+            // fields only set when the export carries them. The Callback URL is the redirect uri, older versions wrote it as
+            // callBackUrl next to a redirectUri. Older versions also saved the tokens themselves
+            const optionalFields: [string[], keyof RequestAuthentication][] = [
+                [['authUrl'], 'authorizationUrl'],
+                [['redirect_uri', 'callBackUrl', 'redirectUri'], 'redirectUri'],
+                [['state'], 'state'],
+                [['code_verifier'], 'codeVerifier'],
+                [['headerPrefix'], 'prefix'],
+                [['accessToken'], 'token'],
+                [['refreshToken'], 'refreshToken'],
+            ]
+
+            for(const [postmanKeys, restfoxKey] of optionalFields) {
+                const value = getOAuth2Value(...postmanKeys)
+                if(typeof value === 'string' && value !== '') {
+                    (authentication as Record<string, unknown>)[restfoxKey] = value
+                }
             }
         }
     }

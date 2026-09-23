@@ -149,13 +149,27 @@
 
                 <tr>
                     <td class="user-select-none">
+                        <label for="oauth-client-authentication" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Client Authentication
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <div class="custom-select" style="margin: 0;" @click="handleClientAuthenticationMenu">
+                            {{ clientAuthentications.find(item => item.value === clientAuthentication)?.label }}
+                            <i class="fa fa-caret-down space-right"></i>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="user-select-none">
                         <label for="oauth-grant-type" :class="{ disabled: collectionItem.authentication.disabled }">
                             Grant Type
                         </label>
                     </td>
                     <td class="full-width">
                         <div class="custom-select" style="margin: 0;" @click="handleGrantTypeMenu">
-                            {{ grantTypes.find(item => item.value === collectionItem.authentication?.grantType)?.label }}
+                            {{ grantTypes.find(item => item.value !== undefined && item.value === collectionItem.authentication?.grantType)?.label ?? (collectionItem.authentication?.grantType || 'Select Grant Type') }}
                             <i class="fa fa-caret-down space-right"></i>
                         </div>
                     </td>
@@ -311,6 +325,25 @@
                         />
                     </td>
                 </tr>
+                <tr>
+                    <td class="user-select-none">
+                        <label for="oauth-prefix" :class="{ disabled: collectionItem.authentication.disabled }">
+                            Prefix
+                        </label>
+                    </td>
+                    <td class="full-width">
+                        <CodeMirrorSingleLine
+                            v-model="collectionItem.authentication.prefix"
+                            :env-variables="collectionItemEnvironmentResolved"
+                            :autocompletions="tagAutocompletions"
+                            @tagClick="onTagClick"
+                            :input-text-compatible="true"
+                            :disabled="collectionItem.authentication.disabled"
+                            placeholder="Bearer"
+                            :key="'oauth-prefix'"
+                        />
+                    </td>
+                </tr>
 
                 <!-- Password Grant Type Fields -->
                 <template v-if="collectionItem.authentication.grantType === 'password'">
@@ -418,6 +451,15 @@
         :selected-option="collectionItem.authentication?.grantType"
         @click="handleGrantTypeChange"
     />
+
+    <ContextMenu
+        :options="clientAuthentications"
+        v-model:show="showClientAuthenticationMenu"
+        :x="clientAuthenticationMenuX"
+        :y="clientAuthenticationMenuY"
+        :selected-option="clientAuthentication"
+        @click="handleClientAuthenticationChange"
+    />
 </template>
 
 <script setup lang="ts">
@@ -426,7 +468,7 @@ import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem, Flags } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
-import { fetchWrapper, getAuthenticationType, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, substituteEnvironmentVariables } from '@/helpers'
+import { createOAuthTokenRequest, describeOAuthTokenError, fetchWrapper, getAuthenticationType, getMissingOAuthTokenFieldsMessage, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, parseOAuthTokenResponse, substituteEnvironmentVariables } from '@/helpers'
 import { useToast } from 'vue-toast-notification'
 import { bufferToString } from '@/utils/response'
 
@@ -523,6 +565,30 @@ const grantTypes = ref([
     },
 ])
 
+const clientAuthentications = ref([
+    {
+        'type': 'option',
+        'label': 'Client Authentication',
+        'disabled': true,
+        'class': 'text-with-line'
+    },
+    {
+        'type': 'option',
+        'label': 'Basic Auth Header',
+        'value': 'header',
+        'class': 'context-menu-item-with-left-padding'
+    },
+    {
+        'type': 'option',
+        'label': 'Request Body',
+        'value': 'body',
+        'class': 'context-menu-item-with-left-padding'
+    },
+])
+
+// a config saved before the choice existed sent the client credentials in the body, so that is what an unset value means
+const clientAuthentication = computed(() => props.collectionItem.authentication?.clientAuthentication ?? 'body')
+
 const showRequestAuthMenu = ref(false)
 const requestAuthMenuX = ref<number | null>(null)
 const requestAuthMenuY = ref<number | null>(null)
@@ -534,6 +600,10 @@ const tagAutocompletions = computed(() => {
 const showGrantTypeMenu = ref(false)
 const grantTypeMenuX = ref<number | null>(null)
 const grantTypeMenuY = ref<number | null>(null)
+
+const showClientAuthenticationMenu = ref(false)
+const clientAuthenticationMenuX = ref<number | null>(null)
+const clientAuthenticationMenuY = ref<number | null>(null)
 
 function handleRequestAuthMenu(event: any) {
     const containerElement = event.target.closest('.custom-select')
@@ -547,6 +617,12 @@ function handleCollectionItemAuthenticationTypeChange(event: string) {
         props.collectionItem.authentication = {}
     }
     props.collectionItem.authentication.type = event === 'inherit' ? INHERITED_AUTHENTICATION_TYPE : event
+
+    // a config set up from scratch sends the client credentials the way RFC 6749 recommends, one that already has a
+    // token url was saved before the choice existed and keeps sending them in the body
+    if (event === 'oauth2' && props.collectionItem.authentication.clientAuthentication === undefined && props.collectionItem.authentication.accessTokenUrl === undefined) {
+        props.collectionItem.authentication.clientAuthentication = 'header'
+    }
 }
 
 function handleGrantTypeMenu(event: any) {
@@ -561,6 +637,19 @@ function handleGrantTypeChange(event: string) {
         props.collectionItem.authentication = {}
     }
     props.collectionItem.authentication.grantType = event
+}
+
+function handleClientAuthenticationMenu(event: any) {
+    const containerElement = event.target.closest('.custom-select')
+    clientAuthenticationMenuX.value = containerElement.getBoundingClientRect().left
+    clientAuthenticationMenuY.value = containerElement.getBoundingClientRect().top + containerElement.getBoundingClientRect().height
+    showClientAuthenticationMenu.value = true
+}
+
+function handleClientAuthenticationChange(event: 'header' | 'body') {
+    if (props.collectionItem.authentication) {
+        props.collectionItem.authentication.clientAuthentication = event
+    }
 }
 
 function toggleAuthEnabled(event: Event) {
@@ -674,67 +763,70 @@ async function requestOAuthToken() {
     const env = props.collectionItemEnvironmentResolved
 
     if (auth) {
-        const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
-        const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret)
-        const accessTokenUrl: any = await substituteEnvironmentVariables(env, auth.accessTokenUrl)
+        // a field that was never filled in is undefined and would otherwise be sent as the text 'undefined'
+        const clientId: string = await substituteEnvironmentVariables(env, auth.clientId ?? '')
+        const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret ?? '')
+        const accessTokenUrl: string = await substituteEnvironmentVariables(env, auth.accessTokenUrl ?? '')
         const scope: string | null = auth.scope ? await substituteEnvironmentVariables(env, auth.scope) : null
-        const grantType: string | any = auth.grantType
+        const grantType: string | undefined = auth.grantType
 
-        oath2Precheck(clientId, clientSecret, accessTokenUrl, grantType)
-
-        const bodyData = new URLSearchParams({
-            grant_type: grantType,
-            client_id: clientId,
-            client_secret: clientSecret,
-        })
-
-        if (scope) {
-            bodyData.append('scope', scope)
-        }
+        const grantParameters: Record<string, string> = {}
 
         // Handle different grant types
         if (grantType === 'password') {
-            const username: string = await substituteEnvironmentVariables(env, auth.username)
-            const password: string = await substituteEnvironmentVariables(env, auth.password)
-            bodyData.append('username', username)
-            bodyData.append('password', password)
+            grantParameters.username = await substituteEnvironmentVariables(env, auth.username ?? '')
+            grantParameters.password = await substituteEnvironmentVariables(env, auth.password ?? '')
         } else if (grantType === 'authorization_code') {
-            const authorizationCode: string = await substituteEnvironmentVariables(env, auth.authorizationCode)
-            const redirectUri: string = await substituteEnvironmentVariables(env, auth.redirectUri)
-
-            if (isMissing(authorizationCode) || isMissing(redirectUri)) {
-                toast.error('Please provide Authorization Code and Redirect URI.')
-                return
-            }
-
-            bodyData.append('code', authorizationCode)
-            bodyData.append('redirect_uri', redirectUri)
+            grantParameters.code = await substituteEnvironmentVariables(env, auth.authorizationCode ?? '')
+            grantParameters.redirect_uri = await substituteEnvironmentVariables(env, auth.redirectUri ?? '')
 
             // Add code verifier for PKCE
             if (auth.usePKCE && auth.codeVerifier) {
-                bodyData.append('code_verifier', auth.codeVerifier)
+                grantParameters.code_verifier = auth.codeVerifier
             }
         }
+
+        const missingFieldsMessage = getMissingOAuthTokenFieldsMessage('get', {
+            grantType,
+            accessTokenUrl,
+            username: grantParameters.username,
+            authorizationCode: grantParameters.code,
+            redirectUri: grantParameters.redirect_uri,
+        })
+
+        if (missingFieldsMessage) {
+            toast.error(missingFieldsMessage)
+            return
+        }
+
+        const parameters: Record<string, string> = {
+            grant_type: grantType as string,
+        }
+
+        if (scope) {
+            parameters.scope = scope
+        }
+
+        Object.assign(parameters, grantParameters)
 
         try {
             const abortController = new AbortController()
 
-            const headers = {
-                'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED
-            }
+            const { headers, body } = createOAuthTokenRequest(clientId, clientSecret, auth.clientAuthentication, parameters)
 
-            const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
+            const response = await fetchWrapper(accessTokenUrl, 'POST', headers, body, abortController.signal, {
                 electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
                 disableSSLVerification: props.flags.disableSSLVerification,
                 requestTimeout: getSavedRequestTimeout(),
             })
 
-            if(response.status !== 200) {
-                couldNotFetchTokenError(response)
+            const res = parseOAuthTokenResponse(response.buffer)
+
+            if(response.status !== 200 || !res?.access_token) {
+                couldNotFetchTokenError(response, accessTokenUrl)
                 return
             }
 
-            const res = JSON.parse(new TextDecoder().decode(response.buffer))
             if (auth && props.collectionItem && props.collectionItem.authentication) {
                 props.collectionItem.authentication.token = res.access_token
                 props.collectionItem.authentication.refreshToken = res.refresh_token
@@ -742,7 +834,7 @@ async function requestOAuthToken() {
             toast.success('OAuth token obtained successfully!')
 
         } catch (error) {
-            couldNotFetchTokenError(error)
+            couldNotFetchTokenError(error, accessTokenUrl)
         }
     }
 }
@@ -753,39 +845,39 @@ async function refreshOAuthToken() {
 
     if(auth) {
         if(props.collectionItem && props.collectionItem.authentication) {
-            const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
-            const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret)
-            const accessTokenUrl: any = await substituteEnvironmentVariables(env, auth.accessTokenUrl)
+            const clientId: string = await substituteEnvironmentVariables(env, auth.clientId ?? '')
+            const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret ?? '')
+            const accessTokenUrl: string = await substituteEnvironmentVariables(env, auth.accessTokenUrl ?? '')
             const refreshToken: string | any = props.collectionItem.authentication.refreshToken
 
-            oath2Precheck(clientId, clientSecret, accessTokenUrl, auth.grantType)
+            const missingFieldsMessage = getMissingOAuthTokenFieldsMessage('refresh', { accessTokenUrl })
 
-            const bodyData = new URLSearchParams({
-                grant_type: constants.GRANT_TYPES.refresh_token,
-                client_id: clientId,
-                client_secret: clientSecret,
-                refresh_token: refreshToken,
-            })
+            if (missingFieldsMessage) {
+                toast.error(missingFieldsMessage)
+                return
+            }
 
             try {
                 const abortController = new AbortController()
 
-                const headers = {
-                    'Content-Type': constants.MIME_TYPE.FORM_URL_ENCODED
-                }
+                const { headers, body } = createOAuthTokenRequest(clientId, clientSecret, auth.clientAuthentication, {
+                    grant_type: constants.GRANT_TYPES.refresh_token,
+                    refresh_token: refreshToken,
+                })
 
-                const response = await fetchWrapper(accessTokenUrl, 'POST', headers, bodyData.toString(), abortController.signal, {
+                const response = await fetchWrapper(accessTokenUrl, 'POST', headers, body, abortController.signal, {
                     electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
                     disableSSLVerification: props.flags.disableSSLVerification,
                     requestTimeout: getSavedRequestTimeout(),
                 })
 
-                if(response.status !== 200) {
-                    couldNotFetchTokenError(response)
+                const res = parseOAuthTokenResponse(response.buffer)
+
+                if(response.status !== 200 || !res?.access_token) {
+                    couldNotFetchTokenError(response, accessTokenUrl)
                     return
                 }
 
-                const res = JSON.parse(new TextDecoder().decode(response.buffer))
                 if(props.collectionItem && props.collectionItem.authentication) {
                     props.collectionItem.authentication.token = res.access_token
                     if('refresh_token' in res) {
@@ -795,13 +887,16 @@ async function refreshOAuthToken() {
                 toast.success('OAuth token refreshed successfully!')
 
             } catch (error) {
-                couldNotFetchTokenError(error)
+                couldNotFetchTokenError(error, accessTokenUrl)
             }
         }
     }
 }
 
-function couldNotFetchTokenError(error: any) {
+function couldNotFetchTokenError(error: any, accessTokenUrl: string) {
+    // worked out before the buffer is turned into text for the log below
+    const message = describeOAuthTokenError(error, accessTokenUrl)
+
     try {
         error.body = bufferToString(error.buffer)
         delete error.buffer
@@ -809,26 +904,9 @@ function couldNotFetchTokenError(error: any) {
         error.headers = Object.fromEntries(error.headers)
     } catch {}
     console.error('Error fetching OAuth token:', error)
-    toast.error('Error fetching OAuth token. Please check the console for more details.')
-}
 
-function oath2Precheck(clientId: string, clientSecret: string, accessTokenUrl: string, grantType?: string) {
-    if (grantType && grantType === 'authorization_code') {
-        const auth = props.collectionItem?.authentication
-        if (auth) {
-            if (!auth.authorizationUrl || !auth.redirectUri || !auth.authorizationCode) {
-                toast.error('Please provide Authorization URL, Redirect URI, and Authorization Code.')
-                return
-            }
-            if (auth.usePKCE && !auth.codeVerifier) {
-                toast.error('Please provide Code Verifier for PKCE.')
-                return
-            }
-        }
-    } else if (!clientId || !clientSecret || !accessTokenUrl) {
-        toast.error('Please provide all OAuth credentials.')
-        return
-    }
+    // long enough to read a message that names the setting to change, a click dismisses it
+    toast.error(message, { duration: 10000 })
 }
 
 function onTagClick(...args: any) {
