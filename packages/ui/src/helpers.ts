@@ -21,12 +21,14 @@ import {
     EditorConfig,
     SetEnvironmentVariableFunction,
     Flags,
+    CACertificates,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
 import constants from '@/constants'
 import { handleResponseTag } from '@/utils/tag'
 import { handleTags } from '@/parsers/tag'
+import { getSettingsFile, putSettingsFile, deleteSettingsFile } from '@/db'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -116,6 +118,102 @@ export function getSavedRequestTimeout() {
     const savedRequestTimeout = localStorage.getItem(constants.LOCAL_STORAGE_KEY.REQUEST_TIMEOUT)
     const requestTimeout = Number(savedRequestTimeout)
     return Number.isFinite(requestTimeout) && requestTimeout > 0 ? Math.floor(requestTimeout) : 0
+}
+
+const CA_CERTIFICATES_SETTINGS_FILE_ID = 'ca-certificates'
+
+// read once, web-standalone sends the certificates' id with every request
+let savedCACertificates: Promise<CACertificates | null> | undefined
+
+// Settings > CA Certificates, trusted by the Electron and web-standalone transports in addition to the default certificates
+// and those installed in the operating system. A copy of the picked file, kept in the settings files database
+export function getSavedCACertificates(): Promise<CACertificates | null> {
+    savedCACertificates ??= getSettingsFile(CA_CERTIFICATES_SETTINGS_FILE_ID).then(file => {
+        return file ? { fileName: file.fileName, certificates: file.content } : null
+    }).catch(error => {
+        // a failed read is tried again next time
+        savedCACertificates = undefined
+        throw error
+    })
+
+    return savedCACertificates
+}
+
+export async function saveCACertificates(caCertificates: CACertificates | null) {
+    if(caCertificates) {
+        await putSettingsFile(CA_CERTIFICATES_SETTINGS_FILE_ID, { fileName: caCertificates.fileName, content: caCertificates.certificates })
+    } else {
+        await deleteSettingsFile(CA_CERTIFICATES_SETTINGS_FILE_ID)
+    }
+
+    savedCACertificates = Promise.resolve(caCertificates)
+}
+
+// a certificate file as PEM text, Windows exports a certificate as binary DER as often as PEM. A text file is left as it
+// is, so one that holds no certificate is refused as such
+export async function caCertificatesFileToPEM(file: File): Promise<string> {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const text = new TextDecoder().decode(bytes)
+
+    if(text.includes('-----BEGIN')) {
+        return text
+    }
+
+    let binary = ''
+    for(const byte of bytes) {
+        binary += String.fromCharCode(byte)
+    }
+
+    const base64Lines = window.btoa(binary).match(/.{1,64}/g) ?? []
+
+    return `-----BEGIN CERTIFICATE-----\n${base64Lines.join('\n')}\n-----END CERTIFICATE-----\n`
+}
+
+// web-standalone's server keeps the registered certificates in memory, requests name them by id
+const caCertificatesIdsRegisteredWithServer = new Map<string, string>()
+
+async function registerCACertificatesWithServer(certificates: string, registerAgain = false): Promise<string> {
+    const registeredId = caCertificatesIdsRegisteredWithServer.get(certificates)
+
+    if(registeredId && !registerAgain) {
+        return registeredId
+    }
+
+    const response = await fetch('/proxy-ca-certificates', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'text/plain',
+        },
+        body: certificates,
+    })
+
+    const responseBody = await response.json().catch(() => ({}))
+
+    if(!response.ok) {
+        throw new Error(responseBody.error ?? `The server could not use the CA certificates: ${response.status} ${response.statusText}`.trim())
+    }
+
+    caCertificatesIdsRegisteredWithServer.set(certificates, responseBody.id)
+
+    return responseBody.id
+}
+
+// hands the certificates to the process that sends requests, and throws when it cannot use them. Returns web-standalone's
+// id for them
+export async function registerCACertificates(certificates: string | null): Promise<string | null> {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        const { error } = await window.electronIPC.setCACertificates(certificates)
+
+        if(error) {
+            throw new Error(error)
+        }
+    }
+
+    if(import.meta.env.MODE === 'web-standalone' && certificates !== null) {
+        return registerCACertificatesWithServer(certificates)
+    }
+
+    return null
 }
 
 export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
@@ -239,14 +337,25 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 proxyHeaders[`x-proxy-req-header-${header}`] = headers[header]
             })
 
-            const response = await fetch('/proxy', {
-                method: 'POST',
-                headers: proxyHeaders,
-                body: method !== 'GET' ? body : undefined,
-                signal
-            })
+            const caCertificates = await getSavedCACertificates()
 
-            const responseBody = await response.json()
+            const fetchFromProxy = async(caCertificatesId: string | null) => {
+                const response = await fetch('/proxy', {
+                    method: 'POST',
+                    headers: caCertificatesId ? { ...proxyHeaders, 'x-proxy-flag-ca-certificates-id': caCertificatesId } : proxyHeaders,
+                    body: method !== 'GET' ? body : undefined,
+                    signal
+                })
+
+                return await response.json()
+            }
+
+            let responseBody = await fetchFromProxy(caCertificates ? await registerCACertificatesWithServer(caCertificates.certificates) : null)
+
+            // the server restarted and forgot the certificates
+            if(responseBody.event === 'caCertificatesNotFound' && caCertificates) {
+                responseBody = await fetchFromProxy(await registerCACertificatesWithServer(caCertificates.certificates, true))
+            }
 
             return await new Promise((resolve, reject) => {
                 if(responseBody.event === 'response') {
@@ -1818,10 +1927,11 @@ export function uriParse(urlString: string): {
     return { protocol, host, port, pathname, hash, search }
 }
 
-// a browser checks a socket's certificate itself and cannot be told to skip that, so with SSL verification disabled
-// web-standalone connects a secure socket through its server, which skips the check the way /proxy does for requests
-export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebStandalone' | 'disableSSLVerification'>, serverLocation: Pick<Location, 'protocol' | 'host'> = window.location): string {
-    if(!flags.isWebStandalone || !flags.disableSSLVerification) {
+// a browser checks a socket's certificate itself and cannot be told to skip that or to trust another CA, so with SSL
+// verification disabled, or with CA certificates registered under caCertificatesId, web-standalone connects a secure
+// socket through its server, which checks it the way /proxy does for requests
+export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebStandalone' | 'disableSSLVerification'> & { caCertificatesId?: string | null }, serverLocation: Pick<Location, 'protocol' | 'host'> = window.location): string {
+    if(!flags.isWebStandalone || (!flags.disableSSLVerification && !flags.caCertificatesId)) {
         return url
     }
 
@@ -1839,7 +1949,9 @@ export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebSta
 
     const protocol = parsedUrl.protocol === 'wss:' ? (serverLocation.protocol === 'https:' ? 'wss:' : 'ws:') : serverLocation.protocol
 
-    return `${protocol}//${serverLocation.host}/proxy-socket/true/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
+    const verification = flags.disableSSLVerification ? 'true' : `ca-${flags.caCertificatesId}`
+
+    return `${protocol}//${serverLocation.host}/proxy-socket/${verification}/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
 }
 
 export function getStatusText(statusCode: number): string {

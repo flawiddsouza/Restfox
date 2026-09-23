@@ -58,6 +58,8 @@
                 </div>
 
                 <div v-show="activeTab === 'request-response'" class="tab-panel">
+                    <div class="settings-section-heading">Requests</div>
+
                     <div>
                         <div style="margin-bottom: var(--label-margin-bottom);">Global User Agent</div>
                         <input type="text" v-model="globalUserAgent" class="full-width-input" placeholder="Enter user agent string">
@@ -82,16 +84,34 @@
                     </div>
 
                     <template v-if="flags.isElectron || flags.isWebStandalone">
+                        <div class="settings-section-heading">Certificates</div>
+
+                        <div>
+                            <div style="margin-bottom: var(--label-margin-bottom);">CA Certificates</div>
+                            <div v-if="caCertificates" style="display: flex; align-items: center; column-gap: 0.5rem;">
+                                <span>{{ caCertificates.fileName }}</span>
+                                <button class="button" @click="removeCACertificates">Remove</button>
+                            </div>
+                            <template v-else>
+                                <button class="button" @click="$refs.caCertificatesFileInput.click()">Select File</button>
+                                <input type="file" ref="caCertificatesFileInput" accept=".pem,.crt,.cer,.der" @change="selectCACertificates" style="display: none;">
+                            </template>
+                            <div v-if="caCertificatesError" style="margin-top: 0.3rem; color: var(--base-color-error);">{{ caCertificatesError }}</div>
+                            <div style="margin-top: 0.3rem;">Trusted in addition to the built-in certificates and those installed in your operating system, for servers behind a company proxy or signed by your own CA. PEM or DER, a PEM file can hold several certificates.</div>
+                        </div>
+
                         <div style="padding-top: 1rem">
                             <label style="display: flex;">
                                 <input type="checkbox" v-model="disableSSLVerification"> <div style="margin-left: 0.5rem;">Disable SSL Verification</div>
                             </label>
-                            <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this will disable SSL verification for all requests made from the application. This is useful when you are working with self signed certificates.</div>
+                            <div style="margin-left: 1.3rem; margin-top: 0.3rem;">Ticking this accepts any certificate for all requests made from the application. Adding the server's certificate or its CA above is safer.</div>
                         </div>
                     </template>
 
                     <template v-if="flags.isElectron">
-                        <div style="padding-top: 1rem">
+                        <div class="settings-section-heading">Connection</div>
+
+                        <div>
                             <label style="display: flex;">
                                 <input type="checkbox" v-model="electronSwitchToChromiumFetch"> <div style="margin-left: 0.5rem;">Switch to Chromium Fetch</div>
                             </label>
@@ -99,7 +119,9 @@
                         </div>
                     </template>
 
-                    <div style="padding-top: 1rem">
+                    <div class="settings-section-heading">Responses</div>
+
+                    <div>
                         <div style="margin-bottom: var(--label-margin-bottom);">Custom Response Formats</div>
                         <div style="margin-bottom: 0.5rem;">Add additional content types to be recognized as supported formats in the response panel (to bypass the binary response warning):</div>
                         <div style="display: flex; margin-bottom: 0.5rem;">
@@ -162,7 +184,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import { getSavedRequestTimeout, getVersion } from '@/helpers'
+import { getSavedRequestTimeout, getSavedCACertificates, saveCACertificates, caCertificatesFileToPEM, registerCACertificates, getVersion } from '@/helpers'
 
 export default {
     props: {
@@ -184,6 +206,8 @@ export default {
             responsePanelRatio: null,
             disablePageViewAnalyticsTracking: false,
             disableSSLVerification: false,
+            caCertificates: null,
+            caCertificatesError: '',
             electronSwitchToChromiumFetch: false,
             requestTimeout: 0,
             disableIframeSandbox: false,
@@ -286,6 +310,35 @@ export default {
         removeCustomFormat(index) {
             this.customResponseFormats.splice(index, 1)
         },
+        async selectCACertificates(event) {
+            const file = event.target.files[0]
+            // picking the same file again after an error fires change again
+            event.target.value = ''
+
+            if(!file) {
+                return
+            }
+
+            this.caCertificatesError = ''
+
+            try {
+                const certificates = await caCertificatesFileToPEM(file)
+                // the transport checks the file, so one it cannot use is never saved
+                await registerCACertificates(certificates)
+                await this.setCACertificates({ fileName: file.name, certificates })
+            } catch(e) {
+                this.caCertificatesError = `${file.name}: ${e.message}`
+            }
+        },
+        async removeCACertificates() {
+            this.caCertificatesError = ''
+            await this.setCACertificates(null)
+        },
+        async setCACertificates(caCertificates) {
+            await saveCACertificates(caCertificates)
+            this.caCertificates = caCertificates
+            this.$store.state.flags.caCertificates = caCertificates
+        },
         resetWidths() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.SIDEBAR_WIDTH)
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.REQUEST_PANEL_RATIO)
@@ -299,6 +352,9 @@ export default {
         },
         resetDisableSSLVerification() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION)
+        },
+        async resetCACertificates() {
+            await saveCACertificates(null)
         },
         resetElectronSwitchToChromiumFetch() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
@@ -333,7 +389,7 @@ export default {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS)
             this.customResponseFormats = []
         },
-        resetSettings(target = null) {
+        async resetSettings(target = null) {
             if(target) {
                 if(target === 'widths') {
                     this.resetWidths()
@@ -348,6 +404,7 @@ export default {
             this.resetLayout()
             this.resetDisablePageViewAnalyticsTracking()
             this.resetDisableSSLVerification()
+            await this.resetCACertificates()
             this.resetElectronSwitchToChromiumFetch()
             this.resetRequestTimeout()
             this.resetDisableIframeSandbox()
@@ -411,6 +468,14 @@ export default {
             }
 
             this.requestTimeout = getSavedRequestTimeout()
+            this.caCertificatesError = ''
+            if(this.flags.isElectron || this.flags.isWebStandalone) {
+                getSavedCACertificates().then(caCertificates => {
+                    this.caCertificates = caCertificates
+                }).catch(error => {
+                    this.caCertificatesError = `The saved file could not be read: ${error.message}`
+                })
+            }
 
             if(savedDisableIframeSandbox) {
                 try {
@@ -491,5 +556,19 @@ export default {
     padding-top: 1rem;
     overflow-y: auto;
     min-height: 45svh;
+}
+
+.settings-section-heading {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--default-border-color);
+}
+
+.settings-section-heading:not(:first-child) {
+    margin-top: 1.75rem;
 }
 </style>

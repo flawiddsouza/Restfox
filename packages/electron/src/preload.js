@@ -31,6 +31,7 @@ const ipcFunctions = [
     'openFolder',
     'readFile',
     'setDisableSSLVerification',
+    'setCACertificates',
     'updateElectronApp',
 ]
 

@@ -19,13 +19,14 @@ function serverTextFrame(text) {
     return Buffer.concat([Buffer.from([0x81, payload.length]), payload])
 }
 
+const filesDir = path.join(import.meta.dirname, '..', 'test-api', 'files')
+
 // a self-signed HTTPS server that answers like a Socket.IO polling endpoint and echoes WebSocket text messages
-function startSelfSignedServer() {
-    const filesDir = path.join(import.meta.dirname, '..', 'test-api', 'files')
-    const server = https.createServer({
-        key: fs.readFileSync(path.join(filesDir, 'localhost.key')),
-        cert: fs.readFileSync(path.join(filesDir, 'localhost.crt')),
-    })
+function startSelfSignedServer(tlsOptions = {
+    key: fs.readFileSync(path.join(filesDir, 'localhost.key')),
+    cert: fs.readFileSync(path.join(filesDir, 'localhost.crt')),
+}) {
+    const server = https.createServer(tlsOptions)
     const received = []
     trackSockets(server)
 
@@ -188,5 +189,75 @@ test('a socket proxy url without a valid target origin is refused', async() => {
         assert.equal(response.status, 400)
     } finally {
         closeServer(proxy)
+    }
+})
+
+// signed by test-ca.crt, a CA in no trust store, like a site behind a company's TLS inspection proxy
+function startCASignedServer() {
+    return startSelfSignedServer({
+        key: fs.readFileSync(path.join(filesDir, 'test-ca-localhost.key')),
+        cert: fs.readFileSync(path.join(filesDir, 'test-ca-localhost.crt')),
+    })
+}
+
+async function registerCACertificates(proxy) {
+    const response = await fetch(`http://127.0.0.1:${proxy.address().port}/proxy-ca-certificates`, {
+        method: 'POST',
+        body: fs.readFileSync(path.join(filesDir, 'test-ca.crt'), 'utf8'),
+    })
+
+    return (await response.json()).id
+}
+
+test('a wss url to a server signed by registered CA certificates connects through the proxy with SSL verification on', async() => {
+    const target = await startCASignedServer()
+    const proxy = await listenApp()
+
+    try {
+        const targetOrigin = target.origin.replace('https:', 'wss:')
+        const id = await registerCACertificates(proxy)
+
+        const trusted = await openWebSocket(`ws://127.0.0.1:${proxy.address().port}${socketProxyPath(`ca-${id}`, targetOrigin, '/websocket')}`, 'hello')
+        assert.equal(trusted, 'message echo:hello')
+
+        const untrusted = await openWebSocket(`ws://127.0.0.1:${proxy.address().port}${socketProxyPath(false, targetOrigin, '/websocket')}`, 'hello')
+        assert.equal(untrusted, 'error')
+    } finally {
+        closeServer(proxy)
+        closeServer(target.server)
+    }
+})
+
+test('Socket.IO polling to a server signed by registered CA certificates goes through the proxy', async() => {
+    const target = await startCASignedServer()
+    const proxy = await listenApp()
+
+    try {
+        const id = await registerCACertificates(proxy)
+        const response = await fetch(`http://127.0.0.1:${proxy.address().port}${socketProxyPath(`ca-${id}`, target.origin, '/socket.io/?EIO=4&transport=polling')}`)
+
+        assert.equal(response.status, 200)
+        assert.equal(await response.text(), '0{"sid":"abc"}')
+    } finally {
+        closeServer(proxy)
+        closeServer(target.server)
+    }
+})
+
+test('a socket naming CA certificates the server does not have is refused with the reason', async() => {
+    const target = await startCASignedServer()
+    const proxy = await listenApp()
+
+    try {
+        const response = await fetch(`http://127.0.0.1:${proxy.address().port}${socketProxyPath('ca-forgotten', target.origin, '/socket.io/?EIO=4&transport=polling')}`)
+        assert.equal(response.status, 502)
+        assert.match(await response.text(), /no longer registered/)
+
+        const result = await openWebSocket(`ws://127.0.0.1:${proxy.address().port}${socketProxyPath('ca-forgotten', target.origin.replace('https:', 'wss:'), '/websocket')}`, 'hello')
+        assert.equal(result, 'error')
+        assert.equal(target.received.length, 0)
+    } finally {
+        closeServer(proxy)
+        closeServer(target.server)
     }
 })

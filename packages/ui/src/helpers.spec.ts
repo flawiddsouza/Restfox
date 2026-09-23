@@ -23,7 +23,8 @@ import {
     describeOAuthTokenError,
     getMissingOAuthTokenFieldsMessage,
     getSocketConnectionUrl,
-    fetchGraphQLSchema
+    fetchGraphQLSchema,
+    caCertificatesFileToPEM,
 } from './helpers'
 import type { CollectionItem, HandleRequestState, RequestFinalResponse } from './global'
 import { readFile } from 'node:fs/promises'
@@ -1218,12 +1219,40 @@ describe(`Function: ${getSocketConnectionUrl.name}`, () => {
             .toBe('http://localhost:4004/proxy-socket/true/https%3A%2F%2Flocalhost%3A5605/socket.io-v4?room=a')
     })
 
+    test('web-standalone with CA certificates connects a secure url through the server, which trusts them', () => {
+        expect(getSocketConnectionUrl('wss://localhost:5605/websocket', { isWebStandalone: true, disableSSLVerification: false, caCertificatesId: 'abc' }, standaloneOnHttp))
+            .toBe('ws://localhost:4004/proxy-socket/ca-abc/wss%3A%2F%2Flocalhost%3A5605/websocket')
+        // with SSL verification disabled there is nothing to check a certificate against
+        expect(getSocketConnectionUrl('wss://localhost:5605/websocket', { isWebStandalone: true, disableSSLVerification: true, caCertificatesId: 'abc' }, standaloneOnHttp))
+            .toBe('ws://localhost:4004/proxy-socket/true/wss%3A%2F%2Flocalhost%3A5605/websocket')
+        expect(getSocketConnectionUrl('ws://localhost:5605/websocket', { isWebStandalone: true, disableSSLVerification: false, caCertificatesId: 'abc' }, standaloneOnHttp))
+            .toBe('ws://localhost:5605/websocket')
+    })
+
     test('everything else connects directly as before', () => {
         const url = 'wss://localhost:5605/websocket'
         expect(getSocketConnectionUrl(url, { isWebStandalone: true, disableSSLVerification: false }, standaloneOnHttp)).toBe(url)
+        expect(getSocketConnectionUrl(url, { isWebStandalone: true, disableSSLVerification: false, caCertificatesId: null }, standaloneOnHttp)).toBe(url)
+        expect(getSocketConnectionUrl(url, { isWebStandalone: false, disableSSLVerification: false, caCertificatesId: 'abc' }, standaloneOnHttp)).toBe(url)
         expect(getSocketConnectionUrl(url, { isWebStandalone: false, disableSSLVerification: true }, standaloneOnHttp)).toBe(url)
         expect(getSocketConnectionUrl('ws://localhost:5605/websocket', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp)).toBe('ws://localhost:5605/websocket')
         expect(getSocketConnectionUrl('not a url', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp)).toBe('not a url')
+    })
+})
+
+describe(`Function: ${caCertificatesFileToPEM.name}`, () => {
+    const pemFile = path.join(__dirname, '..', '..', 'test-api', 'files', 'test-ca.crt')
+
+    test('keeps a PEM file as it is', async() => {
+        const pem = await readFile(pemFile, 'utf8')
+        expect(await caCertificatesFileToPEM(new File([pem], 'test-ca.crt'))).toBe(pem)
+    })
+
+    test('turns a binary DER certificate, as Windows exports one, into PEM', async() => {
+        const pem = await readFile(pemFile, 'utf8')
+        const der = Buffer.from(pem.replace(/-----(BEGIN|END) CERTIFICATE-----|\s/g, ''), 'base64')
+
+        expect(await caCertificatesFileToPEM(new File([der], 'test-ca.cer'))).toBe(pem)
     })
 })
 

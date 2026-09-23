@@ -3,6 +3,7 @@ const { fetch, Agent, FormData } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 const { withSentHeadersCapture } = require('./sent-headers-capture.js')
+const { getCACertificatesWithCustom } = require('./ca-certificates.js')
 
 let abortController = {}
 let cancelledRequestIds = new Set()
@@ -32,6 +33,23 @@ const localhostTds = [
 
 const agents = new Map()
 
+// Settings > CA Certificates, sent by the renderer
+let customCACertificates = []
+
+function setCustomCACertificates(certificates) {
+    customCACertificates = certificates
+
+    // a pooled connection keeps the certificates it was verified with
+    for(const agent of agents.values()) {
+        agent.close().catch(() => {})
+    }
+    agents.clear()
+}
+
+function getCustomCACertificates() {
+    return customCACertificates
+}
+
 function getAgentForRequest(urlParsed, disableSSLVerification) {
     const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}`
 
@@ -39,6 +57,7 @@ function getAgentForRequest(urlParsed, disableSSLVerification) {
         const agent = new Agent({
             connect: {
                 rejectUnauthorized: disableSSLVerification ? false : true,
+                ...(customCACertificates.length > 0 ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
                 lookup: async(hostname, _opts, callback) => {
                     try {
                         console.log('lookup', hostname)
@@ -188,4 +207,6 @@ function cancelRequest(requestId) {
 module.exports = {
     handleSendRequest,
     cancelRequest,
+    setCustomCACertificates,
+    getCustomCACertificates,
 }

@@ -125,6 +125,12 @@ export interface RequestFinalResponse {
     name?: string
 }
 
+// Settings > CA Certificates
+export interface CACertificates {
+    fileName: string
+    certificates: string // PEM
+}
+
 export interface Flags {
     hideBrowserRelatedResponsePanelErrors: boolean
     browserExtensionEnabled: boolean
@@ -132,6 +138,7 @@ export interface Flags {
     isWebStandalone: boolean
     isElectron: boolean
     disableSSLVerification: boolean
+    caCertificates: CACertificates | null
     electronSwitchToChromiumFetch: boolean
     hidePasswordFields: boolean
     requestTimeout: number

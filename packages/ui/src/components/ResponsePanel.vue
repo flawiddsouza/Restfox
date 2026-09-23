@@ -117,7 +117,7 @@
                             <div style="margin-bottom: 0.5rem">Possible causes for this error:</div>
                             <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">1) Given request URL is incorrect or invalid</div>
                             <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">2) The server for the url isn't returning a valid response for the created request</div>
-                            <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">3) The server for the url has an expired or invalid ssl certificate</div>
+                            <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">3) The server for the url has an expired or invalid ssl certificate<template v-if="flags.isElectron || flags.isWebStandalone">. If it is self-signed or from your own CA, add it in Settings > Request / Response > CA Certificates or tick Disable SSL Verification there</template></div>
                             <template v-if="flags.isBrowser">
                                 <template v-if="!flags.hideBrowserRelatedResponsePanelErrors">
                                     <div style="margin-left: 0.5rem; margin-bottom: 0.4rem; line-height: 1rem;">4) No CORS headers present for the requested url and requested http method</div>

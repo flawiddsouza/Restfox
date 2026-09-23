@@ -98,6 +98,40 @@ db.version(5).stores({
     responses: '_id, collectionId'
 })
 
+// settings that hold a file, such as Settings > CA Certificates, too large for localStorage. A database of its own, a new
+// table in the Restfox database would raise its version and older releases could not open it
+export interface SettingsFile {
+    fileName: string
+    content: string
+}
+
+class RestfoxSettingsFilesDatabase extends Dexie {
+    files!: Dexie.Table<SettingsFile & { _id: string }>
+
+    constructor() {
+        super('Restfox-SettingsFiles')
+
+        this.version(1).stores({
+            files: '_id',
+        })
+    }
+}
+
+const settingsFilesDB = new RestfoxSettingsFilesDatabase()
+
+export async function getSettingsFile(id: string): Promise<SettingsFile | null> {
+    const file = await settingsFilesDB.files.get(id)
+    return file ? { fileName: file.fileName, content: file.content } : null
+}
+
+export async function putSettingsFile(id: string, file: SettingsFile) {
+    await settingsFilesDB.files.put({ _id: id, ...file })
+}
+
+export async function deleteSettingsFile(id: string) {
+    await settingsFilesDB.files.delete(id)
+}
+
 export async function exportDB() {
     const blob = await db.export()
     return blob

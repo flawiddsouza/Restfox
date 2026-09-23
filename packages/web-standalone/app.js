@@ -5,10 +5,14 @@ import https from 'https'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { pathToFileURL } from 'url'
+import { createHash } from 'crypto'
 import * as db from './src/db.js'
 import * as helpers from './src/helpers.js'
 import TaskQueue from './src/task-queue.js'
 import { withSentHeadersCapture } from './src/sent-headers-capture.js'
+import { trustSystemCACertificates, parseCACertificates, getCACertificatesWithCustom } from './src/ca-certificates.js'
+
+trustSystemCACertificates()
 
 const app = express()
 
@@ -32,15 +36,40 @@ function apiRoute(handler) {
     }
 }
 
+// Settings > CA Certificates. The UI registers a file here once and names it by id in each request, so the file does
+// not travel in every request's headers. One server can serve several people, each with their own file
+const CUSTOM_CA_CERTIFICATES_LIMIT = 100
+const customCACertificatesById = new Map()
+
+app.post('/proxy-ca-certificates', express.text({ type: '*/*', limit: '5mb' }), (req, res) => {
+    try {
+        const certificates = parseCACertificates(req.body)
+        const id = createHash('sha256').update(certificates.join('\n')).digest('hex')
+
+        // the most recently registered stay, the oldest go past the limit
+        customCACertificatesById.delete(id)
+        customCACertificatesById.set(id, certificates)
+        if(customCACertificatesById.size > CUSTOM_CA_CERTIFICATES_LIMIT) {
+            customCACertificatesById.delete(customCACertificatesById.keys().next().value)
+        }
+
+        res.json({ id })
+    } catch(e) {
+        res.status(400).json({ error: e.message })
+    }
+})
+
 const agents = new Map()
 
-function getAgentForRequest(urlParsed, disableSSLVerification) {
-    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}`
+function getAgentForRequest(urlParsed, disableSSLVerification, customCACertificatesId = null) {
+    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}:${customCACertificatesId}`
 
     if(!agents.has(key)) {
+        const customCACertificates = customCACertificatesById.get(customCACertificatesId)
         const agent = new Agent({
             connect: {
                 rejectUnauthorized: disableSSLVerification ? false : true,
+                ...(customCACertificates ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
             },
             allowH2: true,
             headersTimeout: 0,
@@ -59,9 +88,16 @@ app.post('/proxy', async(req, res) => {
     const method = req.headers['x-proxy-req-method']
     const requestTimeoutRaw = Number(req.headers['x-proxy-flag-timeout'] ?? 0)
     const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
+    const customCACertificatesId = req.headers['x-proxy-flag-ca-certificates-id'] ?? null
     const headers = {}
 
-    const agent = getAgentForRequest(new URL(url), disableSSLVerification)
+    // after a restart the server has forgotten the file, the UI registers it again and repeats the request
+    if(customCACertificatesId !== null && !customCACertificatesById.has(customCACertificatesId)) {
+        res.send({ event: 'caCertificatesNotFound' })
+        return
+    }
+
+    const agent = getAgentForRequest(new URL(url), disableSSLVerification, customCACertificatesId)
 
     // header names arrive lowercased, by Node and by any HTTP/2 hop in front of this server, so the UI sends them as
     // typed in a value. An older UI does not, and its headers go out lowercase as before
@@ -162,7 +198,8 @@ app.post('/proxy', async(req, res) => {
         if(!res.writableEnded && !res.destroyed) {
             res.send({
                 event: 'responseError',
-                eventData: timedOut ? `Request timed out after ${requestTimeout} ms` : e.message
+                // undici says only "fetch failed", the reason, such as a rejected certificate, is its cause
+                eventData: timedOut ? `Request timed out after ${requestTimeout} ms` : (e.cause?.message ? `${e.message}: ${e.cause.message}` : e.message)
             })
         }
     } finally {
@@ -173,7 +210,8 @@ app.post('/proxy', async(req, res) => {
 })
 
 // WebSocket and Socket.IO connections are made by the browser, which checks certificates itself, so with SSL verification
-// disabled the UI connects through here instead: /proxy-socket/<disable ssl verification>/<encoded target origin><target path>
+// disabled or custom CA certificates the UI connects through here instead:
+// /proxy-socket/<true to disable ssl verification, ca-<id> for the registered CA certificates>/<encoded target origin><target path>
 // Socket.IO starts with HTTP polling requests and then upgrades to a WebSocket, both come through this prefix
 const SOCKET_PROXY_PREFIX = '/proxy-socket/'
 
@@ -186,7 +224,7 @@ function parseSocketProxyUrl(requestUrl) {
         return null
     }
 
-    const [disableSSLVerification, encodedOrigin, ...rest] = requestUrl.slice(SOCKET_PROXY_PREFIX.length).split('/')
+    const [verification, encodedOrigin, ...rest] = requestUrl.slice(SOCKET_PROXY_PREFIX.length).split('/')
 
     let targetOrigin
     try {
@@ -204,8 +242,16 @@ function parseSocketProxyUrl(requestUrl) {
 
     return {
         url: new URL(`${protocol}//${targetOrigin.host}/${rest.join('/')}`),
-        disableSSLVerification: disableSSLVerification === 'true',
+        disableSSLVerification: verification === 'true',
+        customCACertificatesId: verification?.startsWith('ca-') ? verification.slice('ca-'.length) : null,
     }
+}
+
+// after a restart the server has forgotten the file, connecting again registers it again
+const SOCKET_PROXY_CA_CERTIFICATES_NOT_FOUND = 'The CA certificates are no longer registered with the server, connect again'
+
+function isSocketProxyCACertificatesMissing(target) {
+    return target.customCACertificatesId !== null && !customCACertificatesById.has(target.customCACertificatesId)
 }
 
 function getSocketProxyRequestHeaders(incomingHeaders, skippedHeaders) {
@@ -228,6 +274,11 @@ app.all(`${SOCKET_PROXY_PREFIX}*`, async(req, res) => {
         return
     }
 
+    if(isSocketProxyCACertificatesMissing(target)) {
+        res.status(502).send(SOCKET_PROXY_CA_CERTIFICATES_NOT_FOUND)
+        return
+    }
+
     const abortController = new AbortController()
     res.on('close', () => {
         if(!res.writableEnded) {
@@ -237,7 +288,7 @@ app.all(`${SOCKET_PROXY_PREFIX}*`, async(req, res) => {
 
     try {
         const response = await fetch(target.url, {
-            dispatcher: getAgentForRequest(target.url, target.disableSSLVerification),
+            dispatcher: getAgentForRequest(target.url, target.disableSSLVerification, target.customCACertificatesId),
             method: req.method,
             headers: getSocketProxyRequestHeaders(req.headers, SOCKET_PROXY_SKIPPED_REQUEST_HEADERS),
             body: ['GET', 'HEAD'].includes(req.method) ? undefined : Readable.toWeb(req),
@@ -276,11 +327,19 @@ export function handleSocketProxyUpgrade(req, socket, head) {
         return
     }
 
+    if(isSocketProxyCACertificatesMissing(target)) {
+        socket.end(`HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n${SOCKET_PROXY_CA_CERTIFICATES_NOT_FOUND}`)
+        return
+    }
+
+    const customCACertificates = customCACertificatesById.get(target.customCACertificatesId)
+
     const upstreamRequest = (target.url.protocol === 'https:' ? https : http).request(target.url, {
         method: req.method,
         // the upgrade headers pass through as they are, so the browser and the target negotiate the protocol between them
         headers: getSocketProxyRequestHeaders(req.headers, ['host', 'cookie']),
         rejectUnauthorized: !target.disableSSLVerification,
+        ...(customCACertificates ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
     })
 
     upstreamRequest.on('upgrade', (upstreamResponse, upstreamSocket, upstreamHead) => {

@@ -266,6 +266,7 @@ import {
     setEnvironmentVariable,
     jsonStringify,
     substituteEnvironmentVariables,
+    registerCACertificates,
 } from '@/helpers'
 import Tabs from './Tabs.vue'
 import ioV2 from 'socket.io-client-v2'
@@ -378,6 +379,26 @@ async function connect(client: Client) {
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
     const clientUrlWithEnvironmentVariablesSubtituted = await substituteEnvironmentVariables(environment, client.url)
 
+    // web-standalone's server connects a secure socket for the browser when CA certificates are set, and needs them
+    // registered first
+    let caCertificatesId: string | null = null
+
+    if (flags.value.isWebStandalone && flags.value.caCertificates && !flags.value.disableSSLVerification && /^(wss|https):/i.test(clientUrlWithEnvironmentVariablesSubtituted)) {
+        try {
+            caCertificatesId = await registerCACertificates(flags.value.caCertificates.certificates)
+        } catch (error: any) {
+            delete pendingConnections[socketKey]
+
+            addClientMessage(client, {
+                timestamp: new Date().getTime(),
+                message: `Could not connect to ${clientUrlWithEnvironmentVariablesSubtituted}: ${error.message}`,
+                type: 'INFO'
+            })
+
+            return
+        }
+    }
+
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
 
     // a socket Connect is still showing for has failed or is still trying, such as a Socket.IO v2 client that
@@ -391,7 +412,7 @@ async function connect(client: Client) {
 
     try {
         if (client.type === undefined) {
-            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(getSocketConnectionUrl(clientUrlWithEnvironmentVariablesSubtituted, flags.value))
+            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(getSocketConnectionUrl(clientUrlWithEnvironmentVariablesSubtituted, { ...flags.value, caCertificatesId }))
         } else if (client.type.startsWith('Socket.IO')) {
             const targetUrl = new URL(clientUrlWithEnvironmentVariablesSubtituted)
 
@@ -399,7 +420,7 @@ async function connect(client: Client) {
                 targetUrl.pathname = '/socket.io/'
             }
 
-            const parsedUrl = new URL(getSocketConnectionUrl(targetUrl.href, flags.value))
+            const parsedUrl = new URL(getSocketConnectionUrl(targetUrl.href, { ...flags.value, caCertificatesId }))
 
             let mainUrl = parsedUrl.origin
 
@@ -473,7 +494,7 @@ async function connect(client: Client) {
 
         // browsers do not say why a connection failed, a rejected certificate looks like any other failure
         if ((flags.value.isElectron || flags.value.isWebStandalone) && !flags.value.disableSSLVerification && /^(wss|https):/i.test(clientUrlWithEnvironmentVariablesSubtituted)) {
-            message += '. If the server uses a self-signed certificate, tick Settings > Request / Response > Disable SSL Verification'
+            message += '. If the server uses a self-signed certificate or one from your own CA, add it in Settings > Request / Response > CA Certificates or tick Disable SSL Verification there'
         }
 
         addClientMessage(client, {

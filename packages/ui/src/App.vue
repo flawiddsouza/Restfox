@@ -20,6 +20,7 @@ import {
     debounce,
     initStoragePersistence,
     getSavedRequestTimeout,
+    getSavedCACertificates,
 } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
@@ -71,9 +72,21 @@ export default {
             if(import.meta.env.MODE === 'desktop-electron') {
                 window.electronIPC.setDisableSSLVerification(this.$store.state.flags.disableSSLVerification)
             }
+        },
+        '$store.state.flags.caCertificates'() {
+            if(import.meta.env.MODE === 'desktop-electron') {
+                this.sendCACertificatesToElectron()
+            }
         }
     },
     methods: {
+        sendCACertificatesToElectron() {
+            window.electronIPC.setCACertificates(this.$store.state.flags.caCertificates?.certificates ?? null).then(({ error }) => {
+                if(error) {
+                    console.error(`Settings > CA Certificates > ${this.$store.state.flags.caCertificates?.fileName}: ${error}`)
+                }
+            })
+        },
         async fetchSetCollectionForWorkspace() {
             if(!this.activeWorkspace) {
                 this.activeWorkspaceLoaded = false
@@ -439,6 +452,20 @@ export default {
         }
 
         emitter.on('error', this.handleError)
+
+        // the main process keeps the certificates across page reloads, so they are sent even when there are none. Other
+        // builds send requests through the browser, which has no setting for them
+        if(import.meta.env.MODE === 'desktop-electron' || import.meta.env.MODE === 'web-standalone') {
+            getSavedCACertificates().then(caCertificates => {
+                this.$store.state.flags.caCertificates = caCertificates
+
+                if(import.meta.env.MODE === 'desktop-electron') {
+                    this.sendCACertificatesToElectron()
+                }
+            }).catch(error => {
+                console.error('Settings > CA Certificates could not be read:', error)
+            })
+        }
 
         if(import.meta.env.MODE === 'desktop-electron') {
             // the main process keeps the setting across page reloads, so the saved value is sent even when it is the default

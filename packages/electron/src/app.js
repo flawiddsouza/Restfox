@@ -9,10 +9,13 @@ const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
 const updateElectronApp = require('update-electron-app')
 const windowStateKeeper = require('./utils/window-state')
+const { trustSystemCACertificates } = require('./ca-certificates')
 
 Object.assign(console, log.functions)
 
 if(require('electron-squirrel-startup')) return app.quit()
+
+trustSystemCACertificates()
 
 // add a right-click context menu to the app, includes options to copy, paste, select all etc.
 contextMenu()
@@ -219,6 +222,8 @@ app.whenReady().then(async() => {
     ipcMain.handle('readFile', (_, ...args) => helpers.readFile(...args))
 
     ipcMain.handle('setDisableSSLVerification', (_, ...args) => helpers.setDisableSSLVerification(...args))
+
+    ipcMain.handle('setCACertificates', (_, ...args) => helpers.setCACertificates(...args))
 
     app.on('certificate-error', helpers.handleCertificateError)
 

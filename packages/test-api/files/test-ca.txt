@@ -1,0 +1,12 @@
+test-ca.crt is a CA that is in no trust store, test-ca-localhost.crt is signed by it, like a site behind a company's TLS
+inspection proxy. The CA's key was discarded.
+
+openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out test-ca.crt -days 36500 -subj "/CN=Restfox Test CA" -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+openssl req -newkey rsa:2048 -nodes -keyout test-ca-localhost.key -out leaf.csr -subj "/CN=localhost"
+printf "subjectAltName=DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n" > leaf.ext
+openssl x509 -req -in leaf.csr -CA test-ca.crt -CAkey ca.key -CAcreateserial -out test-ca-localhost.crt -days 36500 -extfile leaf.ext
+
+test-client-auth-only.crt is self-signed for localhost and names only client authentication as its purpose, so a server
+must not be trusted with it. Its key was discarded.
+
+openssl req -x509 -newkey rsa:2048 -nodes -keyout client.key -out test-client-auth-only.crt -days 36500 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" -addext "extendedKeyUsage=clientAuth"

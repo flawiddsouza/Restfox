@@ -3,6 +3,8 @@ const fileUtils = require('./file-utils')
 const fs = require('fs').promises
 const path = require('path')
 const { platform } = require('os')
+const requests = require('./request')
+const { parseCACertificates, isCertificateTrustedByCustomCA } = require('./ca-certificates')
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []
@@ -88,10 +90,39 @@ async function setDisableSSLVerification(value) {
     await session.defaultSession.closeAllConnections()
 }
 
-// Chromium asks here about each certificate it rejected, so the answer follows the setting at the time. Not
-// setCertificateVerifyProc, the network service caches its result and a certificate stays accepted after unticking
-function handleCertificateError(event, _webContents, _url, _error, _certificate, callback) {
-    if(sslVerificationDisabled) {
+let customCACertificatesText = null
+
+// Settings > CA Certificates, the text of a PEM file or null. Requests through undici and, via handleCertificateError,
+// Chromium's connections trust these certificates in addition to the default ones
+async function setCACertificates(text) {
+    const value = text ? String(text) : null
+
+    if(value === customCACertificatesText) {
+        return { error: null }
+    }
+
+    let certificates = []
+
+    if(value !== null) {
+        try {
+            certificates = parseCACertificates(value)
+        } catch(e) {
+            return { error: e.message }
+        }
+    }
+
+    customCACertificatesText = value
+    requests.setCustomCACertificates(certificates)
+    await session.defaultSession.closeAllConnections()
+
+    return { error: null }
+}
+
+// Chromium asks here about each certificate it rejected, so the answer follows the settings at the time. Not
+// setCertificateVerifyProc, the network service caches its result and a certificate stays accepted after unticking.
+// Chromium already trusts the operating system's certificates, a custom one is checked here
+function handleCertificateError(event, _webContents, url, error, certificate, callback) {
+    if(sslVerificationDisabled || (error === 'net::ERR_CERT_AUTHORITY_INVALID' && isCertificateTrustedByCustomCA(certificate, new URL(url).hostname, requests.getCustomCACertificates()))) {
         event.preventDefault()
         callback(true)
     }
@@ -118,6 +149,7 @@ module.exports = {
     openFolder,
     readFile,
     setDisableSSLVerification,
+    setCACertificates,
     handleCertificateError,
     removePrefixFromString,
 }
