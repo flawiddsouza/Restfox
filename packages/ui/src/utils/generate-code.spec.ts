@@ -76,7 +76,7 @@ describe(`${generateCode.name}`, () => {
         const input = await generateCode(request, environment, {}, undefined, 'shell', 'curl')
         const expectedOutput = `curl --request POST \\
     --url 'http://clicks-inges-abc-xyz.ap-south-1.elb.amazonaws.com/collect?appId=demo_app2' \\
-    --header 'content-type: application/json; charset=utf-8' \\
+    --header 'Content-Type: application/json; charset=utf-8' \\
     --data '[{"event_type":"api_event","event_id":"954a6478-88bf-4baf-8c1b-efe2ea9fd0e6","timestamp":1697544030000,"app_id":"demo_app2","attributes":{"environment":"test","value":279.9}}]'`
         assert.equal(input, expectedOutput)
     })

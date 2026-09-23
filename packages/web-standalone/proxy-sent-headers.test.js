@@ -58,11 +58,14 @@ function listenApp() {
     })
 }
 
-async function proxyRequest(proxy, { url, method = 'GET', headers = {}, body, disableSSLVerification = false }) {
+async function proxyRequest(proxy, { url, method = 'GET', headers = {}, body, disableSSLVerification = false, headerNames }) {
     const proxyHeaders = {
         'x-proxy-req-url': url,
         'x-proxy-req-method': method,
         'x-proxy-flag-disable-ssl-verification': String(disableSSLVerification),
+    }
+    if(headerNames !== undefined) {
+        proxyHeaders['x-proxy-flag-header-names'] = JSON.stringify(headerNames)
     }
     for(const [name, value] of Object.entries(headers)) {
         proxyHeaders[`x-proxy-req-header-${name}`] = value
@@ -86,6 +89,48 @@ test('proxy reports the upstream request headers exactly as sent for HTTP/1.1', 
         assert.equal(wire.requestLine, 'GET /path?x=1 HTTP/1.1')
         assert.ok(wire.headers.some(([name]) => name === 'connection'))
         assert.deepEqual(result.eventData.requestHeadersSent, wire.headers)
+    } finally {
+        proxy.close()
+        upstream.server.close()
+    }
+})
+
+test('proxy sends header names in the case the UI typed them', async() => {
+    const upstream = await startRawServer('HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok')
+    const proxy = await listenApp()
+
+    try {
+        const headers = { 'Environment': 'ADMIN', 'X-Mixed-Case': 'v', 'user-agent': 'Restfox/test' }
+        const result = await proxyRequest(proxy, {
+            url: `http://127.0.0.1:${upstream.port}/`,
+            headers,
+            headerNames: Object.keys(headers),
+        })
+
+        assert.equal(result.event, 'response')
+        const sentNames = upstream.received().headers.map(([name]) => name)
+        assert.ok(sentNames.includes('Environment'))
+        assert.ok(sentNames.includes('X-Mixed-Case'))
+        assert.ok(sentNames.includes('user-agent'))
+    } finally {
+        proxy.close()
+        upstream.server.close()
+    }
+})
+
+// an older UI does not send the names, its headers stay lowercase as before
+test('proxy sends header names lowercase when the UI does not send their case', async() => {
+    const upstream = await startRawServer('HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok')
+    const proxy = await listenApp()
+
+    try {
+        const result = await proxyRequest(proxy, {
+            url: `http://127.0.0.1:${upstream.port}/`,
+            headers: { 'Environment': 'ADMIN' },
+        })
+
+        assert.equal(result.event, 'response')
+        assert.ok(upstream.received().headers.some(([name, value]) => name === 'environment' && value === 'ADMIN'))
     } finally {
         proxy.close()
         upstream.server.close()

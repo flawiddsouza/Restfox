@@ -63,9 +63,19 @@ app.post('/proxy', async(req, res) => {
 
     const agent = getAgentForRequest(new URL(url), disableSSLVerification)
 
+    // header names arrive lowercased, by Node and by any HTTP/2 hop in front of this server, so the UI sends them as
+    // typed in a value. An older UI does not, and its headers go out lowercase as before
+    const typedHeaderNames = new Map()
+    try {
+        for(const headerName of JSON.parse(req.headers['x-proxy-flag-header-names'] ?? '[]')) {
+            typedHeaderNames.set(String(headerName).toLowerCase(), String(headerName))
+        }
+    } catch {}
+
     Object.keys(req.headers).forEach(header => {
         if(header.startsWith('x-proxy-req-header-')) {
-            headers[header.replace('x-proxy-req-header-', '')] = req.headers[header]
+            const headerName = header.replace('x-proxy-req-header-', '')
+            headers[typedHeaderNames.get(headerName) ?? headerName] = req.headers[header]
         }
     })
 

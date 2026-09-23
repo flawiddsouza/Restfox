@@ -231,6 +231,8 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 'x-proxy-req-url': url.toString(),
                 'x-proxy-req-method': method,
                 'x-proxy-flag-timeout': requestTimeout.toString(),
+                // header names reach the server lowercased, by Node and by any HTTP/2 hop in front of it, a value keeps them as typed
+                'x-proxy-flag-header-names': JSON.stringify(Object.keys(headers)),
             }
 
             Object.keys(headers).forEach(header => {
@@ -375,6 +377,12 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     }
 }
 
+// header names are sent in the case they were typed in but compared without regard to case, as HTTP compares them
+function findHeaderName(headers: Record<string, unknown>, headerName: string): string | undefined {
+    const lowerCaseHeaderName = headerName.toLowerCase()
+    return Object.keys(headers).find(existingHeaderName => existingHeaderName.toLowerCase() === lowerCaseHeaderName)
+}
+
 export async function createRequestData(
     state: HandleRequestState,
     request: CollectionItem,
@@ -500,30 +508,44 @@ export async function createRequestData(
 
     const headers: Record<string, string | any> = {}
 
+    // sets a header whatever case an earlier one of the same name was typed in, the header keeps its place and takes
+    // the later spelling, as in Insomnia
+    const setHeader = (headerName: string, headerValue: string) => {
+        const existingHeaderName = findHeaderName(headers, headerName)
 
+        if(existingHeaderName !== undefined && existingHeaderName !== headerName) {
+            for(const [name, value] of Object.entries(headers)) {
+                delete headers[name]
+                headers[name === existingHeaderName ? headerName : name] = value
+            }
+        }
+
+        headers[headerName] = headerValue
+    }
 
     if('GLOBAL_HEADERS' in environment) {
         Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
-            headers[header.toLowerCase()] = environment.GLOBAL_HEADERS[header]
+            setHeader(header, environment.GLOBAL_HEADERS[header])
         })
     }
 
     if('headers' in request && request.headers !== undefined) {
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
-            const headerName = (await substituteEnvironmentVariables(environment, header.name, { cacheId })).toLowerCase()
+            const headerName = await substituteEnvironmentVariables(environment, header.name, { cacheId })
             const headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
 
-            if(body instanceof FormData && headerName === 'content-type') { // exclude content-type header for multipart/form-data
+            if(body instanceof FormData && headerName.toLowerCase() === 'content-type') { // exclude content-type header for multipart/form-data
                 continue
             }
 
             if(headerName !== '') {
-                if(headerName in headers) {
+                const existingHeaderName = findHeaderName(headers, headerName)
+                if(existingHeaderName !== undefined) {
                     //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
-                    headers[headerName] += `, ${headerValue}`
+                    setHeader(headerName, `${headers[existingHeaderName]}, ${headerValue}`)
                 } else {
-                    headers[headerName] = headerValue
+                    setHeader(headerName, headerValue)
                 }
             }
         }
@@ -531,8 +553,8 @@ export async function createRequestData(
 
     // eslint-disable-next-line prefer-const
     for(let [headerName, headerValues] of Object.entries(parentHeaders)) {
-        headerName = (await substituteEnvironmentVariables(environment, headerName.toLowerCase(), { cacheId })).toLowerCase()
-        if(headerName in headers) {
+        headerName = await substituteEnvironmentVariables(environment, headerName, { cacheId })
+        if(findHeaderName(headers, headerName) !== undefined) {
             continue //ignore parent headers
         }
         const buffer = []
@@ -545,7 +567,16 @@ export async function createRequestData(
     }
 
     const setAuthentication = async(authentication: RequestAuthentication) => {
-        headers['Authorization'] = await resolveAuthentication(cacheId, authentication, environment)
+        const authorization = await resolveAuthentication(cacheId, authentication, environment)
+        const existingHeaderName = findHeaderName(headers, 'Authorization')
+
+        // a typed Authorization header and the Auth tab's are sent together, as the transports joined them when the
+        // typed one was a separate lowercase key
+        if(existingHeaderName !== undefined) {
+            headers[existingHeaderName] = `${headers[existingHeaderName]}, ${authorization}`
+        } else {
+            headers['Authorization'] = authorization
+        }
     }
 
     if(request.authentication && hasOwnAuthentication(request.authentication)) {
@@ -586,8 +617,10 @@ export async function handleRequest(
 
         const globalUserAgent = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GLOBAL_USER_AGENT)
 
-        if (!headers['user-agent']) {
-            headers['user-agent'] = globalUserAgent || `Restfox/${getVersion()}`
+        const userAgentHeaderName = findHeaderName(headers, 'user-agent')
+
+        if (userAgentHeaderName === undefined || !headers[userAgentHeaderName]) {
+            headers[userAgentHeaderName ?? 'user-agent'] = globalUserAgent || `Restfox/${getVersion()}`
         }
 
         const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
@@ -623,7 +656,10 @@ export async function handleRequest(
         // a browser fetch drops these, so they are removed only when the configured headers stand in for the sent ones
         if(!headersSent) {
             forbiddenHeaders.forEach(forbiddenHeader => {
-                delete headersToSave[forbiddenHeader.toLowerCase()]
+                const headerName = findHeaderName(headersToSave, forbiddenHeader)
+                if(headerName !== undefined) {
+                    delete headersToSave[headerName]
+                }
             })
         }
 

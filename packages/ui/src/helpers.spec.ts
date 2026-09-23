@@ -24,7 +24,7 @@ import {
     getMissingOAuthTokenFieldsMessage,
     getSocketConnectionUrl
 } from './helpers'
-import type { CollectionItem, HandleRequestState } from './global'
+import type { CollectionItem, HandleRequestState, RequestFinalResponse } from './global'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -1011,6 +1011,71 @@ describe('Authentication inheritance', () => {
         const insomniaExport = { resources: [{ _id: 'r', _type: 'request', parentId: null, name: 'Request', method: 'GET', url: 'https://example.test/', body: {}, authentication: { type: 'none' } }] }
         const collection = convertInsomniaExportToRestfoxCollection(insomniaExport, 'w')
         expect(collection[0].authentication).toEqual({ type: 'none' })
+    })
+})
+
+describe('Header name casing', () => {
+    const request = (fields: Partial<CollectionItem>) => ({ _id: 'r', _type: 'request', workspaceId: 'w', parentId: 'f', name: 'Request', method: 'GET', url: 'https://example.test/', ...fields }) as CollectionItem
+    const prepare = (fields: Partial<CollectionItem>, { environment = {}, parentHeaders = {}, parentAuthentication }: { environment?: Record<string, unknown>, parentHeaders?: Record<string, string[]>, parentAuthentication?: CollectionItem['authentication'] } = {}) => {
+        const state: HandleRequestState = { currentPlugin: null, testResults: [] }
+        return createRequestData(state, request(fields), environment, parentHeaders, parentAuthentication, null, [], null)
+    }
+
+    test('a header name is sent as typed', async() => {
+        const result = await prepare({ headers: [{ name: 'Environment', value: 'ADMIN' }] })
+        expect(result.headers).toEqual({ Environment: 'ADMIN' })
+    })
+
+    test('a header name from a variable keeps the case the variable resolves to', async() => {
+        const result = await prepare({ headers: [{ name: '{{HEADER}}', value: 'v' }] }, { environment: { HEADER: 'X-Api-Key' } })
+        expect(result.headers).toEqual({ 'X-Api-Key': 'v' })
+    })
+
+    test('names still match without regard to case: the same header twice is joined, the request spelling wins over a global one', async() => {
+        const result = await prepare({ headers: [{ name: 'X-Tag', value: 'a' }, { name: 'x-tag', value: 'b' }, { name: 'X-Env', value: 'request' }] }, { environment: { GLOBAL_HEADERS: { 'x-env': 'global' } } })
+        expect(result.headers).toEqual({ 'x-tag': 'a, b', 'X-Env': 'global, request' })
+    })
+
+    test('a folder header is skipped when the request has the same header in another case, and keeps its own spelling otherwise', async() => {
+        const result = await prepare({ headers: [{ name: 'X-Tenant', value: 'request' }] }, { parentHeaders: { 'x-tenant': ['folder'], 'X-Folder-Only': ['f'] } })
+        expect(result.headers).toEqual({ 'X-Tenant': 'request', 'X-Folder-Only': 'f' })
+    })
+
+    test('a folder header name from a variable resolves like a request header name', async() => {
+        const result = await prepare({}, { environment: { HEADER: 'X-Api-Key' }, parentHeaders: { '{{HEADER}}': ['v'] } })
+        expect(result.headers).toEqual({ 'X-Api-Key': 'v' })
+    })
+
+    test('a typed Authorization header and the Auth tab are still sent together as one value, as the transports joined them before', async() => {
+        const result = await prepare({ headers: [{ name: 'Authorization', value: 'Custom abc' }], authentication: { type: 'bearer', token: 't' } })
+        expect(result.headers).toEqual({ Authorization: 'Custom abc, Bearer t' })
+    })
+
+    test('a Content-Type header in any case is left out for a multipart body', async() => {
+        const result = await prepare({ method: 'POST', body: { mimeType: 'multipart/form-data', params: [{ name: 'a', value: '1' }] }, headers: [{ name: 'Content-Type', value: 'multipart/form-data' }] })
+        expect(result.headers).toEqual({})
+    })
+
+    describe('when sent', () => {
+        const send = async(fields: Partial<CollectionItem>) => {
+            let sentHeaders: Record<string, string> = {}
+            vi.stubGlobal('fetch', async(_url: string, init: { headers: Record<string, string> }) => {
+                sentHeaders = init.headers
+                return new Response('ok')
+            })
+            const response = await handleRequest(request(fields), {}, {}, undefined, async() => undefined, [], null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 })
+            return { sentHeaders, response }
+        }
+
+        test('a typed User-Agent in any case replaces the default one', async() => {
+            const { sentHeaders } = await send({ headers: [{ name: 'User-Agent', value: 'custom' }] })
+            expect(sentHeaders).toEqual({ 'User-Agent': 'custom' })
+        })
+
+        test('the headers a browser does not send are left out of the saved request in any case', async() => {
+            const { response } = await send({ headers: [{ name: 'Cookie', value: 'a=1' }, { name: 'X-Kept', value: 'k' }] })
+            expect(Object.keys((response as RequestFinalResponse).request.headers)).toEqual(['X-Kept', 'user-agent'])
+        })
     })
 })
 
