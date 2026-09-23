@@ -1,23 +1,47 @@
 import { ViewPlugin, Decoration, EditorView, ViewUpdate } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
+import getObjectPathValue from 'lodash.get'
+import { getObjectPaths } from '@/helpers'
 
-export const variableMatchingRegex = /{{ ([^\s]*?) }}|{{([^\s]*?)}}/g
+// {{name}} or {{ name }}, the name may contain spaces but not start or end with one, and no braces, so one match cannot
+// run on into the next variable
+export const variableMatchingRegex = /{{ ([^\s{}](?:[^{}\n]*?[^\s{}])?) }}|{{([^\s{}](?:[^{}\n]*?[^\s{}])?)}}/g
+
+// the names substituteEnvironmentVariables replaces with a value: every nested path of the environment, and each path
+// behind "_." when the environment has no "_" of its own
+function getEnvironmentVariableValues(envVariables: any): Map<string, unknown> {
+    const values = new Map<string, unknown>()
+
+    for(const objectPath of getObjectPaths(envVariables ?? {})) {
+        const value = getObjectPathValue(envVariables, objectPath)
+        values.set(objectPath, value)
+
+        if(!envVariables['_']) {
+            values.set(`_.${objectPath}`, value)
+        }
+    }
+
+    return values
+}
 
 export function envVarDecoration(envVariables: any) {
+    // the editors rebuild this extension when the environment changes, so the names are collected once for it
+    const envVariableValues = getEnvironmentVariableValues(envVariables)
+
     return ViewPlugin.fromClass(class {
         decorations
 
         constructor(view: EditorView) {
-            this.decorations = this.highlightEnvVariables(view, envVariables)
+            this.decorations = this.highlightEnvVariables(view)
         }
 
         update(update: ViewUpdate) {
             if (update.docChanged || update.viewportChanged || update.selectionSet) {
-                this.decorations = this.highlightEnvVariables(update.view, envVariables)
+                this.decorations = this.highlightEnvVariables(update.view)
             }
         }
 
-        highlightEnvVariables(view: EditorView, envVariables: any) {
+        highlightEnvVariables(view: EditorView) {
             const builder = new RangeSetBuilder<Decoration>()
             for (const { from, to } of view.visibleRanges) {
                 const range = view.state.doc.sliceString(from, to)
@@ -31,9 +55,11 @@ export function envVarDecoration(envVariables: any) {
                     const isSelected = this.isWithinSelectionAndNotEmpty(view, start, end)
 
                     const varName = match[1] || match[2]
-                    const isInEnv = varName in envVariables
+                    const isInEnv = envVariableValues.has(varName)
+                    const value = envVariableValues.get(varName)
                     const className = isSelected ? '' : (isInEnv ? 'valid-env-var' : 'invalid-env-var')
-                    const titleText = isInEnv ? envVariables[varName] : 'Environment variable not found'
+                    // an object is substituted as JSON, so it shows as JSON
+                    const titleText = isInEnv ? (typeof value === 'object' ? JSON.stringify(value) : String(value)) : 'Environment variable not found'
                     const decoration = Decoration.mark({
                         class: className,
                         attributes: { title: titleText }

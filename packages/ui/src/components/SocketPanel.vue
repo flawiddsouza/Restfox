@@ -261,13 +261,12 @@ import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
 import {
     formatTimestamp,
     generateId,
-    getObjectPaths,
     getSocketConnectionUrl,
     getAlertConfirmPromptContainer,
     setEnvironmentVariable,
     jsonStringify,
+    substituteEnvironmentVariables,
 } from '@/helpers'
-import getObjectPathValue from 'lodash.get'
 import Tabs from './Tabs.vue'
 import ioV2 from 'socket.io-client-v2'
 import { io as ioV3 } from 'socket.io-client-v3'
@@ -376,15 +375,8 @@ async function connect(client: Client) {
 
     pendingConnections[socketKey] = connectionTarget
 
-    let clientUrlWithEnvironmentVariablesSubtituted = client.url
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
-    const possibleEnvironmentObjectPaths: string[] = getObjectPaths(environment)
-
-    possibleEnvironmentObjectPaths.forEach(objectPath => {
-        const objectPathValue = getObjectPathValue(environment, objectPath)
-        clientUrlWithEnvironmentVariablesSubtituted = clientUrlWithEnvironmentVariablesSubtituted.replace(`{{ _.${objectPath} }}`, objectPathValue)
-        clientUrlWithEnvironmentVariablesSubtituted = clientUrlWithEnvironmentVariablesSubtituted.replace(`{{${objectPath}}}`, objectPathValue)
-    })
+    const clientUrlWithEnvironmentVariablesSubtituted = await substituteEnvironmentVariables(environment, client.url)
 
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
 
@@ -634,16 +626,8 @@ async function sendMessage(client: Client) {
         return
     }
 
-    let messageToSend = client.message
-
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
-    const possibleEnvironmentObjectPaths: string[] = getObjectPaths(environment)
-
-    possibleEnvironmentObjectPaths.forEach(objectPath => {
-        const objectPathValue = getObjectPathValue(environment, objectPath)
-        messageToSend = messageToSend.replace(`{{ _.${objectPath} }}`, objectPathValue)
-        messageToSend = messageToSend.replace(`{{${objectPath}}}`, objectPathValue)
-    })
+    const messageToSend = await substituteEnvironmentVariables(environment, client.message)
 
     if (socket instanceof WebSocket) {
         socket.send(messageToSend)
