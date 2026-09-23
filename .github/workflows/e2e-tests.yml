@@ -17,8 +17,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+      # keep in step with the playwright version pinned in packages/ui/tests/package.json so the browsers are already
+      # in the image and `npx playwright install` has nothing to download
+      image: mcr.microsoft.com/playwright:v1.44.0-jammy
     defaults:
       run:
         working-directory: ./packages/ui
@@ -33,3 +36,5 @@ jobs:
       run: npm run ci-test
       env:
         HOME: /root
+        # the default host answers with a redirect that the downloader stalls on, only reached if the image and the pinned version drift apart
+        PLAYWRIGHT_DOWNLOAD_HOST: https://cdn.playwright.dev

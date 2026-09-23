@@ -1,9 +1,9 @@
 <template>
-    <div class="custom-select" style="display: inline-flex; width: 6.8rem;" @click="handleRequestAuthMenu">
-        {{ collectionItem.authentication ? requestAuthList.find(item => item.value === collectionItem.authentication?.type)?.label : 'No Auth' }}
+    <div class="custom-select" style="display: inline-flex; width: 9rem;" @click="handleRequestAuthMenu">
+        {{ requestAuthList.find(item => item.value === authenticationType)?.label }}
         <i class="fa fa-caret-down space-right"></i>
     </div>
-    <div v-if="collectionItem.authentication && collectionItem.authentication.type !== 'No Auth'">
+    <div v-if="collectionItem.authentication && authenticationType !== 'inherit' && authenticationType !== 'none'">
         <table class="auth table-layout-fixed">
             <tr>
                 <td class="user-select-none">
@@ -406,7 +406,7 @@
         v-model:show="showRequestAuthMenu"
         :x="requestAuthMenuX"
         :y="requestAuthMenuY"
-        :selected-option="collectionItem.authentication?.type ?? 'No Auth'"
+        :selected-option="authenticationType"
         @click="handleCollectionItemAuthenticationTypeChange"
     />
 
@@ -426,7 +426,7 @@ import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem, Flags } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
-import { fetchWrapper, getSavedRequestTimeout, substituteEnvironmentVariables } from '@/helpers'
+import { fetchWrapper, getAuthenticationType, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, substituteEnvironmentVariables } from '@/helpers'
 import { useToast } from 'vue-toast-notification'
 import { bufferToString } from '@/utils/response'
 
@@ -482,11 +482,19 @@ const requestAuthList = ref([
     },
     {
         'type': 'option',
+        'label': 'Inherit from Parent',
+        'value': 'inherit',
+        'class': 'context-menu-item-with-left-padding'
+    },
+    {
+        'type': 'option',
         'label': 'No Auth',
-        'value': 'No Auth',
+        'value': 'none',
         'class': 'context-menu-item-with-left-padding'
     },
 ])
+
+const authenticationType = computed(() => getAuthenticationType(props.collectionItem.authentication))
 
 const grantTypes = ref([
     {
@@ -538,7 +546,7 @@ function handleCollectionItemAuthenticationTypeChange(event: string) {
     if (!props.collectionItem.authentication) {
         props.collectionItem.authentication = {}
     }
-    props.collectionItem.authentication.type = event
+    props.collectionItem.authentication.type = event === 'inherit' ? INHERITED_AUTHENTICATION_TYPE : event
 }
 
 function handleGrantTypeMenu(event: any) {

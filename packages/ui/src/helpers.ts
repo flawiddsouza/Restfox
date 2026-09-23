@@ -547,11 +547,9 @@ export async function createRequestData(
         headers['Authorization'] = await resolveAuthentication(cacheId, authentication, environment)
     }
 
-    if(request.authentication && request.authentication.type !== 'No Auth' && !request.authentication.disabled) {
+    if(request.authentication && hasOwnAuthentication(request.authentication)) {
         await setAuthentication(request.authentication)
-    }
-
-    if(parentAuthentication && parentAuthentication.type !== 'No Auth' && !parentAuthentication.disabled && (request.authentication === undefined || request.authentication.type === 'No Auth')) {
+    } else if(getAuthenticationType(request.authentication) === 'inherit' && parentAuthentication && hasOwnAuthentication(parentAuthentication)) {
         await setAuthentication(parentAuthentication)
     }
 
@@ -802,7 +800,7 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
                     disabled: parameter.disabled
                 })) : [],
                 pathParameters: item.pathParameters ?? [],
-                authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
+                authentication: 'authentication' in item && Object.keys(item.authentication).length > 0 ? item.authentication : { type: INHERITED_AUTHENTICATION_TYPE },
                 description: 'description' in item ? item.description : undefined,
                 parentId,
                 workspaceId
@@ -866,7 +864,7 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string, wor
                         description: parameter.description,
                         disabled: parameter.disabled
                     })) : [],
-                    authentication: item.authentication && Object.keys(item.authentication).length > 0 ? item.authentication : { type: 'No Auth' },
+                    authentication: item.authentication && Object.keys(item.authentication).length > 0 ? item.authentication : { type: INHERITED_AUTHENTICATION_TYPE },
                     description: item.description,
                     parentId: item.parentId,
                     workspaceId,
@@ -1744,6 +1742,26 @@ export async function initStoragePersistence() {
     }
 }
 
+// what an item that inherits stores. It is the value every older version wrote for an item without an auth of its own,
+// and the only one they read as inherit, so it is kept so that a collection exported from here inherits in every version
+export const INHERITED_AUTHENTICATION_TYPE = 'No Auth'
+
+// 'inherit' takes the auth of the nearest folder above that has one of its own, 'none' sends no auth and, on a folder, stops
+// inheritance below it. An item without an authentication object or type inherits as well
+export function getAuthenticationType(authentication: RequestAuthentication | undefined): string {
+    if(authentication === undefined || authentication.type === undefined || authentication.type === INHERITED_AUTHENTICATION_TYPE) {
+        return 'inherit'
+    }
+
+    return authentication.type
+}
+
+// an auth that is unticked counts as none, it neither sends anything nor falls back to the folder's
+export function hasOwnAuthentication(authentication: RequestAuthentication): boolean {
+    const authenticationType = getAuthenticationType(authentication)
+    return authenticationType !== 'inherit' && authenticationType !== 'none' && !authentication.disabled
+}
+
 export async function resolveAuthentication(cacheId: string, authentication: RequestAuthentication, environment: any) {
     if(authentication.type === 'basic') {
         return generateBasicAuthString(
@@ -2026,12 +2044,15 @@ function convertRestfoxAuthToInsomniaAuth(auth: any) {
 }
 
 export function convertPostmanAuthToRestfoxAuth(request: any) {
-    let authentication: RequestAuthentication = { type: 'No Auth' }
+    // Postman leaves auth out of an item that inherits its folder's and writes noauth on one that opted out
+    let authentication: RequestAuthentication = { type: INHERITED_AUTHENTICATION_TYPE }
 
     if('auth' in request && request.auth) {
         const authType = request.auth.type
 
-        if(authType === 'bearer' && request.auth.bearer) {
+        if(authType === 'noauth') {
+            authentication = { type: 'none' }
+        } else if(authType === 'bearer' && request.auth.bearer) {
             const token = Array.isArray(request.auth.bearer)
                 ? request.auth.bearer.find((item: any) => item.key === 'token')?.value || ''
                 : request.auth.bearer.token

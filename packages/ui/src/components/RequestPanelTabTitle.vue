@@ -28,13 +28,15 @@
         </template>
     </template>
     <template v-if="requestPanelTab.name === 'Auth'">
-        <template v-if="'authentication' in activeTab && activeTab.authentication.type !== 'No Auth'">
-            <span> ({{ getAuthenticationTypeLabel(activeTab.authentication.type) }})</span>
+        <template v-if="getAuthenticationType(activeTab.authentication) !== 'inherit'">
+            <span> ({{ getAuthenticationTypeLabel(getAuthenticationType(activeTab.authentication)) }})</span>
         </template>
     </template>
 </template>
 
 <script>
+import { getAuthenticationType } from '@/helpers'
+
 export default {
     props: {
         requestPanelTab: {
@@ -53,8 +55,11 @@ export default {
         }
     },
     methods: {
+        getAuthenticationType,
         getAuthenticationTypeLabel(authenticationType) {
             switch(authenticationType) {
+                case 'none':
+                    return 'No Auth'
                 case 'basic':
                     return 'Basic'
                 case 'bearer':

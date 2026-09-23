@@ -20,6 +20,8 @@ import {
     setObjectPathValue,
     getAllHttpRequestsInFolder,
     getParentPath,
+    getAuthenticationType,
+    hasOwnAuthentication,
 } from './helpers'
 import {
     getResponsesByCollectionId,
@@ -179,8 +181,11 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
             Object.assign(environment, tempEnvironment)
         }
 
-        if(parent.authentication && parent.authentication.type !== 'No Auth' && !parent.authentication.disabled) {
+        if(parent.authentication && hasOwnAuthentication(parent.authentication)) {
             authentication = parent.authentication
+        } else if(getAuthenticationType(parent.authentication) === 'none') {
+            // a folder set to No Auth stops the auth of the folders above it, one whose own auth is unticked passes it through
+            authentication = undefined
         }
 
         if(parent.headers) {

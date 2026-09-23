@@ -15,7 +15,9 @@ import {
     setObjectPathValue,
     prepareCollectionForExport,
     convertRestfoxExportToRestfoxCollection,
-    deepClone
+    convertInsomniaExportToRestfoxCollection,
+    deepClone,
+    INHERITED_AUTHENTICATION_TYPE
 } from './helpers'
 import type { CollectionItem, HandleRequestState } from './global'
 
@@ -507,10 +509,16 @@ describe(`Function: ${handleRequest.name}`, () => {
 })
 
 describe('convertPostmanAuthToRestfoxAuth', () => {
-    test('should return No Auth when auth is not present', () => {
+    test('should return Inherit when auth is not present', () => {
         const request = {}
         const result = convertPostmanAuthToRestfoxAuth(request)
-        expect(result).toEqual({ type: 'No Auth' })
+        expect(result).toEqual({ type: INHERITED_AUTHENTICATION_TYPE })
+    })
+
+    test('should return No Auth when auth is noauth', () => {
+        const request = { auth: { type: 'noauth' } }
+        const result = convertPostmanAuthToRestfoxAuth(request)
+        expect(result).toEqual({ type: 'none' })
     })
 
     test('should handle bearer authentication', () => {
@@ -860,6 +868,61 @@ describe(`Function: ${setObjectPathValue.name}`, () => {
         setObjectPathValue({}, 'constructor.prototype.polluted', 'yes')
         expect(({} as any).polluted).toBeUndefined()
         expect(console.warn).toHaveBeenCalledTimes(2)
+    })
+})
+
+describe('Authentication inheritance', () => {
+    const folderAuthentication = { type: 'bearer', token: 'folder-token' }
+    const prepare = (authentication: CollectionItem['authentication'], { parentAuthentication }: { parentAuthentication: CollectionItem['authentication'] } = { parentAuthentication: folderAuthentication }) => {
+        const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: 'f', name: 'Request', method: 'GET', url: 'https://example.test/', authentication } as CollectionItem
+        const state: HandleRequestState = { currentPlugin: null, testResults: [] }
+        return createRequestData(state, request, {}, {}, parentAuthentication, null, [], null)
+    }
+
+    test('a request set to No Auth under a bearer folder sends no Authorization header', async() => {
+        const result = await prepare({ type: 'none' })
+        expect(result.headers).not.toHaveProperty('Authorization')
+    })
+
+    test('a request set to Inherit sends the folder token', async() => {
+        const result = await prepare({ type: INHERITED_AUTHENTICATION_TYPE })
+        expect(result.headers.Authorization).toBe('Bearer folder-token')
+    })
+
+    test('Inherit is stored as the value older versions wrote for an item without an auth of its own', () => {
+        expect(INHERITED_AUTHENTICATION_TYPE).toBe('No Auth')
+    })
+
+    test('a request without an authentication object, or with an empty one, inherits', async() => {
+        expect((await prepare(undefined)).headers.Authorization).toBe('Bearer folder-token')
+        expect((await prepare({})).headers.Authorization).toBe('Bearer folder-token')
+    })
+
+    test('a request whose own auth is unticked sends nothing instead of the folder token', async() => {
+        const result = await prepare({ type: 'bearer', token: 'own-token', disabled: true })
+        expect(result.headers).not.toHaveProperty('Authorization')
+    })
+
+    test('a request with an auth of its own sends that instead of the folder token', async() => {
+        const result = await prepare({ type: 'bearer', token: 'own-token' })
+        expect(result.headers.Authorization).toBe('Bearer own-token')
+    })
+
+    test('a request set to Inherit with no folder auth sends no Authorization header', async() => {
+        const result = await prepare({ type: INHERITED_AUTHENTICATION_TYPE }, { parentAuthentication: undefined })
+        expect(result.headers).not.toHaveProperty('Authorization')
+    })
+
+    test('an Insomnia request without an auth of its own imports as Inherit', () => {
+        const insomniaExport = { resources: [{ _id: 'r', _type: 'request', parentId: null, name: 'Request', method: 'GET', url: 'https://example.test/', body: {}, authentication: {} }] }
+        const collection = convertInsomniaExportToRestfoxCollection(insomniaExport, 'w')
+        expect(collection[0].authentication).toEqual({ type: INHERITED_AUTHENTICATION_TYPE })
+    })
+
+    test('an Insomnia request with auth type none imports as No Auth', () => {
+        const insomniaExport = { resources: [{ _id: 'r', _type: 'request', parentId: null, name: 'Request', method: 'GET', url: 'https://example.test/', body: {}, authentication: { type: 'none' } }] }
+        const collection = convertInsomniaExportToRestfoxCollection(insomniaExport, 'w')
+        expect(collection[0].authentication).toEqual({ type: 'none' })
     })
 })
 

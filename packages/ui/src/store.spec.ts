@@ -31,8 +31,9 @@ vi.mock('./db', () => ({
 }))
 
 import { createPlugin, deletePlugin, updatePlugin } from './db'
-import type { Plugin, Workspace } from './global'
+import type { CollectionItem, Plugin, Workspace } from './global'
 import { store } from './store'
+import { INHERITED_AUTHENTICATION_TYPE } from './helpers'
 
 function scriptPlugin(id: string, code: { pre_request: string, post_request: string }): Plugin {
     return {
@@ -123,5 +124,42 @@ describe('saveRequestScript', () => {
             pre_request: 'second',
             post_request: '',
         })
+    })
+})
+
+describe('getEnvironmentForRequest', () => {
+    const folder = (id: string, parentId: string | null, authentication: CollectionItem['authentication']): CollectionItem => ({
+        _id: id,
+        _type: 'request_group',
+        name: id,
+        parentId,
+        workspaceId: 'workspace-id',
+        authentication,
+    })
+    const request: CollectionItem = { _id: 'request-id', _type: 'request', name: 'Request', parentId: 'child', workspaceId: 'workspace-id' }
+    const rootAuthentication = { type: 'bearer', token: 'root-token' }
+
+    const resolve = async(childAuthentication: CollectionItem['authentication']) => {
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace', dotEnv: {} } as Workspace
+        store.state.collection = [folder('root', null, rootAuthentication), folder('child', 'root', childAuthentication), request]
+        const { parentAuthentication } = await store.dispatch('getEnvironmentForRequest', { collectionItem: request })
+        return parentAuthentication
+    }
+
+    test('a folder set to No Auth stops the auth of the folders above it', async() => {
+        expect(await resolve({ type: 'none' })).toBeUndefined()
+    })
+
+    test('a folder set to Inherit, or without an authentication object, passes the auth of the folder above it through', async() => {
+        expect(await resolve({ type: INHERITED_AUTHENTICATION_TYPE })).toEqual(rootAuthentication)
+        expect(await resolve(undefined)).toEqual(rootAuthentication)
+    })
+
+    test('a folder whose own auth is unticked passes the auth of the folder above it through, as it always has', async() => {
+        expect(await resolve({ type: 'bearer', token: 'child-token', disabled: true })).toEqual(rootAuthentication)
+    })
+
+    test('a folder with an auth of its own wins over the folder above it', async() => {
+        expect(await resolve({ type: 'basic', username: 'u', password: 'p' })).toEqual({ type: 'basic', username: 'u', password: 'p' })
     })
 })
