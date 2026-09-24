@@ -139,25 +139,6 @@ export function getProxySettingsInUse(proxySettings: ProxySettings): Partial<Pro
     return proxySettings.mode === 'custom' ? proxySettings : { mode: proxySettings.mode }
 }
 
-// Electron hands Chromium's proxy login to the app for page requests but not for WebSocket, so a page request through
-// the proxy goes first and Chromium keeps the login. The host does not exist, the proxy asks for the login before it
-// looks the host up. Once Chromium has the login, it sends it at once and this is quick
-export async function primeProxyLogin(proxySettings: ProxySettings | null) {
-    if(proxySettings?.mode !== 'custom' || !proxySettings.username) {
-        return
-    }
-
-    // a proxy that does not answer holds up a socket's connect by 3 seconds at most
-    const abortController = new AbortController()
-    const timeoutId = setTimeout(() => abortController.abort(), 3000)
-
-    await fetch('http://restfox-proxy-login.invalid/', { mode: 'no-cors', signal: abortController.signal }).catch(() => {
-        // the answer does not matter, only that the proxy asked for the login
-    })
-
-    clearTimeout(timeoutId)
-}
-
 // the reason Custom's proxy URL cannot be used, or null. Without a scheme it is an HTTP proxy. Custom is not saved
 // until it can be, so picking it keeps the previous choice working while the URL is typed in
 export function getProxyUrlError(url: string): string | null {
@@ -165,10 +146,18 @@ export function getProxyUrlError(url: string): string | null {
         return 'Enter a proxy URL to use Custom'
     }
 
-    try {
-        const proxyUrl = new URL(url.includes('://') ? url : `http://${url}`)
+    // the scheme is read here and the rest parsed as http, browsers before Chromium 130 leave the host of a socks5:// URL
+    // empty, as of any scheme they do not know
+    const scheme = url.includes('://') ? url.slice(0, url.indexOf('://')).toLowerCase() : 'http'
 
-        if(!['http:', 'https:', 'socks5:'].includes(proxyUrl.protocol) || proxyUrl.hostname === '') {
+    if(!['http', 'https', 'socks5'].includes(scheme)) {
+        return 'Enter a proxy like http://proxy.example.com:8080, https:// and socks5:// work too'
+    }
+
+    try {
+        const proxyUrl = new URL(`http://${url.includes('://') ? url.slice(url.indexOf('://') + 3) : url}`)
+
+        if(proxyUrl.hostname === '') {
             return 'Enter a proxy like http://proxy.example.com:8080, https:// and socks5:// work too'
         }
 

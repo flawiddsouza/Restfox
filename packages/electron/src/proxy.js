@@ -156,8 +156,9 @@ async function getProxyForRequest(url, proxySettings, resolveSystemProxy = null,
 }
 
 // the same setting for Chromium's own connections, WebSocket, Socket.IO and Chromium fetch, through session.setProxy.
-// Chromium matches a bypass entry exactly, so each also gets its subdomains as the list above means
-function getChromiumProxyConfig(proxySettings) {
+// Custom goes to the loopback relay on relayPort, which passes connections to the proxy (proxy-relay.js). Chromium
+// matches a bypass entry exactly, so each also gets its subdomains as the list above means
+function getChromiumProxyConfig(proxySettings, relayPort = null) {
     if(proxySettings?.mode === 'off') {
         return { mode: 'direct' }
     }
@@ -169,7 +170,6 @@ function getChromiumProxyConfig(proxySettings) {
             return { mode: 'direct' }
         }
 
-        const proxyUrl = new URL(address.includes('://') ? address : `http://${address}`)
         const proxyBypassRules = String(proxySettings.bypass ?? '').split(/[\s,]+/).filter(entry => entry !== '').flatMap(entry => {
             if(entry === '*') {
                 return ['*']
@@ -188,7 +188,7 @@ function getChromiumProxyConfig(proxySettings) {
             return [name, `*.${name}`]
         })
 
-        return { mode: 'fixed_servers', proxyRules: `${proxyUrl.protocol}//${proxyUrl.host}`, proxyBypassRules: proxyBypassRules.join(',') }
+        return { mode: 'fixed_servers', proxyRules: `http://127.0.0.1:${relayPort}`, proxyBypassRules: proxyBypassRules.join(',') }
     }
 
     return { mode: 'system' }

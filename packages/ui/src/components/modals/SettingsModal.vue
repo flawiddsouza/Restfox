@@ -73,14 +73,14 @@
                             Get Browser UserAgent
                         </button>
                         <div style="margin-top: 1rem">
-                            Note that the default user agent <strong>Restfox/{{ getVersion() }}</strong> is used when no global user agent is set here or on request level.
+                            Note that the default user agent <span class="code">Restfox/{{ getVersion() }}</span> is used when no global user agent is set here or on request level.
                         </div>
                     </div>
 
                     <div style="padding-top: 1rem">
                         <div style="margin-bottom: var(--label-margin-bottom);">Request Timeout (ms)</div>
                         <input type="number" min="0" step="1000" v-model.number="requestTimeout" class="full-width-input" placeholder="0">
-                        <div style="margin-top: 0.3rem;">Abort a request if it does not complete within this many milliseconds. Set to <strong>0</strong> for no timeout (unlimited).</div>
+                        <div style="margin-top: 0.3rem;">Abort a request if it does not complete within this many milliseconds. Set to <span class="code">0</span> for no timeout (unlimited).</div>
                     </div>
 
                     <template v-if="flags.isElectron || flags.isWebStandalone">
@@ -140,7 +140,7 @@
                                 <div style="padding-top: 0.5rem">
                                     <div style="margin-bottom: var(--label-margin-bottom);">Bypass Proxy For</div>
                                     <input type="text" v-model.lazy.trim="proxy.bypass" class="full-width-input" placeholder="internal.example.com, 10.0.0.5:8080">
-                                    <div style="margin-top: 0.3rem;">Hosts to connect to directly, separated by commas. An entry covers its subdomains too, <strong>*</strong> covers every host.</div>
+                                    <div style="margin-top: 0.3rem;">Hosts to connect to directly, separated by commas, such as <span class="code">internal.example.com</span> or <span class="code">10.0.0.0/8</span>. Each covers its subdomains too, and <span class="code">*</span> covers every host.</div>
                                 </div>
                             </template>
                             <div style="margin-top: 0.3rem;">Applies to requests, scripts, WebSocket and Socket.IO. localhost always connects directly.</div>

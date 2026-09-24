@@ -4,8 +4,9 @@ const fs = require('fs').promises
 const path = require('path')
 const { platform } = require('os')
 const requests = require('./request')
-const { parseCACertificates, isCertificateTrustedByCustomCA } = require('./ca-certificates')
-const { getChromiumProxyConfig } = require('./proxy')
+const { parseCACertificates, isCertificateTrustedByCustomCA, getCACertificatesWithCustom } = require('./ca-certificates')
+const { getChromiumProxyConfig, getProxyForRequest } = require('./proxy')
+const { startProxyRelay } = require('./proxy-relay')
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []
@@ -123,39 +124,36 @@ async function setCACertificates(text) {
 let proxySettings
 // Chromium starts on the system proxy
 let chromiumProxyConfig = { mode: 'system' }
+// started for the first Custom proxy and kept, it reads the setting of the moment for each connection
+let proxyRelay = null
 
 // Settings > Proxy. Requests through undici pick their proxy per request, System asking Chromium, which reads the
-// operating system's settings. Chromium's own connections follow the session's proxy. Returns whether it changed
+// operating system's settings. Chromium's own connections follow the session's proxy, Custom through the relay
 async function setProxy(settings) {
     const value = settings ?? null
 
     if(JSON.stringify(value) === JSON.stringify(proxySettings)) {
-        return false
+        return
+    }
+
+    // before the setting is kept, a relay that could not start is tried again when the renderer sends it again
+    if(value?.mode === 'custom' && proxyRelay === null) {
+        proxyRelay = await startProxyRelay(url => getProxyForRequest(url, proxySettings), () => ({
+            rejectUnauthorized: !sslVerificationDisabled,
+            ...(requests.getCustomCACertificates().length > 0 ? { ca: getCACertificatesWithCustom(requests.getCustomCACertificates()) } : {}),
+        }))
     }
 
     proxySettings = value
     requests.setProxySettings(value, url => session.defaultSession.resolveProxy(url))
-    // Chromium would keep sending the proxy login it has, which may be the one before the change
-    await session.defaultSession.clearAuthCache()
 
     // sent on every load like the settings above, closing connections when Chromium's proxy stays the same would also
     // drop the dev server's live reload socket
-    const config = getChromiumProxyConfig(value)
+    const config = getChromiumProxyConfig(value, proxyRelay?.port)
     if(JSON.stringify(config) !== JSON.stringify(chromiumProxyConfig)) {
         chromiumProxyConfig = config
         await session.defaultSession.setProxy(config)
         await session.defaultSession.closeAllConnections()
-    }
-
-    return true
-}
-
-// Chromium asks for the credentials of a proxy that wants them, Custom has them. A system proxy's are not known here.
-// Asked again for the same request, the proxy refused them, answering again would repeat the request without end
-function handleLogin(event, _webContents, details, authInfo, callback) {
-    if(authInfo.isProxy && details.firstAuthAttempt && proxySettings?.mode === 'custom' && proxySettings.username) {
-        event.preventDefault()
-        callback(proxySettings.username, proxySettings.password ?? '')
     }
 }
 
@@ -192,7 +190,6 @@ module.exports = {
     setDisableSSLVerification,
     setCACertificates,
     setProxy,
-    handleLogin,
     handleCertificateError,
     removePrefixFromString,
 }

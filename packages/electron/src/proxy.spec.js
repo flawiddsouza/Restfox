@@ -76,14 +76,15 @@ test('loopback hosts connect directly in every mode, as Chromium does', async() 
     }
 })
 
-test('Chromium gets the same choice, the custom proxy without credentials and each bypass entry with its subdomains', () => {
+test('Chromium gets the same choice, Custom through the relay, and each bypass entry with its subdomains', () => {
     expect(getChromiumProxyConfig(null)).toEqual({ mode: 'system' })
     expect(getChromiumProxyConfig({ mode: 'system' })).toEqual({ mode: 'system' })
     expect(getChromiumProxyConfig({ mode: 'off' })).toEqual({ mode: 'direct' })
     expect(getChromiumProxyConfig({ mode: 'custom', url: ' ' })).toEqual({ mode: 'direct' })
-    expect(getChromiumProxyConfig({ mode: 'custom', url: 'proxy.test:3128', username: 'user', password: 'secret', bypass: '.corp.test, api.test:8080 *' })).toEqual({
+    // Custom goes to the loopback relay, which has the proxy and its login
+    expect(getChromiumProxyConfig({ mode: 'custom', url: 'proxy.test:3128', username: 'user', password: 'secret', bypass: '.corp.test, api.test:8080 *' }, 5000)).toEqual({
         mode: 'fixed_servers',
-        proxyRules: 'http://proxy.test:3128',
+        proxyRules: 'http://127.0.0.1:5000',
         proxyBypassRules: 'corp.test,*.corp.test,api.test:8080,*.api.test:8080,*',
     })
 })
@@ -103,7 +104,7 @@ test('a bypass entry can be an IP address or range, IPv6 included, as NO_PROXY o
 })
 
 test('Chromium gets addresses and ranges without a subdomain rule, an IPv6 address in brackets', () => {
-    expect(getChromiumProxyConfig({ mode: 'custom', url: 'proxy.test:1', bypass: '10.0.0.0/8, 2001:db8::1, 2001:db8::/32, [::5]:8080, 10.1.2.3:8080' }).proxyBypassRules)
+    expect(getChromiumProxyConfig({ mode: 'custom', url: 'proxy.test:1', bypass: '10.0.0.0/8, 2001:db8::1, 2001:db8::/32, [::5]:8080, 10.1.2.3:8080' }, 5000).proxyBypassRules)
         .toBe('10.0.0.0/8,[2001:db8::1],2001:db8::/32,[::5]:8080,10.1.2.3:8080')
 })
 

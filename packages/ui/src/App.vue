@@ -23,7 +23,6 @@ import {
     getSavedCACertificates,
     getSavedProxySettings,
     getProxySettingsInUse,
-    primeProxyLogin,
 } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
@@ -92,13 +91,7 @@ export default {
             const proxy = this.$store.state.flags.proxy
 
             // a plain copy, IPC cannot send the store's reactive object
-            window.electronIPC.setProxy(proxy ? { ...getProxySettingsInUse(proxy) } : null).then(changed => {
-                // a change clears the proxy login Chromium kept, so it is asked for again here, and by the Socket panel before
-                // each connect
-                if(changed) {
-                    primeProxyLogin(proxy)
-                }
-            }).catch(error => {
+            window.electronIPC.setProxy(proxy ? { ...getProxySettingsInUse(proxy) } : null).catch(error => {
                 console.error('Settings > Proxy:', error.message)
             })
         },

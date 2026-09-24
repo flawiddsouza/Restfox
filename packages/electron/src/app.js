@@ -227,8 +227,6 @@ app.whenReady().then(async() => {
 
     ipcMain.handle('setProxy', (_, ...args) => helpers.setProxy(...args))
 
-    app.on('login', helpers.handleLogin)
-
     app.on('certificate-error', helpers.handleCertificateError)
 
     ipcMain.handle('updateElectronApp', (_) => {

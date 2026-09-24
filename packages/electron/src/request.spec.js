@@ -4,26 +4,17 @@ import http2 from 'node:http2'
 import fs from 'node:fs'
 import path from 'node:path'
 import { handleSendRequest, setProxySettings } from './request.js'
+import { parseWireRequest, startForwardProxy, startSocks5Proxy, closeTestProxies } from './test-proxies.js'
 
 const servers = []
 
 afterEach(() => {
     setProxySettings(null, null)
+    closeTestProxies()
     for(const server of servers.splice(0)) {
         server.close()
     }
 })
-
-// splits a raw HTTP/1.1 request into its request line, header pairs and body
-function parseWireRequest(raw) {
-    const headerEnd = raw.indexOf('\r\n\r\n')
-    const [requestLine, ...headerLines] = raw.slice(0, headerEnd).split('\r\n')
-    const headers = headerLines.map(line => {
-        const separator = line.indexOf(': ')
-        return [line.slice(0, separator), line.slice(separator + 2)]
-    })
-    return { requestLine, headers, body: raw.slice(headerEnd + 4) }
-}
 
 // a bare TCP server that records the exact bytes the client sends, like the reporter's nc -l
 function startRawServer(responseBytes) {
@@ -121,42 +112,6 @@ test('reports the header block sent on an HTTP/2 connection', async() => {
     }
 })
 
-// a forward proxy like a company's: answers a plain HTTP request itself, which arrives as a full URL, and tunnels a
-// CONNECT to 127.0.0.1, so the target's host name only has to resolve at the proxy, as on a network behind one
-function startForwardProxy() {
-    const received = []
-    const server = net.createServer(socket => {
-        let raw = ''
-        const onData = chunk => {
-            raw += chunk.toString('latin1')
-            if(!raw.includes('\r\n\r\n')) {
-                return
-            }
-            socket.removeListener('data', onData)
-            const request = parseWireRequest(raw)
-            received.push(request)
-            const [method, target] = request.requestLine.split(' ')
-            if(method === 'CONNECT') {
-                const upstream = net.connect(Number(target.split(':')[1]), '127.0.0.1', () => {
-                    socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
-                    upstream.pipe(socket)
-                    socket.pipe(upstream)
-                })
-                upstream.on('error', () => socket.destroy())
-                return
-            }
-            const body = `proxied ${request.requestLine}`
-            socket.end(`HTTP/1.1 200 OK\r\ncontent-length: ${body.length}\r\n\r\n${body}`)
-        }
-        socket.on('data', onData)
-        socket.on('error', () => {})
-    })
-    servers.push(server)
-    return new Promise(resolve => {
-        server.listen(0, '127.0.0.1', () => resolve({ url: `http://127.0.0.1:${server.address().port}`, received }))
-    })
-}
-
 test('Settings > Proxy > Custom sends plain HTTP to the proxy as a full URL with its credentials', async() => {
     const proxy = await startForwardProxy()
     setProxySettings({ mode: 'custom', url: proxy.url, username: 'user', password: 'p@ss' }, null)
@@ -208,44 +163,6 @@ test('Settings > Proxy > System uses the proxy Electron resolves, and Off connec
     expect(proxy.received).toHaveLength(1)
     expect(resolved).toHaveLength(1)
 })
-
-// a SOCKS5 proxy asking for a username and password (RFC 1929), tunnelling to 127.0.0.1 whatever host it is asked for
-function startSocks5Proxy() {
-    const logins = []
-    const server = net.createServer(socket => {
-        socket.on('error', () => {})
-        let stage = 'greeting'
-        socket.on('data', function onData(chunk) {
-            if(stage === 'greeting') {
-                socket.write(Buffer.from([5, 2]))
-                stage = 'login'
-                return
-            }
-            if(stage === 'login') {
-                const usernameLength = chunk[1]
-                const username = chunk.subarray(2, 2 + usernameLength).toString()
-                const password = chunk.subarray(3 + usernameLength, 3 + usernameLength + chunk[2 + usernameLength]).toString()
-                logins.push({ username, password })
-                socket.write(Buffer.from([1, 0]))
-                stage = 'connect'
-                return
-            }
-            // CONNECT with a domain name: 5 1 0 3 length name port
-            const port = chunk.readUInt16BE(chunk.length - 2)
-            socket.removeListener('data', onData)
-            const upstream = net.connect(port, '127.0.0.1', () => {
-                socket.write(Buffer.from([5, 0, 0, 1, 0, 0, 0, 0, 0, 0]))
-                upstream.pipe(socket)
-                socket.pipe(upstream)
-            })
-            upstream.on('error', () => socket.destroy())
-        })
-    })
-    servers.push(server)
-    return new Promise(resolve => {
-        server.listen(0, '127.0.0.1', () => resolve({ url: `socks5://127.0.0.1:${server.address().port}`, logins }))
-    })
-}
 
 test('Settings > Proxy > Custom logs in to a SOCKS5 proxy with the username and password as typed', async() => {
     const socks = await startSocks5Proxy()

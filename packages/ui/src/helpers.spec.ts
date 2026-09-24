@@ -421,7 +421,7 @@ describe('Function: getProxySettingsInUse', () => {
 
 describe('Function: getProxyUrlError', () => {
     test('accepts HTTP, HTTPS and SOCKS5 proxies, a missing scheme meaning HTTP, and a single name such as a hosts entry', () => {
-        for(const url of ['proxy.test:3128', 'http://proxy.test:3128', 'https://proxy.test', 'socks5://127.0.0.1:1080', 'proxy']) {
+        for(const url of ['proxy.test:3128', 'http://proxy.test:3128', 'https://proxy.test', 'socks5://127.0.0.1:1080', 'SOCKS5://proxy.test:1080', 'proxy']) {
             expect(getProxyUrlError(url)).toBe(null)
         }
     })
@@ -429,6 +429,7 @@ describe('Function: getProxyUrlError', () => {
     test('a login in the URL goes in Username and Password instead', () => {
         expect(getProxyUrlError('http://user:pass@proxy.test:8080')).toBe('Enter the login in Username and Password, not in the URL')
         expect(getProxyUrlError('user@proxy.test:8080')).toBe('Enter the login in Username and Password, not in the URL')
+        expect(getProxyUrlError('socks5://user:pass@proxy.test:1080')).toBe('Enter the login in Username and Password, not in the URL')
     })
 
     test('an empty URL asks for one', () => {

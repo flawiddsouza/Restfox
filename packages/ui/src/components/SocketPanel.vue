@@ -268,7 +268,6 @@ import {
     substituteEnvironmentVariables,
     registerCACertificates,
     registerProxySettings,
-    primeProxyLogin,
 } from '@/helpers'
 import Tabs from './Tabs.vue'
 import ioV2 from 'socket.io-client-v2'
@@ -381,12 +380,12 @@ async function connect(client: Client) {
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
     const clientUrlWithEnvironmentVariablesSubtituted = await substituteEnvironmentVariables(environment, client.url)
 
-    // web-standalone's server connects a secure socket for the browser when CA certificates are set, and needs them
-    // registered first. On every connect: a restarted server has forgotten them, and unlike a request, a socket is not
-    // repeated when the server says so
+    // web-standalone's server relays a socket for the browser and needs CA certificates registered first, for a secure
+    // target or an https:// proxy. On every connect: a restarted server has forgotten them, and unlike a request, a
+    // socket is not repeated when the server says so
     let caCertificatesId: string | null = null
 
-    if (flags.value.isWebStandalone && flags.value.caCertificates && !flags.value.disableSSLVerification && /^(wss|https):/i.test(clientUrlWithEnvironmentVariablesSubtituted)) {
+    if (flags.value.isWebStandalone && flags.value.caCertificates && !flags.value.disableSSLVerification) {
         try {
             caCertificatesId = await registerCACertificates(flags.value.caCertificates.certificates, true)
         } catch (error: any) {
@@ -420,11 +419,6 @@ async function connect(client: Client) {
 
             return
         }
-    }
-
-    // Electron's Chromium keeps a proxy's login only after a page request asks for it, a proxy down at launch never did
-    if (flags.value.isElectron) {
-        await primeProxyLogin(flags.value.proxy)
     }
 
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
