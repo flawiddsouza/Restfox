@@ -5,6 +5,7 @@ import path from 'path'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import app, { handleSocketProxyUpgrade } from './app.js'
+import { startForwardProxy } from './test-forward-proxy.js'
 
 // reads one short masked client frame and returns its text
 function readClientTextFrame(buffer) {
@@ -259,5 +260,114 @@ test('a socket naming CA certificates the server does not have is refused with t
     } finally {
         closeServer(proxy)
         closeServer(target.server)
+    }
+})
+
+// how the UI names the settings of a socket to a host other than loopback
+function socketProxyPathWithOptions(options, targetOrigin, targetPath) {
+    return `/proxy-socket/${encodeURIComponent(JSON.stringify(options))}/${encodeURIComponent(targetOrigin)}${targetPath}`
+}
+
+function registerProxySettings(proxy, proxySettings) {
+    return fetch(`http://127.0.0.1:${proxy.address().port}/proxy-settings`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(proxySettings),
+    })
+}
+
+async function registerProxySettingsId(proxy, proxySettings) {
+    return (await (await registerProxySettings(proxy, proxySettings)).json()).id
+}
+
+test('Settings > Proxy > Custom carries a relayed wss WebSocket through a CONNECT tunnel with the proxy\'s credentials', async() => {
+    const forwardProxy = await startForwardProxy()
+    const target = await startSelfSignedServer()
+    const proxy = await listenApp()
+    const port = target.server.address().port
+
+    try {
+        const proxySettingsId = await registerProxySettingsId(proxy, { mode: 'custom', url: forwardProxy.url, username: 'user', password: 'p@ss' })
+        const secure = socketProxyPathWithOptions({ disableSSLVerification: true, caCertificatesId: null, proxySettingsId }, `wss://api.proxy-test.test:${port}`, '/websocket')
+        // the relay URL, which a reverse proxy in front of the server may log, holds no password
+        assert.doesNotMatch(decodeURIComponent(secure), /p@ss/)
+        assert.equal(await openWebSocket(`ws://127.0.0.1:${proxy.address().port}${secure}`, 'hello'), 'message echo:hello')
+        assert.equal(forwardProxy.received[0].requestLine, `CONNECT api.proxy-test.test:${port} HTTP/1.1`)
+        assert.deepEqual(forwardProxy.received[0].headers.find(([name]) => name === 'proxy-authorization'), ['proxy-authorization', `Basic ${Buffer.from('user:p@ss').toString('base64')}`])
+        assert.equal(target.received.at(-1).url, '/websocket')
+        assert.equal(target.received.at(-1).headers.cookie, undefined)
+
+        // SSL verification still applies inside the tunnel
+        const verified = socketProxyPathWithOptions({ disableSSLVerification: false, caCertificatesId: null, proxySettingsId }, `wss://api.proxy-test.test:${port}`, '/websocket')
+        assert.equal(await openWebSocket(`ws://127.0.0.1:${proxy.address().port}${verified}`, 'hello'), 'error')
+    } finally {
+        closeServer(proxy)
+        closeServer(target.server)
+        forwardProxy.close()
+    }
+})
+
+test('Settings > Proxy > Custom carries relayed Socket.IO polling, and Off connects directly', async() => {
+    const forwardProxy = await startForwardProxy()
+    const proxy = await listenApp()
+
+    try {
+        const customId = await registerProxySettingsId(proxy, { mode: 'custom', url: forwardProxy.url })
+        const proxied = await fetch(`http://127.0.0.1:${proxy.address().port}${socketProxyPathWithOptions({ disableSSLVerification: false, caCertificatesId: null, proxySettingsId: customId }, 'http://api.proxy-test.test', '/socket.io/?EIO=4&transport=polling')}`)
+        assert.equal(await proxied.text(), 'proxied GET http://api.proxy-test.test/socket.io/?EIO=4&transport=polling HTTP/1.1')
+
+        // the host resolves only at the proxy, so going direct fails to find it
+        const offId = await registerProxySettingsId(proxy, { mode: 'off' })
+        const direct = await fetch(`http://127.0.0.1:${proxy.address().port}${socketProxyPathWithOptions({ disableSSLVerification: false, caCertificatesId: null, proxySettingsId: offId }, 'http://api.proxy-test.test', '/socket.io/?EIO=4&transport=polling')}`)
+        assert.equal(direct.status, 502)
+        assert.match(await direct.text(), /ENOTFOUND api\.proxy-test\.test/)
+        assert.equal(forwardProxy.received.length, 1)
+    } finally {
+        closeServer(proxy)
+        forwardProxy.close()
+    }
+})
+
+test('a proxy setting keeps its random id when registered again, and one that cannot be read is refused', async() => {
+    const proxy = await listenApp()
+
+    try {
+        const proxySettings = { mode: 'custom', url: 'http://proxy.test:3128', username: 'user', password: 'secret' }
+        const id = await registerProxySettingsId(proxy, proxySettings)
+        assert.match(id, /^[0-9a-f-]{36}$/)
+        assert.equal(await registerProxySettingsId(proxy, proxySettings), id)
+        assert.notEqual(await registerProxySettingsId(proxy, { ...proxySettings, password: 'other' }), id)
+
+        for(const body of ['not json', '"custom"', '[]', 'null']) {
+            const refused = await fetch(`http://127.0.0.1:${proxy.address().port}/proxy-settings`, { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+            assert.equal(refused.status, 400, body)
+        }
+    } finally {
+        closeServer(proxy)
+    }
+})
+
+test('a socket naming a proxy setting the server does not have is refused with the reason', async() => {
+    const proxy = await listenApp()
+
+    try {
+        const path = socketProxyPathWithOptions({ disableSSLVerification: false, caCertificatesId: null, proxySettingsId: 'forgotten-after-a-restart' }, 'http://api.proxy-test.test', '/socket.io/?EIO=4&transport=polling')
+        const response = await fetch(`http://127.0.0.1:${proxy.address().port}${path}`)
+        assert.equal(response.status, 502)
+        assert.equal(await response.text(), 'The proxy setting is no longer registered with the server, connect again')
+        assert.equal(await openWebSocket(`ws://127.0.0.1:${proxy.address().port}${path.replace('http%3A', 'ws%3A')}`, 'hello'), 'error')
+    } finally {
+        closeServer(proxy)
+    }
+})
+
+test('a socket relay url whose settings cannot be read is refused', async() => {
+    const proxy = await listenApp()
+
+    try {
+        const response = await fetch(`http://127.0.0.1:${proxy.address().port}/proxy-socket/%7Bnot-json/${encodeURIComponent('http://api.proxy-test.test')}/socket.io/`)
+        assert.equal(response.status, 400)
+    } finally {
+        closeServer(proxy)
     }
 })

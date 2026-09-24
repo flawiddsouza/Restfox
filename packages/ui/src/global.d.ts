@@ -131,6 +131,15 @@ export interface CACertificates {
     certificates: string // PEM
 }
 
+// Settings > Proxy, never saved means System
+export interface ProxySettings {
+    mode: 'system' | 'off' | 'custom'
+    url: string // Custom's proxy, http://, https:// or socks5://
+    username: string
+    password: string
+    bypass: string // hosts Custom connects to directly, separated by commas or spaces
+}
+
 export interface Flags {
     hideBrowserRelatedResponsePanelErrors: boolean
     browserExtensionEnabled: boolean
@@ -139,6 +148,7 @@ export interface Flags {
     isElectron: boolean
     disableSSLVerification: boolean
     caCertificates: CACertificates | null
+    proxy: ProxySettings | null
     electronSwitchToChromiumFetch: boolean
     hidePasswordFields: boolean
     responseLineWrapping: boolean

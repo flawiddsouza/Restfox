@@ -22,6 +22,7 @@ import {
     SetEnvironmentVariableFunction,
     Flags,
     CACertificates,
+    ProxySettings,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -120,6 +121,68 @@ export function getSavedRequestTimeout() {
     return Number.isFinite(requestTimeout) && requestTimeout > 0 ? Math.floor(requestTimeout) : 0
 }
 
+export const DEFAULT_PROXY_SETTINGS: ProxySettings = { mode: 'system', url: '', username: '', password: '', bypass: '' }
+
+// Settings > Proxy, null when never saved, which is System. Fields a saved value lacks take their defaults
+export function getSavedProxySettings(): ProxySettings | null {
+    try {
+        const savedProxySettings = JSON.parse(localStorage.getItem(constants.LOCAL_STORAGE_KEY.PROXY) ?? 'null')
+        return savedProxySettings !== null && typeof savedProxySettings === 'object' ? { ...DEFAULT_PROXY_SETTINGS, ...savedProxySettings } : null
+    } catch {
+        return null
+    }
+}
+
+// what the transports need of Settings > Proxy: Custom's fields only while Custom is chosen, so a password kept for
+// switching back is not sent along
+export function getProxySettingsInUse(proxySettings: ProxySettings): Partial<ProxySettings> & Pick<ProxySettings, 'mode'> {
+    return proxySettings.mode === 'custom' ? proxySettings : { mode: proxySettings.mode }
+}
+
+// Electron hands Chromium's proxy login to the app for page requests but not for WebSocket, so a page request through
+// the proxy goes first and Chromium keeps the login. The host does not exist, the proxy asks for the login before it
+// looks the host up. Once Chromium has the login, it sends it at once and this is quick
+export async function primeProxyLogin(proxySettings: ProxySettings | null) {
+    if(proxySettings?.mode !== 'custom' || !proxySettings.username) {
+        return
+    }
+
+    // a proxy that does not answer holds up a socket's connect by 3 seconds at most
+    const abortController = new AbortController()
+    const timeoutId = setTimeout(() => abortController.abort(), 3000)
+
+    await fetch('http://restfox-proxy-login.invalid/', { mode: 'no-cors', signal: abortController.signal }).catch(() => {
+        // the answer does not matter, only that the proxy asked for the login
+    })
+
+    clearTimeout(timeoutId)
+}
+
+// the reason Custom's proxy URL cannot be used, or null. Without a scheme it is an HTTP proxy. Custom is not saved
+// until it can be, so picking it keeps the previous choice working while the URL is typed in
+export function getProxyUrlError(url: string): string | null {
+    if(url.trim() === '') {
+        return 'Enter a proxy URL to use Custom'
+    }
+
+    try {
+        const proxyUrl = new URL(url.includes('://') ? url : `http://${url}`)
+
+        if(!['http:', 'https:', 'socks5:'].includes(proxyUrl.protocol) || proxyUrl.hostname === '') {
+            return 'Enter a proxy like http://proxy.example.com:8080, https:// and socks5:// work too'
+        }
+
+        // Electron hands the proxy's login to Chromium's own connections from the fields, not from the URL
+        if(proxyUrl.username || proxyUrl.password) {
+            return 'Enter the login in Username and Password, not in the URL'
+        }
+    } catch {
+        return 'Enter a proxy like http://proxy.example.com:8080, https:// and socks5:// work too'
+    }
+
+    return null
+}
+
 const CA_CERTIFICATES_SETTINGS_FILE_ID = 'ca-certificates'
 
 // read once, web-standalone sends the certificates' id with every request
@@ -199,8 +262,8 @@ async function registerCACertificatesWithServer(certificates: string, registerAg
 }
 
 // hands the certificates to the process that sends requests, and throws when it cannot use them. Returns web-standalone's
-// id for them
-export async function registerCACertificates(certificates: string | null): Promise<string | null> {
+// id for them. registerAgain skips the id kept from before, which a restarted server has forgotten
+export async function registerCACertificates(certificates: string | null, registerAgain = false): Promise<string | null> {
     if(import.meta.env.MODE === 'desktop-electron') {
         const { error } = await window.electronIPC.setCACertificates(certificates)
 
@@ -210,10 +273,33 @@ export async function registerCACertificates(certificates: string | null): Promi
     }
 
     if(import.meta.env.MODE === 'web-standalone' && certificates !== null) {
-        return registerCACertificatesWithServer(certificates)
+        return registerCACertificatesWithServer(certificates, registerAgain)
     }
 
     return null
+}
+
+// web-standalone relays a socket with Settings > Proxy named by the id this returns, so the password stays out of the
+// relay's URL, which a reverse proxy in front of the server may log. Registered on every connect, a restarted server has
+// forgotten it, and the same setting keeps its id
+export async function registerProxySettings(proxySettings: ProxySettings): Promise<string> {
+    const proxySettingsInUse = getProxySettingsInUse(proxySettings)
+
+    const response = await fetch('/proxy-settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(proxySettingsInUse),
+    })
+
+    const responseBody = await response.json().catch(() => ({}))
+
+    if(!response.ok) {
+        throw new Error(responseBody.error ?? `The server could not use the proxy setting: ${response.status} ${response.statusText}`.trim())
+    }
+
+    return responseBody.id
 }
 
 export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
@@ -331,6 +417,13 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 'x-proxy-flag-timeout': requestTimeout.toString(),
                 // header names reach the server lowercased, by Node and by any HTTP/2 hop in front of it, a value keeps them as typed
                 'x-proxy-flag-header-names': JSON.stringify(Object.keys(headers)),
+            }
+
+            // Settings > Proxy, encoded since a header value holds only Latin-1 and a password may not. Never saved is
+            // System, which the server also assumes when the header is missing
+            const proxySettings = getSavedProxySettings()
+            if(proxySettings) {
+                proxyHeaders['x-proxy-flag-proxy'] = encodeURIComponent(JSON.stringify(getProxySettingsInUse(proxySettings)))
             }
 
             Object.keys(headers).forEach(header => {
@@ -1927,11 +2020,17 @@ export function uriParse(urlString: string): {
     return { protocol, host, port, pathname, hash, search }
 }
 
-// a browser checks a socket's certificate itself and cannot be told to skip that or to trust another CA, so with SSL
-// verification disabled, or with CA certificates registered under caCertificatesId, web-standalone connects a secure
-// socket through its server, which checks it the way /proxy does for requests
-export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebStandalone' | 'disableSSLVerification'> & { caCertificatesId?: string | null }, serverLocation: Pick<Location, 'protocol' | 'host'> = window.location): string {
-    if(!flags.isWebStandalone || (!flags.disableSSLVerification && !flags.caCertificatesId)) {
+function isLoopbackHostname(hostname: string) {
+    return hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '[::1]' || /^127(\.\d{1,3}){3}$/.test(hostname)
+}
+
+// web-standalone connects sockets through its server, like requests, so a Socket.IO target needs no CORS for this page,
+// an https page can reach a ws:// target, and Settings > Proxy applies. Loopback stays with the browser, which is the
+// user's own machine and not always the server's. A browser checks a socket's certificate itself and cannot be told to
+// skip that or to trust another CA, so a secure loopback socket still goes through the server with SSL verification
+// disabled or CA certificates registered under caCertificatesId
+export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebStandalone' | 'disableSSLVerification'> & { caCertificatesId?: string | null, proxySettingsId?: string | null }, serverLocation: Pick<Location, 'protocol' | 'host'> = window.location): string {
+    if(!flags.isWebStandalone) {
         return url
     }
 
@@ -1943,15 +2042,30 @@ export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebSta
         return url
     }
 
-    if(parsedUrl.protocol !== 'wss:' && parsedUrl.protocol !== 'https:') {
+    if(!['ws:', 'wss:', 'http:', 'https:'].includes(parsedUrl.protocol)) {
         return url
     }
 
-    const protocol = parsedUrl.protocol === 'wss:' ? (serverLocation.protocol === 'https:' ? 'wss:' : 'ws:') : serverLocation.protocol
+    let options: string
 
-    const verification = flags.disableSSLVerification ? 'true' : `ca-${flags.caCertificatesId}`
+    if(isLoopbackHostname(parsedUrl.hostname)) {
+        if((parsedUrl.protocol !== 'wss:' && parsedUrl.protocol !== 'https:') || (!flags.disableSSLVerification && !flags.caCertificatesId)) {
+            return url
+        }
 
-    return `${protocol}//${serverLocation.host}/proxy-socket/${verification}/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
+        options = flags.disableSSLVerification ? 'true' : `ca-${flags.caCertificatesId}`
+    } else {
+        // with SSL verification disabled there is nothing to check a certificate against
+        options = encodeURIComponent(JSON.stringify({
+            disableSSLVerification: flags.disableSSLVerification,
+            caCertificatesId: flags.disableSSLVerification ? null : (flags.caCertificatesId ?? null),
+            proxySettingsId: flags.proxySettingsId ?? null,
+        }))
+    }
+
+    const protocol = parsedUrl.protocol.startsWith('ws') ? (serverLocation.protocol === 'https:' ? 'wss:' : 'ws:') : serverLocation.protocol
+
+    return `${protocol}//${serverLocation.host}/proxy-socket/${options}/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
 }
 
 export function getStatusText(statusCode: number): string {

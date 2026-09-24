@@ -9,6 +9,9 @@ import {
     toTree,
     getSpaces,
     getSavedRequestTimeout,
+    getSavedProxySettings,
+    getProxySettingsInUse,
+    getProxyUrlError,
     fetchWrapper,
     handleRequest,
     createRequestData,
@@ -384,6 +387,59 @@ describe('Function: getSavedRequestTimeout', () => {
 
         localStorage.setItem('Restfox-RequestTimeout', 'abc')
         expect(getSavedRequestTimeout()).toBe(0)
+    })
+})
+
+describe('Function: getSavedProxySettings', () => {
+    test('never saved, or unreadable, is null, which the transports take as System', () => {
+        expect(getSavedProxySettings()).toBe(null)
+
+        for(const saved of ['not json', 'null', '"custom"', '5']) {
+            localStorage.setItem('Restfox-Proxy', saved)
+            expect(getSavedProxySettings()).toBe(null)
+        }
+    })
+
+    test('fields a saved value lacks take their defaults', () => {
+        localStorage.setItem('Restfox-Proxy', '{}')
+        expect(getSavedProxySettings()).toEqual({ mode: 'system', url: '', username: '', password: '', bypass: '' })
+
+        localStorage.setItem('Restfox-Proxy', JSON.stringify({ mode: 'custom', url: 'http://proxy.test:3128' }))
+        expect(getSavedProxySettings()).toEqual({ mode: 'custom', url: 'http://proxy.test:3128', username: '', password: '', bypass: '' })
+    })
+})
+
+describe('Function: getProxySettingsInUse', () => {
+    test('sends the Custom fields only while Custom is chosen, a password kept for switching back stays behind', () => {
+        const custom = { mode: 'custom' as const, url: 'http://proxy.test:3128', username: 'user', password: 'secret', bypass: 'internal.test' }
+
+        expect(getProxySettingsInUse(custom)).toEqual(custom)
+        expect(getProxySettingsInUse({ ...custom, mode: 'system' })).toEqual({ mode: 'system' })
+        expect(getProxySettingsInUse({ ...custom, mode: 'off' })).toEqual({ mode: 'off' })
+    })
+})
+
+describe('Function: getProxyUrlError', () => {
+    test('accepts HTTP, HTTPS and SOCKS5 proxies, a missing scheme meaning HTTP, and a single name such as a hosts entry', () => {
+        for(const url of ['proxy.test:3128', 'http://proxy.test:3128', 'https://proxy.test', 'socks5://127.0.0.1:1080', 'proxy']) {
+            expect(getProxyUrlError(url)).toBe(null)
+        }
+    })
+
+    test('a login in the URL goes in Username and Password instead', () => {
+        expect(getProxyUrlError('http://user:pass@proxy.test:8080')).toBe('Enter the login in Username and Password, not in the URL')
+        expect(getProxyUrlError('user@proxy.test:8080')).toBe('Enter the login in Username and Password, not in the URL')
+    })
+
+    test('an empty URL asks for one', () => {
+        expect(getProxyUrlError('')).toBe('Enter a proxy URL to use Custom')
+        expect(getProxyUrlError('  ')).toBe('Enter a proxy URL to use Custom')
+    })
+
+    test('refuses what the transports cannot connect through', () => {
+        for(const url of ['http://', 'socks4://proxy.test:1080', 'ftp://proxy.test', 'http://proxy test']) {
+            expect(getProxyUrlError(url)).toMatch('Enter a proxy like')
+        }
     })
 })
 
@@ -1210,8 +1266,6 @@ describe(`Function: ${getSocketConnectionUrl.name}`, () => {
     test('web-standalone with SSL verification disabled connects a wss url through the server', () => {
         expect(getSocketConnectionUrl('wss://localhost:5605/websocket?token=1', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp))
             .toBe('ws://localhost:4004/proxy-socket/true/wss%3A%2F%2Flocalhost%3A5605/websocket?token=1')
-        expect(getSocketConnectionUrl('wss://example.com/ws', { isWebStandalone: true, disableSSLVerification: true }, { protocol: 'https:', host: 'restfox.example.com' }))
-            .toBe('wss://restfox.example.com/proxy-socket/true/wss%3A%2F%2Fexample.com/ws')
     })
 
     test('a Socket.IO https url keeps the path the client polls and upgrades on', () => {
@@ -1229,7 +1283,7 @@ describe(`Function: ${getSocketConnectionUrl.name}`, () => {
             .toBe('ws://localhost:5605/websocket')
     })
 
-    test('everything else connects directly as before', () => {
+    test('loopback, and every socket in other builds, connects directly as before', () => {
         const url = 'wss://localhost:5605/websocket'
         expect(getSocketConnectionUrl(url, { isWebStandalone: true, disableSSLVerification: false }, standaloneOnHttp)).toBe(url)
         expect(getSocketConnectionUrl(url, { isWebStandalone: true, disableSSLVerification: false, caCertificatesId: null }, standaloneOnHttp)).toBe(url)
@@ -1237,6 +1291,26 @@ describe(`Function: ${getSocketConnectionUrl.name}`, () => {
         expect(getSocketConnectionUrl(url, { isWebStandalone: false, disableSSLVerification: true }, standaloneOnHttp)).toBe(url)
         expect(getSocketConnectionUrl('ws://localhost:5605/websocket', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp)).toBe('ws://localhost:5605/websocket')
         expect(getSocketConnectionUrl('not a url', { isWebStandalone: true, disableSSLVerification: true }, standaloneOnHttp)).toBe('not a url')
+        for(const loopback of ['ws://127.0.0.1:5605/websocket', 'ws://[::1]:5605/websocket', 'ws://api.localhost/websocket', 'http://localhost:5605/socket.io/']) {
+            expect(getSocketConnectionUrl(loopback, { isWebStandalone: true, disableSSLVerification: false, proxySettingsId: 'p1' }, standaloneOnHttp)).toBe(loopback)
+        }
+    })
+
+    test('web-standalone connects every socket to another host through the server, with its settings and Settings > Proxy', () => {
+        const options = (value: object) => encodeURIComponent(JSON.stringify(value))
+
+        expect(getSocketConnectionUrl('ws://example.com/ws?x=1', { isWebStandalone: true, disableSSLVerification: false }, standaloneOnHttp))
+            .toBe(`ws://localhost:4004/proxy-socket/${options({ disableSSLVerification: false, caCertificatesId: null, proxySettingsId: null })}/ws%3A%2F%2Fexample.com/ws?x=1`)
+        expect(getSocketConnectionUrl('http://example.com:3000/socket.io/', { isWebStandalone: true, disableSSLVerification: false, proxySettingsId: 'p1' }, standaloneOnHttp))
+            .toBe(`http://localhost:4004/proxy-socket/${options({ disableSSLVerification: false, caCertificatesId: null, proxySettingsId: 'p1' })}/http%3A%2F%2Fexample.com%3A3000/socket.io/`)
+        expect(getSocketConnectionUrl('wss://example.com/ws', { isWebStandalone: true, disableSSLVerification: false, caCertificatesId: 'abc' }, { protocol: 'https:', host: 'restfox.example.com' }))
+            .toBe(`wss://restfox.example.com/proxy-socket/${options({ disableSSLVerification: false, caCertificatesId: 'abc', proxySettingsId: null })}/wss%3A%2F%2Fexample.com/ws`)
+        // an https page reaches a ws:// target through its own wss://
+        expect(getSocketConnectionUrl('ws://example.com/ws', { isWebStandalone: true, disableSSLVerification: false }, { protocol: 'https:', host: 'restfox.example.com' }))
+            .toMatch(/^wss:\/\/restfox\.example\.com\/proxy-socket\//)
+        // with SSL verification disabled there is nothing to check a certificate against
+        expect(getSocketConnectionUrl('wss://example.com/ws', { isWebStandalone: true, disableSSLVerification: true, caCertificatesId: 'abc' }, standaloneOnHttp))
+            .toBe(`ws://localhost:4004/proxy-socket/${options({ disableSSLVerification: true, caCertificatesId: null, proxySettingsId: null })}/wss%3A%2F%2Fexample.com/ws`)
     })
 })
 

@@ -108,10 +108,45 @@
                         </div>
                     </template>
 
-                    <template v-if="flags.isElectron">
+                    <template v-if="flags.isElectron || flags.isWebStandalone">
                         <div class="settings-section-heading">Connection</div>
 
                         <div>
+                            <div style="margin-bottom: var(--label-margin-bottom);">Proxy</div>
+                            <select class="full-width-input" v-model="proxy.mode">
+                                <option value="system">System</option>
+                                <option value="off">Off</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                            <div style="margin-top: 0.3rem;" v-if="proxy.mode === 'system' && flags.isElectron">Uses your operating system's proxy settings, a PAC script included. When the system has no proxy, the HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables apply.</div>
+                            <div style="margin-top: 0.3rem;" v-if="proxy.mode === 'system' && flags.isWebStandalone">Uses the HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables of the server running Restfox.</div>
+                            <div style="margin-top: 0.3rem;" v-if="proxy.mode === 'off'">Connects directly, even when the system has a proxy.</div>
+                            <template v-if="proxy.mode === 'custom'">
+                                <div style="padding-top: 0.5rem">
+                                    <div style="margin-bottom: var(--label-margin-bottom);">Proxy URL</div>
+                                    <input type="text" v-model.lazy.trim="proxy.url" class="full-width-input" placeholder="http://proxy.example.com:8080">
+                                    <div v-if="proxyUrlError" style="margin-top: 0.3rem; color: var(--base-color-error);">{{ proxyUrlError }}</div>
+                                </div>
+                                <div style="display: flex; gap: 1rem; padding-top: 0.5rem">
+                                    <div style="flex: 1">
+                                        <div style="margin-bottom: var(--label-margin-bottom);">Username</div>
+                                        <input type="text" v-model.lazy="proxy.username" class="full-width-input" placeholder="Optional">
+                                    </div>
+                                    <div style="flex: 1">
+                                        <div style="margin-bottom: var(--label-margin-bottom);">Password</div>
+                                        <input type="password" v-model.lazy="proxy.password" class="full-width-input" placeholder="Optional">
+                                    </div>
+                                </div>
+                                <div style="padding-top: 0.5rem">
+                                    <div style="margin-bottom: var(--label-margin-bottom);">Bypass Proxy For</div>
+                                    <input type="text" v-model.lazy.trim="proxy.bypass" class="full-width-input" placeholder="internal.example.com, 10.0.0.5:8080">
+                                    <div style="margin-top: 0.3rem;">Hosts to connect to directly, separated by commas. An entry covers its subdomains too, <strong>*</strong> covers every host.</div>
+                                </div>
+                            </template>
+                            <div style="margin-top: 0.3rem;">Applies to requests, scripts, WebSocket and Socket.IO. localhost always connects directly.</div>
+                        </div>
+
+                        <div style="padding-top: 1rem" v-if="flags.isElectron">
                             <label style="display: flex;">
                                 <input type="checkbox" v-model="electronSwitchToChromiumFetch"> <div style="margin-left: 0.5rem;">Switch to Chromium Fetch</div>
                             </label>
@@ -184,7 +219,7 @@
 <script>
 import Modal from '@/components/Modal.vue'
 import constants from '../../constants'
-import { getSavedRequestTimeout, getSavedCACertificates, saveCACertificates, caCertificatesFileToPEM, registerCACertificates, getVersion } from '@/helpers'
+import { getSavedRequestTimeout, getSavedCACertificates, saveCACertificates, caCertificatesFileToPEM, registerCACertificates, getVersion, DEFAULT_PROXY_SETTINGS, getSavedProxySettings, getProxyUrlError } from '@/helpers'
 
 export default {
     props: {
@@ -208,6 +243,7 @@ export default {
             disableSSLVerification: false,
             caCertificates: null,
             caCertificatesError: '',
+            proxy: { ...DEFAULT_PROXY_SETTINGS },
             electronSwitchToChromiumFetch: false,
             requestTimeout: 0,
             disableIframeSandbox: false,
@@ -232,6 +268,9 @@ export default {
         flags() {
             return this.$store.state.flags
         },
+        proxyUrlError() {
+            return this.proxy.mode === 'custom' ? getProxyUrlError(this.proxy.url) : null
+        },
         gitTag() {
             return import.meta.env.VITE_GIT_TAG
         },
@@ -249,6 +288,19 @@ export default {
         disableSSLVerification() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.DISABLE_SSL_VERIFICATION, this.disableSSLVerification)
             this.$store.state.flags.disableSSLVerification = this.disableSSLVerification
+        },
+        proxy: {
+            handler() {
+                // opening the modal fills in the saved value, which is not a change. Custom without a usable URL is not saved,
+                // the previous choice keeps working
+                if(JSON.stringify(this.proxy) === JSON.stringify(getSavedProxySettings() ?? DEFAULT_PROXY_SETTINGS) || this.proxyUrlError) {
+                    return
+                }
+
+                localStorage.setItem(constants.LOCAL_STORAGE_KEY.PROXY, JSON.stringify(this.proxy))
+                this.$store.state.flags.proxy = { ...this.proxy }
+            },
+            deep: true
         },
         electronSwitchToChromiumFetch() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH, this.electronSwitchToChromiumFetch)
@@ -356,6 +408,9 @@ export default {
         async resetCACertificates() {
             await saveCACertificates(null)
         },
+        resetProxy() {
+            localStorage.removeItem(constants.LOCAL_STORAGE_KEY.PROXY)
+        },
         resetElectronSwitchToChromiumFetch() {
             localStorage.removeItem(constants.LOCAL_STORAGE_KEY.ELECTRON_SWITCH_TO_CHROMIUM_FETCH)
         },
@@ -405,6 +460,7 @@ export default {
             this.resetDisablePageViewAnalyticsTracking()
             this.resetDisableSSLVerification()
             await this.resetCACertificates()
+            this.resetProxy()
             this.resetElectronSwitchToChromiumFetch()
             this.resetRequestTimeout()
             this.resetDisableIframeSandbox()
@@ -468,6 +524,7 @@ export default {
             }
 
             this.requestTimeout = getSavedRequestTimeout()
+            this.proxy = getSavedProxySettings() ?? { ...DEFAULT_PROXY_SETTINGS }
             this.caCertificatesError = ''
             if(this.flags.isElectron || this.flags.isWebStandalone) {
                 getSavedCACertificates().then(caCertificates => {

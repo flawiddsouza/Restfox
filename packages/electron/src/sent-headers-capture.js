@@ -16,7 +16,8 @@ function parseHeaderBlock(block) {
 
 diagnosticsChannel.subscribe('undici:request:create', ({ request }) => {
     const capture = sentHeadersCapture.getStore()
-    if(capture) {
+    // a proxy's CONNECT runs in the same context, it goes to the proxy with its credentials, not to the server
+    if(capture && request.method !== 'CONNECT') {
         coreRequestCaptures.set(request, capture)
     }
 })

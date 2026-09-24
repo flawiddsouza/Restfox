@@ -267,6 +267,8 @@ import {
     jsonStringify,
     substituteEnvironmentVariables,
     registerCACertificates,
+    registerProxySettings,
+    primeProxyLogin,
 } from '@/helpers'
 import Tabs from './Tabs.vue'
 import ioV2 from 'socket.io-client-v2'
@@ -380,12 +382,13 @@ async function connect(client: Client) {
     const clientUrlWithEnvironmentVariablesSubtituted = await substituteEnvironmentVariables(environment, client.url)
 
     // web-standalone's server connects a secure socket for the browser when CA certificates are set, and needs them
-    // registered first
+    // registered first. On every connect: a restarted server has forgotten them, and unlike a request, a socket is not
+    // repeated when the server says so
     let caCertificatesId: string | null = null
 
     if (flags.value.isWebStandalone && flags.value.caCertificates && !flags.value.disableSSLVerification && /^(wss|https):/i.test(clientUrlWithEnvironmentVariablesSubtituted)) {
         try {
-            caCertificatesId = await registerCACertificates(flags.value.caCertificates.certificates)
+            caCertificatesId = await registerCACertificates(flags.value.caCertificates.certificates, true)
         } catch (error: any) {
             delete pendingConnections[socketKey]
 
@@ -397,6 +400,31 @@ async function connect(client: Client) {
 
             return
         }
+    }
+
+    // web-standalone's server also relays a socket with Settings > Proxy, named by an id registered the same way. Never
+    // saved is System, which the server assumes without an id
+    let proxySettingsId: string | null = null
+
+    if (flags.value.isWebStandalone && flags.value.proxy) {
+        try {
+            proxySettingsId = await registerProxySettings(flags.value.proxy)
+        } catch (error) {
+            delete pendingConnections[socketKey]
+
+            addClientMessage(client, {
+                timestamp: new Date().getTime(),
+                message: `Could not connect to ${clientUrlWithEnvironmentVariablesSubtituted}: ${(error as Error).message}`,
+                type: 'INFO'
+            })
+
+            return
+        }
+    }
+
+    // Electron's Chromium keeps a proxy's login only after a page request asks for it, a proxy down at launch never did
+    if (flags.value.isElectron) {
+        await primeProxyLogin(flags.value.proxy)
     }
 
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
@@ -412,7 +440,7 @@ async function connect(client: Client) {
 
     try {
         if (client.type === undefined) {
-            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(getSocketConnectionUrl(clientUrlWithEnvironmentVariablesSubtituted, { ...flags.value, caCertificatesId }))
+            sockets[activeTab.value._id + '-' + client.id] = new WebSocket(getSocketConnectionUrl(clientUrlWithEnvironmentVariablesSubtituted, { ...flags.value, caCertificatesId, proxySettingsId }))
         } else if (client.type.startsWith('Socket.IO')) {
             const targetUrl = new URL(clientUrlWithEnvironmentVariablesSubtituted)
 
@@ -420,7 +448,7 @@ async function connect(client: Client) {
                 targetUrl.pathname = '/socket.io/'
             }
 
-            const parsedUrl = new URL(getSocketConnectionUrl(targetUrl.href, { ...flags.value, caCertificatesId }))
+            const parsedUrl = new URL(getSocketConnectionUrl(targetUrl.href, { ...flags.value, caCertificatesId, proxySettingsId }))
 
             let mainUrl = parsedUrl.origin
 

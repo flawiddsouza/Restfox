@@ -21,6 +21,9 @@ import {
     initStoragePersistence,
     getSavedRequestTimeout,
     getSavedCACertificates,
+    getSavedProxySettings,
+    getProxySettingsInUse,
+    primeProxyLogin,
 } from './helpers'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
@@ -77,9 +80,28 @@ export default {
             if(import.meta.env.MODE === 'desktop-electron') {
                 this.sendCACertificatesToElectron()
             }
+        },
+        '$store.state.flags.proxy'() {
+            if(import.meta.env.MODE === 'desktop-electron') {
+                this.sendProxyToElectron()
+            }
         }
     },
     methods: {
+        sendProxyToElectron() {
+            const proxy = this.$store.state.flags.proxy
+
+            // a plain copy, IPC cannot send the store's reactive object
+            window.electronIPC.setProxy(proxy ? { ...getProxySettingsInUse(proxy) } : null).then(changed => {
+                // a change clears the proxy login Chromium kept, so it is asked for again here, and by the Socket panel before
+                // each connect
+                if(changed) {
+                    primeProxyLogin(proxy)
+                }
+            }).catch(error => {
+                console.error('Settings > Proxy:', error.message)
+            })
+        },
         sendCACertificatesToElectron() {
             window.electronIPC.setCACertificates(this.$store.state.flags.caCertificates?.certificates ?? null).then(({ error }) => {
                 if(error) {
@@ -473,9 +495,12 @@ export default {
             })
         }
 
+        this.$store.state.flags.proxy = getSavedProxySettings()
+
         if(import.meta.env.MODE === 'desktop-electron') {
             // the main process keeps the setting across page reloads, so the saved value is sent even when it is the default
             window.electronIPC.setDisableSSLVerification(this.$store.state.flags.disableSSLVerification)
+            this.sendProxyToElectron()
             if (!this.$store.state.flags.disableAutoUpdate) {
                 console.log('invoke updateElectronApp')
                 window.electronIPC.updateElectronApp()

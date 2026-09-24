@@ -32,6 +32,7 @@ const ipcFunctions = [
     'readFile',
     'setDisableSSLVerification',
     'setCACertificates',
+    'setProxy',
     'updateElectronApp',
 ]
 

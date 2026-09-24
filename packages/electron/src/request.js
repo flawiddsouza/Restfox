@@ -1,9 +1,10 @@
 const { File } = require('node:buffer')
-const { fetch, Agent, FormData } = require('undici')
+const { fetch, Agent, ProxyAgent, FormData } = require('undici')
 const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 const { withSentHeadersCapture } = require('./sent-headers-capture.js')
 const { getCACertificatesWithCustom } = require('./ca-certificates.js')
+const { getProxyForRequest, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } = require('./proxy.js')
 
 let abortController = {}
 let cancelledRequestIds = new Set()
@@ -50,8 +51,39 @@ function getCustomCACertificates() {
     return customCACertificates
 }
 
-function getAgentForRequest(urlParsed, disableSSLVerification) {
-    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}`
+// Settings > Proxy, sent by the renderer, and Electron's session.resolveProxy for its System choice
+let proxySettings = null
+let resolveSystemProxy = null
+
+function setProxySettings(settings, systemProxyResolver) {
+    proxySettings = settings
+    resolveSystemProxy = systemProxyResolver
+
+    for(const agent of agents.values()) {
+        agent.close().catch(() => {})
+    }
+    agents.clear()
+}
+
+function getAgentForRequest(urlParsed, disableSSLVerification, proxyUrl = null, proxyToken = null) {
+    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}:${proxyUrl}:${proxyToken}`
+
+    if(!agents.has(key) && proxyUrl !== null) {
+        const tls = {
+            rejectUnauthorized: disableSSLVerification ? false : true,
+            ...(customCACertificates.length > 0 ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
+        }
+
+        agents.set(key, new ProxyAgent({
+            ...getProxyAgentOptions(proxyUrl, tls, proxyToken),
+            // plain HTTP goes to the proxy as a full URL, like browsers and curl send it, HTTPS through a CONNECT tunnel
+            proxyTunnel: false,
+            requestTls: { ...tls, allowH2: true },
+            allowH2: true,
+            headersTimeout: 0,
+            bodyTimeout: 0,
+        }))
+    }
 
     if(!agents.has(key)) {
         const agent = new Agent({
@@ -135,9 +167,12 @@ async function handleSendRequest(data) {
             body = new File([new Uint8Array(body.buffer)], body.name, { type: body.type })
         }
 
-        const startTime = new Date()
-
         const urlParsed = new URL(url)
+        // before the clock starts, a PAC script can take a while
+        const proxyUrl = await getProxyForRequest(urlParsed, proxySettings, resolveSystemProxy)
+        const { headers: headersToSend, token: proxyToken } = proxyUrl !== null ? takeProxyAuthorization(headers) : { headers, token: null }
+
+        const startTime = new Date()
 
         console.log({
             disableSSLVerification
@@ -145,10 +180,10 @@ async function handleSendRequest(data) {
 
         const { result: response, headersSent } = await withSentHeadersCapture(() => fetch(url, {
             method,
-            headers,
+            headers: headersToSend,
             body: method !== 'GET' ? body : undefined,
             signal: requestAbortController.signal,
-            dispatcher: getAgentForRequest(urlParsed, disableSSLVerification),
+            dispatcher: getAgentForRequest(urlParsed, disableSSLVerification, proxyUrl, proxyToken),
         }))
 
         const headEndTime = new Date()
@@ -177,7 +212,7 @@ async function handleSendRequest(data) {
             timeTaken,
             headTimeTaken,
             bodyTimeTaken,
-            requestHeadersSent: headersSent,
+            requestHeadersSent: proxyUrl !== null ? removeProxyCredentials(headersSent, headers) : headersSent,
         }
         return {
             event: 'response',
@@ -209,4 +244,5 @@ module.exports = {
     cancelRequest,
     setCustomCACertificates,
     getCustomCACertificates,
+    setProxySettings,
 }

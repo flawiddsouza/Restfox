@@ -30,6 +30,7 @@ export default {
         GENERATE_CODE_CLIENT: 'Restfox-GenerateCodeClient',
         GLOBAL_USER_AGENT: 'Restfox-GlobalUserAgent',
         REQUEST_TIMEOUT: 'Restfox-RequestTimeout',
+        PROXY: 'Restfox-Proxy',
         INDENT_SIZE: 'Restfox-IndentSize',
         SHOW_TABS: 'Restfox-ShowTabs',
         HIDE_PASSWORD_FIELDS: 'Restfox-HidePasswordFields',

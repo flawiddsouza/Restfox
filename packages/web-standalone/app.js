@@ -1,16 +1,17 @@
 import express from 'express'
-import { fetch, Agent } from 'undici'
+import { fetch, Agent, ProxyAgent } from 'undici'
 import http from 'http'
 import https from 'https'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { pathToFileURL } from 'url'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import * as db from './src/db.js'
 import * as helpers from './src/helpers.js'
 import TaskQueue from './src/task-queue.js'
 import { withSentHeadersCapture } from './src/sent-headers-capture.js'
 import { trustSystemCACertificates, parseCACertificates, getCACertificatesWithCustom } from './src/ca-certificates.js'
+import { getProxyForRequest, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } from './src/proxy.js'
 
 trustSystemCACertificates()
 
@@ -59,18 +60,59 @@ app.post('/proxy-ca-certificates', express.text({ type: '*/*', limit: '5mb' }), 
     }
 })
 
+// Settings > Proxy for relayed sockets. A socket's relay URL names it by id, so its password stays out of URLs, which a
+// reverse proxy in front of this server may log. The id is random, the same setting keeps it, the oldest go past the limit
+const PROXY_SETTINGS_LIMIT = 100
+const proxySettingsById = new Map()
+const proxySettingsIdsByValue = new Map()
+
+app.post('/proxy-settings', express.text({ type: '*/*', limit: '100kb' }), (req, res) => {
+    let proxySettings = null
+    try {
+        proxySettings = JSON.parse(req.body)
+    } catch {}
+
+    if(proxySettings === null || typeof proxySettings !== 'object' || Array.isArray(proxySettings)) {
+        res.status(400).json({ error: 'The proxy setting must be a JSON object' })
+        return
+    }
+
+    const value = JSON.stringify(proxySettings)
+    const id = proxySettingsIdsByValue.get(value) ?? randomUUID()
+
+    proxySettingsIdsByValue.delete(value)
+    proxySettingsIdsByValue.set(value, id)
+    proxySettingsById.set(id, proxySettings)
+    if(proxySettingsIdsByValue.size > PROXY_SETTINGS_LIMIT) {
+        const [oldestValue, oldestId] = proxySettingsIdsByValue.entries().next().value
+        proxySettingsIdsByValue.delete(oldestValue)
+        proxySettingsById.delete(oldestId)
+    }
+
+    res.json({ id })
+})
+
 const agents = new Map()
 
-function getAgentForRequest(urlParsed, disableSSLVerification, customCACertificatesId = null) {
-    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}:${customCACertificatesId}`
+function getAgentForRequest(urlParsed, disableSSLVerification, customCACertificatesId = null, proxyUrl = null, proxyToken = null) {
+    const key = `${urlParsed.hostname}:${urlParsed.port}:${disableSSLVerification}:${customCACertificatesId}:${proxyUrl}:${proxyToken}`
 
     if(!agents.has(key)) {
         const customCACertificates = customCACertificatesById.get(customCACertificatesId)
-        const agent = new Agent({
-            connect: {
-                rejectUnauthorized: disableSSLVerification ? false : true,
-                ...(customCACertificates ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
-            },
+        const tls = {
+            rejectUnauthorized: disableSSLVerification ? false : true,
+            ...(customCACertificates ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
+        }
+        const agent = proxyUrl !== null ? new ProxyAgent({
+            ...getProxyAgentOptions(proxyUrl, tls, proxyToken),
+            // plain HTTP goes to the proxy as a full URL, like browsers and curl send it, HTTPS through a CONNECT tunnel
+            proxyTunnel: false,
+            requestTls: { ...tls, allowH2: true },
+            allowH2: true,
+            headersTimeout: 0,
+            bodyTimeout: 0,
+        }) : new Agent({
+            connect: tls,
             allowH2: true,
             headersTimeout: 0,
             bodyTimeout: 0,
@@ -89,6 +131,11 @@ app.post('/proxy', async(req, res) => {
     const requestTimeoutRaw = Number(req.headers['x-proxy-flag-timeout'] ?? 0)
     const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
     const customCACertificatesId = req.headers['x-proxy-flag-ca-certificates-id'] ?? null
+    // Settings > Proxy, an older UI sends none, which is System, this server's HTTP_PROXY, HTTPS_PROXY and NO_PROXY
+    let proxySettings = null
+    try {
+        proxySettings = JSON.parse(decodeURIComponent(req.headers['x-proxy-flag-proxy'] ?? 'null'))
+    } catch {}
     const headers = {}
 
     // after a restart the server has forgotten the file, the UI registers it again and repeats the request
@@ -96,8 +143,6 @@ app.post('/proxy', async(req, res) => {
         res.send({ event: 'caCertificatesNotFound' })
         return
     }
-
-    const agent = getAgentForRequest(new URL(url), disableSSLVerification, customCACertificatesId)
 
     // header names arrive lowercased, by Node and by any HTTP/2 hop in front of this server, so the UI sends them as
     // typed in a value. An older UI does not, and its headers go out lowercase as before
@@ -145,12 +190,16 @@ app.post('/proxy', async(req, res) => {
     }
 
     try {
+        const proxyUrl = await getProxyForRequest(new URL(url), proxySettings)
+        const { headers: headersToSend, token: proxyToken } = proxyUrl !== null ? takeProxyAuthorization(headers) : { headers, token: null }
+        const agent = getAgentForRequest(new URL(url), disableSSLVerification, customCACertificatesId, proxyUrl, proxyToken)
+
         const startTime = new Date()
 
         const { result: response, headersSent } = await withSentHeadersCapture(() => fetch(url, {
             dispatcher: agent,
             method,
-            headers,
+            headers: headersToSend,
             body,
             duplex: 'half',
             signal: abortController.signal,
@@ -182,7 +231,7 @@ app.post('/proxy', async(req, res) => {
             timeTaken,
             headTimeTaken,
             bodyTimeTaken,
-            requestHeadersSent: headersSent,
+            requestHeadersSent: proxyUrl !== null ? removeProxyCredentials(headersSent, headers) : headersSent,
         }
 
         if(!res.writableEnded && !res.destroyed) {
@@ -239,19 +288,50 @@ function parseSocketProxyUrl(requestUrl) {
 
     // a WebSocket url is requested and upgraded over its HTTP counterpart
     const protocol = targetOrigin.protocol.replace(/^ws/, 'http')
+    const url = new URL(`${protocol}//${targetOrigin.host}/${rest.join('/')}`)
 
+    // the UI relays every socket to a host other than loopback, naming its settings as JSON, Settings > Proxy by id
+    if(verification?.startsWith('%7B')) {
+        try {
+            const options = JSON.parse(decodeURIComponent(verification))
+            return {
+                url,
+                disableSSLVerification: options.disableSSLVerification === true,
+                customCACertificatesId: options.caCertificatesId ?? null,
+                proxySettingsId: options.proxySettingsId ?? null,
+            }
+        } catch {
+            return null
+        }
+    }
+
+    // a secure socket to loopback, and every socket from an older UI, names only the verification. Without a proxy
+    // setting the proxy is System, as for a request from an older UI
     return {
-        url: new URL(`${protocol}//${targetOrigin.host}/${rest.join('/')}`),
+        url,
         disableSSLVerification: verification === 'true',
         customCACertificatesId: verification?.startsWith('ca-') ? verification.slice('ca-'.length) : null,
+        proxySettingsId: null,
     }
 }
 
-// after a restart the server has forgotten the file, connecting again registers it again
+// after a restart the server has forgotten the file, the UI registers it again on every connect
 const SOCKET_PROXY_CA_CERTIFICATES_NOT_FOUND = 'The CA certificates are no longer registered with the server, connect again'
 
 function isSocketProxyCACertificatesMissing(target) {
     return target.customCACertificatesId !== null && !customCACertificatesById.has(target.customCACertificatesId)
+}
+
+// after a restart the server has forgotten the setting, the UI registers it again on every connect
+const SOCKET_PROXY_SETTINGS_NOT_FOUND = 'The proxy setting is no longer registered with the server, connect again'
+
+function isSocketProxySettingsMissing(target) {
+    return target.proxySettingsId !== null && !proxySettingsById.has(target.proxySettingsId)
+}
+
+// none named is System, this server's HTTP_PROXY, HTTPS_PROXY and NO_PROXY
+function getSocketProxySettings(target) {
+    return target.proxySettingsId !== null ? proxySettingsById.get(target.proxySettingsId) : null
 }
 
 function getSocketProxyRequestHeaders(incomingHeaders, skippedHeaders) {
@@ -279,6 +359,11 @@ app.all(`${SOCKET_PROXY_PREFIX}*`, async(req, res) => {
         return
     }
 
+    if(isSocketProxySettingsMissing(target)) {
+        res.status(502).send(SOCKET_PROXY_SETTINGS_NOT_FOUND)
+        return
+    }
+
     const abortController = new AbortController()
     res.on('close', () => {
         if(!res.writableEnded) {
@@ -287,8 +372,9 @@ app.all(`${SOCKET_PROXY_PREFIX}*`, async(req, res) => {
     })
 
     try {
+        const proxyUrl = await getProxyForRequest(target.url, getSocketProxySettings(target))
         const response = await fetch(target.url, {
-            dispatcher: getAgentForRequest(target.url, target.disableSSLVerification, target.customCACertificatesId),
+            dispatcher: getAgentForRequest(target.url, target.disableSSLVerification, target.customCACertificatesId, proxyUrl),
             method: req.method,
             headers: getSocketProxyRequestHeaders(req.headers, SOCKET_PROXY_SKIPPED_REQUEST_HEADERS),
             body: ['GET', 'HEAD'].includes(req.method) ? undefined : Readable.toWeb(req),
@@ -332,6 +418,71 @@ export function handleSocketProxyUpgrade(req, socket, head) {
         return
     }
 
+    if(isSocketProxySettingsMissing(target)) {
+        socket.end(`HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n${SOCKET_PROXY_SETTINGS_NOT_FOUND}`)
+        return
+    }
+
+    getProxyForRequest(target.url, getSocketProxySettings(target)).then(proxyUrl => {
+        if(proxyUrl === null) {
+            relaySocketUpgradeDirectly(req, socket, head, target)
+        } else {
+            relaySocketUpgradeThroughProxy(req, socket, head, target, proxyUrl)
+        }
+    }, e => {
+        console.error('socket proxy error:', e.message)
+        socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n')
+    })
+}
+
+// undici opens the tunnel, through HTTP, HTTPS and SOCKS5 proxies alike, and the target's answer goes to the browser
+async function relaySocketUpgradeThroughProxy(req, socket, head, target, proxyUrl) {
+    const customCACertificates = customCACertificatesById.get(target.customCACertificatesId)
+    const tls = {
+        rejectUnauthorized: !target.disableSSLVerification,
+        ...(customCACertificates ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
+    }
+    // a plain ws:// target too goes through a CONNECT tunnel, which proxies pass WebSocket traffic through
+    const dispatcher = new ProxyAgent({ ...getProxyAgentOptions(proxyUrl, tls), proxyTunnel: true, requestTls: tls })
+
+    socket.on('error', () => dispatcher.destroy().catch(() => {}))
+
+    try {
+        const { headers, socket: upstreamSocket } = await dispatcher.upgrade({
+            origin: target.url.origin,
+            path: `${target.url.pathname}${target.url.search}`,
+            method: req.method,
+            // undici writes the connection and upgrade headers itself
+            headers: getSocketProxyRequestHeaders(req.headers, ['host', 'cookie', 'connection', 'upgrade']),
+            protocol: req.headers.upgrade ?? 'websocket',
+        })
+
+        // the browser went away while the tunnel was being opened
+        if(socket.destroyed) {
+            upstreamSocket.destroy()
+            return
+        }
+
+        const headerLines = Object.entries(headers).flatMap(([name, value]) => [value].flat().map(item => `${name}: ${item}\r\n`))
+        socket.write(`HTTP/1.1 101 Switching Protocols\r\n${headerLines.join('')}\r\n`)
+
+        if(head.length > 0) {
+            upstreamSocket.write(head)
+        }
+
+        upstreamSocket.on('error', () => socket.destroy())
+        socket.on('error', () => upstreamSocket.destroy())
+        upstreamSocket.pipe(socket).pipe(upstreamSocket)
+    } catch(e) {
+        console.error('socket proxy error:', e.message)
+        socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n')
+    } finally {
+        // the upgraded socket no longer belongs to it
+        dispatcher.close().catch(() => {})
+    }
+}
+
+function relaySocketUpgradeDirectly(req, socket, head, target) {
     const customCACertificates = customCACertificatesById.get(target.customCACertificatesId)
 
     const upstreamRequest = (target.url.protocol === 'https:' ? https : http).request(target.url, {

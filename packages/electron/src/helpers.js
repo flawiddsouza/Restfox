@@ -5,6 +5,7 @@ const path = require('path')
 const { platform } = require('os')
 const requests = require('./request')
 const { parseCACertificates, isCertificateTrustedByCustomCA } = require('./ca-certificates')
+const { getChromiumProxyConfig } = require('./proxy')
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []
@@ -118,6 +119,46 @@ async function setCACertificates(text) {
     return { error: null }
 }
 
+// undefined until the renderer first sends it, null when never saved, which is System
+let proxySettings
+// Chromium starts on the system proxy
+let chromiumProxyConfig = { mode: 'system' }
+
+// Settings > Proxy. Requests through undici pick their proxy per request, System asking Chromium, which reads the
+// operating system's settings. Chromium's own connections follow the session's proxy. Returns whether it changed
+async function setProxy(settings) {
+    const value = settings ?? null
+
+    if(JSON.stringify(value) === JSON.stringify(proxySettings)) {
+        return false
+    }
+
+    proxySettings = value
+    requests.setProxySettings(value, url => session.defaultSession.resolveProxy(url))
+    // Chromium would keep sending the proxy login it has, which may be the one before the change
+    await session.defaultSession.clearAuthCache()
+
+    // sent on every load like the settings above, closing connections when Chromium's proxy stays the same would also
+    // drop the dev server's live reload socket
+    const config = getChromiumProxyConfig(value)
+    if(JSON.stringify(config) !== JSON.stringify(chromiumProxyConfig)) {
+        chromiumProxyConfig = config
+        await session.defaultSession.setProxy(config)
+        await session.defaultSession.closeAllConnections()
+    }
+
+    return true
+}
+
+// Chromium asks for the credentials of a proxy that wants them, Custom has them. A system proxy's are not known here.
+// Asked again for the same request, the proxy refused them, answering again would repeat the request without end
+function handleLogin(event, _webContents, details, authInfo, callback) {
+    if(authInfo.isProxy && details.firstAuthAttempt && proxySettings?.mode === 'custom' && proxySettings.username) {
+        event.preventDefault()
+        callback(proxySettings.username, proxySettings.password ?? '')
+    }
+}
+
 // Chromium asks here about each certificate it rejected, so the answer follows the settings at the time. Not
 // setCertificateVerifyProc, the network service caches its result and a certificate stays accepted after unticking.
 // Chromium already trusts the operating system's certificates, a custom one is checked here
@@ -150,6 +191,8 @@ module.exports = {
     readFile,
     setDisableSSLVerification,
     setCACertificates,
+    setProxy,
+    handleLogin,
     handleCertificateError,
     removePrefixFromString,
 }

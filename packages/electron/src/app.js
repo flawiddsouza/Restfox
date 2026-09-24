@@ -225,6 +225,10 @@ app.whenReady().then(async() => {
 
     ipcMain.handle('setCACertificates', (_, ...args) => helpers.setCACertificates(...args))
 
+    ipcMain.handle('setProxy', (_, ...args) => helpers.setProxy(...args))
+
+    app.on('login', helpers.handleLogin)
+
     app.on('certificate-error', helpers.handleCertificateError)
 
     ipcMain.handle('updateElectronApp', (_) => {
