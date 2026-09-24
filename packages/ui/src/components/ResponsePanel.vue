@@ -56,6 +56,17 @@
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
+                <!-- the icon shows the current state, Tabler's text-wrap and text-wrap-disabled. Font Awesome's free set has no wrap icon -->
+                <span
+                    class="response-panel-tab-action-line-wrapping"
+                    @click="toggleResponseLineWrapping"
+                    :title="flags.responseLineWrapping ? 'Long lines wrap, click to scroll sideways instead' : 'Long lines scroll sideways, click to wrap them'"
+                >
+                    <svg viewBox="0 0 24 24" width="1.15em" height="1.15em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <path v-if="flags.responseLineWrapping" d="M4 6h16M4 18h5m-5-6h13a3 3 0 0 1 0 6h-4l2-2m0 4l-2-2"></path>
+                        <path v-else d="M4 6h10M4 18h10M4 12h17l-3-3m0 6l3-3"></path>
+                    </svg>
+                </span>
                 <i class="fas fa-code" @click="setSelectedTextAsEnvironmentVariable" title="Set selected text as environment variable"></i>
                 <i class="fas fa-download" @click="downloadResponse" title="Download response as a file"></i>
                 <i class="fas fa-paste" @click="copyResponseToClipboard" title="Copy response to clipboard"></i>
@@ -186,7 +197,8 @@
                     </div>
                 </div>
             </div>
-            <div class="content-box" v-if="activeResponsePanelTab === 'Timeline'">
+            <!-- the minimum sizes let the timeline scroll itself instead of growing the panel to its full width and height -->
+            <div class="content-box" style="min-width: 0; min-height: 0" v-if="activeResponsePanelTab === 'Timeline'">
                 <ResponsePanelTimeline v-model:response="response"></ResponsePanelTimeline>
             </div>
         </div>
@@ -577,12 +589,13 @@ export default {
 
                 if(this.$refs.scrollableArea) {
                     this.$refs.scrollableArea.scrollTop = 0
+                    this.getScrollableElement().scrollTop = 0
                 }
 
                 if(!this.scrollableAreaEventListenerAttached && !this.shouldShowLargeResponseWarning) {
                     nextTick(() => {
                         if(this.$refs.scrollableArea) {
-                            this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
+                            this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll, true)
                             this.scrollableAreaEventListenerAttached = true
                         }
                     })
@@ -600,7 +613,7 @@ export default {
                 if(confirmed && !this.scrollableAreaEventListenerAttached) {
                     nextTick(() => {
                         if(this.$refs.scrollableArea) {
-                            this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll)
+                            this.$refs.scrollableArea.addEventListener('scroll', this.scrollableAreaOnScroll, true)
                             this.scrollableAreaEventListenerAttached = true
                         }
                     })
@@ -769,8 +782,12 @@ export default {
             this.showResponseFilteringHelpModal = true
         },
         getStatusText,
+        // the text viewer scrolls itself inside the scrollable area, other previews scroll the area, a capturing listener sees both
         scrollableAreaOnScroll(event) {
             this.scrollableAreaScrollTop = event.target.scrollTop
+        },
+        getScrollableElement() {
+            return this.$refs.scrollableArea.querySelector('.cm-scroller') ?? this.$refs.scrollableArea
         },
         responseStatusColorMapping,
         getHistoryResponses() {
@@ -824,6 +841,10 @@ export default {
         selectPreviewMode(mode: string) {
             this.previewMode = mode
         },
+        toggleResponseLineWrapping() {
+            this.flags.responseLineWrapping = !this.flags.responseLineWrapping
+            localStorage.setItem(constants.LOCAL_STORAGE_KEY.RESPONSE_LINE_WRAPPING, String(this.flags.responseLineWrapping))
+        },
         bufferToJSONString,
         filterJSONResponse,
         filterXmlResponse,
@@ -831,12 +852,12 @@ export default {
     activated() {
         if(this.response && this.scrollableAreaEventListenerAttached && this.scrollableAreaScrollTop !== null) {
             nextTick(() => {
-                this.$refs.scrollableArea.scrollTop = this.scrollableAreaScrollTop
+                this.getScrollableElement().scrollTop = this.scrollableAreaScrollTop
             })
         }
     },
     beforeUnmount() {
-        this.$refs.scrollableArea?.removeEventListener('scroll', this.scrollableAreaOnScroll)
+        this.$refs.scrollableArea?.removeEventListener('scroll', this.scrollableAreaOnScroll, true)
         this.scrollableAreaEventListenerAttached = false
     },
 }
@@ -968,7 +989,8 @@ export default {
     border-bottom: 1px solid var(--default-border-color);
 }
 
-.response-panel-tabs .response-panel-tab-actions i {
+.response-panel-tabs .response-panel-tab-actions i,
+.response-panel-tabs .response-panel-tab-actions .response-panel-tab-action-line-wrapping {
     height: 100%;
     display: grid;
     place-items: center;

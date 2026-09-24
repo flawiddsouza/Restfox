@@ -4,13 +4,15 @@
 
 <script>
 import { EditorView, lineNumbers, keymap, drawSelection } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import { json } from '@codemirror/lang-json'
 import { foldGutter, syntaxHighlighting } from '@codemirror/language'
 import { codeMirrorSyntaxHighlighting } from '@/helpers'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import { defaultKeymap } from '@codemirror/commands'
 import { codeMirrorStyleOverrides } from '@/utils/code-mirror-style-overrides'
+
+const lineWrapping = new Compartment()
 
 function createState(documentText, vueInstance) {
     const extensions = [
@@ -20,7 +22,7 @@ function createState(documentText, vueInstance) {
         foldGutter({ openText: '▾', closedText: '▸' }),
         highlightSelectionMatches(),
         drawSelection(),
-        EditorView.lineWrapping,
+        lineWrapping.of(vueInstance.$store.state.flags.responseLineWrapping ? EditorView.lineWrapping : []),
         EditorView.editable.of(true),
         EditorState.readOnly.of(true),
         codeMirrorStyleOverrides,
@@ -60,6 +62,11 @@ export default {
             this.editor.dispatch({
                 changes: { from: 0, to: this.editor.state.doc.length, insert: this.modelValue }
             })
+        },
+        '$store.state.flags.responseLineWrapping'(responseLineWrapping) {
+            this.editor.dispatch({
+                effects: lineWrapping.reconfigure(responseLineWrapping ? EditorView.lineWrapping : [])
+            })
         }
     },
     mounted() {
@@ -72,13 +79,19 @@ export default {
 </script>
 
 <style>
+/* the editor fills the panel and scrolls itself, so the sideways scrollbar of unwrapped lines sits at the bottom of the panel */
+.code-mirror-response-panel-preview, .code-mirror-response-panel-preview .cm-editor {
+    height: 100%;
+}
+
 .code-mirror-response-panel-preview .cm-editor.cm-focused {
     outline: 0 !important;
 }
 
+/* the line numbers stay in place while unwrapped text scrolls under them */
 .code-mirror-response-panel-preview .cm-gutters {
     user-select: none;
-    background-color: inherit;
+    background-color: var(--background-color);
     border-right: 0;
 }
 

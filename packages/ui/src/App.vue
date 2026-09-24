@@ -358,6 +358,7 @@ export default {
         const savedShowTabs = localStorage.getItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS)
         const savedHidePasswordFields = localStorage.getItem(constants.LOCAL_STORAGE_KEY.HIDE_PASSWORD_FIELDS)
         const savedCustomResponseFormats = localStorage.getItem(constants.LOCAL_STORAGE_KEY.CUSTOM_RESPONSE_FORMATS)
+        const savedResponseLineWrapping = localStorage.getItem(constants.LOCAL_STORAGE_KEY.RESPONSE_LINE_WRAPPING)
 
         if(savedTheme) {
             this.$store.state.theme = savedTheme
@@ -441,6 +442,11 @@ export default {
             } catch(e) {
                 this.$store.state.flags.hidePasswordFields = false
             }
+        }
+
+        // unset means wrapping, as before the toggle existed
+        if(savedResponseLineWrapping === 'false') {
+            this.$store.state.flags.responseLineWrapping = false
         }
 
         if(savedCustomResponseFormats) {

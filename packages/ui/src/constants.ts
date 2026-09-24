@@ -34,6 +34,7 @@ export default {
         SHOW_TABS: 'Restfox-ShowTabs',
         HIDE_PASSWORD_FIELDS: 'Restfox-HidePasswordFields',
         CUSTOM_RESPONSE_FORMATS: 'Restfox-CustomResponseFormats',
+        RESPONSE_LINE_WRAPPING: 'Restfox-ResponseLineWrapping',
     },
     HOTKEYS: {
         SEND_REQUEST: 'Ctrl + Enter',

@@ -141,6 +141,7 @@ export interface Flags {
     caCertificates: CACertificates | null
     electronSwitchToChromiumFetch: boolean
     hidePasswordFields: boolean
+    responseLineWrapping: boolean
     requestTimeout: number
 }
 

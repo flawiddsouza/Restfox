@@ -364,6 +364,7 @@ export const store = createStore<State>({
                 disableAutoUpdate: false,
                 showTabs: true,
                 hidePasswordFields: false,
+                responseLineWrapping: true,
             },
             settings: {
                 customResponseFormats: [],

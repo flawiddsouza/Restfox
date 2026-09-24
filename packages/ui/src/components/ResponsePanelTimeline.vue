@@ -1,6 +1,6 @@
 <template>
-    <div>
-        <div>
+    <div style="height: 100%">
+        <div style="height: 100%">
             <CodeMirrorResponsePanelPreview :model-value="timelineViewer(response)" data-testid="response-panel-tab-Timeline__preview"></CodeMirrorResponsePanelPreview>
         </div>
     </div>
