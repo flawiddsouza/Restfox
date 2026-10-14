@@ -3,7 +3,7 @@
 import { test, expect } from 'vitest'
 import { createRequestContextForPlugin, createResponseContextForPlugin, usePlugin } from './plugin'
 import { CollectionItem, RequestFinalResponse, RequestParam } from './global'
-import { nanoid } from 'nanoid'
+import { SendResolver } from './helpers'
 
 async function createExpose({ parameters = [] }: { parameters?: RequestParam[] } = {}) {
     const request: CollectionItem = {
@@ -22,9 +22,7 @@ async function createExpose({ parameters = [] }: { parameters?: RequestParam[] }
         testResults: []
     }
 
-    const cacheId = nanoid()
-
-    const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults, null)
+    const { expose } = await createRequestContextForPlugin(new SendResolver('w'), request, environment, setEnvironmentVariable, state.testResults, null)
 
     return { expose, environment }
 }
@@ -201,4 +199,19 @@ test('ungzip rf.response.getBodyText() using pako from unpkg.com', async() => {
     })
 
     expect(environment.uncompressedText).toBe('{"Instances":[]}')
+})
+
+test('rf.getEnvVar reads a prompt tag as its remembered value or its default, it cannot open the box', async() => {
+    const request: CollectionItem = { _id: 'test', _type: 'request', parentId: 'test', workspaceId: 'test', name: 'test' }
+    const environment = { PASSWORD: `{% prompt(title='Password', defaultValue='fallback') %}`, OTHER: 'plain' }
+    const { expose } = await createRequestContextForPlugin(new SendResolver('w'), request, environment, () => undefined, [], null)
+    expect(expose.rf.getEnvVar('PASSWORD')).toBe('fallback')
+    expect(expose.rf.getEnvVar('OTHER')).toBe('plain')
+})
+
+test('rf.getEnvVar returns text that only looks like a tag as written, as before', async() => {
+    const request: CollectionItem = { _id: 'test', _type: 'request', parentId: 'test', workspaceId: 'test', name: 'test' }
+    const environment = { TEMPLATE: '{% my-tag() %} and {% raw %}' }
+    const { expose } = await createRequestContextForPlugin(new SendResolver('w'), request, environment, () => undefined, [], null)
+    expect(expose.rf.getEnvVar('TEMPLATE')).toBe('{% my-tag() %} and {% raw %}')
 })

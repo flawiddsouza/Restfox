@@ -265,7 +265,7 @@ import {
     getAlertConfirmPromptContainer,
     setEnvironmentVariable,
     jsonStringify,
-    substituteEnvironmentVariables,
+    substituteEnvironmentVariablesForSend,
     registerCACertificates,
     registerProxySettings,
 } from '@/helpers'
@@ -378,7 +378,18 @@ async function connect(client: Client) {
     pendingConnections[socketKey] = connectionTarget
 
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
-    const clientUrlWithEnvironmentVariablesSubtituted = await substituteEnvironmentVariables(environment, client.url)
+
+    let clientUrlWithEnvironmentVariablesSubtituted: string
+    // what the messages show, which are saved: a value typed into a masked prompt shows as ******
+    let clientUrlToShow: string
+
+    try {
+        ({ textResolved: clientUrlWithEnvironmentVariablesSubtituted, textResolvedMasked: clientUrlToShow } = await substituteEnvironmentVariablesForSend(environment, client.url, activeWorkspace.value._id))
+    } catch (error: any) {
+        delete pendingConnections[socketKey]
+        $toast.error(error.message)
+        return
+    }
 
     // web-standalone's server relays a socket for the browser and needs CA certificates registered first, for a secure
     // target or an https:// proxy. On every connect: a restarted server has forgotten them, and unlike a request, a
@@ -393,7 +404,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Could not connect to ${clientUrlWithEnvironmentVariablesSubtituted}: ${error.message}`,
+                message: `Could not connect to ${clientUrlToShow}: ${error.message}`,
                 type: 'INFO'
             })
 
@@ -413,7 +424,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Could not connect to ${clientUrlWithEnvironmentVariablesSubtituted}: ${(error as Error).message}`,
+                message: `Could not connect to ${clientUrlToShow}: ${(error as Error).message}`,
                 type: 'INFO'
             })
 
@@ -421,7 +432,7 @@ async function connect(client: Client) {
         }
     }
 
-    clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlWithEnvironmentVariablesSubtituted
+    clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlToShow
 
     // a socket Connect is still showing for has failed or is still trying, such as a Socket.IO v2 client that
     // reconnects on its own, it would otherwise stay open next to the new one with no way to disconnect it
@@ -473,13 +484,13 @@ async function connect(client: Client) {
     } catch(e) {
         console.log(e)
         delete pendingConnections[socketKey]
-        $toast.error(`Invalid WebSocket URL: ${clientUrlWithEnvironmentVariablesSubtituted}`)
+        $toast.error(`Invalid WebSocket URL: ${clientUrlToShow}`)
         return
     }
 
     addClientMessage(client, {
         timestamp: new Date().getTime(),
-        message: `Connecting to ${clientUrlWithEnvironmentVariablesSubtituted}`,
+        message: `Connecting to ${clientUrlToShow}`,
         type: 'INFO'
     })
 
@@ -512,7 +523,7 @@ async function connect(client: Client) {
 
         connectionFailureReported = true
 
-        let message = `Could not connect to ${clientUrlWithEnvironmentVariablesSubtituted}${reason ? `: ${reason}` : ''}`
+        let message = `Could not connect to ${clientUrlToShow}${reason ? `: ${reason}` : ''}`
 
         // browsers do not say why a connection failed, a rejected certificate looks like any other failure
         if ((flags.value.isElectron || flags.value.isWebStandalone) && !flags.value.disableSSLVerification && /^(wss|https):/i.test(clientUrlWithEnvironmentVariablesSubtituted)) {
@@ -535,7 +546,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
+                message: `Connected to ${clientUrlToShow}`,
                 type: 'INFO'
             })
         })
@@ -561,7 +572,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Disconnected from ${clientUrlWithEnvironmentVariablesSubtituted}`,
+                message: `Disconnected from ${clientUrlToShow}`,
                 type: 'INFO'
             })
         })
@@ -575,7 +586,7 @@ async function connect(client: Client) {
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
-                message: `Connected to ${clientUrlWithEnvironmentVariablesSubtituted}`,
+                message: `Connected to ${clientUrlToShow}`,
                 type: 'INFO'
             })
         })
@@ -670,7 +681,16 @@ async function sendMessage(client: Client) {
     }
 
     const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
-    const messageToSend = await substituteEnvironmentVariables(environment, client.message)
+
+    let messageToSend: string
+    let messageToSendMasked: string
+
+    try {
+        ({ textResolved: messageToSend, textResolvedMasked: messageToSendMasked } = await substituteEnvironmentVariablesForSend(environment, client.message, activeWorkspace.value._id))
+    } catch (error: any) {
+        $toast.error(error.message)
+        return
+    }
 
     if (socket instanceof WebSocket) {
         socket.send(messageToSend)
@@ -680,7 +700,8 @@ async function sendMessage(client: Client) {
         socket.emit(client.event, messageToSend)
     }
 
-    let clientMessageToSave = messageToSend
+    // a value typed into a masked prompt is saved as ******
+    let clientMessageToSave = messageToSendMasked
 
     if (socket.constructor.name.startsWith('Socket')) {
         clientMessageToSave = `[${client.event}] ${clientMessageToSave}`

@@ -171,11 +171,16 @@
             </template>
             <div class="content-box" v-if="activeResponsePanelTab === 'Request'">
                 <div><span :class="`request-method--${response.request.method}`" style="padding-right: 0.25rem;">{{ response.request.method }}</span> {{ response.url }}{{ response.request.query }}</div>
+                <div style="margin-top: 0.5rem" v-if="response.request.maskedPromptOmitted">{{ describeMaskedPromptOmitted(response.request.maskedPromptOmitted) }}.</div>
                 <div style="margin-top: 0.5rem">
                     <table>
                         <tr v-for="header in Object.keys(response.request.headers)">
                             <td style="white-space: nowrap">{{ header }}</td>
                             <td style="word-break: break-word">{{ response.request.headers[header] }}</td>
+                        </tr>
+                        <tr v-for="header in response.request.maskedPromptOmitted?.reason === 'masked-field' ? response.request.maskedPromptOmitted.headerNames : []">
+                            <td style="white-space: nowrap">{{ header }}</td>
+                            <td style="word-break: break-word">(left out)</td>
                         </tr>
                     </table>
                 </div>
@@ -249,6 +254,7 @@ import {
     timeAgo,
     responseStatusColorMapping,
     getStatusDescription,
+    describeMaskedPromptOmitted,
 } from '@/helpers'
 import {
     bufferToJSONString,
@@ -463,6 +469,12 @@ export default {
             return null
         },
         responseRequestBodyOutput() {
+            // a multipart body is shown from its unresolved fields in any case
+            const maskedPromptOmitted = this.response.request.maskedPromptOmitted
+            if(maskedPromptOmitted && (maskedPromptOmitted.reason === 'script-read' || maskedPromptOmitted.body) && this.response.request.original.body.mimeType !== 'multipart/form-data') {
+                return null
+            }
+
             if(this.response.request.body === null && !this.response.request.original.body.params) {
                 return null
             }
@@ -623,6 +635,7 @@ export default {
     },
     methods: {
         getStatusDescription,
+        describeMaskedPromptOmitted,
         timeAgo,
         cancelRequest() {
             this.requestAbortController.abort()

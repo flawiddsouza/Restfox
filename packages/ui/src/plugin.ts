@@ -6,6 +6,7 @@ import { Arena } from '@flawiddsouza/quickjs-emscripten-sync'
 import getObjectPathValue from 'lodash.get'
 import chai from 'chai'
 import { fetchWrapper, getSavedRequestTimeout, substituteEnvironmentVariables } from './helpers'
+import type { SendResolver } from './helpers'
 import { fileIPC } from './db'
 import {
     CollectionItem,
@@ -18,6 +19,13 @@ import {
     SetEnvironmentVariableFunction,
 } from './global'
 import constants from './constants'
+import { PromptCancelledError, replacePromptTagsWithKnownValues } from './utils/prompt-tag'
+
+// send is the send the script runs in, which learns when it reads a masked prompt's value
+function getEnvironmentVariable(environment: any, objectPath: string, send?: SendResolver) {
+    const value = getObjectPathValue(environment, objectPath)
+    return typeof value === 'string' ? replacePromptTagsWithKnownValues(value, send?.workspaceId, () => send?.markScriptReadMaskedPrompt()) : value
+}
 
 const test = (testResults: PluginTestResult[]) => (description: string, callback: () => void) => {
     try {
@@ -63,7 +71,7 @@ const generalContextMethodsBase = {
     },
 }
 
-export async function createRequestContextForPlugin(cacheId: string, request: CollectionItem, environment: any, setEnvironmentVariable: SetEnvironmentVariableFunction | null, testResults: PluginTestResult[], pluginCollectionId?: string | null): Promise<{ expose: PluginExpose }> {
+export async function createRequestContextForPlugin(send: SendResolver, request: CollectionItem, environment: any, setEnvironmentVariable: SetEnvironmentVariableFunction | null, testResults: PluginTestResult[], pluginCollectionId?: string | null): Promise<{ expose: PluginExpose }> {
     const state: CollectionItem = JSON.parse(JSON.stringify(request))
 
     if(state.body === undefined) {
@@ -88,12 +96,13 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
         state.body.fileName = request.body.fileName
     }
 
-    const headerCache: Record<string, string | undefined> = {}
+    // read through the send, which learns when a script reads a masked prompt's value
+    const headerCache: Record<string, (() => string) | undefined> = {}
 
     const generalContextMethods = {
         ...generalContextMethodsBase,
         getEnvVar(objectPath: string) {
-            return getObjectPathValue(environment, objectPath)
+            return getEnvironmentVariable(environment, objectPath, send)
         },
         setEnvVar(objectPath: string, value: string) {
             if(setEnvironmentVariable) {
@@ -107,21 +116,32 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
         },
     }
 
-    if (state.headers) {
-        for (const header of state.headers) {
-            substituteEnvironmentVariables(environment, header.value, { cacheId }).then(substitutedValue => {
-                headerCache[header.name.toLowerCase()] = substitutedValue
-            })
+    // resolved before the script runs, which reads them synchronously. A header that is not sent never asks, its prompt
+    // reads as its preview value
+    for (const header of state.headers ?? []) {
+        try {
+            if (header.disabled || header.name === '') {
+                const text = await substituteEnvironmentVariables(environment, header.value)
+                headerCache[header.name.toLowerCase()] = () => text
+            } else {
+                headerCache[header.name.toLowerCase()] = await send.resolveForScript(environment, header.value)
+            }
+        } catch (error) {
+            // Cancel stops the send. Another error, such as an unknown tag, is reported by the send if the header is still
+            // there after the script
+            if (error instanceof PromptCancelledError) {
+                throw error
+            }
         }
     }
 
-    const substitutedUrl = state.url !== undefined ? await substituteEnvironmentVariables(environment, state.url, { cacheId }) : undefined
+    const readUrl = state.url !== undefined ? await send.resolveForScript(environment, state.url) : undefined
 
     const context: PluginExposeContext = {
         ...generalContextMethods,
         request: {
             getURL() {
-                return substitutedUrl
+                return readUrl?.()
             },
             getMethod() {
                 return state.method
@@ -155,7 +175,7 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
                     state.headers = []
                 }
                 const header = state.headers.find((header) => header.name.toLowerCase() == headerName.toLowerCase())
-                return header ? headerCache[headerName.toLowerCase()] : undefined
+                return header ? headerCache[headerName.toLowerCase()]?.() : undefined
             },
             setHeader(headerName: string, value: string) {
                 if(state.headers === undefined) {
@@ -183,7 +203,7 @@ export async function createRequestContextForPlugin(cacheId: string, request: Co
     }
 }
 
-export function createResponseContextForPlugin(response: RequestFinalResponse, environment: any, setEnvironmentVariable: SetEnvironmentVariableFunction, testResults: PluginTestResult[], pluginCollectionId?: string | null): { expose: PluginExpose } {
+export function createResponseContextForPlugin(response: RequestFinalResponse, environment: any, setEnvironmentVariable: SetEnvironmentVariableFunction, testResults: PluginTestResult[], pluginCollectionId?: string | null, send?: SendResolver): { expose: PluginExpose } {
     let bufferCopy = response.buffer.slice(0)
     const headers = response.headers
     const statusCode = response.status
@@ -192,7 +212,7 @@ export function createResponseContextForPlugin(response: RequestFinalResponse, e
     const generalContextMethods = {
         ...generalContextMethodsBase,
         getEnvVar(objectPath: string) {
-            return getObjectPathValue(environment, objectPath)
+            return getEnvironmentVariable(environment, objectPath, send)
         },
         setEnvVar(objectPath: string, value: string) {
             setEnvironmentVariable(objectPath, value)

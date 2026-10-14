@@ -4,7 +4,7 @@
             <div>
                 <label>
                     <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Function</div>
-                    <select class="full-width-input" v-model="parsedFuncForEdit.functionName" required>
+                    <select class="full-width-input" v-model="parsedFuncForEdit.functionName" @change="onFunctionChange" required>
                         <option v-for="availableFunction in availableFunctions" :value="availableFunction.value">{{ availableFunction.label }}</option>
                     </select>
                 </label>
@@ -13,7 +13,14 @@
             <div v-if="formConfig[parsedFuncForEdit.functionName as keyof typeof formConfig]">
                 <template v-for="field in formConfig[parsedFuncForEdit.functionName as keyof typeof formConfig]">
                     <div :style="{ marginTop: '1rem' }" v-if="shouldShowField(field)">
-                        <label>
+                        <label style="display: flex;" v-if="field.type === 'checkbox'">
+                            <input
+                                type="checkbox"
+                                :checked="isParameterChecked(parsedFuncForEdit.parameters[field.property])"
+                                @change="parsedFuncForEdit.parameters[field.property] = ($event.target as HTMLInputElement).checked ? 1 : 0"
+                            > <div style="margin-left: 0.5rem;">{{ field.label }}</div>
+                        </label>
+                        <label v-else>
                             <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">{{ field.label }}</div>
 
                             <select
@@ -43,8 +50,14 @@
                                 :required="field.required"
                             >
                         </label>
+                        <div v-if="field.hint" :style="{ marginTop: '0.3rem', marginLeft: field.type === 'checkbox' ? '1.3rem' : undefined }">{{ field.hint }}</div>
                     </div>
                 </template>
+            </div>
+
+            <div style="margin-top: 1rem" v-if="parsedFuncForEdit.functionName === 'prompt' && rememberedPromptValueCount > 0">
+                <button type="button" class="button" @click="forgetRememberedValues">Forget Remembered Values</button>
+                <div style="margin-top: 0.3rem;">Clears the values kept by Ask, for all prompts.</div>
             </div>
 
             <div style="margin-top: 1rem">
@@ -66,12 +79,16 @@
 import { computed, onBeforeMount, PropType, Ref, ref, watch } from 'vue'
 import Modal from '@/components/Modal.vue'
 import type { ParsedResult } from '@/parsers/tag'
-import { toFunctionString } from '@/parsers/tag'
+import { isParameterChecked, toFunctionString } from '@/parsers/tag'
 import { getCollectionForWorkspace } from '@/db'
 import { useStore } from 'vuex'
 import { flattenTree, prependParentTitleToChildTitle, sortTree, substituteEnvironmentVariables, toTree } from '@/helpers'
 import { CollectionItem } from '@/global'
 import { Base64 } from 'js-base64'
+import { countRememberedPromptValues, forgetPromptValues } from '@/utils/prompt-tag'
+import { useToast } from 'vue-toast-notification'
+
+const toast = useToast()
 
 const props = defineProps({
     showModal: {
@@ -100,6 +117,10 @@ const availableFunctions = [
     {
         label: `Response – reference values from other request's responses`,
         value: 'response',
+    },
+    {
+        label: 'Prompt – ask for a value when sending',
+        value: 'prompt',
     },
 ]
 
@@ -137,7 +158,35 @@ const availableTriggerBehaviors = [
     },
 ]
 
-const formConfig = {
+type FormField = {
+    type: 'select' | 'number' | 'base64' | 'checkbox'
+    label: string
+    property: string
+    options?: string
+    optionLabel?: string
+    optionValue?: string
+    required?: boolean
+    default?: string | number
+    condition?: string
+    hint?: string
+}
+
+const availablePromptAskOptions = [
+    {
+        label: 'Every send',
+        value: 'always',
+    },
+    {
+        label: 'Every send, pre-filled with the last value',
+        value: 'prefill',
+    },
+    {
+        label: 'Once, until Restfox is closed or reloaded',
+        value: 'once',
+    },
+]
+
+const formConfig: Record<string, FormField[]> = {
     response: [
         {
             type: 'select',
@@ -190,7 +239,45 @@ const formConfig = {
             required: true,
             default: 60,
         }
-    ]
+    ],
+    prompt: [
+        {
+            type: 'base64',
+            label: 'Title',
+            property: 'title',
+            required: true,
+            hint: 'Shown at the top of the box.',
+        },
+        {
+            type: 'base64',
+            label: 'Label',
+            property: 'label',
+            hint: 'Shown above the input.',
+        },
+        {
+            type: 'base64',
+            label: 'Default Value',
+            property: 'defaultValue',
+            hint: 'Filled into the box, and shown in previews.',
+        },
+        {
+            type: 'select',
+            label: 'Ask',
+            property: 'ask',
+            options: 'availablePromptAskOptions',
+            optionLabel: 'label',
+            optionValue: 'value',
+            required: true,
+            default: 'always',
+            hint: 'Pre-filled and Once keep the value until Restfox is closed or reloaded. Requests that use the same environment variable share it.',
+        },
+        {
+            type: 'checkbox',
+            label: 'Mask Text',
+            property: 'mask',
+            hint: 'Hides what is typed, and keeps it out of the response history.',
+        },
+    ],
 }
 
 const showModalComp = ref(props.showModal)
@@ -200,6 +287,9 @@ const collectionItems: Ref<CollectionItem[]> = ref([])
 const preview = ref('')
 
 const parsedFuncForEdit = ref(JSON.parse(JSON.stringify(props.parsedFunc)))
+
+// the values are kept outside Vue, so the count is read when the editor opens
+const rememberedPromptValueCount = ref(countRememberedPromptValues())
 fillDefaultValues()
 generatePreview()
 
@@ -209,6 +299,7 @@ const options = computed(() => {
         availableFunctions: availableFunctions,
         availableAttributes: availableAttributes,
         availableTriggerBehaviors: availableTriggerBehaviors,
+        availablePromptAskOptions: availablePromptAskOptions,
     }
 })
 
@@ -216,6 +307,7 @@ watch(() => props.showModal, (newVal) => {
     showModalComp.value = newVal
     if (newVal) {
         parsedFuncForEdit.value = JSON.parse(JSON.stringify(props.parsedFunc))
+        rememberedPromptValueCount.value = countRememberedPromptValues()
         fillDefaultValues()
         generatePreview()
         getAllRequests()
@@ -226,9 +318,23 @@ watch(() => parsedFuncForEdit.value, () => {
     generatePreview()
 }, { deep: true })
 
+// another function's parameters mean nothing to this one
+function onFunctionChange() {
+    parsedFuncForEdit.value.parameters = {}
+    fillDefaultValues()
+}
+
 watch(showModalComp, (newVal) => {
     emit('update:showModal', newVal)
 })
+
+// shown only while values are kept, the button then goes away
+function forgetRememberedValues() {
+    const forgottenCount = forgetPromptValues()
+    rememberedPromptValueCount.value = 0
+    generatePreview() // it showed the remembered value
+    toast.success(`Forgot the values of all prompts (${forgottenCount})`)
+}
 
 function updateTag() {
     props.updateFunc(toFunctionString(parsedFuncForEdit.value))
@@ -286,7 +392,7 @@ function shouldShowField(field: any) {
 }
 
 function fillDefaultValues() {
-    for (const field of formConfig[parsedFuncForEdit.value.functionName as keyof typeof formConfig]) {
+    for (const field of formConfig[parsedFuncForEdit.value.functionName] ?? []) {
         if (field.default && !parsedFuncForEdit.value.parameters[field.property]) {
             parsedFuncForEdit.value.parameters[field.property] = field.default
         }
@@ -301,6 +407,7 @@ async function generatePreview(tagTrigger = false) {
     preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, {
         tagTrigger,
         noError: true,
+        workspaceId: store.state.activeWorkspace._id,
     })
 }
 

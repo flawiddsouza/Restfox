@@ -119,6 +119,8 @@ export interface RequestFinalResponse {
       headersSent?: RequestInitialResponseHeader[]
       body: any
       original: CollectionItem
+      // what a masked prompt tag left out above, missing when nothing was
+      maskedPromptOmitted?: MaskedPromptOmitted
     }
     createdAt: number
     testResults: any[]
@@ -252,6 +254,16 @@ export interface CreateRequestDataReturn {
     headers: Record<string, string>;
     body?: FormData | URLSearchParams | string | File | null;
 }
+
+// What a masked prompt tag left out of a saved request. A url saved as written has an empty query, a header left out
+// is removed from both header lists, a body left out is null
+export type MaskedPromptOmitted =
+    // the parts its value went into: the url saved with masked values as ****** ('masked'), or as written when it
+    // cannot be ('written'), such as for a masked port, and a header named as sent with masked values as ******
+    | { reason: 'masked-field', url: false | 'masked' | 'written', headerNames: string[], body: boolean }
+    // a script read the value and may have put it anywhere, even in a header's name, so the url, every header, the
+    // body and the test names and errors are left out
+    | { reason: 'script-read' }
 
 export interface HandleRequestState {
     currentPlugin: string | null

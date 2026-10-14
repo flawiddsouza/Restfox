@@ -163,3 +163,19 @@ describe('getEnvironmentForRequest', () => {
         expect(await resolve({ type: 'basic', username: 'u', password: 'p' })).toEqual({ type: 'basic', username: 'u', password: 'p' })
     })
 })
+
+describe('getEnvironmentForRequest with a prompt tag', () => {
+    test('a prompt tag in a folder environment is left for send time, so switching tabs never asks', async() => {
+        const createPrompt = vi.fn(async() => 'typed')
+        ;(window as any).createPrompt = createPrompt
+        const tag = `{% prompt(title='Password') %}`
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace', dotEnv: {}, environment: { WORKSPACE_PASSWORD: tag } } as unknown as Workspace
+        store.state.collection = [
+            { _id: 'folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', environment: { PASSWORD: tag, COPY: '{{WORKSPACE_PASSWORD}}' } },
+            { _id: 'request-id', _type: 'request', name: 'Request', parentId: 'folder', workspaceId: 'workspace-id' },
+        ] as CollectionItem[]
+        const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: store.state.collection[1] })
+        expect(environment).toMatchObject({ PASSWORD: tag, WORKSPACE_PASSWORD: tag, COPY: tag })
+        expect(createPrompt).not.toHaveBeenCalled()
+    })
+})

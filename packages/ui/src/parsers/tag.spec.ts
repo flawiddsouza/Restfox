@@ -91,3 +91,9 @@ test('handleTags: #311', async() => {
 
     expect(await handleTags(handleResponseTag, input, false, undefined, true)).toEqual(expectedOutput)
 })
+
+test('parseFunction: a bare true or false reads as 1 or 0, as the tag editor writes a checkbox', async() => {
+    expect(parseFunction(`prompt(title='a', mask=true)`).parameters).toEqual({ title: 'a', mask: 1 })
+    expect(parseFunction(`prompt(mask=false, ask='once')`).parameters).toEqual({ mask: 0, ask: 'once' })
+    expect(parseFunction(`prompt(title='mask=true')`).parameters).toEqual({ title: 'mask=true' })
+})

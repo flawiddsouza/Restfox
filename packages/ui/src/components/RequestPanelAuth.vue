@@ -468,7 +468,7 @@ import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
 import { CollectionItem, Flags } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
-import { createOAuthTokenRequest, describeOAuthTokenError, fetchWrapper, getAuthenticationType, getMissingOAuthTokenFieldsMessage, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, parseOAuthTokenResponse, substituteEnvironmentVariables } from '@/helpers'
+import { createOAuthTokenRequest, describeOAuthTokenError, fetchWrapper, getAuthenticationType, getMissingOAuthTokenFieldsMessage, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, parseOAuthTokenResponse, SendResolver } from '@/helpers'
 import { useToast } from 'vue-toast-notification'
 import { bufferToString } from '@/utils/response'
 
@@ -689,16 +689,34 @@ function generateRandomState(): string {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 }
 
+// the fields of one token request are one send for prompt tags: a prompt used twice asks once, cancelling stops it.
+// The fields are sent, never saved
+async function runWithPromptSend(action: (send: SendResolver) => Promise<void>) {
+    try {
+        await action(new SendResolver(props.collectionItem.workspaceId))
+    } catch (error: any) {
+        if (error?.cause === 'display-error') {
+            toast.error(error.message)
+            return
+        }
+        throw error
+    }
+}
+
 async function openAuthorizationUrl() {
+    await runWithPromptSend(openAuthorizationUrlForSend)
+}
+
+async function openAuthorizationUrlForSend(send: SendResolver) {
     const auth = props.collectionItem?.authentication
     const env = props.collectionItemEnvironmentResolved
 
     if (auth) {
         try {
-            const clientId: string = await substituteEnvironmentVariables(env, auth.clientId)
-            const authorizationUrl: string = await substituteEnvironmentVariables(env, auth.authorizationUrl)
-            const redirectUri: string = await substituteEnvironmentVariables(env, auth.redirectUri)
-            const scope: string = auth.scope ? await substituteEnvironmentVariables(env, auth.scope) : ''
+            const clientId: string = await send.resolve(env, auth.clientId, 'unsaved')
+            const authorizationUrl: string = await send.resolve(env, auth.authorizationUrl, 'unsaved')
+            const redirectUri: string = await send.resolve(env, auth.redirectUri, 'unsaved')
+            const scope: string = auth.scope ? await send.resolve(env, auth.scope, 'unsaved') : ''
 
             if (isMissing(clientId) || isMissing(authorizationUrl) || isMissing(redirectUri)) {
                 toast.error('Please provide Client ID, Authorization URL, and Redirect URI.')
@@ -710,7 +728,7 @@ async function openAuthorizationUrl() {
             if (!auth.state) {
                 auth.state = state
             }
-            state = await substituteEnvironmentVariables(env, state)
+            state = await send.resolve(env, state, 'unsaved')
 
             // Build authorization URL
             const params = new URLSearchParams({
@@ -751,7 +769,10 @@ async function openAuthorizationUrl() {
                     toast.info('Check console for authorization URL.')
                 })
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.cause === 'display-error') {
+                throw error
+            }
             console.error('Error opening authorization URL:', error)
             toast.error('Error opening authorization URL.')
         }
@@ -759,26 +780,30 @@ async function openAuthorizationUrl() {
 }
 
 async function requestOAuthToken() {
+    await runWithPromptSend(requestOAuthTokenForSend)
+}
+
+async function requestOAuthTokenForSend(send: SendResolver) {
     const auth = props.collectionItem?.authentication
     const env = props.collectionItemEnvironmentResolved
 
     if (auth) {
         // a field that was never filled in is undefined and would otherwise be sent as the text 'undefined'
-        const clientId: string = await substituteEnvironmentVariables(env, auth.clientId ?? '')
-        const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret ?? '')
-        const accessTokenUrl: string = await substituteEnvironmentVariables(env, auth.accessTokenUrl ?? '')
-        const scope: string | null = auth.scope ? await substituteEnvironmentVariables(env, auth.scope) : null
+        const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
+        const clientSecret: string = await send.resolve(env, auth.clientSecret ?? '', 'unsaved')
+        const accessTokenUrl: string = await send.resolve(env, auth.accessTokenUrl ?? '', 'unsaved')
+        const scope: string | null = auth.scope ? await send.resolve(env, auth.scope, 'unsaved') : null
         const grantType: string | undefined = auth.grantType
 
         const grantParameters: Record<string, string> = {}
 
         // Handle different grant types
         if (grantType === 'password') {
-            grantParameters.username = await substituteEnvironmentVariables(env, auth.username ?? '')
-            grantParameters.password = await substituteEnvironmentVariables(env, auth.password ?? '')
+            grantParameters.username = await send.resolve(env, auth.username ?? '', 'unsaved')
+            grantParameters.password = await send.resolve(env, auth.password ?? '', 'unsaved')
         } else if (grantType === 'authorization_code') {
-            grantParameters.code = await substituteEnvironmentVariables(env, auth.authorizationCode ?? '')
-            grantParameters.redirect_uri = await substituteEnvironmentVariables(env, auth.redirectUri ?? '')
+            grantParameters.code = await send.resolve(env, auth.authorizationCode ?? '', 'unsaved')
+            grantParameters.redirect_uri = await send.resolve(env, auth.redirectUri ?? '', 'unsaved')
 
             // Add code verifier for PKCE
             if (auth.usePKCE && auth.codeVerifier) {
@@ -840,14 +865,18 @@ async function requestOAuthToken() {
 }
 
 async function refreshOAuthToken() {
+    await runWithPromptSend(refreshOAuthTokenForSend)
+}
+
+async function refreshOAuthTokenForSend(send: SendResolver) {
     const auth = props.collectionItem?.authentication
     const env = props.collectionItemEnvironmentResolved
 
     if(auth) {
         if(props.collectionItem && props.collectionItem.authentication) {
-            const clientId: string = await substituteEnvironmentVariables(env, auth.clientId ?? '')
-            const clientSecret: string = await substituteEnvironmentVariables(env, auth.clientSecret ?? '')
-            const accessTokenUrl: string = await substituteEnvironmentVariables(env, auth.accessTokenUrl ?? '')
+            const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
+            const clientSecret: string = await send.resolve(env, auth.clientSecret ?? '', 'unsaved')
+            const accessTokenUrl: string = await send.resolve(env, auth.accessTokenUrl ?? '', 'unsaved')
             const refreshToken: string | any = props.collectionItem.authentication.refreshToken
 
             const missingFieldsMessage = getMissingOAuthTokenFieldsMessage('refresh', { accessTokenUrl })

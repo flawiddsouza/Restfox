@@ -4,7 +4,7 @@ import {
     RequestAuthentication,
     RequestParam,
 } from '@/global'
-import { createRequestData, getEditorConfig, getSpaces, substituteEnvironmentVariables } from '@/helpers'
+import { createRequestData, getEditorConfig, getSpaces, SendResolver } from '@/helpers'
 import { HTTPSnippet, availableTargets } from 'httpsnippet-browser'
 
 export function getAvailableTargets() {
@@ -19,12 +19,15 @@ export async function generateCode(
     target: 'shell',
     clientId: 'curl'
 ) {
+    // one send for prompt tags, so a prompt in the url and the body asks once. The code is shown, never saved
+    const send = new SendResolver(request.workspaceId)
+
     const state: HandleRequestState = {
         currentPlugin: null,
         testResults: []
     }
 
-    const requestData = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, null, [], null)
+    const requestData = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, null, [], null, send)
 
     const har = {
         method: request.method,
@@ -41,8 +44,8 @@ export async function generateCode(
         if(har.postData.mimeType === 'application/x-www-form-urlencoded') {
             const params = har.postData.params?.map(async(item: RequestParam) => {
                 return {
-                    name: await substituteEnvironmentVariables(environment, item.name),
-                    value: await substituteEnvironmentVariables(environment, item.value)
+                    name: await send.resolve(environment, item.name, 'unsaved'),
+                    value: await send.resolve(environment, item.value, 'unsaved')
                 }
             })
 
@@ -52,16 +55,16 @@ export async function generateCode(
         if(har.postData.mimeType === 'multipart/form-data') {
             for(const param of har.postData.params?.filter((param: RequestParam) => !param.disabled) ?? []) {
                 if(param.type === 'text') {
-                    param.name = await substituteEnvironmentVariables(environment, param.name)
-                    param.value = await substituteEnvironmentVariables(environment, param.value)
+                    param.name = await send.resolve(environment, param.name, 'unsaved')
+                    param.value = await send.resolve(environment, param.value, 'unsaved')
                 } else {
-                    param.name = await substituteEnvironmentVariables(environment, param.name)
+                    param.name = await send.resolve(environment, param.name, 'unsaved')
                 }
             }
         }
 
         if(har.postData.mimeType === 'text/plain' || har.postData.mimeType === 'application/json' || har.postData.mimeType === 'application/graphql') {
-            har.postData.text = await substituteEnvironmentVariables(environment, har.postData.text ?? '')
+            har.postData.text = await send.resolve(environment, har.postData.text ?? '', 'unsaved')
         }
     }
 

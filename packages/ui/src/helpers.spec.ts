@@ -28,8 +28,12 @@ import {
     getSocketConnectionUrl,
     fetchGraphQLSchema,
     caCertificatesFileToPEM,
+    substituteEnvironmentVariablesForSend,
+    SendResolver,
+    describeMaskedPromptOmitted,
 } from './helpers'
-import type { CollectionItem, HandleRequestState, RequestFinalResponse } from './global'
+import { forgetPromptValues } from './utils/prompt-tag'
+import type { CollectionItem, HandleRequestState, RequestAuthentication, RequestFinalResponse } from './global'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -1490,5 +1494,456 @@ describe('Restfox export and import', () => {
             ['workspace script', null, 'w2'],
             ['request script', importedRequest._id, 'w2'],
         ])
+    })
+})
+
+describe('Prompt tag', () => {
+    const request = (fields: Partial<CollectionItem>) => ({ _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'Request', method: 'GET', url: 'https://example.test/', ...fields }) as CollectionItem
+    const prepare = (fields: Partial<CollectionItem>) => {
+        const state: HandleRequestState = { currentPlugin: null, testResults: [] }
+        return createRequestData(state, request(fields), {}, {}, undefined, null, [], null)
+    }
+    const send = async(fields: Partial<CollectionItem>, environment: Record<string, unknown> = {}, plugins: unknown[] = []) => {
+        const sent: { url?: string, headers?: Record<string, string> } = {}
+        vi.stubGlobal('fetch', async(url: string, init: { headers: Record<string, string> }) => {
+            sent.url = url
+            sent.headers = init.headers
+            return new Response('ok')
+        })
+        const response = await handleRequest(request(fields), environment, {}, undefined, async() => undefined, plugins as any, null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 }) as RequestFinalResponse
+        return { sent, response }
+    }
+
+    let answers: (string | null)[]
+    const createPrompt = vi.fn<(...args: unknown[]) => Promise<string | null | undefined>>(async() => answers.length > 0 ? answers.shift() : null)
+
+    beforeEach(() => {
+        answers = []
+        createPrompt.mockClear()
+        ;(window as any).createPrompt = createPrompt
+    })
+
+    test('asks on send and sends what was typed', async() => {
+        answers = ['42']
+        const result = await prepare({ url: `https://example.test/users/{% prompt(title='User id') %}` })
+        expect(result.url.href).toBe('https://example.test/users/42')
+        expect(createPrompt).toHaveBeenCalledTimes(1)
+        expect(createPrompt.mock.calls[0][0]).toBe('User id')
+    })
+
+    test('the same prompt in two places asks once per send, and again on the next send', async() => {
+        const tag = `{% prompt(title='Tenant') %}`
+        answers = ['a', 'b']
+        const first = await prepare({ url: `https://example.test/${tag}`, headers: [{ name: 'X-Tenant', value: tag }] })
+        expect([first.url.pathname, first.headers['X-Tenant']]).toEqual(['/a', 'a'])
+        const second = await prepare({ url: `https://example.test/${tag}`, headers: [{ name: 'X-Tenant', value: tag }] })
+        expect([second.url.pathname, second.headers['X-Tenant']]).toEqual(['/b', 'b'])
+        expect(createPrompt).toHaveBeenCalledTimes(2)
+    })
+
+    test('Ask once keeps the value for later sends, shared by the same prompt in another request, such as through one environment variable', async() => {
+        const environment = { PASSWORD: `{% prompt(title='Password once', ask='once') %}` }
+        answers = ['secret']
+        await createRequestData({ currentPlugin: null, testResults: [] }, request({ headers: [{ name: 'X-Password', value: '{{PASSWORD}}' }] }), environment, {}, undefined, null, [], null)
+        const other = await createRequestData({ currentPlugin: null, testResults: [] }, request({ _id: 'other', url: 'https://example.test/{{PASSWORD}}' }), environment, {}, undefined, null, [], null)
+        expect(other.url.pathname).toBe('/secret')
+        expect(createPrompt).toHaveBeenCalledTimes(1)
+    })
+
+    test('Ask once and pre-filled keep a value per workspace: the same prompt in another workspace asks again and previews its default', async() => {
+        const once = `{% prompt(title='Workspace password', defaultValue='d', ask='once') %}`
+        const prefill = `{% prompt(title='Workspace user', ask='prefill') %}`
+        answers = ['prod-pass', 'prod-user', 'staging-pass', 'staging-user']
+        await prepare({ headers: [{ name: 'X-Password', value: once }, { name: 'X-User', value: prefill }] })
+        const staging = await prepare({ workspaceId: 'staging', headers: [{ name: 'X-Password', value: once }, { name: 'X-User', value: prefill }] })
+        expect([staging.headers['X-Password'], staging.headers['X-User']]).toEqual(['staging-pass', 'staging-user'])
+        expect(createPrompt.mock.calls.map(call => [call[0], call[1]])).toEqual([['Workspace password', 'd'], ['Workspace user', ''], ['Workspace password', 'd'], ['Workspace user', '']])
+        expect(await substituteEnvironmentVariables({}, once, { workspaceId: 'w' })).toBe('prod-pass')
+        expect(await substituteEnvironmentVariables({}, once, { workspaceId: 'other' })).toBe('d')
+    })
+
+    test('Ask once does not share with a prompt that has another title', async() => {
+        answers = ['a-pass', 'b-pass']
+        const first = await prepare({ headers: [{ name: 'X-Password', value: `{% prompt(title='Customer A password', ask='once') %}` }] })
+        const second = await prepare({ headers: [{ name: 'X-Password', value: `{% prompt(title='Customer B password', ask='once') %}` }] })
+        expect([first.headers['X-Password'], second.headers['X-Password']]).toEqual(['a-pass', 'b-pass'])
+        expect(createPrompt).toHaveBeenCalledTimes(2)
+    })
+
+    test('cancelling the box stops the send, naming the prompt as the box did', async() => {
+        const { response } = await send({ url: `https://example.test/{% prompt(title='Password') %}` })
+        expect((response as any).error).toBe('Error: Prompt "Password" was cancelled')
+        const untitled = await send({ url: `https://example.test/{% prompt() %}` })
+        expect((untitled.response as any).error).toBe('Error: Prompt "Enter value" was cancelled')
+    })
+
+    test('previews never open the box: they show the default, or ****** for a masked prompt', async() => {
+        const preview = (tag: string) => substituteEnvironmentVariables({}, tag, { tagTrigger: false, noError: true })
+        expect(await preview(`{% prompt(title='Id', defaultValue='7') %}`)).toBe('7')
+        expect(await preview(`{% prompt(title='Password', defaultValue='x', mask=1) %}`)).toBe('******')
+        expect(createPrompt).not.toHaveBeenCalled()
+    })
+
+    test('only a send asks, a text resolved outside one shows the preview value even when tags are run', async() => {
+        expect(await substituteEnvironmentVariables({}, `{% prompt(title='Id', defaultValue='7') %}`)).toBe('7')
+        expect(await substituteEnvironmentVariables({}, `{% prompt(title='Password', defaultValue='x', mask=1) %}`)).toBe('******')
+        expect(createPrompt).not.toHaveBeenCalled()
+    })
+
+    test('Ask every send, pre-filled, fills the box with what was typed last time for that prompt only, a masked prompt hides what is typed', async() => {
+        const tag = `{% prompt(title='Last', label='Your value', ask='prefill', mask=1) %}`
+        answers = ['x', 'y', 'z']
+        await prepare({ url: `https://example.test/${tag}` })
+        await prepare({ url: `https://example.test/${tag}` })
+        await prepare({ url: `https://example.test/{% prompt(title='Last', label='Another value', ask='prefill', mask=1) %}` })
+        expect(createPrompt.mock.calls[0]).toEqual(['Last', '', [], { label: 'Your value', mask: true }])
+        expect(createPrompt.mock.calls[1]).toEqual(['Last', 'x', [], { label: 'Your value', mask: true }])
+        expect(createPrompt.mock.calls[2]).toEqual(['Last', '', [], { label: 'Another value', mask: true }])
+    })
+
+    test('a masked prompt in one header leaves only that header out of history, the url, the other headers and the body are saved', async() => {
+        answers = ['s3cret']
+        const tag = `{% prompt(title='Token', mask=1) %}`
+        const { sent, response } = await send({ method: 'POST', url: 'https://example.test/items?q=1', headers: [{ name: 'Authorization', value: `Bearer ${tag}` }, { name: 'X-Trace', value: 't1' }], body: { mimeType: 'application/json', text: '{"a":1}' } })
+        expect(sent.headers?.Authorization).toBe('Bearer s3cret')
+        expect(JSON.stringify(response)).not.toContain('s3cret')
+        expect(response.url).toBe('https://example.test/items')
+        expect(response.request.query).toBe('?q=1')
+        expect(response.request.headers['X-Trace']).toBe('t1')
+        expect(response.request.headers.Authorization).toBeUndefined()
+        expect(response.request.body).toBe('{"a":1}')
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: false, headerNames: ['Authorization'], body: false })
+        expect(response.request.original.headers?.[0].value).toBe(`Bearer ${tag}`)
+    })
+
+    test('a masked prompt in the body leaves only the body out of history', async() => {
+        answers = ['b0dy-secret']
+        const { response } = await send({ method: 'POST', headers: [{ name: 'X-Trace', value: 't1' }], body: { mimeType: 'application/x-www-form-urlencoded', params: [{ name: 'client_secret', value: `{% prompt(title='Secret', mask=1) %}` }] } })
+        expect(JSON.stringify(response)).not.toContain('b0dy-secret')
+        expect(response.request.headers['X-Trace']).toBe('t1')
+        expect(response.request.body).toBeNull()
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: false, headerNames: [], body: true })
+    })
+
+    test('a masked prompt in the url, a path or a query parameter saves the url with its masked values as ******, which every version can parse', async() => {
+        answers = ['p4th', 'qu3ry']
+        const { sent, response } = await send({ url: 'https://example.test/users/:id?key=k', pathParameters: [{ name: 'id', value: `{% prompt(title='Id', mask=1) %}` }], parameters: [{ name: 'key', value: `{% prompt(title='Key', mask=1) %}` }], headers: [{ name: 'X-Trace', value: 't1' }] })
+        expect(String(sent.url)).toBe('https://example.test/users/p4th?key=qu3ry')
+        expect(JSON.stringify(response)).not.toMatch(/p4th|qu3ry/)
+        expect([response.url, response.request.query]).toEqual(['https://example.test/users/******', '?key=******'])
+        expect(new URL(response.url + response.request.query).pathname).toBe('/users/******')
+        expect(response.request.headers['X-Trace']).toBe('t1')
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: 'masked', headerNames: [], body: false })
+        expect(createPrompt).toHaveBeenCalledTimes(2)
+    })
+
+    test('a masked prompt in the port, which a url cannot hold as ******, saves the url as written', async() => {
+        answers = ['8443']
+        const { sent, response } = await send({ url: `https://example.test:{% prompt(title='Port', mask=1) %}/a?q=1` })
+        expect(String(sent.url)).toBe('https://example.test:8443/a?q=1')
+        expect(JSON.stringify(response)).not.toContain('8443')
+        expect([response.url, response.request.query]).toEqual([`https://example.test:{% prompt(title='Port', mask=1) %}/a?q=1`, ''])
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: 'written', headerNames: [], body: false })
+    })
+
+    test('a masked prompt in the Auth tab or reached through a variable leaves out the header it went into', async() => {
+        answers = ['v4r', 'pa55']
+        const { response } = await send({ authentication: { type: 'basic', username: 'user', password: `{% prompt(title='Password', mask=1) %}` }, headers: [{ name: 'X-Api-Key', value: '{{API_KEY}}' }, { name: 'X-Trace', value: 't1' }] }, { API_KEY: `{% prompt(title='Api key', mask=1) %}` })
+        expect(JSON.stringify(response)).not.toMatch(/v4r|dXNlcjpwYTU1/)
+        expect(response.request.headers['X-Trace']).toBe('t1')
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: false, headerNames: ['X-Api-Key', 'Authorization'], body: false })
+    })
+
+    test('a masked prompt in a header\'s name leaves the header out and names it with the value as ******', async() => {
+        answers = ['n4me']
+        const { sent, response } = await send({ headers: [{ name: `X-{% prompt(title='Name', mask=1) %}`, value: 'v' }, { name: 'X-Trace', value: 't1' }] })
+        expect(sent.headers?.['X-n4me']).toBe('v')
+        expect(JSON.stringify(response)).not.toContain('n4me')
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: false, headerNames: ['X-******'], body: false })
+        expect(response.request.headers['X-Trace']).toBe('t1')
+    })
+
+    test('GLOBAL_HEADERS ask their prompts, and send a variable or another tag in them as written, as before', async() => {
+        answers = ['p']
+        const { sent } = await send({}, { TOKEN: 't', GLOBAL_HEADERS: { 'X-Var': '{{TOKEN}}', 'X-Tag': '{% uuid() %}', 'X-Prompt': `{% prompt(title='Global') %}` } })
+        expect([sent.headers?.['X-Var'], sent.headers?.['X-Tag'], sent.headers?.['X-Prompt']]).toEqual(['{{TOKEN}}', '{% uuid() %}', 'p'])
+    })
+
+    test('a url left out goes from the sent headers too: HTTP/2 :path and :authority, and host', async() => {
+        const response = { url: 'https://example.test/a', request: { method: 'GET', query: '?k=S3CRET', headers: {}, headersSent: [[':method', 'GET'], [':path', '/a?k=S3CRET'], [':authority', 'example.test'], [':scheme', 'https'], ['host', 'example.test'], ['x-trace', 't1']], body: null, original: {} } } as unknown as RequestFinalResponse
+        answers = ['S3CRET']
+        const urlSend = new SendResolver('w')
+        await urlSend.resolve({}, `{% prompt(title='Query', mask=1) %}`, 'url')
+        const saved = urlSend.omitMaskedPromptParts(response, request({ url: 'https://example.test/a?k={{K}}' }))
+        expect(saved.request.headersSent).toEqual([[':method', 'GET'], [':scheme', 'https'], ['x-trace', 't1']])
+    })
+
+    test('a masked prompt a script reads is left out of test results too, in a pre-request or a post-request script', async() => {
+        const tag = `{% prompt(title='Test token', ask='once', mask=1) %}`
+        answers = ['t3st-secret']
+        await prepare({ headers: [{ name: 'X-Warm', value: tag }] })
+        const script = (code: { pre_request: string, post_request: string }) => ({ _id: 'p', type: 'script', name: 'script', code, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 })
+        const test = `test('token ' + rf.getEnvVar('TOKEN'), () => expect(rf.getEnvVar('TOKEN')).to.equal('x'))`
+        const pre = await send({ headers: [{ name: 'X-Trace', value: 't1' }] }, { TOKEN: tag }, [script({ pre_request: test, post_request: '' })])
+        expect(pre.response.testResults.map(result => result.passed)).toEqual([false])
+        expect(JSON.stringify(pre.response)).not.toContain('t3st-secret')
+        const post = await send({ headers: [{ name: 'X-Trace', value: 't1' }] }, { TOKEN: tag }, [script({ pre_request: '', post_request: test })])
+        expect(post.response.request.maskedPromptOmitted).toEqual({ reason: 'script-read' })
+        expect(JSON.stringify(post.response)).not.toContain('t3st-secret')
+    })
+
+    test('a disabled or nameless header does not ask, with a pre-request script too', async() => {
+        const plugin = { _id: 'p', type: 'script', name: 'script', code: { pre_request: `rf.request.getMethod()`, post_request: '' }, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 }
+        const { response } = await send({ headers: [{ name: 'X-Off', value: `{% prompt(title='Disabled') %}`, disabled: true }, { name: '', value: `{% prompt(title='Nameless') %}` }] }, {}, [plugin])
+        expect(response.status).toBe(200)
+        expect(createPrompt).not.toHaveBeenCalled()
+    })
+
+    test('cancelling a header prompt stops the send at once, with a pre-request script too: no later prompt asks and the script does not run', async() => {
+        const plugin = { _id: 'p', type: 'script', name: 'script', code: { pre_request: `rf.setEnvVar('ran', 'yes')`, post_request: '' }, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 }
+        const setEnvironmentVariable = vi.fn(async() => undefined)
+        answers = [null]
+        const response = await handleRequest(request({ url: `https://example.test/{% prompt(title='Url') %}`, headers: [{ name: 'X-Header', value: `{% prompt(title='Header') %}` }] }), {}, {}, undefined, setEnvironmentVariable, [plugin] as any, null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 }) as any
+        expect(response.error).toBe('Error: Prompt "Header" was cancelled')
+        expect(createPrompt.mock.calls.map(call => call[0])).toEqual(['Header'])
+        expect(setEnvironmentVariable).not.toHaveBeenCalled()
+    })
+
+    test('Ask once asks once for two sends at the same time, and both send the value', async() => {
+        const tag = `{% prompt(title='Concurrent once', ask='once') %}`
+        answers = ['a', 'b']
+        const [first, second] = await Promise.all([prepare({ headers: [{ name: 'X-Value', value: tag }] }), prepare({ headers: [{ name: 'X-Value', value: tag }] })])
+        expect([first.headers['X-Value'], second.headers['X-Value']]).toEqual(['a', 'a'])
+        expect(createPrompt).toHaveBeenCalledTimes(1)
+    })
+
+    test('GLOBAL_HEADERS send text that only looks like a tag as written', async() => {
+        const { sent } = await send({}, { GLOBAL_HEADERS: { 'X-G': '{% my-tag() %}' } })
+        expect(sent.headers?.['X-G']).toBe('{% my-tag() %}')
+    })
+
+    test('Mask Text written by hand as \'1\' or true masks too', async() => {
+        answers = ['qu0ted', 'b00lean']
+        const quoted = await send({ headers: [{ name: 'X-A', value: `{% prompt(title='Q', mask='1') %}` }] })
+        const bare = await send({ headers: [{ name: 'X-B', value: `{% prompt(title='B', mask=true) %}` }] })
+        expect([quoted.sent.headers?.['X-A'], bare.sent.headers?.['X-B']]).toEqual(['qu0ted', 'b00lean'])
+        expect(JSON.stringify([quoted.response, bare.response])).not.toMatch(/qu0ted|b00lean/)
+    })
+
+    test('two prompts in one field ask in reading order', async() => {
+        answers = ['1', '2']
+        const result = await prepare({ url: `https://example.test/{% prompt(title='First') %}/{% prompt(title='Second') %}` })
+        expect(createPrompt.mock.calls.map(call => call[0])).toEqual(['First', 'Second'])
+        expect(result.url.pathname).toBe('/1/2')
+    })
+
+    test('Forget Remembered Values makes a prompt asked once ask again', async() => {
+        const tag = `{% prompt(title='Password forgotten', ask='once') %}`
+        answers = ['first', 'second']
+        forgetPromptValues() // values other tests kept
+        await prepare({ headers: [{ name: 'X-Password', value: tag }] })
+        expect(forgetPromptValues()).toBe(1)
+        expect(forgetPromptValues()).toBe(0)
+        const second = await prepare({ headers: [{ name: 'X-Password', value: tag }] })
+        expect(second.headers['X-Password']).toBe('second')
+        expect(createPrompt).toHaveBeenCalledTimes(2)
+    })
+
+    test('a socket url or message resolves as a send of its own, and what is shown hides only the masked values', async() => {
+        answers = ['4321', 'ada']
+        const text = `{ "pin": "{% prompt(title='PIN', mask=1) %}", "user": "{% prompt(title='User') %}", "host": "{{ HOST }}" }`
+        expect(await substituteEnvironmentVariablesForSend({ HOST: 'h1' }, text, 'w')).toEqual({
+            textResolved: '{ "pin": "4321", "user": "ada", "host": "h1" }',
+            textResolvedMasked: '{ "pin": "******", "user": "ada", "host": "h1" }',
+        })
+        // shown without asking again
+        expect(createPrompt).toHaveBeenCalledTimes(2)
+    })
+
+    test('a pre-request script that reads a remembered masked prompt through rf.getEnvVar keeps the whole send out of history, it may have put it anywhere', async() => {
+        const tag = `{% prompt(title='Kept token', ask='once', mask=1) %}`
+        answers = ['sek-ret']
+        await prepare({ headers: [{ name: 'X-Warm', value: tag }] })
+        const plugin = { _id: 'p', type: 'script', name: 'script', code: { pre_request: `rf.request.setHeader('X-Token', rf.getEnvVar('TOKEN'))`, post_request: '' }, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 }
+        const { response } = await send({ method: 'POST', headers: [{ name: 'X-Trace', value: 't1' }], body: { mimeType: 'text/plain', text: 'b' } }, { TOKEN: tag }, [plugin])
+        expect(response.status).toBe(200)
+        expect(JSON.stringify(response)).not.toContain('sek-ret')
+        expect(response.request.maskedPromptOmitted).toEqual({ reason: 'script-read' })
+        expect([response.url, response.request.query, response.request.headers, response.request.body]).toEqual(['https://example.test/', '', {}, null])
+    })
+
+    test('a pre-request script reading a masked header through rf.request.getHeader keeps the whole send out of history, one that does not read it leaves out only that header', async() => {
+        const tag = `{% prompt(title='Header token', ask='once', mask=1) %}`
+        answers = ['h3ader']
+        // remembered first, a script reads a header only once it is resolved
+        await prepare({ headers: [{ name: 'X-Warm', value: tag }] })
+        const headers = [{ name: 'X-Token', value: tag }, { name: 'X-Trace', value: 't1' }]
+        const script = (code: string) => ({ _id: 'p', type: 'script', name: 'script', code: { pre_request: code, post_request: '' }, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 })
+        const reading = await send({ headers }, {}, [script(`rf.request.setHeader('X-Copy', rf.request.getHeader('X-Token'))`)])
+        expect(reading.sent.headers?.['X-Copy']).toBe('h3ader')
+        expect(JSON.stringify(reading.response)).not.toContain('h3ader')
+        expect(reading.response.request.maskedPromptOmitted).toEqual({ reason: 'script-read' })
+        const notReading = await send({ headers }, {}, [script(`rf.request.setHeader('X-Other', 'o')`)])
+        expect(notReading.response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: false, headerNames: ['X-Token'], body: false })
+        expect(notReading.response.request.headers['X-Trace']).toBe('t1')
+    })
+
+    test('a header left out goes from the sent headers too, matched without regard to case', async() => {
+        const response = { url: 'https://example.test/a', request: { method: 'GET', query: '?q=1', headers: { authorization: 'Bearer x', 'X-Trace': 't1' }, headersSent: [['host', 'example.test'], ['authorization', 'Bearer x'], ['x-trace', 't1']], body: 'b', original: {} } } as unknown as RequestFinalResponse
+        const tag = `{% prompt(title='Omitted', ask='once', mask=1) %}`
+        answers = ['x']
+        const headerSend = new SendResolver('w')
+        await headerSend.resolve({}, tag, { header: 'Authorization' })
+        const saved = headerSend.omitMaskedPromptParts(response, request({ url: '{{BASE}}/a?q=1' }))
+        expect(saved.request.headers).toEqual({ 'X-Trace': 't1' })
+        expect(saved.request.headersSent).toEqual([['host', 'example.test'], ['x-trace', 't1']])
+        expect([saved.url, saved.request.query, saved.request.body]).toEqual(['https://example.test/a', '?q=1', 'b'])
+        const allSend = new SendResolver('w')
+        await allSend.resolve({}, tag, 'url')
+        await allSend.resolve({}, tag, 'body')
+        const all = allSend.omitMaskedPromptParts(response, request({ url: '{{BASE}}/a?q=1' }))
+        expect([all.url, all.request.query, all.request.body]).toEqual(['{{BASE}}/a?q=1', '', null])
+        const unsavedSend = new SendResolver('w')
+        await unsavedSend.resolve({}, tag, 'unsaved')
+        expect(unsavedSend.omitMaskedPromptParts(response, request({}))).toBe(response)
+    })
+
+    test('the note names each part left out and why', () => {
+        expect(describeMaskedPromptOmitted({ reason: 'masked-field', url: false, headerNames: ['Authorization'], body: false })).toBe('Left out because a masked prompt was used there: the Authorization header')
+        expect(describeMaskedPromptOmitted({ reason: 'masked-field', url: false, headerNames: ['Authorization'], body: true })).toBe('Left out because a masked prompt was used there: the Authorization header and the body')
+        expect(describeMaskedPromptOmitted({ reason: 'masked-field', url: 'written', headerNames: ['X-Key', 'Authorization'], body: true })).toBe('Left out because a masked prompt was used there: the URL (shown as written), the X-Key header, the Authorization header and the body')
+        expect(describeMaskedPromptOmitted({ reason: 'masked-field', url: 'masked', headerNames: [], body: false })).toBe('Left out because a masked prompt was used there: the masked values in the URL (shown as ******)')
+        expect(describeMaskedPromptOmitted({ reason: 'script-read' })).toBe('Left out because a script read a masked prompt: the URL (shown as written), the headers, the body and the test names and errors')
+    })
+
+    test('a request that used only unmasked prompts saves the resolved request as before', async() => {
+        answers = ['v']
+        const { response } = await send({ headers: [{ name: 'X-Value', value: `{% prompt(title='Value') %}` }] })
+        expect(response.request.headers['X-Value']).toBe('v')
+        expect(response.request.maskedPromptOmitted).toBeUndefined()
+    })
+
+    // Each text a send can read, one at a time, gets a masked prompt and is sent twice with two typed values. Where the
+    // server got the value, the saved copies must be the same, so no form of the value, encoded or not, is saved
+    describe('in any text of a send', () => {
+        // script runs a pre-request script that reads nothing, so the texts are also prepared for a script
+        type Fixture = { request: CollectionItem, parentHeaders: Record<string, string[]>, parentAuthentication?: RequestAuthentication, environment: Record<string, any>, script?: boolean }
+
+        // one body and one auth kind of each, from the request, its folders and the environment, with disabled items, a
+        // query typed into the url and a folder header the request's own replaces
+        const fixtures: Fixture[] = [
+            {
+                request: request({ method: 'POST', url: 'https://example.test/users/:id', parameters: [{ name: 'q', value: '1' }], pathParameters: [{ name: 'id', value: '7' }], headers: [{ name: 'X-Header', value: 'h' }, { name: 'X-Var', value: '{{VAR}}' }], body: { mimeType: 'application/json', text: '{"a":"b"}' }, authentication: { type: 'basic', username: 'u', password: 'p' } }),
+                parentHeaders: { 'X-Folder': ['f'], 'X-Header': ['replaced'] },
+                environment: { VAR: 'v', GLOBAL_HEADERS: { 'X-Global': 'g' } },
+            },
+            {
+                request: request({ method: 'POST', url: 'https://example.test/?k=v', body: { mimeType: 'application/x-www-form-urlencoded', params: [{ name: 'f', value: '1' }] }, authentication: { type: 'bearer', prefix: 'Bearer', token: 't' } }),
+                parentHeaders: {},
+                environment: {},
+            },
+            {
+                request: request({ method: 'POST', body: { mimeType: 'multipart/form-data', params: [{ type: 'text', name: 'm', value: '1' }] } }),
+                parentHeaders: {},
+                parentAuthentication: { type: 'basic', username: 'fu', password: 'fp' },
+                environment: {},
+            },
+            {
+                request: request({ method: 'POST', parameters: [{ name: 'on', value: '1' }, { name: 'off', value: '0', disabled: true }], headers: [{ name: 'X-On', value: 'on' }, { name: 'X-Off', value: 'off', disabled: true }], body: { mimeType: 'text/plain', text: 'plain' }, authentication: { type: 'oauth2', prefix: 'Bearer', token: 'o' } }),
+                parentHeaders: {},
+                environment: {},
+                script: true,
+            },
+        ]
+
+        // maps whose keys are header names
+        const headerNameMaps = ['parentHeaders', 'environment.GLOBAL_HEADERS']
+
+        // every text in the fixture by its path, a header name map's key as "<map>.<key>:name"
+        function textPaths(value: any, path: string[] = []): string[][] {
+            if (typeof value === 'string') {
+                return [path]
+            }
+            if (value === null || typeof value !== 'object') {
+                return []
+            }
+            return Object.entries(value).flatMap(([key, child]) => [
+                ...(headerNameMaps.includes(path.join('.')) ? [[...path, `${key}:name`]] : []),
+                ...textPaths(child, [...path, key]),
+            ])
+        }
+
+        function withTag(fixture: Fixture, path: string[], tag: string): Fixture {
+            const copy = JSON.parse(JSON.stringify(fixture))
+            const parent = path.slice(0, -1).reduce((object, key) => object[key], copy)
+            const last = path[path.length - 1]
+            if (last.endsWith(':name')) {
+                const name = last.slice(0, -':name'.length)
+                const entries = Object.entries(parent)
+                Object.keys(parent).forEach(key => delete parent[key])
+                entries.forEach(([key, child]) => parent[key === name ? name + tag : key] = child)
+            } else {
+                parent[last] += tag
+            }
+            return copy
+        }
+
+        const script = { _id: 'p', type: 'script', name: 'script', code: { pre_request: 'rf.request.getMethod()', post_request: '' }, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 }
+
+        async function sendWithAnswer(fixture: Fixture, answer: string) {
+            let sent = ''
+            vi.stubGlobal('fetch', async(url: string, init: { headers: Record<string, string>, body: unknown }) => {
+                const body = init.body instanceof FormData ? [...init.body.entries()] : String(init.body)
+                sent = JSON.stringify([url, init.headers, body])
+                return new Response('ok')
+            })
+            answers = [answer]
+            createPrompt.mockClear()
+            const response = await handleRequest(fixture.request, fixture.environment, fixture.parentHeaders, fixture.parentAuthentication, async() => undefined, (fixture.script ? [script] : []) as any, null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 }) as RequestFinalResponse
+            // what differs on every send
+            const saved = { ...response, _id: '', createdAt: 0, timeTaken: 0, headTimeTaken: 0, bodyTimeTaken: 0 }
+            return { sent, saved: JSON.stringify(saved), asked: createPrompt.mock.calls.length }
+        }
+
+        test('reaches the server and is never saved', async() => {
+            const tag = `{% prompt(title='Any text', mask=1) %}`
+            const notSent: string[] = []
+            const notSentButAsked: string[] = []
+            const saved: string[] = []
+
+            for (const [index, fixture] of fixtures.entries()) {
+                for (const path of textPaths(fixture)) {
+                    const fixtureWithTag = withTag(fixture, path, tag)
+                    const first = await sendWithAnswer(fixtureWithTag, 'Aaaa1111')
+                    const second = await sendWithAnswer(fixtureWithTag, 'Bbbb2222')
+                    const name = `${index}:${path.join('.')}`
+                    if (first.sent === second.sent) {
+                        notSent.push(name)
+                        if (first.asked > 0) {
+                            notSentButAsked.push(name)
+                        }
+                        continue
+                    }
+                    if (second.saved !== first.saved) {
+                        saved.push(name)
+                    }
+                }
+            }
+
+            expect(saved).toEqual([])
+
+            // so the check covers every text a send reads: these are the only ones the server never got. A path
+            // parameter's name is sent only where the url uses it
+            const notSentFields = ['_id', '_type', 'workspaceId', 'name', 'method', 'body.mimeType']
+            expect(notSent.sort()).toEqual([
+                ...notSentFields.map(field => `0:request.${field}`), '0:request.pathParameters.0.name', '0:request.authentication.type', '0:parentHeaders.X-Header.0',
+                ...notSentFields.map(field => `1:request.${field}`), '1:request.authentication.type',
+                ...notSentFields.map(field => `2:request.${field}`), '2:request.body.params.0.type', '2:parentAuthentication.type',
+                ...notSentFields.map(field => `3:request.${field}`), '3:request.authentication.type', '3:request.parameters.1.name', '3:request.parameters.1.value', '3:request.headers.1.name', '3:request.headers.1.value',
+            ].sort())
+
+            // a text that is not sent never asks, apart from a path parameter's name, which the url is searched for
+            expect(notSentButAsked).toEqual(['0:request.pathParameters.0.name'])
+        })
     })
 })

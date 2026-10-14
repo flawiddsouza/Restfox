@@ -23,12 +23,15 @@ import {
     Flags,
     CACertificates,
     ProxySettings,
+    MaskedPromptOmitted,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
 import constants from '@/constants'
 import { handleResponseTag } from '@/utils/tag'
+import { getPromptPreviewValue, handlePromptTag } from '@/utils/prompt-tag'
 import { handleTags } from '@/parsers/tag'
+import type { ParsedResult } from '@/parsers/tag'
 import { getSettingsFile, putSettingsFile, deleteSettingsFile } from '@/db'
 
 // From: https://stackoverflow.com/a/67802481/4932305
@@ -74,12 +77,28 @@ export function flattenTree(array: CollectionItem[]) {
     return level
 }
 
-export async function substituteEnvironmentVariables(
+// A prompt tag never asks here, it shows its preview value, with what Ask kept in workspaceId: only a SendResolver asks
+export function substituteEnvironmentVariables(
     environment: any,
     string: string,
-    options: { tagTrigger?: boolean, cacheId?: string, noError?: boolean } = {}
+    options: { tagTrigger?: boolean, noError?: boolean, resolvePromptTags?: boolean, workspaceId?: string } = {}
 ) {
-    const { tagTrigger = true, cacheId = undefined, noError = false } = options
+    return substituteEnvironmentVariablesWith(environment, string, options)
+}
+
+// send keeps response tags' responses for one send and resolves its prompt tags. promptTagsOnly leaves variables and
+// other tags as written
+async function substituteEnvironmentVariablesWith(
+    environment: any,
+    string: string,
+    options: { tagTrigger?: boolean, noError?: boolean, resolvePromptTags?: boolean, promptTagsOnly?: boolean, workspaceId?: string },
+    send?: { cacheId: string, handlePromptTag: (parsedTag: ParsedResult) => Promise<string> }
+) {
+    const { tagTrigger = true, noError = false, resolvePromptTags = true, promptTagsOnly = false } = options
+
+    if(promptTagsOnly) {
+        environment = {}
+    }
 
     let substitutedString = String(string)
 
@@ -106,9 +125,191 @@ export async function substituteEnvironmentVariables(
         substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
 
-    substitutedString = await handleTags(handleResponseTag, substitutedString, tagTrigger, cacheId, noError)
+    const handlePromptTagForString = async(parsedTag: ParsedResult) => send ? send.handlePromptTag(parsedTag) : getPromptPreviewValue(parsedTag, options.workspaceId)
+
+    substitutedString = await handleTags(handleResponseTag, substitutedString, tagTrigger, send?.cacheId, noError, handlePromptTagForString, resolvePromptTags, !promptTagsOnly)
 
     return substitutedString
+}
+
+// The part of a send a text goes into, which a masked prompt's value there leaves out of the saved copy: the url is
+// saved as written, a header and the body are left out. 'unsaved' is a text no copy of the send keeps, such as an
+// OAuth 2.0 token request's fields or generated code
+export type SendPart = 'url' | 'body' | { header: string } | 'unsaved'
+
+// One send of a request, or one preparation of it such as generated code. Prompt tags ask only through it, and each
+// text it resolves names the part of the send it goes into, so a masked prompt's value never reaches a saved copy
+export class SendResolver {
+    // what Ask keeps is kept per workspace
+    constructor(readonly workspaceId: string) {}
+
+    // response tags keep their response for the send by it
+    readonly cacheId = nanoid()
+    // the values this send was given, so a prompt used twice in one send asks once
+    private readonly promptValues = new Map<string, Promise<string>>()
+    private maskedUrl = false
+    private maskedBody = false
+    // a header is left out by the name it was sent with, and named in the note with masked values hidden
+    private readonly maskedHeaders: { nameSent: string, nameShown: string }[] = []
+    // the url as saved when a masked prompt's value went into it, with masked values hidden, null when it cannot be
+    // built so, such as for a masked port
+    private urlShown: URL | null = null
+    private scriptReadMaskedPrompt = false
+
+    resolve(environment: any, text: string, part: SendPart) {
+        return this.substitute(environment, text, () => this.omit(part))
+    }
+
+    // The url from the texts build resolves, and once more with masked values hidden when one went into it. That
+    // second time reuses what this send's tags gave, so nothing asks or is sent twice
+    async resolveUrl(environment: any, build: (resolveText: (text: string) => Promise<string>) => Promise<URL>) {
+        const url = await build(text => this.resolve(environment, text, 'url'))
+
+        if(this.maskedUrl) {
+            try {
+                this.urlShown = await build(text => this.substitute(environment, text, () => undefined, { hideMasked: true }))
+            } catch {
+                // saved as written
+            }
+        }
+
+        return url
+    }
+
+    // A header's name resolves first, then its values unless skip decides from the name that it is not sent, so a
+    // prompt in a header that is not sent never asks. promptTagsOnly leaves variables and other tags as written
+    async resolveHeader(environment: any, name: string, values: string[], skip: (nameResolved: string) => boolean, promptTagsOnly = false) {
+        let nameMasked = false
+        const nameResolved = await this.substitute(environment, name, () => {
+            nameMasked = true
+        }, { promptTagsOnly })
+
+        if(skip(nameResolved)) {
+            return null
+        }
+
+        if(nameMasked) {
+            this.omitHeader(nameResolved, await this.substitute(environment, name, () => undefined, { hideMasked: true, promptTagsOnly }))
+        }
+
+        const valuesResolved: string[] = []
+
+        for(const value of values) {
+            valuesResolved.push(await this.substitute(environment, value, () => this.omit({ header: nameResolved }), { promptTagsOnly }))
+        }
+
+        return { nameResolved, valuesResolved }
+    }
+
+    // A pre-request script may read what a text resolved to. Once it reads a masked prompt's value it may have put it
+    // anywhere, so nothing the send resolved to is saved
+    async resolveForScript(environment: any, text: string) {
+        let masked = false
+        const textResolved = await this.substitute(environment, text, () => {
+            masked = true
+        })
+
+        return () => {
+            if(masked) {
+                this.markScriptReadMaskedPrompt()
+            }
+            return textResolved
+        }
+    }
+
+    markScriptReadMaskedPrompt() {
+        this.scriptReadMaskedPrompt = true
+    }
+
+    // the text as this send resolved it, and with masked prompt values hidden, which is what may be shown and saved
+    async resolveWithMasked(environment: any, text: string) {
+        let maskedPromptUsed = false
+        const textResolved = await this.substitute(environment, text, () => {
+            maskedPromptUsed = true
+        })
+
+        // resolved again from what this send's tags gave, so nothing asks or is sent twice
+        const textResolvedMasked = maskedPromptUsed ? await this.substitute(environment, text, () => undefined, { hideMasked: true }) : textResolved
+
+        return { textResolved, textResolvedMasked }
+    }
+
+    get maskedPromptOmitted(): MaskedPromptOmitted | null {
+        if(this.scriptReadMaskedPrompt) {
+            return { reason: 'script-read' }
+        }
+
+        if(!this.maskedUrl && !this.maskedBody && this.maskedHeaders.length === 0) {
+            return null
+        }
+
+        const url = !this.maskedUrl ? false : this.urlShown !== null ? 'masked' : 'written'
+
+        return { reason: 'masked-field', url, headerNames: this.maskedHeaders.map(header => header.nameShown), body: this.maskedBody }
+    }
+
+    // A masked value may be encoded where it went, such as base64 in Basic auth or url-encoded in a form, so each
+    // part it went into is left out whole: the url is rebuilt with masked values hidden, else kept as written, the
+    // headers go from both header lists, the body goes
+    omitMaskedPromptParts(response: RequestFinalResponse, request: CollectionItem): RequestFinalResponse {
+        const maskedPromptOmitted = this.maskedPromptOmitted
+
+        if(maskedPromptOmitted === null) {
+            return response
+        }
+
+        const scriptRead = maskedPromptOmitted.reason === 'script-read'
+        const urlOmitted = scriptRead || maskedPromptOmitted.url !== false
+        // a script may have changed a variable the url uses to the value, so only a url the send built itself is shown
+        const urlShown = scriptRead ? null : this.urlShown
+        const isOmittedHeader = (headerName: string) => scriptRead || this.maskedHeaders.some(header => header.nameSent.toLowerCase() === headerName.toLowerCase())
+        // the transport's list also carries the url, in HTTP/2 :path and :authority, and host in both
+        const isOmittedHeaderSent = (headerName: string) => isOmittedHeader(headerName) || (urlOmitted && [':path', ':authority', 'host'].includes(headerName.toLowerCase()))
+
+        return {
+            ...response,
+            url: !urlOmitted ? response.url : urlShown !== null ? urlShown.origin + urlShown.pathname : request.url ?? '',
+            request: {
+                ...response.request,
+                query: !urlOmitted ? response.request.query : urlShown !== null ? urlShown.search : '',
+                headers: Object.fromEntries(Object.entries(response.request.headers).filter(([name]) => !isOmittedHeader(name))),
+                headersSent: response.request.headersSent?.filter(([name]) => !isOmittedHeaderSent(name)),
+                body: scriptRead || maskedPromptOmitted.body ? null : response.request.body,
+                maskedPromptOmitted,
+            },
+            // a script that read the value may have written it into a test's name or error
+            testResults: scriptRead ? response.testResults.map(testResult => ({ ...testResult, description: '(left out)', ...(testResult.error !== undefined ? { error: '(left out)' } : {}) })) : response.testResults,
+        }
+    }
+
+    private substitute(environment: any, text: string, onMaskedPrompt: () => void, { hideMasked = false, promptTagsOnly = false } = {}) {
+        return substituteEnvironmentVariablesWith(environment, text, { promptTagsOnly }, {
+            cacheId: this.cacheId,
+            handlePromptTag: parsedTag => handlePromptTag(parsedTag, this.workspaceId, this.promptValues, onMaskedPrompt, hideMasked),
+        })
+    }
+
+    private omit(part: SendPart) {
+        if(part === 'url') {
+            this.maskedUrl = true
+        } else if(part === 'body') {
+            this.maskedBody = true
+        } else if(part !== 'unsaved') {
+            this.omitHeader(part.header, part.header)
+        }
+    }
+
+    // a header named first keeps its place, the later spelling of the same name is the same header
+    private omitHeader(nameSent: string, nameShown: string) {
+        if(nameSent !== '' && !this.maskedHeaders.some(header => header.nameSent.toLowerCase() === nameSent.toLowerCase())) {
+            this.maskedHeaders.push({ nameSent, nameShown })
+        }
+    }
+}
+
+// text resolved as a send of its own, and the same with masked prompt values hidden, which is what may be shown and saved
+export function substituteEnvironmentVariablesForSend(environment: any, text: string, workspaceId: string) {
+    return new SendResolver(workspaceId).resolveWithMasked(environment, text)
 }
 
 export function generateBasicAuthString(username: string, password: string) {
@@ -582,12 +783,12 @@ export async function createRequestData(
     parentAuthentication: RequestAuthentication | undefined,
     setEnvironmentVariable: SetEnvironmentVariableFunction | null,
     plugins: Plugin[],
-    workspaceLocation: string | null
+    workspaceLocation: string | null,
+    // a caller that saves the send, or resolves more of it, passes its own
+    send = new SendResolver(request.workspaceId)
 ): Promise<CreateRequestDataReturn> {
-    const cacheId = nanoid()
-
     for(const plugin of plugins) {
-        const { expose } = await createRequestContextForPlugin(cacheId, request, environment, setEnvironmentVariable, state.testResults, plugin.collectionId)
+        const { expose } = await createRequestContextForPlugin(send, request, environment, setEnvironmentVariable, state.testResults, plugin.collectionId)
 
         state.currentPlugin = plugin.type === 'script' ? 'Script: Pre Request' : `${plugin.name} (Pre Request)`
 
@@ -613,8 +814,8 @@ export async function createRequestData(
             const formParams = new URLSearchParams()
 
             for (const item of request.body.params.filter(item => !item.disabled)) {
-                const name = await substituteEnvironmentVariables(environment, item.name, { cacheId })
-                const value = await substituteEnvironmentVariables(environment, item.value, { cacheId })
+                const name = await send.resolve(environment, item.name, 'body')
+                const value = await send.resolve(environment, item.value, 'body')
                 formParams.append(name, value)
             }
 
@@ -630,13 +831,13 @@ export async function createRequestData(
                     for (const param of request.body.params.filter(item => !item.disabled)) {
                         if (param.type === 'text') {
                             formData.append(
-                                await substituteEnvironmentVariables(environment, param.name, { cacheId }),
-                                await substituteEnvironmentVariables(environment, param.value, { cacheId })
+                                await send.resolve(environment, param.name, 'body'),
+                                await send.resolve(environment, param.value, 'body')
                             )
                         } else if (param.files) {
                             for (const file of param.files) {
                                 formData.append(
-                                    await substituteEnvironmentVariables(environment, param.name, { cacheId }),
+                                    await send.resolve(environment, param.name, 'body'),
                                     file as File
                                 )
                             }
@@ -648,7 +849,7 @@ export async function createRequestData(
         }
 
         if(request.body.mimeType === 'text/plain' || request.body.mimeType === 'application/json' || request.body.mimeType === 'application/graphql') {
-            body = await substituteEnvironmentVariables(environment, request.body.text ?? '', { cacheId })
+            body = await send.resolve(environment, request.body.text ?? '', 'body')
         }
 
         if(request.body.mimeType === 'application/octet-stream' && request.body.fileName instanceof File) {
@@ -662,40 +863,46 @@ export async function createRequestData(
     const requestUrl = request.url!
     const requestUrlWithoutQuery = request.parameters ? requestUrl.split('?')[0] : requestUrl
 
-    let urlWithEnvironmentVariablesSubstituted = await substituteEnvironmentVariables(environment, requestUrlWithoutQuery, { cacheId })
+    const buildUrl = async(resolveText: (text: string) => Promise<string>) => {
+        let urlWithEnvironmentVariablesSubstituted = await resolveText(requestUrlWithoutQuery)
 
-    if(request.pathParameters) {
-        for (const pathParameter of request.pathParameters.filter(item => !item.disabled)) {
-            const paramName = await substituteEnvironmentVariables(environment, pathParameter.name, { cacheId })
-            const paramValue = await substituteEnvironmentVariables(environment, pathParameter.value, { cacheId })
+        if(request.pathParameters) {
+            for (const pathParameter of request.pathParameters.filter(item => !item.disabled)) {
+                const paramName = await resolveText(pathParameter.name)
+                const paramValue = await resolveText(pathParameter.value)
 
-            urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted
-                .replaceAll(`:${paramName}`, paramValue)
-                .replaceAll(`{${paramName}}`, paramValue)
+                urlWithEnvironmentVariablesSubstituted = urlWithEnvironmentVariablesSubstituted
+                    .replaceAll(`:${paramName}`, paramValue)
+                    .replaceAll(`{${paramName}}`, paramValue)
+            }
         }
+
+        const builtUrl = new URL(urlWithEnvironmentVariablesSubstituted)
+
+        if(request.parameters) {
+            const enabledParams = request.parameters.filter(item => !item.disabled)
+            const queryParams = new URLSearchParams()
+
+            for (const param of enabledParams) {
+                const paramName = await resolveText(param.name)
+                const paramValue = await resolveText(param.value)
+
+                queryParams.append(
+                    paramName,
+                    decodeURIComponent(paramValue)
+                )
+            }
+
+            // appended as text instead of through url.searchParams, which would re-encode the query the variable resolved to
+            if(enabledParams.length > 0) {
+                builtUrl.search = builtUrl.search + (builtUrl.search ? '&' : '?') + queryParams.toString()
+            }
+        }
+
+        return builtUrl
     }
 
-    const url = new URL(urlWithEnvironmentVariablesSubstituted)
-
-    if(request.parameters) {
-        const enabledParams = request.parameters.filter(item => !item.disabled)
-        const queryParams = new URLSearchParams()
-
-        for (const param of enabledParams) {
-            const paramName = await substituteEnvironmentVariables(environment, param.name, { cacheId })
-            const paramValue = await substituteEnvironmentVariables(environment, param.value, { cacheId })
-
-            queryParams.append(
-                paramName,
-                decodeURIComponent(paramValue)
-            )
-        }
-
-        // appended as text instead of through url.searchParams, which would re-encode the query the variable resolved to
-        if(enabledParams.length > 0) {
-            url.search = url.search + (url.search ? '&' : '?') + queryParams.toString()
-        }
-    }
+    const url = await send.resolveUrl(environment, buildUrl)
 
     const headers: Record<string, string | any> = {}
 
@@ -714,52 +921,48 @@ export async function createRequestData(
         headers[headerName] = headerValue
     }
 
+    // sent as written, as they always were, apart from prompt tags
     if('GLOBAL_HEADERS' in environment) {
-        Object.keys(environment.GLOBAL_HEADERS).forEach(header => {
-            setHeader(header, environment.GLOBAL_HEADERS[header])
-        })
+        for(const [name, value] of Object.entries(environment.GLOBAL_HEADERS)) {
+            const header = typeof value === 'string' ? await send.resolveHeader(environment, name, [value], () => false, true) : null
+            setHeader(header?.nameResolved ?? name, header?.valuesResolved[0] ?? value as string)
+        }
     }
 
     if('headers' in request && request.headers !== undefined) {
         const enabledHeaders = request.headers.filter(header => !header.disabled)
         for(const header of enabledHeaders) {
-            const headerName = await substituteEnvironmentVariables(environment, header.name, { cacheId })
-            const headerValue = await substituteEnvironmentVariables(environment, header.value, { cacheId })
+            // a header without a name is not sent, nor content-type for multipart/form-data
+            const resolvedHeader = await send.resolveHeader(environment, header.name, [header.value], headerName => headerName === '' || (body instanceof FormData && headerName.toLowerCase() === 'content-type'))
 
-            if(body instanceof FormData && headerName.toLowerCase() === 'content-type') { // exclude content-type header for multipart/form-data
+            if(resolvedHeader === null) {
                 continue
             }
 
-            if(headerName !== '') {
-                const existingHeaderName = findHeaderName(headers, headerName)
-                if(existingHeaderName !== undefined) {
-                    //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
-                    setHeader(headerName, `${headers[existingHeaderName]}, ${headerValue}`)
-                } else {
-                    setHeader(headerName, headerValue)
-                }
+            const { nameResolved: headerName, valuesResolved: [headerValue] } = resolvedHeader
+
+            const existingHeaderName = findHeaderName(headers, headerName)
+            if(existingHeaderName !== undefined) {
+                //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
+                setHeader(headerName, `${headers[existingHeaderName]}, ${headerValue}`)
+            } else {
+                setHeader(headerName, headerValue)
             }
         }
     }
 
-    // eslint-disable-next-line prefer-const
-    for(let [headerName, headerValues] of Object.entries(parentHeaders)) {
-        headerName = await substituteEnvironmentVariables(environment, headerName, { cacheId })
-        if(findHeaderName(headers, headerName) !== undefined) {
-            continue //ignore parent headers
+    for(const [name, values] of Object.entries(parentHeaders)) {
+        // the request's own header of the same name wins
+        const parentHeader = await send.resolveHeader(environment, name, values, headerName => findHeaderName(headers, headerName) !== undefined)
+
+        if(parentHeader !== null) {
+            headers[parentHeader.nameResolved] = parentHeader.valuesResolved.join(', ')
         }
-        const buffer = []
-        for(const value of headerValues) {
-            const headerValue = await substituteEnvironmentVariables(environment, value, { cacheId })
-            buffer.push(headerValue)
-        }
-        const mergedValues = buffer.join(', ')
-        headers[headerName] = mergedValues
     }
 
     const setAuthentication = async(authentication: RequestAuthentication) => {
-        const authorization = await resolveAuthentication(cacheId, authentication, environment)
         const existingHeaderName = findHeaderName(headers, 'Authorization')
+        const authorization = await resolveAuthentication(send, authentication, environment, existingHeaderName ?? 'Authorization')
 
         // a typed Authorization header and the Auth tab's are sent together, as the transports joined them when the
         // typed one was a separate lowercase key
@@ -781,6 +984,23 @@ export async function createRequestData(
         headers,
         body,
     }
+}
+
+// says what a masked prompt left out of a saved request and why, such as "Left out because a masked prompt was used
+// there: the Authorization header and the body"
+export function describeMaskedPromptOmitted(maskedPromptOmitted: MaskedPromptOmitted) {
+    if(maskedPromptOmitted.reason === 'script-read') {
+        return 'Left out because a script read a masked prompt: the URL (shown as written), the headers, the body and the test names and errors'
+    }
+
+    const parts = [
+        ...(maskedPromptOmitted.url === 'masked' ? ['the masked values in the URL (shown as ******)'] : []),
+        ...(maskedPromptOmitted.url === 'written' ? ['the URL (shown as written)'] : []),
+        ...maskedPromptOmitted.headerNames.map(name => `the ${name} header`),
+        ...(maskedPromptOmitted.body ? ['the body'] : []),
+    ]
+
+    return `Left out because a masked prompt was used there: ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts.join('')}`
 }
 
 function setDefaultUserAgent(headers: Record<string, string>) {
@@ -813,8 +1033,11 @@ export async function handleRequest(
         testResults: [],
     }
 
+    // what a masked prompt left out of the saved copy is known once the request is prepared
+    const send = new SendResolver(request.workspaceId)
+
     try {
-        const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation)
+        const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation, send)
 
         setDefaultUserAgent(headers)
 
@@ -904,7 +1127,7 @@ export async function handleRequest(
         }
 
         for(const plugin of plugins) {
-            const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults, plugin.collectionId)
+            const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults, plugin.collectionId, send)
 
             state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : `${plugin.name} (Post Request)`
 
@@ -919,7 +1142,8 @@ export async function handleRequest(
 
         responseToSend.testResults = state.testResults
 
-        return responseToSend
+        // after the scripts, which still read the resolved url
+        return send.omitMaskedPromptParts(responseToSend, request)
     } catch(e: any) {
         console.error(e)
 
@@ -2315,18 +2539,21 @@ export function describeOAuthTokenError(error: any, accessTokenUrl: string): str
     return message
 }
 
-export async function resolveAuthentication(cacheId: string, authentication: RequestAuthentication, environment: any) {
+// headerName is the header the auth is sent in
+export async function resolveAuthentication(send: SendResolver, authentication: RequestAuthentication, environment: any, headerName: string) {
+    const part = { header: headerName }
+
     if(authentication.type === 'basic') {
         return generateBasicAuthString(
-            await substituteEnvironmentVariables(environment, authentication.username ?? '', { cacheId }),
-            await substituteEnvironmentVariables(environment, authentication.password ?? '', { cacheId })
+            await send.resolve(environment, authentication.username ?? '', part),
+            await send.resolve(environment, authentication.password ?? '', part)
         )
     }
 
     if(authentication.type === 'bearer' || authentication.type === 'oauth2') {
         const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
         const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
-        return `${await substituteEnvironmentVariables(environment, authenticationBearerPrefix, { cacheId })} ${await substituteEnvironmentVariables(environment, authenticationBearerToken, { cacheId })}`
+        return `${await send.resolve(environment, authenticationBearerPrefix, part)} ${await send.resolve(environment, authenticationBearerToken, part)}`
     }
 }
 

@@ -272,6 +272,11 @@ export default {
                 label: 'response()',
                 type: 'function',
                 apply: snippet('{% response() %}')
+            },
+            {
+                label: 'prompt()',
+                type: 'function',
+                apply: snippet('{% prompt() %}')
             }
         ],
     },

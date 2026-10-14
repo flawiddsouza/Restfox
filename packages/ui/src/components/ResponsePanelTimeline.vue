@@ -8,7 +8,7 @@
 
 <script>
 import CodeMirrorResponsePanelPreview from '@/components/CodeMirrorResponsePanelPreview.vue'
-import { dateFormat, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
+import { dateFormat, describeMaskedPromptOmitted, getStatusText, humanFriendlySize, uriParse } from '@/helpers'
 import { bufferToString } from '@/utils/response'
 
 export default {
@@ -27,15 +27,23 @@ export default {
             try {
                 const uri = response.request.query ? response.url + response.request.query : response.url
                 const preparationInfo = `* Preparing request to ${ uri }\n* Current time is ${new Date(dateFormat(response.createdAt, true)).toISOString()}\n`
-                const uriInfo = uriParse(uri)
+
+                const maskedPromptOmitted = response.request.maskedPromptOmitted
 
                 let requestInfo = ''
+
+                if(maskedPromptOmitted) {
+                    requestInfo += `* ${describeMaskedPromptOmitted(maskedPromptOmitted)}\n`
+                }
 
                 if(!response.request.headersSent) {
                     requestInfo += '* Request headers below are as configured, headers the transport adds or drops are not shown\n'
                 }
 
-                requestInfo += `> ${response.request.method} ${uriInfo.search !== '' ? uriInfo.pathname + uriInfo.search : uriInfo.pathname}\n`
+                // a url saved as written may not parse, such as {{ BASE_URL }}/items
+                const uriInfo = maskedPromptOmitted && (maskedPromptOmitted.reason === 'script-read' || maskedPromptOmitted.url === 'written') ? null : uriParse(uri)
+
+                requestInfo += `> ${response.request.method} ${uriInfo === null ? uri : uriInfo.search !== '' ? uriInfo.pathname + uriInfo.search : uriInfo.pathname}\n`
 
                 if(response.request.headersSent) {
                     // the transport reported the headers it put on the wire, host and anything it added are in this list
@@ -43,13 +51,19 @@ export default {
                         requestInfo += `> ${name}: ${value}\n`
                     }
                 } else {
-                    requestInfo += `> Host: ${uriInfo.host}\n`
+                    if(uriInfo !== null) {
+                        requestInfo += `> Host: ${uriInfo.host}\n`
+                    }
 
                     for (const [key, value] of Object.entries(response.request.headers)) {
                         if (key && value) {
                             requestInfo += `> ${key}: ${value}\n`
                         }
                     }
+                }
+
+                for (const name of maskedPromptOmitted?.reason === 'masked-field' ? maskedPromptOmitted.headerNames : []) {
+                    requestInfo += `> ${name}: (left out)\n`
                 }
 
                 if(response.request.body) {

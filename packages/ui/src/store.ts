@@ -167,7 +167,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
             environment[varName] = dotEnv[key]
         })
         // substitute process.env variables in workspace environment
-        environment = JSON.parse(await substituteEnvironmentVariables(environment, JSON.stringify(environment)))
+        environment = JSON.parse(await substituteEnvironmentVariables(environment, JSON.stringify(environment), { resolvePromptTags: false }))
     }
 
     const headers: Record<string, string[]> = {}
@@ -176,7 +176,8 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
     for(const parent of requestParentArray) {
         if(parent.environment) {
             let tempEnvironment = JSON.stringify(parent.environment)
-            tempEnvironment = await substituteEnvironmentVariables(environment, tempEnvironment)
+            // a prompt tag is left for the send, this runs for every open tab on each tab switch
+            tempEnvironment = await substituteEnvironmentVariables(environment, tempEnvironment, { resolvePromptTags: false })
             tempEnvironment = JSON.parse(tempEnvironment)
             Object.assign(environment, tempEnvironment)
         }

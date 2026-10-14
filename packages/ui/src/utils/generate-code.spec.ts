@@ -81,3 +81,14 @@ describe(`${generateCode.name}`, () => {
         assert.equal(input, expectedOutput)
     })
 })
+
+test('a prompt in the url and the body asks once', async() => {
+    const createPrompt = vi.fn(async() => 'v1')
+    ;(window as any).createPrompt = createPrompt
+    const tag = `{% prompt(title='Version') %}`
+    const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'r', method: 'POST', url: `https://example.test/${tag}`, body: { mimeType: 'application/json', text: `{"v":"${tag}"}` } }
+    const code = await generateCode(request as any, {}, {}, undefined, 'shell', 'curl')
+    assert.include(code, 'https://example.test/v1')
+    assert.include(code, '{"v":"v1"}')
+    assert.equal(createPrompt.mock.calls.length, 1)
+})

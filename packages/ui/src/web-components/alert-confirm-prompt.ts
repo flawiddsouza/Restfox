@@ -1,15 +1,33 @@
+// titles hold names from collection data, and a prompt tag's title, label and default come from it, which may have been imported
+function escapeHtml(text: string) {
+    return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+}
+
+interface PromptOptions {
+    label?: string
+    mask?: boolean
+}
+
 class AlertConfirmPrompt extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({ mode: 'open' })
     }
 
-    createDialog = (type: 'prompt' | 'confirm' | 'alert', title: string, defaultValue = '', selectList = []) => {
+    createDialog = (type: 'prompt' | 'confirm' | 'alert', title: string, defaultValue = '', selectList = [], options?: PromptOptions) => {
         const div = document.createElement('div')
 
         let inputHtml = ''
         if (type === 'prompt') {
-            if (title.toLowerCase().includes('color')) {
+            // given options, a plain text or password box, whatever the title says
+            if (options) {
+                inputHtml = `
+                <div style="margin-top: 0.5rem;">
+                    ${options.label !== undefined ? `<div class="dialog-label">${escapeHtml(options.label)}</div>` : ''}
+                    <input type="${options.mask ? 'password' : 'text'}" value="${escapeHtml(defaultValue ?? '')}" class="dialog-input" id="dialog-input" spellcheck="false" autocomplete="off">
+                </div>
+                `
+            } else if (title.toLowerCase().includes('color')) {
                 inputHtml = `
                 <div style="margin-top: 0.5rem;">
                     <input type="color" value="${defaultValue ?? '#000000'}" class="color-preview" id="dialog-color-input">
@@ -39,7 +57,7 @@ class AlertConfirmPrompt extends HTMLElement {
         div.innerHTML = `
         <div class="dialog-container">
             <div class="dialog dialog-${type}">
-                <div>${title}</div>
+                <div>${escapeHtml(title)}</div>
                 ${inputHtml}
                 <div style="margin-top: 1rem; text-align: right; user-select: none;">
                     <button class="dialog-primary-button" id="dialog-confirm">OK</button>
@@ -58,7 +76,7 @@ class AlertConfirmPrompt extends HTMLElement {
         shadowRoot.querySelector('#root')?.appendChild(div)
 
         if (type === 'prompt') {
-            if (title.toLowerCase().includes('color')) {
+            if (title.toLowerCase().includes('color') && !options) {
                 shadowRoot.getElementById('dialog-color-input')?.focus()
             } else {
                 shadowRoot.getElementById('dialog-input')?.focus()
@@ -82,7 +100,7 @@ class AlertConfirmPrompt extends HTMLElement {
 
             const confirm = () => {
                 if (type === 'prompt') {
-                    if (title.toLowerCase().includes('color')) {
+                    if (title.toLowerCase().includes('color') && !options) {
                         resolve((shadowRoot.getElementById('dialog-color-input') as HTMLInputElement).value)
                     } else {
                         resolve((shadowRoot.getElementById('dialog-input') as HTMLInputElement).value)
@@ -113,7 +131,7 @@ class AlertConfirmPrompt extends HTMLElement {
 
                 // Trap focus inside dialog
                 if (e.type === 'keydown') {
-                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled), input[type="color"]:not(:disabled)') as NodeListOf<HTMLElement>
+                    const focusableEls = div.querySelectorAll('button:not(:disabled), input[type="text"]:not(:disabled), input[type="password"]:not(:disabled), input[type="color"]:not(:disabled)') as NodeListOf<HTMLElement>
                     const firstFocusableEl = focusableEls[0]
                     const lastFocusableEl = focusableEls[focusableEls.length - 1]
 
@@ -153,8 +171,8 @@ class AlertConfirmPrompt extends HTMLElement {
         })
     }
 
-    createPrompt = (title: string, defaultValue = '', selectList = []) => {
-        return this.createDialog('prompt', title, defaultValue, selectList)
+    createPrompt = (title: string, defaultValue = '', selectList = [], options?: PromptOptions) => {
+        return this.createDialog('prompt', title, defaultValue, selectList, options)
     }
 
     createConfirm = (title: string) => {
@@ -240,6 +258,11 @@ class AlertConfirmPrompt extends HTMLElement {
             caret-color: var(--modal-caret-color);
             background-color: var(--modal-background-color);
             color: var(--text-color);
+        }
+
+        .dialog-label {
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
         }
 
         .color-preview {
