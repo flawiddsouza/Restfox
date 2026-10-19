@@ -175,24 +175,33 @@ jobs:
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/chromewebstore
           create_credentials_file: false
-      # Uploads as a draft, publishing stays a manual Submit for review in the store dashboard
       - name: Upload to the Chrome Web Store
         env:
           TOKEN: ${{ steps.google.outputs.access_token }}
           ITEM_URL: https://chromewebstore.googleapis.com/v2/publishers/c9838cf7-7295-4639-8a19-3ebf3ff634dd/items/fihmegnabgglklkppphibngblkomlhcn
           UPLOAD_URL: https://chromewebstore.googleapis.com/upload/v2/publishers/c9838cf7-7295-4639-8a19-3ebf3ff634dd/items/fihmegnabgglklkppphibngblkomlhcn
         run: |
-          response=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" -T packages/browser-extension/v3-app/src.zip "$UPLOAD_URL:upload")
+          response=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" -T packages/browser-extension/v3-app/src.zip "$UPLOAD_URL:upload") || { echo "$response"; exit 1; }
           echo "$response"
           state=$(echo "$response" | jq -r '.uploadState')
           for attempt in $(seq 1 30); do
             [ "$state" != "IN_PROGRESS" ] && break
             sleep 10
-            response=$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$ITEM_URL:fetchStatus")
+            response=$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$ITEM_URL:fetchStatus") || { echo "$response"; exit 1; }
             echo "$response"
             state=$(echo "$response" | jq -r '.lastAsyncUploadState')
           done
           [ "$state" = "SUCCEEDED" ] || { echo "Upload did not succeed: $state"; exit 1; }
+      # Google reviews the upload and, once approved, holds it until the user clicks Publish in the store dashboard
+      - name: Submit for review
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+          ITEM_URL: https://chromewebstore.googleapis.com/v2/publishers/c9838cf7-7295-4639-8a19-3ebf3ff634dd/items/fihmegnabgglklkppphibngblkomlhcn
+        run: |
+          response=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"publishType": "STAGED_PUBLISH"}' "$ITEM_URL:publish") || { echo "$response"; exit 1; }
+          echo "$response"
+          state=$(echo "$response" | jq -r '.state')
+          [ "$state" = "PENDING_REVIEW" ] || [ "$state" = "STAGED" ] || { echo "Submission was not accepted: $state"; exit 1; }
   build-docker-image:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-docker-image' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
