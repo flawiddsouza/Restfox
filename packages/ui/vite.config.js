@@ -1,13 +1,39 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
+import fs from 'fs'
 import copy from 'rollup-plugin-copy'
 import { VitePWA } from 'vite-plugin-pwa'
 import { ViteRevisionPlugin } from './vite-plugin-revision'
 import checker from 'vite-plugin-checker'
 
+// Copies the build into another package's folder, emptied first so files of
+// earlier builds do not pile up there
+function copyBuildTo(...destinations) {
+    return [
+        {
+            name: 'empty-copy-destinations',
+            apply: 'build',
+            buildStart() {
+                for(const destination of destinations) {
+                    fs.rmSync(path.resolve(__dirname, destination), { recursive: true, force: true })
+                }
+            },
+        },
+        copy({
+            targets: destinations.map(dest => ({ src: 'dist/*', dest })),
+            hook: 'writeBundle'
+        }),
+    ]
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+    // The offline cache and its update prompt are for the web build. The other
+    // builds carry their files with them and update through their own channel,
+    // and Electron's file:// pages cannot register a service worker at all
+    const usesOfflineCache = !['web-standalone', 'desktop', 'desktop-electron'].includes(mode)
+
     const config = {
         plugins: [
             process.env.VITEST ? null : ViteRevisionPlugin(mode),
@@ -18,7 +44,7 @@ export default defineConfig(({ mode }) => {
                     }
                 }
             }),
-            mode !== 'web-standalone' ? VitePWA({
+            usesOfflineCache ? VitePWA({
                 includeAssets: [
                     'favicon.png',
                     'favicon.ico',
@@ -57,7 +83,7 @@ export default defineConfig(({ mode }) => {
                 }
             }) : {
                 // Stub for virtual:pwa-register/vue so ReloadPrompt.vue compiles
-                // without VitePWA generating a service worker in web-standalone mode
+                // in the builds without the offline cache
                 name: 'pwa-stub',
                 resolveId(id) {
                     if (id === 'virtual:pwa-register/vue') return id
@@ -109,38 +135,15 @@ export default defineConfig(({ mode }) => {
     }
 
     if(mode === 'desktop') {
-        config.plugins.push(
-            copy({
-                targets: [
-                    { src: 'dist/*', dest: '../electron/ui' },
-                    { src: 'dist/*', dest: '../tauri/ui' },
-                    { src: 'dist/*', dest: '../browser-extension/v3-app/src/ui' }
-                ],
-                hook: 'writeBundle'
-            })
-        )
+        config.plugins.push(...copyBuildTo('../electron/ui', '../tauri/ui', '../browser-extension/v3-app/src/ui'))
     }
 
     if(mode === 'desktop-electron') {
-        config.plugins.push(
-            copy({
-                targets: [
-                    { src: 'dist/*', dest: '../electron/ui' },
-                ],
-                hook: 'writeBundle'
-            })
-        )
+        config.plugins.push(...copyBuildTo('../electron/ui'))
     }
 
     if(mode === 'web-standalone') {
-        config.plugins.push(
-            copy({
-                targets: [
-                    { src: 'dist/*', dest: '../web-standalone/public' },
-                ],
-                hook: 'writeBundle'
-            })
-        )
+        config.plugins.push(...copyBuildTo('../web-standalone/public'))
     }
 
     return config

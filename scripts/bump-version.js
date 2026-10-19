@@ -51,11 +51,29 @@ if (args.includes('--major')) {
 
 packageJSON.version = `${major}.${minor}.${patch}`
 
-const chromeAppManifestVersion = chromeAppManifest.version.split('.')
-const chromeAppManifestMajor = Number(chromeAppManifestVersion[0])
-const chromeAppManifestMinor = Number(chromeAppManifestVersion[1])
-const chromeAppManifestPatch = Number(chromeAppManifestVersion[2])
-chromeAppManifest.version = `${chromeAppManifestMajor}.${chromeAppManifestMinor}.${chromeAppManifestPatch+1}`
+// Chrome compares versions number by number from the left, a missing number counting as 0
+function isNewerVersion(version, than) {
+    const versionParts = version.split('.').map(Number)
+    const thanParts = than.split('.').map(Number)
+    for(let i = 0; i < Math.max(versionParts.length, thanParts.length); i++) {
+        const difference = (versionParts[i] ?? 0) - (thanParts[i] ?? 0)
+        if(difference !== 0) {
+            return difference > 0
+        }
+    }
+    return false
+}
+
+// An extension update must be newer than what users have, so the extension keeps counting from where the Chrome Web
+// Store has it until the Restfox version overtakes that count, and takes the Restfox version from then on.
+// version_name is what people see, so it always shows the Restfox version.
+if(isNewerVersion(packageJSON.version, chromeAppManifest.version)) {
+    chromeAppManifest.version = packageJSON.version
+} else {
+    const [chromeAppManifestMajor, chromeAppManifestMinor, chromeAppManifestPatch] = chromeAppManifest.version.split('.').map(Number)
+    chromeAppManifest.version = `${chromeAppManifestMajor}.${chromeAppManifestMinor}.${chromeAppManifestPatch + 1}`
+}
+chromeAppManifest.version_name = packageJSON.version
 
 writeFileSync(pathToElectronPackageJSON, JSON.stringify(packageJSON, null, 4) + '\n')
 writeFileSync(pathToChromeAppManifest, JSON.stringify(chromeAppManifest, null, 4) + '\n')

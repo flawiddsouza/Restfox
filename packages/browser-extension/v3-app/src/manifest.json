@@ -2,11 +2,14 @@
     "name": "Restfox",
     "description": "Minimalistic HTTP Client for API Development and Testing",
     "version": "1.0.645",
+    "version_name": "0.40.0",
     "manifest_version": 3,
     "icons": {
         "512": "icons/favicon.png"
     },
-    "permissions": [],
+    "permissions": [
+        "unlimitedStorage"
+    ],
     "host_permissions": [
         "*://*/*"
     ],
