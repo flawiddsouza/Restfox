@@ -576,6 +576,55 @@ describe(`Function: ${handleRequest.name}`, () => {
 
         await expect(promise).resolves.toMatchObject({ error: 'Error: Request Timed Out' })
     })
+
+    const sendRequest = (signal: AbortSignal) => handleRequest(
+        {
+            _id: 'request-id',
+            _type: 'request',
+            name: 'Request',
+            parentId: null,
+            workspaceId: 'workspace-id',
+            url: 'https://example.com',
+            method: 'GET',
+        } as CollectionItem,
+        {},
+        {},
+        undefined,
+        async() => undefined,
+        [],
+        null,
+        signal,
+        {
+            electronSwitchToChromiumFetch: false,
+            disableSSLVerification: false,
+            requestTimeout: 0,
+        }
+    )
+
+    test('a cancel the user asked for is reported in the panel, not logged as an error', async() => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.stubGlobal('fetch', (_url: string, init: FetchInitWithSignal) => new Promise((_resolve, reject) => {
+            if(init.signal.aborted) {
+                reject(init.signal.reason)
+            }
+            init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true })
+        }))
+
+        const abortController = new AbortController()
+        const promise = sendRequest(abortController.signal)
+        abortController.abort()
+
+        await expect(promise).resolves.toMatchObject({ error: 'Error: Request Cancelled' })
+        expect(consoleError).not.toHaveBeenCalled()
+    })
+
+    test('a request that fails is still logged as an error', async() => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')))
+
+        await expect(sendRequest(new AbortController().signal)).resolves.toMatchObject({ error: 'Error: Request failed' })
+        expect(consoleError).toHaveBeenCalled()
+    })
 })
 
 describe('convertPostmanAuthToRestfoxAuth', () => {
@@ -984,6 +1033,33 @@ describe(`Function: ${createRequestData.name}`, () => {
     test('leaves the encoding of a signed url from a variable untouched when appending Query table rows', async() => {
         const result = await prepare('{{SIGNED_URL}}?part=1', [{ name: 'part', value: '1' }], { SIGNED_URL: 'https://example.test/f?sig=a%2Fb%3D&name=x+y' })
         expect(result.url.href).toBe('https://example.test/f?sig=a%2Fb%3D&name=x+y&part=1')
+    })
+
+    test('sends a %20 typed in the query as %20, and a typed + still as a literal plus', async() => {
+        const result = await prepare('https://example.test/path?b=two%20words&d=a+b&c=x%2By', [
+            { name: 'b', value: 'two%20words' },
+            { name: 'd', value: 'a+b' },
+            { name: 'c', value: 'x%2By' },
+        ])
+        expect(result.url.href).toBe('https://example.test/path?b=two%20words&d=a%2Bb&c=x%2By')
+    })
+
+    test('encodes a space and non-ASCII typed in the Query table', async() => {
+        const result = await prepare('https://example.test/path?q=hello world&s=é', [
+            { name: 'q', value: 'hello world' },
+            { name: 's', value: 'é' },
+        ])
+        expect(result.url.href).toBe('https://example.test/path?q=hello%20world&s=%C3%A9')
+    })
+
+    test('sends a % that starts no escape as %25 instead of failing the send', async() => {
+        const result = await prepare('https://example.test/path?p=100%', [{ name: 'p', value: '100%' }])
+        expect(result.url.href).toBe('https://example.test/path?p=100%25')
+    })
+
+    test('reads a parameter name as typed in the url, like its value', async() => {
+        const result = await prepare('https://example.test/path?a%20b=x', [{ name: 'a%20b', value: 'x' }])
+        expect(result.url.href).toBe('https://example.test/path?a%20b=x')
     })
 })
 

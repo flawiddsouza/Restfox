@@ -430,7 +430,8 @@ function checkIfCodeRequiresAsync(code: string) {
 
 const globals = {
     console: {
-        log: console.log
+        // looked up on each call, since main.ts replaces console.log after this file loads, to copy lines into Logs
+        log: (...args: unknown[]) => console.log(...args)
     },
     expect: chai.expect,
     assert: chai.assert,

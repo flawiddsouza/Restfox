@@ -881,21 +881,29 @@ export async function createRequestData(
 
         if(request.parameters) {
             const enabledParams = request.parameters.filter(item => !item.disabled)
-            const queryParams = new URLSearchParams()
+            const queryParts: string[] = []
+
+            // the rows hold the query text as typed in the url, so each part is decoded and encoded again: a space goes out
+            // as %20 rather than the form encoding's +, which a signed url's exact text needs, and a typed + still goes out
+            // as %2B, as it always did; a % that starts no escape is kept as typed instead of failing the send
+            const encodeQueryPart = (text: string) => {
+                try {
+                    return encodeURIComponent(decodeURIComponent(text))
+                } catch {
+                    return encodeURIComponent(text)
+                }
+            }
 
             for (const param of enabledParams) {
                 const paramName = await resolveText(param.name)
                 const paramValue = await resolveText(param.value)
 
-                queryParams.append(
-                    paramName,
-                    decodeURIComponent(paramValue)
-                )
+                queryParts.push(`${encodeQueryPart(paramName)}=${encodeQueryPart(paramValue)}`)
             }
 
             // appended as text instead of through url.searchParams, which would re-encode the query the variable resolved to
             if(enabledParams.length > 0) {
-                builtUrl.search = builtUrl.search + (builtUrl.search ? '&' : '?') + queryParams.toString()
+                builtUrl.search = builtUrl.search + (builtUrl.search ? '&' : '?') + queryParts.join('&')
             }
         }
 
@@ -1145,7 +1153,10 @@ export async function handleRequest(
         // after the scripts, which still read the resolved url
         return send.omitMaskedPromptParts(responseToSend, request)
     } catch(e: any) {
-        console.error(e)
+        // a cancel the user asked for is reported in the panel, every other failure also goes to Logs
+        if(e?.name !== 'AbortError') {
+            console.error(e)
+        }
 
         let error = 'Error: Request failed'
 

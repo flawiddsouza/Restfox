@@ -215,3 +215,25 @@ test('rf.getEnvVar returns text that only looks like a tag as written, as before
     const { expose } = await createRequestContextForPlugin(new SendResolver('w'), request, environment, () => undefined, [], null)
     expect(expose.rf.getEnvVar('TEMPLATE')).toBe('{% my-tag() %} and {% raw %}')
 })
+
+// main.ts replaces console.log after plugin.ts has loaded, to copy every line into Logs
+test('console.log in a script goes to the console.log in place when the script runs', async() => {
+    const { expose } = await createExpose()
+    const logged: unknown[][] = []
+    const originalLog = console.log
+    console.log = (...args: unknown[]) => {
+        logged.push(args)
+    }
+
+    try {
+        await usePlugin(expose, {
+            name: 'Test Plugin',
+            code: `console.log('from the script', 42)`,
+            parentPathForReadFile: null,
+        })
+    } finally {
+        console.log = originalLog
+    }
+
+    expect(logged).toContainEqual(['from the script', 42])
+})
