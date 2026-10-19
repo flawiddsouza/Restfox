@@ -7,7 +7,7 @@ module.exports = {
             'entitlements-inherit': 'entitlements.plist',
             'gatekeeper-assess': false,
             hardenedRuntime: true,
-            identity: 'Developer ID Application: Athanasios Plastiras (Y46L589C5C)'
+            identity: 'Developer ID Application: Flawid DSouza (6BX4777J5K)'
         },
         osxNotarize: {
             tool: 'notarytool',

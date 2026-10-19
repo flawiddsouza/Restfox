@@ -14,6 +14,9 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   NODE_VERSION: 26
+  # Electron Forge unpacks Electron with extract-zip, which stops halfway on Node 26 and exits 0, so the Electron jobs
+  # would pass with nothing built (nodejs/node#63487). Node only runs the build tools there, the app runs on Electron's.
+  ELECTRON_BUILD_NODE_VERSION: 24
 
 jobs:
   build-electron-linux:
@@ -26,7 +29,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ env.ELECTRON_BUILD_NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -52,7 +55,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ env.ELECTRON_BUILD_NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -78,7 +81,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ env.ELECTRON_BUILD_NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -109,7 +112,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ env.ELECTRON_BUILD_NODE_VERSION }}
       - name: Build UI
         working-directory: ./packages/ui
         run: |
@@ -134,6 +137,62 @@ jobs:
       - name: Upload snap to GitHub release
         run: |
           node scripts/upload-file-to-latest-draft-release.js ./packages/electron/dist/${{ env.SNAP_FILE_NAME }}
+  publish-chrome-extension:
+    # Google admits the store sign-in only for a v tag, so a manual run on a branch skips this job
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'publish-chrome-extension' || github.event.inputs.job-to-run == '') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build UI
+        working-directory: ./packages/ui
+        run: |
+          npm ci
+          npm run build-desktop
+      - name: Zip the extension app
+        working-directory: ./packages/browser-extension/v3-app
+        run: npm run zip
+      - name: Keep the zip with the run
+        uses: actions/upload-artifact@v7
+        with:
+          name: restfox-extension-app
+          path: packages/browser-extension/v3-app/src.zip
+      # Google only lets main.yml sign in for a v tag of this repository, see AGENTS.md
+      - name: Sign in to Google as the store service account
+        id: google
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/564579398954/locations/global/workloadIdentityPools/github/providers/restfox-repo
+          service_account: restfox-release@chrome-web-store-api-access.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          create_credentials_file: false
+      # Uploads as a draft, publishing stays a manual Submit for review in the store dashboard
+      - name: Upload to the Chrome Web Store
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+          ITEM_URL: https://chromewebstore.googleapis.com/v2/publishers/c9838cf7-7295-4639-8a19-3ebf3ff634dd/items/fihmegnabgglklkppphibngblkomlhcn
+          UPLOAD_URL: https://chromewebstore.googleapis.com/upload/v2/publishers/c9838cf7-7295-4639-8a19-3ebf3ff634dd/items/fihmegnabgglklkppphibngblkomlhcn
+        run: |
+          response=$(curl --fail-with-body -sS -X POST -H "Authorization: Bearer $TOKEN" -T packages/browser-extension/v3-app/src.zip "$UPLOAD_URL:upload")
+          echo "$response"
+          state=$(echo "$response" | jq -r '.uploadState')
+          for attempt in $(seq 1 30); do
+            [ "$state" != "IN_PROGRESS" ] && break
+            sleep 10
+            response=$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$ITEM_URL:fetchStatus")
+            echo "$response"
+            state=$(echo "$response" | jq -r '.lastAsyncUploadState')
+          done
+          [ "$state" = "SUCCEEDED" ] || { echo "Upload did not succeed: $state"; exit 1; }
   build-docker-image:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-docker-image' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
