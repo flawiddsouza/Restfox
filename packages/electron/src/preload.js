@@ -34,6 +34,7 @@ const ipcFunctions = [
     'setCACertificates',
     'setProxy',
     'updateElectronApp',
+    'getInstallInfo',
 ]
 
 const electronIPC = ipcFunctions.reduce((acc, funcName) => {

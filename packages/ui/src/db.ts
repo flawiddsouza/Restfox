@@ -56,6 +56,7 @@ const webStandaloneIPC = {
     deletePluginsByCollectionIds:       (workspace: any, collectionIds: string[]) => callWebStandaloneAPI('deletePluginsByCollectionIds', { workspace, collectionIds }),
     createPlugins:                      (workspace: any, plugins: any[]) => callWebStandaloneAPI('createPlugins', { workspace, plugins }),
     readFile:                           (filePath: string, workspaceLocation?: string) => callWebStandaloneAPI('readFile', { filePath, workspaceLocation }),
+    getInstallInfo:                     () => callWebStandaloneAPI('getInstallInfo', {}),
 }
 
 function resolveFileIPC() {

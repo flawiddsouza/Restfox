@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron')
 const { resolve } = require('path')
+const fs = require('fs')
 const contextMenu = require('electron-context-menu')
 const log = require('electron-log/main')
 const open = import('open')
@@ -10,6 +11,7 @@ const TaskQueue = require('./task-queue')
 const updateElectronApp = require('update-electron-app')
 const windowStateKeeper = require('./utils/window-state')
 const { trustSystemCACertificates } = require('./ca-certificates')
+const { getInstallKind } = require('./install-kind')
 
 Object.assign(console, log.functions)
 
@@ -38,8 +40,8 @@ function createWindow() {
         defaultWidth: parseInt(workAreaSize.width * 0.75),
         defaultHeight: parseInt(workAreaSize.height * 0.75),
         defaultMaximize: true,
-    };
-    const winState = windowStateKeeper(winStateOptions);
+    }
+    const winState = windowStateKeeper(winStateOptions)
 
     const win = new BrowserWindow({
         x: winState.x,
@@ -233,6 +235,17 @@ app.whenReady().then(async() => {
         console.log('ipcMain: updateElectronApp')
         updateElectronApp()
     })
+
+    ipcMain.handle('getInstallInfo', () => ({
+        appName: app.getName(),
+        installKind: getInstallKind({
+            isPackaged: app.isPackaged,
+            platform: process.platform,
+            env: process.env,
+            execPath: process.execPath,
+            fileExists: fs.existsSync,
+        }),
+    }))
 
     createWindow()
 

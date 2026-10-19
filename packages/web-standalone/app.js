@@ -563,6 +563,9 @@ app.post('/api/createPlugins',                    apiRoute(({ workspace, plugins
 // File read route
 app.post('/api/readFile',                         apiRoute(({ filePath, workspaceLocation }) => helpers.readFile(filePath, workspaceLocation)))
 
+// How this server was installed, for the page view analytics reports. The Docker image sets RESTFOX_INSTALL_KIND
+app.post('/api/getInstallInfo',                   apiRoute(() => ({ installKind: process.env.RESTFOX_INSTALL_KIND || 'node' })))
+
 // Directory browse route (web-standalone only)
 app.get('/api/browse', async (req, res) => {
     try {

@@ -20,11 +20,11 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-linux' || github.event.inputs.job-to-run == 'build-electron-snap' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
@@ -46,11 +46,11 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-electron-windows' || github.event.inputs.job-to-run == '' }}
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
@@ -68,15 +68,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-14 is arm64, macos-13 is x86_64 (so we get builds for both architectures)
+        # macos-26 is arm64, macos-26-intel is x86_64 (so we get builds for both architectures)
         # see https://github.com/actions/runner-images#available-images for more info
-        os: [macos-14, macos-13]
+        os: [macos-26, macos-26-intel]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
@@ -103,11 +103,11 @@ jobs:
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Build UI
@@ -138,7 +138,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.job-to-run == 'build-docker-image' || github.event.inputs.job-to-run == '' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Extract version from tag
@@ -148,7 +148,7 @@ jobs:
         run: |
           docker build -t flawiddsouza/restfox:${{ env.VERSION }} -t flawiddsouza/restfox:latest .
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -160,11 +160,11 @@ jobs:
     needs: [build-electron-linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Generate & Update Release Notes

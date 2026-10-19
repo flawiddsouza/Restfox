@@ -15,6 +15,7 @@ RUN npm ci
 
 # Stage 2: Copy the necessary files from the build stage and remove unnecessary files
 FROM node:26-alpine
+ENV RESTFOX_INSTALL_KIND=docker
 RUN mkdir -p /app/web-standalone/public
 WORKDIR /app/web-standalone
 VOLUME /app/data

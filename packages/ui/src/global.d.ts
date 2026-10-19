@@ -17,6 +17,11 @@ declare global {
     }
 }
 
+export interface InstallInfo {
+    installKind: string
+    appName?: string
+}
+
 export interface CollectionItem {
     _id: string
     _type: 'request' | 'request_group' | 'socket'

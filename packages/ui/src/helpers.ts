@@ -2221,6 +2221,20 @@ export function getVersion(): string {
     return version
 }
 
+// Names the build this page is, for page view analytics
+export function getBuild(): 'desktop' | 'web-standalone' | 'extension' | 'web' {
+    if(import.meta.env.MODE === 'desktop-electron') {
+        return 'desktop'
+    }
+    if(import.meta.env.MODE === 'web-standalone') {
+        return 'web-standalone'
+    }
+    if(window.location.protocol.endsWith('-extension:')) {
+        return 'extension'
+    }
+    return 'web'
+}
+
 export function uriParse(urlString: string): {
     protocol: string | null;
     host: string | null;

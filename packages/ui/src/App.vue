@@ -12,7 +12,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 </template>
 
 <script>
-import { getCollectionForWorkspace } from './db'
+import { getCollectionForWorkspace, fileIPC } from './db'
 import constants from './constants'
 import {
     checkHotkeyAgainstKeyEvent,
@@ -23,7 +23,10 @@ import {
     getSavedCACertificates,
     getSavedProxySettings,
     getProxySettingsInUse,
+    getVersion,
+    getBuild,
 } from './helpers'
+import { getAnalyticsPageUrl, sendPageView } from '@/utils/analytics'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
 
@@ -401,12 +404,9 @@ export default {
         }
 
         if(!savedDisablePageViewAnalyticsTracking) {
-            const script = document.createElement('script')
-            script.async = true
-            script.defer = true
-            script.dataset.websiteId = 'ed9e95fd-48af-4aac-a929-2a9f04ce9883'
-            script.src = 'https://umami.artelin.dev/umami-analytics.js'
-            document.body.appendChild(script)
+            // an older shell or server has no getInstallInfo
+            const installInfo = fileIPC?.getInstallInfo ? fileIPC.getInstallInfo().catch(() => null) : Promise.resolve(null)
+            installInfo.then(installInfo => sendPageView(getAnalyticsPageUrl(getBuild(), installInfo, getVersion())))
         }
 
         if(savedDisableSSLVerification) {
