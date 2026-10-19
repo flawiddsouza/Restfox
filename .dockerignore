@@ -1,0 +1,12 @@
+# Only what the Dockerfile adds, without generated folders, so a local build
+# gets the same files as a fresh checkout. A path the Dockerfile starts adding
+# goes in this list too.
+*
+!.git
+!docs
+!packages/electron/package.json
+!packages/ui
+!packages/web-standalone
+**/node_modules
+packages/ui/dist
+packages/web-standalone/public
