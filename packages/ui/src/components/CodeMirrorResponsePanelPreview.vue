@@ -74,7 +74,15 @@ export default {
             state: createState(this.modelValue, this),
             parent: this.$el
         })
-    }
+    },
+    methods: {
+        // through CodeMirror, which draws only the lines in view and so has to measure the new position itself
+        scrollToEnd() {
+            this.editor.dispatch({
+                effects: EditorView.scrollIntoView(this.editor.state.doc.length, { y: 'end' })
+            })
+        },
+    },
 }
 </script>
 

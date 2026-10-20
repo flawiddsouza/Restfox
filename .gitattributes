@@ -1,0 +1,5 @@
+# every text file is stored and checked out with LF line endings
+* text=auto eol=lf
+
+# real captures from Google, whose CRLF line endings the parser tests check
+packages/ui/test-data/event-streams/gemini-*.sse -text

@@ -794,7 +794,7 @@ export default {
     methods: {
         async sendRequest(value) {
             if(value === 'send') {
-                this.$store.dispatch('sendRequest', this.activeTab)
+                this.$store.dispatch('sendRequest', { collectionItem: this.activeTab, cancelEarlierSends: true })
                 if(this.isMobile) {
                     this.$store.commit('setActiveMobilePanel', 'response')
                 }
@@ -813,7 +813,7 @@ export default {
                         this.$store.commit('setActiveMobilePanel', 'response')
                     }
                     this.delayRequestSending = setTimeout(() => {
-                        this.$store.dispatch('sendRequest', this.activeTab)
+                        this.$store.dispatch('sendRequest', { collectionItem: this.activeTab, cancelEarlierSends: true })
                         this.delayRequestSending = null
                     }, this.delayRequestSending * 1000)
                 }

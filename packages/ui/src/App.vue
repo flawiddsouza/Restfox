@@ -198,7 +198,7 @@ export default {
                 event.preventDefault()
                 event.stopPropagation()
 
-                this.$store.dispatch('sendRequest', this.activeTab)
+                this.$store.dispatch('sendRequest', { collectionItem: this.activeTab, cancelEarlierSends: true })
 
                 return
             }

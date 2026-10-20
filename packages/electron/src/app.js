@@ -116,7 +116,42 @@ app.whenReady().then(async() => {
         await installExtension(VUEJS_DEVTOOLS)
     }
 
-    ipcMain.handle('sendRequest', (_, ...args) => requests.handleSendRequest(...args))
+    // the sends still running for each window. A reload or close leaves nothing to stop them, and a response that
+    // stays open, such as an event stream, would run on here, so they are cancelled then
+    const runningSendIds = new Map()
+
+    function trackSend(sender, requestId) {
+        let requestIds = runningSendIds.get(sender)
+        if(!requestIds) {
+            requestIds = new Set()
+            runningSendIds.set(sender, requestIds)
+            const cancelAll = () => {
+                requestIds.forEach(id => requests.cancelRequest(id))
+                requestIds.clear()
+            }
+            sender.on('did-navigate', cancelAll)
+            sender.once('destroyed', () => {
+                cancelAll()
+                runningSendIds.delete(sender)
+            })
+        }
+        requestIds.add(requestId)
+        return () => requestIds.delete(requestId)
+    }
+
+    // the response reaches the renderer as pushed requestEvent messages, the invoke reply carries nothing
+    ipcMain.handle('sendRequest', async(event, data) => {
+        const untrackSend = trackSend(event.sender, data.requestId)
+        try {
+            await requests.handleSendRequest(data, message => {
+                if(!event.sender.isDestroyed()) {
+                    event.sender.send('requestEvent', data.requestId, message)
+                }
+            })
+        } finally {
+            untrackSend()
+        }
+    })
     ipcMain.handle('cancelRequest', (_, ...args) => requests.cancelRequest(...args))
 
     const operationQueue = new TaskQueue()

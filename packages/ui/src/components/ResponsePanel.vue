@@ -8,7 +8,8 @@
             <button class="button" @click="cancelRequest">Cancel Request</button>
         </div>
     </div>
-    <template v-if="status !== 'not loaded' && response !== null">
+    <ResponsePanelStream v-if="status === 'receiving'" :tab-id="activeTab._id" :list-view-state="eventListViewStateFor(liveEventListViewStateKey)" />
+    <template v-else-if="status !== 'not loaded' && response !== null">
         <div class="response-panel-address-bar">
             <div class="response-panel-address-bar-tag-container">
                 <div
@@ -31,28 +32,31 @@
             </div>
         </div>
         <div class="response-panel-tabs">
-            <div
-                class="response-panel-tab"
-                :class="{
-                    'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name,
-                    'custom-dropdown': responsePanelTab.name === 'Preview'
-                }"
-                @click="handleTabClick(responsePanelTab, $event)"
-                v-for="responsePanelTab in responsePanelTabs"
-            >
-                {{ responsePanelTab.label }}
-                <i :class="`fa fa-circle ${ allTestsPassed ? 'passed-tests' : 'failed-tests' }`" v-if="responsePanelTab.name === 'Tests' && response.testResults && response.testResults.length > 0" style="margin-left: 0.2rem"></i>
-                <i v-if="responsePanelTab.name === 'Preview'" class="fa fa-caret-down space-right" style="margin-left: 0.2rem"></i>
-                <ContextMenu
-                    v-if="responsePanelTab.name === 'Preview'"
-                    :options="previewModeOptions"
-                    :element="previewModeDropdownState.element"
-                    :x="previewModeDropdownState.contextMenuX"
-                    :y="previewModeDropdownState.contextMenuY"
-                    v-model:show="previewModeDropdownState.visible"
-                    :selected-option="previewMode"
-                    @click="selectPreviewMode"
-                />
+            <!-- in a narrow panel the tabs scroll sideways here, so the actions on the right stay in view -->
+            <div class="response-panel-tab-strip">
+                <div
+                    class="response-panel-tab"
+                    :class="{
+                        'response-panel-tab-active': activeResponsePanelTab === responsePanelTab.name,
+                        'custom-dropdown': responsePanelTab.name === 'Preview'
+                    }"
+                    @click="handleTabClick(responsePanelTab, $event)"
+                    v-for="responsePanelTab in responsePanelTabs"
+                >
+                    {{ responsePanelTab.label }}
+                    <i :class="`fa fa-circle ${ allTestsPassed ? 'passed-tests' : 'failed-tests' }`" v-if="responsePanelTab.name === 'Tests' && response.testResults && response.testResults.length > 0" style="margin-left: 0.2rem"></i>
+                    <i v-if="responsePanelTab.name === 'Preview'" class="fa fa-caret-down space-right" style="margin-left: 0.2rem"></i>
+                    <ContextMenu
+                        v-if="responsePanelTab.name === 'Preview'"
+                        :options="previewModeOptions"
+                        :element="previewModeDropdownState.element"
+                        :x="previewModeDropdownState.contextMenuX"
+                        :y="previewModeDropdownState.contextMenuY"
+                        v-model:show="previewModeDropdownState.visible"
+                        :selected-option="previewMode"
+                        @click="selectPreviewMode"
+                    />
+                </div>
             </div>
             <div class="response-panel-tab-fill"></div>
             <div class="response-panel-tab-actions">
@@ -72,8 +76,12 @@
                 <i class="fas fa-paste" @click="copyResponseToClipboard" title="Copy response to clipboard"></i>
             </div>
         </div>
-        <div class="response-panel-tabs-context">
+        <div class="response-panel-tabs-context" :class="{ 'response-panel-tabs-context-with-banner': bodyIncompleteBanner && activeResponsePanelTab === 'Preview' }">
             <template v-if="activeResponsePanelTab === 'Preview'">
+                <div class="response-panel-incomplete-banner" v-if="bodyIncompleteBanner">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>{{ bodyIncompleteBanner }}</span>
+                </div>
                 <template v-if="shouldShowLargeResponseWarning">
                     <div class="content-box" style="text-align: center; padding: 2rem;">
                         <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: orange; margin-bottom: 1rem;"></i>
@@ -95,11 +103,19 @@
                     <template v-if="response.statusText !== 'Error'">
                         <!-- Raw mode - always show raw text for any content type -->
                         <template v-if="previewMode === 'raw'">
-                            <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
+                            <CodeMirrorResponsePanelPreview ref="textViewer" :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
                         </template>
                         <!-- Rendered mode - different display based on content type -->
                         <template v-else>
-                            <div class="content-box" v-if="responseContentType.startsWith('image/svg')">
+                            <ResponseEventList
+                                v-if="showsEventList"
+                                :key="response._id"
+                                :view-state="eventListViewStateFor(response._id)"
+                                :items="eventListItems.items"
+                                :times="eventListItems.times"
+                                :view="responseStreamView"
+                            />
+                            <div class="content-box" v-else-if="responseContentType.startsWith('image/svg')">
                                 <ImageFromBuffer :buffer="response.buffer" :is-svg="true" style="max-width: 100%; max-height: 100%;" />
                             </div>
                             <div class="content-box" v-else-if="responseContentType.startsWith('image/')">
@@ -112,13 +128,13 @@
                                 <IframeFromBuffer :buffer="response.buffer" style="width: 100%; height: 100%; border: none; background-color: white;" />
                             </div>
                             <template v-else-if="previewMode === 'xml' || responseContentType.startsWith('application/xml') || responseContentType.startsWith('text/xml') || responseContentType.startsWith('application/problem+xml')">
-                                <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                                <CodeMirrorResponsePanelPreview ref="textViewer" :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterXmlResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
                             <template v-else-if="previewMode === 'json' || responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
-                                <CodeMirrorResponsePanelPreview :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
+                                <CodeMirrorResponsePanelPreview ref="textViewer" :model-value="responseFilter === '' ? bufferToJSONString(response.buffer) : filterJSONResponse(response.buffer, responseFilter)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
                             <template v-else>
-                                <CodeMirrorResponsePanelPreview :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
+                                <CodeMirrorResponsePanelPreview ref="textViewer" :model-value="bufferToJSONString(response.buffer)" @selection-changed="codeMirrorSelectionChanged" />
                             </template>
                         </template>
                     </template>
@@ -148,7 +164,7 @@
                     </div>
                 </section>
 
-                <section class="sticky-section" v-if="(previewMode === 'rendered' || previewMode === 'json' || previewMode === 'xml') && !shouldShowLargeResponseWarning">
+                <section class="sticky-section" v-if="(previewMode === 'rendered' || previewMode === 'json' || previewMode === 'xml') && !shouldShowLargeResponseWarning && !showsEventList">
                     <div class="row" v-if="responseContentType.startsWith('application/json') || responseContentType.startsWith('application/problem+json')">
                         <input type="text" class="full-width-input" title="Filter response body" placeholder="$.store.books[*].author" v-model="responseFilter">
                         <a href="#" @click.prevent="showResFilteringHelpModal" class="help-link"><i class="fas fa-question-circle"></i></a>
@@ -234,7 +250,7 @@
 </template>
 
 <script lang="ts">
-import { nextTick, toRaw } from 'vue'
+import { markRaw, nextTick, toRaw } from 'vue'
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
 import MobileBottomSheet from './MobileBottomSheet.vue'
@@ -243,6 +259,8 @@ import ImageFromBuffer from './ImageFromBuffer.vue'
 import IframeFromBuffer from './IframeFromBuffer.vue'
 import PdfFromBuffer from './PdfFromBuffer.vue'
 import ResponsePanelTimeline from './ResponsePanelTimeline.vue'
+import ResponsePanelStream from './ResponsePanelStream.vue'
+import ResponseEventList from './ResponseEventList.vue'
 import {
     dateFormat,
     humanFriendlyTime,
@@ -262,6 +280,8 @@ import {
     filterXmlResponse,
     getResponseContentType,
 } from '@/utils/response'
+import { NDJSON_CONTENT_TYPES, TEXT_CONTENT_TYPE_PREFIXES, getStreamView } from '@/utils/response-stream'
+import { createEventStreamParser, createJsonLinesParser, parseEventStream, parseJsonLines } from '@/utils/event-stream'
 import { emitter } from '@/event-bus'
 import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
 import constants from '@/constants'
@@ -277,6 +297,8 @@ export default {
         IframeFromBuffer,
         PdfFromBuffer,
         ResponsePanelTimeline,
+        ResponsePanelStream,
+        ResponseEventList,
     },
     setup() {
         const { isMobile } = useMobile()
@@ -396,6 +418,9 @@ export default {
             }
 
             return 'not loaded'
+        },
+        liveEventListViewStateKey() {
+            return `send:${this.$store.state.requestResponseStreams[this.activeTab._id]?.sendId}`
         },
         responses() {
             return this.$store.state.responses[this.activeTab._id]
@@ -538,30 +563,22 @@ export default {
             }
 
             const supportedContentTypes = [
-                // Text (covers text/html, text/css, text/javascript, text/xml, text/yaml, etc.)
-                'text/',
-                // JSON
-                'application/json',
-                // Problem JSON (RFC 9457)
-                'application/problem+json',
-                // XML
-                'application/xml',
-                // Problem XML (RFC 9457)
-                'application/problem+xml',
+                // Text, JSON, XML, JavaScript and YAML, as the live view shows them
+                ...TEXT_CONTENT_TYPE_PREFIXES,
                 // Images
                 'image/',
                 // PDF
                 'application/pdf',
-                // JavaScript
-                'application/javascript',
-                // YAML
-                'application/yaml',
+                // JSON lines, shown as a list of lines
+                ...NDJSON_CONTENT_TYPES,
                 // Custom formats
                 ...this.customResponseFormats
             ]
 
+            // without regard to case, as the live view decides it
+            const contentType = this.responseContentType.toLowerCase()
             const isSupported = supportedContentTypes.some(type =>
-                this.responseContentType.startsWith(type)
+                contentType.startsWith(type.toLowerCase())
             )
 
             return !isSupported
@@ -583,10 +600,78 @@ export default {
             return this.response && 'testResults' in this.response
         },
         shouldShowLargeResponseWarning() {
-            return (this.responseSize && this.responseSize > this.LARGE_RESPONSE_THRESHOLD || this.isBinaryResponse) && !this.largeResponseConfirmed
+            // the event list draws only the rows in view, so a large stream needs no warning
+            const isLarge = this.responseSize && this.responseSize > this.LARGE_RESPONSE_THRESHOLD && !this.showsEventList
+            return (isLarge || this.isBinaryResponse) && !this.largeResponseConfirmed
+        },
+        responseStreamView() {
+            return getStreamView(this.responseContentType, this.customResponseFormats)
+        },
+        showsEventList() {
+            return this.previewMode === 'rendered' && this.response?.statusText !== 'Error' && (this.responseStreamView === 'events' || this.responseStreamView === 'lines')
+        },
+        // the events or lines of the body, with when each arrived while that is still known
+        eventListItems() {
+            if(!this.showsEventList || !this.response.buffer) {
+                return { items: [], times: null }
+            }
+
+            const chunkTimes = this.response._id ? this.$store.state.responseChunkTimes[this.response._id] : undefined
+
+            if(!chunkTimes) {
+                const items = this.responseStreamView === 'events' ? parseEventStream(this.response.buffer) : parseJsonLines(this.response.buffer)
+                return { items: markRaw(items), times: null }
+            }
+
+            const parser = this.responseStreamView === 'events' ? createEventStreamParser() : createJsonLinesParser()
+            const bytes = new Uint8Array(this.response.buffer)
+            const items = []
+            const times = []
+            let chunkStart = 0
+            chunkTimes.chunkEnds.forEach((chunkEnd, index) => {
+                for(const item of parser.push(bytes.subarray(chunkStart, chunkEnd))) {
+                    items.push(item)
+                    times.push(chunkTimes.chunkTimes[index])
+                }
+                chunkStart = chunkEnd
+            })
+            const lastChunkTime = chunkTimes.chunkTimes[chunkTimes.chunkTimes.length - 1]
+            for(const item of [...parser.push(bytes.subarray(chunkStart)), ...parser.end()]) {
+                items.push(item)
+                times.push(lastChunkTime)
+            }
+            return { items: markRaw(items), times: markRaw(times) }
+        },
+        bodyIncompleteBanner() {
+            switch(this.response?.bodyIncomplete) {
+                case 'cancelled':
+                    return `Stopped after ${humanFriendlyTime(this.response.timeTaken)}. The response is incomplete.`
+                case 'timedOut':
+                    return `Timed out after ${humanFriendlyTime(this.response.timeTaken)}. The response is incomplete.`
+                case 'failed':
+                    return `Connection lost after ${humanFriendlyTime(this.response.timeTaken)}. The response is incomplete.`
+                default:
+                    return null
+            }
         },
     },
     watch: {
+        // the store shows the finished response of the send it was receiving, so its list starts where the user left the live one
+        status(newStatus, oldStatus) {
+            if(oldStatus === 'receiving' && newStatus === 'loaded' && this.response?._id && this.eventListViewState.key.startsWith('send:')) {
+                // a live text view shares this object to say whether the user was following its end
+                const followedLiveText = !this.showsEventList && this.eventListViewState.state?.stickToBottom === true
+                this.eventListViewState.key = this.response._id
+                if(followedLiveText) {
+                    // a tab out of the page cannot scroll, it opens at the end when shown again
+                    if(this.isDeactivated) {
+                        this.opensTextAtEnd = true
+                    } else {
+                        this.scrollTextToEnd()
+                    }
+                }
+            }
+        },
         response: {
             handler(newResponse, oldResponse) {
                 if(this.responsePanelTabs.length === 2 && (this.activeResponsePanelTab === 'Request' || this.activeResponsePanelTab === 'Tests' || this.activeResponsePanelTab === 'Timeline')) {
@@ -861,13 +946,67 @@ export default {
         bufferToJSONString,
         filterJSONResponse,
         filterXmlResponse,
+        // after the response watcher put the new viewer at the top, and once the viewer has measured its text
+        scrollTextToEnd() {
+            nextTick(() => requestAnimationFrame(() => {
+                if(this.$refs.scrollableArea) {
+                    const scrollableElement = this.getScrollableElement()
+                    scrollableElement.scrollTop = scrollableElement.scrollHeight
+                    // the text viewer draws only the lines in view, and a position set before its first measure can
+                    // leave it blank, so it is also asked to scroll there itself
+                    this.$refs.textViewer?.scrollToEnd()
+                }
+            }))
+        },
+        // the same object for as long as the list shows the same send or response, a fresh one for another
+        eventListViewStateFor(key) {
+            if(this.eventListViewState.key !== key || this.eventListViewState.state === null) {
+                // the path the user typed belongs to the request, whose responses all come in one shape, so every list
+                // of it, live or from history, reads and keeps it in the store, in memory only
+                const extractPathInputs = this.$store.state.extractPathInputs
+                const requestId = this.activeTab._id
+                this.eventListViewState = {
+                    key,
+                    state: {
+                        selectedIndex: null,
+                        scrollTop: null,
+                        stickToBottom: null,
+                        get extractPathInput() {
+                            return requestId in extractPathInputs ? extractPathInputs[requestId] : null
+                        },
+                        set extractPathInput(extractPathInput) {
+                            if(extractPathInput === null) {
+                                delete extractPathInputs[requestId]
+                            } else {
+                                extractPathInputs[requestId] = extractPathInput
+                            }
+                        },
+                    },
+                }
+            }
+            return this.eventListViewState.state
+        },
+    },
+    created() {
+        // only the shown list's, kept out of data() since nothing renders from it
+        this.eventListViewState = { key: '', state: null }
+        // whether the tab is out of the page, and a followed live text that ended meanwhile opens at its end
+        this.isDeactivated = false
+        this.opensTextAtEnd = false
     },
     activated() {
-        if(this.response && this.scrollableAreaEventListenerAttached && this.scrollableAreaScrollTop !== null) {
+        this.isDeactivated = false
+        if(this.opensTextAtEnd) {
+            this.opensTextAtEnd = false
+            this.scrollTextToEnd()
+        } else if(this.response && this.scrollableAreaEventListenerAttached && this.scrollableAreaScrollTop !== null) {
             nextTick(() => {
                 this.getScrollableElement().scrollTop = this.scrollableAreaScrollTop
             })
         }
+    },
+    deactivated() {
+        this.isDeactivated = true
     },
     beforeUnmount() {
         this.$refs.scrollableArea?.removeEventListener('scroll', this.scrollableAreaOnScroll, true)
@@ -904,6 +1043,47 @@ export default {
     font-size: 4rem;
 }
 
+.row {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    background: var(--background-color);
+}
+
+.help-link {
+    text-decoration: none;
+    margin-left: 5px;
+    padding: 6px 10px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--default-border-color);
+}
+.sticky-section {
+    position: sticky;
+    bottom: 0;
+    background-color: var(--background-color);
+}
+
+.response-panel-tabs-context.response-panel-tabs-context-with-banner {
+    grid-template-rows: auto 1fr auto;
+}
+
+.response-panel-incomplete-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--sidebar-item-active-color);
+    border-bottom: 1px solid var(--default-border-color);
+}
+
+.response-panel-incomplete-banner i {
+    color: var(--base-color-warning);
+}
+</style>
+
+<!-- not scoped, ResponsePanelStream draws the same address bar and tabs while a response arrives -->
+<style>
 .response-panel-address-bar {
     display: flex;
     justify-content: space-between;
@@ -916,6 +1096,7 @@ export default {
 
 .response-panel-address-bar .response-panel-address-bar-tag-container {
     display: flex;
+    flex-shrink: 0;
 }
 
 .response-panel-address-bar .tag {
@@ -953,10 +1134,17 @@ export default {
     margin-left: 0.6rem;
 }
 
+/* the history button gives up its width first, its text ends in an ellipsis */
 .response-panel-address-bar .response-panel-address-bar-select-container {
     height: 100%;
     margin-left: 1rem;
-    overflow: auto;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.response-panel-address-bar .response-panel-address-bar-select-container .custom-dropdown-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .response-panel-address-bar  .response-panel-address-bar-select-container .custom-dropdown {
@@ -969,8 +1157,15 @@ export default {
 
 .response-panel-tabs {
     display: flex;
+    min-width: 0;
     user-select: none;
     background-color: var(--sidebar-item-active-color);
+}
+
+.response-panel-tabs .response-panel-tab-strip {
+    display: flex;
+    min-width: 0;
+    overflow-x: auto;
 }
 
 .response-panel-tabs .response-panel-tab {
@@ -993,12 +1188,14 @@ export default {
 }
 
 .response-panel-tabs .response-panel-tab-fill {
-    width: 100%;
+    flex: 1 1 0;
+    min-width: 0;
     border-bottom: 1px solid var(--default-border-color);
 }
 
 .response-panel-tabs .response-panel-tab-actions {
     display: flex;
+    flex-shrink: 0;
     border-bottom: 1px solid var(--default-border-color);
 }
 
@@ -1031,26 +1228,6 @@ export default {
 .response-panel-tabs-context table th, .response-panel-tabs-context table td {
     border: 1px solid var(--default-border-color);
     padding: 0.5rem;
-}
-.row {
-    display: flex;
-    align-items: center;
-    padding: 5px;
-    background: var(--background-color);
-}
-
-.help-link {
-    text-decoration: none;
-    margin-left: 5px;
-    padding: 6px 10px;
-    background-color: var(--background-color);
-    color: var(--text-color);
-    border: 1px solid var(--default-border-color);
-}
-.sticky-section {
-    position: sticky;
-    bottom: 0;
-    background-color: var(--background-color);
 }
 
 @media (max-width: 768px) {

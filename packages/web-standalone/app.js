@@ -1,5 +1,6 @@
 import express from 'express'
 import { fetch, Agent, ProxyAgent } from 'undici'
+import { once } from 'events'
 import http from 'http'
 import https from 'https'
 import { Readable } from 'stream'
@@ -12,6 +13,7 @@ import TaskQueue from './src/task-queue.js'
 import { withSentHeadersCapture } from './src/sent-headers-capture.js'
 import { trustSystemCACertificates, parseCACertificates, getCACertificatesWithCustom } from './src/ca-certificates.js'
 import { getProxyForRequest, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } from './src/proxy.js'
+import { PROXY_FRAMES_CONTENT_TYPE, PROXY_FRAME_TYPE, encodeProxyFrame, encodeProxyJsonFrame } from './src/proxy-frames.js'
 
 trustSystemCACertificates()
 
@@ -131,6 +133,9 @@ app.post('/proxy', async(req, res) => {
     const requestTimeoutRaw = Number(req.headers['x-proxy-flag-timeout'] ?? 0)
     const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
     const customCACertificatesId = req.headers['x-proxy-flag-ca-certificates-id'] ?? null
+    // the UI asks for the body as it arrives, in frames (src/proxy-frames.js). An older UI does not and gets the whole
+    // response in one JSON reply, as does every reply sent before the upstream head arrives
+    const streamFrames = req.headers['x-proxy-flag-stream'] === '1'
     // Settings > Proxy, an older UI sends none, which is System, this server's HTTP_PROXY, HTTPS_PROXY and NO_PROXY
     let proxySettings = null
     try {
@@ -174,6 +179,7 @@ app.post('/proxy', async(req, res) => {
     const abortUpstreamRequest = () => abortController.abort()
     let timedOut = false
     let timeoutId
+    let framesStarted = false
 
     req.on('aborted', abortUpstreamRequest)
     res.on('close', () => {
@@ -211,6 +217,18 @@ app.post('/proxy', async(req, res) => {
         const statusText = response.statusText
         const responseHeaders = [...response.headers.entries()]
 
+        if(streamFrames) {
+            framesStarted = true
+            await sendProxyFrames(res, response, {
+                status,
+                statusText,
+                headers: responseHeaders,
+                headTimeTaken: headEndTime - startTime,
+                requestHeadersSent: proxyUrl !== null ? removeProxyCredentials(headersSent, headers) : headersSent,
+            }, startTime, headEndTime, abortController.signal)
+            return
+        }
+
         const responseBlob = await response.blob()
 
         const endTime = new Date()
@@ -244,11 +262,17 @@ app.post('/proxy', async(req, res) => {
         if(!abortController.signal.aborted) {
             console.error('proxy error:', e)
         }
-        if(!res.writableEnded && !res.destroyed) {
+        // undici says only "fetch failed", the reason, such as a rejected certificate, is its cause
+        const message = timedOut ? `Request timed out after ${requestTimeout} ms` : (e.cause?.message ? `${e.message}: ${e.cause.message}` : e.message)
+        if(framesStarted) {
+            // a client that went away gets nothing more, a reset upstream or the timeout ends the frames with an error
+            if(!res.writableEnded && !res.destroyed) {
+                res.end(encodeProxyJsonFrame(PROXY_FRAME_TYPE.ERROR, { message, timedOut }))
+            }
+        } else if(!res.writableEnded && !res.destroyed) {
             res.send({
                 event: 'responseError',
-                // undici says only "fetch failed", the reason, such as a rejected certificate, is its cause
-                eventData: timedOut ? `Request timed out after ${requestTimeout} ms` : (e.cause?.message ? `${e.message}: ${e.cause.message}` : e.message)
+                eventData: message
             })
         }
     } finally {
@@ -257,6 +281,45 @@ app.post('/proxy', async(req, res) => {
         }
     }
 })
+
+// Sends a response whose head has arrived as frames: head, the body chunk by chunk as upstream sends it, then end. The
+// request timeout still runs, so it covers the body too. A slow client holds back reading upstream, so a large or endless
+// body is not buffered here
+async function sendProxyFrames(res, response, head, startTime, headEndTime, signal) {
+    res.writeHead(200, {
+        'content-type': PROXY_FRAMES_CONTENT_TYPE,
+        'cache-control': 'no-cache, no-transform',
+        // nginx buffers a proxied reply unless told not to, which would hold back a stream until it ends
+        'x-accel-buffering': 'no',
+    })
+
+    const writeFrame = async frame => {
+        if(!res.write(frame)) {
+            // the signal is aborted when the client goes away (res 'close') or the timeout fires, either ends the wait
+            await once(res, 'drain', { signal })
+        }
+    }
+
+    await writeFrame(encodeProxyJsonFrame(PROXY_FRAME_TYPE.HEAD, head))
+
+    if(response.body !== null) {
+        for await (const chunk of response.body) {
+            if(chunk.byteLength > 0) {
+                await writeFrame(encodeProxyFrame(PROXY_FRAME_TYPE.DATA, chunk))
+            }
+        }
+    }
+
+    const endTime = new Date()
+
+    // the UI works out mimeType from the head, as for every transport
+    if(!res.writableEnded && !res.destroyed) {
+        res.end(encodeProxyJsonFrame(PROXY_FRAME_TYPE.END, {
+            timeTaken: endTime - startTime,
+            bodyTimeTaken: endTime - headEndTime,
+        }))
+    }
+}
 
 // WebSocket and Socket.IO connections are made by the browser, which checks certificates itself, so with SSL verification
 // disabled or custom CA certificates the UI connects through here instead:

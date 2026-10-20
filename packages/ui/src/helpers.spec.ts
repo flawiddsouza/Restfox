@@ -31,11 +31,21 @@ import {
     substituteEnvironmentVariablesForSend,
     SendResolver,
     describeMaskedPromptOmitted,
+    saveCACertificates,
 } from './helpers'
 import { forgetPromptValues } from './utils/prompt-tag'
+import { markSendReplaced } from './utils/response-stream'
 import type { CollectionItem, HandleRequestState, RequestAuthentication, RequestFinalResponse } from './global'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+
+// edge-runtime has no IndexedDB, Settings > CA Certificates is kept in memory here
+vi.mock('@/db', async(importOriginal) => ({
+    ...await importOriginal<typeof import('@/db')>(),
+    getSettingsFile: vi.fn(async() => null),
+    putSettingsFile: vi.fn(async() => undefined),
+    deleteSettingsFile: vi.fn(async() => undefined),
+}))
 
 type FetchInitWithSignal = {
     signal: AbortSignal
@@ -536,6 +546,684 @@ describe(`Function: ${fetchWrapper.name}`, () => {
         expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({
             event: 'sendRequest'
         }))
+    })
+})
+
+describe('Streaming responses', () => {
+    const encoder = new TextEncoder()
+    const sseChunk = encoder.encode('data: {"a":1}\n\n')
+    const allByteValues = Uint8Array.from({ length: 256 }, (_, index) => index)
+    const binaryBody = Uint8Array.from({ length: 1024 }, (_, index) => index % 256)
+    const jsonBody = encoder.encode('{"id":1,"name":"ünïcode ✓"}')
+    const requestUrl = new URL('https://example.com')
+    const fetchFlags = (requestTimeout = 0) => ({ electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout })
+
+    // 1, 2, 3, ... bytes, so chunk edges fall everywhere, multibyte characters included
+    const unevenChunks = (bytes: Uint8Array) => {
+        const chunks: Uint8Array[] = []
+        let offset = 0
+        for(let size = 1; offset < bytes.byteLength; size++) {
+            chunks.push(bytes.slice(offset, offset + size))
+            offset += size
+        }
+        return chunks
+    }
+
+    const concat = (parts: Uint8Array[]) => {
+        const bytes = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0))
+        let offset = 0
+        for(const part of parts) {
+            bytes.set(part, offset)
+            offset += part.byteLength
+        }
+        return bytes
+    }
+
+    const progressBytes = (onResponseProgress: ReturnType<typeof vi.fn>) => concat(onResponseProgress.mock.calls.filter(call => call[0].type === 'data').map(call => call[0].bytes))
+
+    // a body that stays open after its chunks until the request's signal aborts it, as a real fetch errors its body then
+    const openBody = (chunks: Uint8Array[], signal: AbortSignal) => new ReadableStream<Uint8Array>({
+        start(controller) {
+            chunks.forEach(chunk => controller.enqueue(chunk))
+            signal.addEventListener('abort', () => controller.error(signal.reason), { once: true })
+        },
+    })
+
+    const closedBody = (chunks: Uint8Array[]) => new ReadableStream<Uint8Array>({
+        start(controller) {
+            chunks.forEach(chunk => controller.enqueue(chunk))
+            controller.close()
+        },
+    })
+
+    const stubOpenBody = (chunks: Uint8Array[], contentType = 'text/event-stream') => {
+        vi.stubGlobal('fetch', async(_url: string, init: FetchInitWithSignal) => new Response(openBody(chunks, init.signal), { headers: { 'content-type': contentType } }))
+    }
+
+    describe('page fetch', () => {
+        // what the page fetch returned when it read the whole body with blob(), Date frozen by fake timers
+        const bufferedResult = async(response: Response) => {
+            const blob = await response.blob()
+            return {
+                status: response.status,
+                statusText: response.statusText,
+                headers: [...response.headers.entries()],
+                mimeType: blob.type,
+                buffer: await blob.arrayBuffer(),
+                timeTaken: 0,
+                headTimeTaken: 0,
+                bodyTimeTaken: 0,
+            }
+        }
+
+        const samples: { name: string, makeResponse: () => Response }[] = [
+            { name: 'JSON', makeResponse: () => new Response(closedBody(unevenChunks(jsonBody)), { status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Trace': 't1' } }) },
+            { name: 'binary', makeResponse: () => new Response(closedBody(unevenChunks(binaryBody)), { headers: { 'content-type': 'application/octet-stream' } }) },
+            { name: 'binary without a content type', makeResponse: () => new Response(closedBody([allByteValues])) },
+            { name: 'empty', makeResponse: () => new Response(null, { status: 204, statusText: 'No Content' }) },
+        ]
+
+        for(const sample of samples) {
+            test(`a ${sample.name} response gives exactly what the buffered read gave, with or without a progress handler`, async() => {
+                vi.useFakeTimers()
+                vi.stubGlobal('fetch', async() => sample.makeResponse())
+                const expected = await bufferedResult(sample.makeResponse())
+
+                const withoutHandler = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())
+                const onResponseProgress = vi.fn()
+                const withHandler = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), onResponseProgress)
+
+                for(const response of [withoutHandler, withHandler]) {
+                    expect(Object.keys(response).sort()).toEqual(Object.keys(expected).sort())
+                    expect(response).toEqual(expected)
+                    expect(response.buffer).toBeInstanceOf(ArrayBuffer)
+                    expect(new Uint8Array(response.buffer)).toEqual(new Uint8Array(expected.buffer))
+                }
+                expect(onResponseProgress.mock.calls[0][0]).toMatchObject({ type: 'head', head: { status: expected.status, headers: expected.headers } })
+                expect(progressBytes(onResponseProgress)).toEqual(new Uint8Array(expected.buffer))
+            })
+        }
+
+        test('a timeout after the head keeps the bytes received, marked timedOut, and reports head and data as they arrive', async() => {
+            vi.useFakeTimers()
+            stubOpenBody([sseChunk])
+            const onResponseProgress = vi.fn()
+
+            const promise = fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(50), onResponseProgress)
+            await vi.advanceTimersByTimeAsync(10)
+
+            expect(onResponseProgress.mock.calls.map(call => call[0].type)).toEqual(['head', 'data'])
+            expect(onResponseProgress.mock.calls[0][0].head.status).toBe(200)
+            expect(onResponseProgress.mock.calls[1][0].bytes).toEqual(sseChunk)
+
+            await vi.advanceTimersByTimeAsync(50)
+            const response = await promise
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+            expect(response.bodyIncomplete).toBe('timedOut')
+            expect(response.status).toBe(200)
+            expect(response.mimeType).toBe('text/event-stream')
+        })
+
+        test('a cancel after the first chunk keeps it, marked cancelled, and logs nothing', async() => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+            stubOpenBody([sseChunk])
+            const abortController = new AbortController()
+            const onResponseProgress = vi.fn((progress: { type: string }) => {
+                if(progress.type === 'data') {
+                    abortController.abort()
+                }
+            })
+
+            const response = await fetchWrapper(requestUrl, 'GET', {}, null, abortController.signal, fetchFlags(), onResponseProgress)
+
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(consoleError).not.toHaveBeenCalled()
+        })
+
+        test('without a progress handler the timeout still covers the body and rejects as before, and so does a cancel', async() => {
+            vi.useFakeTimers()
+            stubOpenBody([sseChunk], 'application/json')
+            const timedOut = fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(50))
+            const timedOutExpectation = expect(timedOut).rejects.toMatchObject({ name: 'TimeoutError' })
+            await vi.advanceTimersByTimeAsync(50)
+            await timedOutExpectation
+
+            const abortController = new AbortController()
+            const cancelled = fetchWrapper(requestUrl, 'GET', {}, null, abortController.signal, fetchFlags(1000))
+            const cancelledExpectation = expect(cancelled).rejects.toMatchObject({ name: 'AbortError' })
+            await vi.advanceTimersByTimeAsync(10)
+            abortController.abort()
+            await cancelledExpectation
+        })
+
+        test('a body that fails after the head keeps what arrived, marked failed, with one line in Logs, and rejects without a handler', async() => {
+            const failingBody = () => new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(sseChunk)
+                    setTimeout(() => controller.error(new TypeError('network error')), 0)
+                },
+            })
+            vi.stubGlobal('fetch', async() => new Response(failingBody(), { headers: { 'content-type': 'text/event-stream' } }))
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+            const response = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())
+
+            expect(response.bodyIncomplete).toBe('failed')
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+            expect(consoleError).toHaveBeenCalledTimes(1)
+            expect(consoleError.mock.calls[0][0]).toMatchObject({ message: 'network error' })
+
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())).rejects.toMatchObject({ name: 'TypeError', message: 'network error' })
+        })
+
+        test('a failure before the head rejects as before, with a progress handler too', async() => {
+            vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')))
+            const onResponseProgress = vi.fn()
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), onResponseProgress)).rejects.toMatchObject({ message: 'Failed to fetch' })
+            expect(onResponseProgress).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('Electron', () => {
+        type Push = (requestId: string, message: unknown) => void
+
+        const stubElectron = () => {
+            const listeners: Push[] = []
+            const ipc = {
+                onRequestEvent: vi.fn((callback: Push) => {
+                    listeners.push(callback)
+                }),
+                sendRequest: vi.fn<(payload: { requestId: string }) => Promise<unknown>>(async() => undefined),
+                cancelRequest: vi.fn(),
+            }
+            ;(window as any).electronIPC = ipc
+            const push: Push = (requestId, message) => listeners.forEach(listener => listener(requestId, message))
+            return { ipc, push }
+        }
+
+        // a mimeType taken from the header as is, not as a blob gives it, would differ
+        const head = { status: 200, statusText: 'OK', headers: [['content-type', 'Application/JSON; Charset=UTF-8']], headTimeTaken: 5, requestHeadersSent: [['accept', '*/*']] }
+        // as main and the server send it, with no mimeType, which the UI works out from the head
+        const end = { timeTaken: 12, bodyTimeTaken: 7 }
+        const mimeType = 'application/json;charset=utf-8'
+
+        // what the renderer made of main's old { event: 'response' } reply
+        const bufferedResult = (bytes: Uint8Array) => ({
+            status: 200,
+            statusText: 'OK',
+            headers: head.headers,
+            mimeType,
+            buffer: new Uint8Array(bytes).buffer,
+            timeTaken: 12,
+            headTimeTaken: 5,
+            bodyTimeTaken: 7,
+            requestHeadersSent: [['accept', '*/*']],
+        })
+
+        const pushResponse = (push: Push, requestId: string, bytes: Uint8Array) => {
+            push(requestId, { event: 'head', eventData: head })
+            unevenChunks(bytes).forEach(chunk => push(requestId, { event: 'data', eventData: chunk }))
+            push(requestId, { event: 'end', eventData: end })
+        }
+
+        const nextTask = () => new Promise(resolve => setTimeout(resolve, 0))
+
+        beforeEach(() => {
+            vi.stubEnv('MODE', 'desktop-electron')
+        })
+
+        afterEach(() => {
+            vi.unstubAllEnvs()
+            delete (window as any).electronIPC
+        })
+
+        const orders: { name: string, send: (push: Push, requestId: string, bytes: Uint8Array) => Promise<void> }[] = [
+            { name: 'all pushed before the invoke reply', send: async(push, requestId, bytes) => pushResponse(push, requestId, bytes) },
+            { name: 'all pushed after the invoke reply', send: async(push, requestId, bytes) => {
+                setTimeout(() => pushResponse(push, requestId, bytes), 0)
+            } },
+            { name: 'the invoke reply between head and data', send: async(push, requestId, bytes) => {
+                push(requestId, { event: 'head', eventData: head })
+                setTimeout(() => {
+                    unevenChunks(bytes).forEach(chunk => push(requestId, { event: 'data', eventData: chunk }))
+                    push(requestId, { event: 'end', eventData: end })
+                }, 0)
+            } },
+        ]
+
+        for(const order of orders) {
+            for(const [bodyName, bytes] of [['JSON', jsonBody], ['binary', binaryBody]] as const) {
+                test(`a ${bodyName} response with ${order.name} gives exactly what the old reply gave, with or without a progress handler`, async() => {
+                    const { ipc, push } = stubElectron()
+                    ipc.sendRequest.mockImplementation(async({ requestId }) => {
+                        await order.send(push, requestId, bytes)
+                        return undefined
+                    })
+
+                    const withoutHandler = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())
+                    const onResponseProgress = vi.fn()
+                    const withHandler = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), onResponseProgress)
+
+                    const expected = bufferedResult(bytes)
+                    for(const response of [withoutHandler, withHandler]) {
+                        expect(Object.keys(response).sort()).toEqual(Object.keys(expected).sort())
+                        expect(response).toEqual(expected)
+                        expect(new Uint8Array(response.buffer)).toEqual(bytes)
+                    }
+                    expect(onResponseProgress.mock.calls[0][0]).toEqual({ type: 'head', head })
+                    expect(progressBytes(onResponseProgress)).toEqual(bytes)
+                })
+            }
+        }
+
+        test('the request body is sent as before', async() => {
+            const { ipc, push } = stubElectron()
+            ipc.sendRequest.mockImplementation(async({ requestId }) => pushResponse(push, requestId, jsonBody))
+
+            await fetchWrapper(requestUrl, 'POST', { 'X-Trace': 't1' }, new File(['ab'], 'a.txt', { type: 'text/plain' }), new AbortController().signal, fetchFlags())
+
+            expect(ipc.sendRequest.mock.calls[0][0]).toEqual({
+                requestId: expect.any(String),
+                url: 'https://example.com/',
+                method: 'POST',
+                headers: { 'X-Trace': 't1' },
+                body: { name: 'a.txt', type: 'text/plain', buffer: [97, 98] },
+                bodyHint: 'File',
+                disableSSLVerification: false,
+            })
+        })
+
+        test('a cancel after the head keeps what arrived and ignores later pushes, without a handler it rejects as before', async() => {
+            const { ipc, push } = stubElectron()
+            let requestId = ''
+            ipc.sendRequest.mockImplementation(async(payload) => {
+                requestId = payload.requestId
+                push(requestId, { event: 'head', eventData: { ...head, headers: [['content-type', 'text/event-stream']] } })
+                push(requestId, { event: 'data', eventData: sseChunk })
+            })
+
+            const abortController = new AbortController()
+            const onResponseProgress = vi.fn()
+            const promise = fetchWrapper(requestUrl, 'GET', {}, null, abortController.signal, fetchFlags(), onResponseProgress)
+            await nextTask()
+            abortController.abort()
+            const response = await promise
+
+            expect(ipc.cancelRequest).toHaveBeenCalledWith(requestId)
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(response.mimeType).toBe('text/event-stream')
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+
+            const callsBefore = onResponseProgress.mock.calls.length
+            push(requestId, { event: 'data', eventData: encoder.encode('late') })
+            push(requestId, { event: 'end', eventData: end })
+            expect(onResponseProgress.mock.calls.length).toBe(callsBefore)
+
+            const abortWithoutHandler = new AbortController()
+            const withoutHandler = fetchWrapper(requestUrl, 'GET', {}, null, abortWithoutHandler.signal, fetchFlags())
+            await nextTask()
+            abortWithoutHandler.abort()
+            await expect(withoutHandler).rejects.toMatchObject({ name: 'AbortError' })
+        })
+
+        test('a timeout after the head keeps what arrived, marked timedOut, before the head it is a TimeoutError', async() => {
+            vi.useFakeTimers()
+            const { ipc, push } = stubElectron()
+            ipc.sendRequest.mockImplementation(async({ requestId }) => {
+                push(requestId, { event: 'head', eventData: head })
+                push(requestId, { event: 'data', eventData: jsonBody })
+            })
+            const promise = fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(50), vi.fn())
+            await vi.advanceTimersByTimeAsync(50)
+            const response = await promise
+            expect(response.bodyIncomplete).toBe('timedOut')
+            expect(new Uint8Array(response.buffer)).toEqual(jsonBody)
+
+            ipc.sendRequest.mockImplementation(async() => undefined)
+            const beforeHead = fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(50), vi.fn())
+            const expectation = expect(beforeHead).rejects.toMatchObject({ name: 'TimeoutError' })
+            await vi.advanceTimersByTimeAsync(50)
+            await expectation
+        })
+
+        test('a body error keeps what arrived, marked failed, with one line in Logs, and rejects without a handler', async() => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+            const { ipc, push } = stubElectron()
+            ipc.sendRequest.mockImplementation(async({ requestId }) => {
+                push(requestId, { event: 'head', eventData: head })
+                push(requestId, { event: 'data', eventData: jsonBody })
+                push(requestId, { event: 'bodyError', eventData: { message: 'terminated: other side closed', timeTaken: 30, bodyTimeTaken: 25 } })
+            })
+
+            const response = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())
+            expect(response).toMatchObject({ bodyIncomplete: 'failed', timeTaken: 30, bodyTimeTaken: 25, headTimeTaken: 5, mimeType })
+            expect(new Uint8Array(response.buffer)).toEqual(jsonBody)
+            expect(consoleError).toHaveBeenCalledTimes(1)
+
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())).rejects.toMatchObject({ message: 'terminated: other side closed' })
+        })
+
+        test('a failure before the head, pushed or from the invoke, rejects as before', async() => {
+            const { ipc, push } = stubElectron()
+            ipc.sendRequest.mockImplementation(async({ requestId }) => push(requestId, { event: 'responseError', eventData: 'TypeError: fetch failed\nError: getaddrinfo ENOTFOUND' }))
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())).rejects.toMatchObject({ message: 'TypeError: fetch failed\nError: getaddrinfo ENOTFOUND' })
+
+            ipc.sendRequest.mockImplementation(async() => {
+                throw new Error('No handler registered for \'sendRequest\'')
+            })
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())).rejects.toMatchObject({ message: 'No handler registered for \'sendRequest\'' })
+        })
+
+        // the store keeps a tab's abort controller until its next send, so a handler left on its signal would keep the body
+        test('a finished send leaves no handler on the signal, which would keep what arrived in memory', async() => {
+            const { ipc, push } = stubElectron()
+            ipc.sendRequest.mockImplementation(async({ requestId }) => pushResponse(push, requestId, jsonBody))
+            const abortController = new AbortController()
+
+            await fetchWrapper(requestUrl, 'GET', {}, null, abortController.signal, fetchFlags(), vi.fn())
+            expect(abortController.signal.onabort).toBeNull()
+
+            ipc.sendRequest.mockImplementation(async({ requestId }) => push(requestId, { event: 'responseError', eventData: 'TypeError: fetch failed' }))
+            const failedAbortController = new AbortController()
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, failedAbortController.signal, fetchFlags(), vi.fn())).rejects.toThrow()
+            expect(failedAbortController.signal.onabort).toBeNull()
+
+            abortController.abort()
+            failedAbortController.abort()
+            expect(ipc.cancelRequest).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('web-standalone', () => {
+        const encodeFrame = (type: number, payload: Uint8Array) => {
+            const frame = new Uint8Array(5 + payload.byteLength)
+            frame[0] = type
+            new DataView(frame.buffer).setUint32(1, payload.byteLength)
+            frame.set(payload, 5)
+            return frame
+        }
+        const jsonFrame = (type: number, value: unknown) => encodeFrame(type, encoder.encode(JSON.stringify(value)))
+
+        // a mimeType taken from the header as is, not as a blob gives it, would differ
+        const head = { status: 200, statusText: 'OK', headers: [['content-type', 'Application/JSON; Charset=UTF-8']], headTimeTaken: 5, requestHeadersSent: [['accept', '*/*']] }
+        // as main and the server send it, with no mimeType, which the UI works out from the head
+        const end = { timeTaken: 12, bodyTimeTaken: 7 }
+        const mimeType = 'application/json;charset=utf-8'
+
+        const framesReply = (bytes: Uint8Array) => concat([
+            jsonFrame(1, head),
+            ...unevenChunks(bytes).map(chunk => encodeFrame(2, chunk)),
+            jsonFrame(3, end),
+        ])
+
+        const framesResponse = (body: ReadableStream<Uint8Array>) => new Response(body, { headers: { 'content-type': 'application/vnd.restfox.proxy-frames', 'cache-control': 'no-cache, no-transform' } })
+        const jsonResponse = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json; charset=utf-8' } })
+
+        // the JSON envelope every server sends without the stream flag, and older servers always
+        const envelope = (bytes: Uint8Array) => ({ event: 'response', eventData: { ...head, mimeType, buffer: Array.from(bytes), timeTaken: end.timeTaken, bodyTimeTaken: end.bodyTimeTaken } })
+        const bufferedResult = (bytes: Uint8Array) => ({ ...head, mimeType, buffer: new Uint8Array(bytes).buffer, timeTaken: end.timeTaken, bodyTimeTaken: end.bodyTimeTaken })
+
+        let proxyReplies: ((init: FetchInitWithSignal & { headers: Record<string, string> }) => Response)[]
+        let proxyRequests: { headers: Record<string, string> }[]
+        let caRegistrations: number
+
+        beforeEach(async() => {
+            vi.stubEnv('MODE', 'web-standalone')
+            await saveCACertificates(null)
+            proxyReplies = []
+            proxyRequests = []
+            caRegistrations = 0
+            vi.stubGlobal('fetch', async(input: string, init: FetchInitWithSignal & { headers: Record<string, string> }) => {
+                if(input === '/proxy-ca-certificates') {
+                    caRegistrations++
+                    return jsonResponse({ id: `ca-${caRegistrations}` })
+                }
+                proxyRequests.push(init)
+                return proxyReplies.shift()!(init)
+            })
+        })
+
+        afterEach(async() => {
+            vi.unstubAllEnvs()
+            await saveCACertificates(null)
+        })
+
+        test('asks for frames, and a frames reply split at every byte offset gives exactly what the JSON reply gave, with or without a handler', async() => {
+            for(const bytes of [jsonBody, allByteValues]) {
+                proxyReplies.push(() => jsonResponse(envelope(bytes)))
+                const expected = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())
+                expect(expected).toEqual(bufferedResult(bytes))
+
+                const reply = framesReply(bytes)
+                for(let offset = 0; offset <= reply.byteLength; offset++) {
+                    const handler = offset % 2 === 0 ? vi.fn() : undefined
+                    proxyReplies.push(() => framesResponse(closedBody([reply.subarray(0, offset), reply.subarray(offset)].filter(part => part.byteLength > 0))))
+                    const response = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), handler)
+                    expect(Object.keys(response).sort()).toEqual(Object.keys(expected).sort())
+                    expect(response).toEqual(expected)
+                    expect(new Uint8Array(response.buffer)).toEqual(bytes)
+                    if(handler) {
+                        expect(handler.mock.calls[0][0]).toEqual({ type: 'head', head })
+                        expect(progressBytes(handler)).toEqual(bytes)
+                    }
+                }
+            }
+            expect(proxyRequests.every(request => request.headers['x-proxy-flag-stream'] === '1')).toBe(true)
+        })
+
+        test('certificates the restarted server forgot are registered again, then the frames are read', async() => {
+            await saveCACertificates({ fileName: 'ca.pem', certificates: '-----BEGIN CERTIFICATE-----\nwp3\n-----END CERTIFICATE-----\n' })
+            proxyReplies.push(() => jsonResponse({ event: 'caCertificatesNotFound' }))
+            proxyReplies.push(() => framesResponse(closedBody([framesReply(jsonBody)])))
+
+            const response = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())
+
+            expect(response).toEqual(bufferedResult(jsonBody))
+            expect(caRegistrations).toBe(2)
+            expect(proxyRequests.map(request => request.headers['x-proxy-flag-ca-certificates-id'])).toEqual(['ca-1', 'ca-2'])
+        })
+
+        test('a failure before the head is still the JSON responseError', async() => {
+            proxyReplies.push(() => jsonResponse({ event: 'responseError', eventData: 'fetch failed: getaddrinfo ENOTFOUND' }))
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())).rejects.toMatchObject({ message: 'fetch failed: getaddrinfo ENOTFOUND' })
+        })
+
+        test('an error frame from the server\'s timeout keeps what arrived, marked timedOut, and is a TimeoutError without a handler', async() => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+            const reply = () => framesResponse(closedBody([concat([jsonFrame(1, head), encodeFrame(2, sseChunk), jsonFrame(4, { message: 'Request timed out after 100 ms', timedOut: true })])]))
+
+            proxyReplies.push(reply)
+            const response = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(100), vi.fn())
+            expect(response.bodyIncomplete).toBe('timedOut')
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+            expect(consoleError).not.toHaveBeenCalled()
+
+            proxyReplies.push(reply)
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(100))).rejects.toMatchObject({ name: 'TimeoutError' })
+        })
+
+        test('an error frame from a failed upstream, or a reply that stops without one, is failed with one line in Logs', async() => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+            proxyReplies.push(() => framesResponse(closedBody([concat([jsonFrame(1, head), encodeFrame(2, sseChunk), jsonFrame(4, { message: 'terminated: other side closed', timedOut: false })])])))
+            const failed = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())
+            expect(failed.bodyIncomplete).toBe('failed')
+            expect(new Uint8Array(failed.buffer)).toEqual(sseChunk)
+            expect(consoleError).toHaveBeenCalledTimes(1)
+
+            proxyReplies.push(() => framesResponse(closedBody([concat([jsonFrame(1, head), encodeFrame(2, sseChunk)])])))
+            const truncated = await fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags(), vi.fn())
+            expect(truncated.bodyIncomplete).toBe('failed')
+            expect(consoleError).toHaveBeenCalledTimes(2)
+
+            proxyReplies.push(() => framesResponse(closedBody([concat([jsonFrame(1, head), jsonFrame(4, { message: 'terminated: other side closed', timedOut: false })])])))
+            await expect(fetchWrapper(requestUrl, 'GET', {}, null, new AbortController().signal, fetchFlags())).rejects.toMatchObject({ message: 'terminated: other side closed' })
+        })
+
+        test('a cancel while frames arrive keeps what arrived, marked cancelled', async() => {
+            proxyReplies.push(init => framesResponse(openBody([concat([jsonFrame(1, head), encodeFrame(2, sseChunk)])], init.signal)))
+            const abortController = new AbortController()
+            const onResponseProgress = vi.fn((progress: { type: string }) => {
+                if(progress.type === 'data') {
+                    abortController.abort()
+                }
+            })
+
+            const response = await fetchWrapper(requestUrl, 'GET', {}, null, abortController.signal, fetchFlags(), onResponseProgress)
+
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+        })
+
+        test('a body cut short counts its time from the send, the wait for the upstream head included, as the other transports do', async() => {
+            vi.useFakeTimers()
+            try {
+                // the server answers once the upstream head arrived, 3 s after the send
+                const slowHead = { ...head, headTimeTaken: 3000 }
+                proxyReplies.push(init => new Promise<Response>(resolve => {
+                    setTimeout(() => resolve(framesResponse(openBody([concat([jsonFrame(1, slowHead), encodeFrame(2, sseChunk)])], init.signal))), 3000)
+                }) as unknown as Response)
+                const abortController = new AbortController()
+                const promise = fetchWrapper(requestUrl, 'GET', {}, null, abortController.signal, fetchFlags(), vi.fn())
+
+                await vi.advanceTimersByTimeAsync(8000)
+                abortController.abort()
+                const response = await promise
+
+                expect(response.bodyIncomplete).toBe('cancelled')
+                expect(response.headTimeTaken).toBe(3000)
+                expect(response.timeTaken).toBe(8000)
+            } finally {
+                vi.useRealTimers()
+            }
+        })
+    })
+
+    describe('handleRequest', () => {
+        const request = (fields: Partial<CollectionItem> = {}) => ({ _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'Request', method: 'GET', url: 'https://example.test/', ...fields }) as CollectionItem
+        const script = (postRequest: string) => ({ _id: 'p', type: 'script', name: 'script', code: { pre_request: '', post_request: postRequest }, workspaceId: null, collectionId: 'r', enabled: true, createdAt: 0, updatedAt: 0 })
+        // getBodyJSON gives undefined for a body that is not JSON, such as half of one
+        const testsAndJSON = `test('status', () => expect(rf.response.getStatusCode()).to.equal(200))\nrf.response.getBodyJSON().choices.length`
+
+        // cancels the send once the first chunk arrived, leaving a partial response
+        const sendCancelledAfterFirstChunk = (fields: Partial<CollectionItem>, plugins: unknown[]) => {
+            stubOpenBody([sseChunk])
+            const abortController = new AbortController()
+            const onResponseProgress = vi.fn((progress: { type: string }) => {
+                if(progress.type === 'data') {
+                    abortController.abort()
+                }
+            })
+            return handleRequest(request(fields), {}, {}, undefined, async() => undefined, plugins as any, null, abortController.signal, fetchFlags(), onResponseProgress) as Promise<RequestFinalResponse>
+        }
+
+        test('scripts run on a partial body, and one that fails on it is a failed test with one line in Logs, the received bytes kept', async() => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+            const response = await sendCancelledAfterFirstChunk({}, [script(testsAndJSON)])
+
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(response.status).toBe(200)
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+            expect(response.testResults).toHaveLength(2)
+            expect(response.testResults[0]).toEqual({ description: 'status', passed: true })
+            expect(response.testResults[1]).toMatchObject({ passed: false, description: expect.stringContaining('Error in Plugin "Script: Post Request"') })
+            expect(response.testResults[1].error).toContain('TypeError')
+            expect(consoleError).toHaveBeenCalledTimes(1)
+        })
+
+        test('a stream a newer Send replaced runs no scripts, since it is thrown away and must not set a variable the new send reads', async() => {
+            stubOpenBody([sseChunk])
+            const abortController = new AbortController()
+            const setEnvironmentVariable = vi.fn(async() => undefined)
+
+            const response = await handleRequest(request(), {}, {}, undefined, setEnvironmentVariable, [script(`rf.setEnvVar('lastId', '1')`)] as any, null, abortController.signal, fetchFlags(), (progress: { type: string }) => {
+                if(progress.type === 'data') {
+                    markSendReplaced(abortController.signal)
+                    abortController.abort()
+                }
+            }) as RequestFinalResponse
+
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(setEnvironmentVariable).not.toHaveBeenCalled()
+        })
+
+        test('a body cut short that is not a stream runs no scripts, as before, so none sets a variable from half of it', async() => {
+            stubOpenBody([new TextEncoder().encode('{"tok')], 'application/json')
+            const abortController = new AbortController()
+            const setEnvironmentVariable = vi.fn(async() => undefined)
+
+            const response = await handleRequest(request(), {}, {}, undefined, setEnvironmentVariable, [script(`rf.setEnvVar('token', rf.response.getBodyText())\ntest('ran', () => expect(1).to.equal(1))`)] as any, null, abortController.signal, fetchFlags(), (progress: { type: string }) => {
+                if(progress.type === 'data') {
+                    abortController.abort()
+                }
+            }) as RequestFinalResponse
+
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(new TextDecoder().decode(response.buffer)).toBe('{"tok')
+            expect(setEnvironmentVariable).not.toHaveBeenCalled()
+            expect(response.testResults).toEqual([])
+        })
+
+        test('a script that fails on a complete body still gives the error, as before', async() => {
+            vi.spyOn(console, 'error').mockImplementation(() => undefined)
+            vi.stubGlobal('fetch', async() => new Response(closedBody([sseChunk]), { headers: { 'content-type': 'text/event-stream' } }))
+
+            const response = await handleRequest(request(), {}, {}, undefined, async() => undefined, [script(testsAndJSON)] as any, null, new AbortController().signal, fetchFlags(), vi.fn())
+
+            expect(response).toMatchObject({ status: null, statusText: 'Error', error: expect.stringContaining('Error in Plugin "Script: Post Request"') })
+        })
+
+        test('a complete stream runs the scripts and is saved without bodyIncomplete', async() => {
+            vi.stubGlobal('fetch', async() => new Response(closedBody(unevenChunks(sseChunk)), { headers: { 'content-type': 'text/event-stream' } }))
+
+            const response = await handleRequest(request(), {}, {}, undefined, async() => undefined, [script(`test('body', () => expect(rf.response.getBodyText()).to.equal('data: {"a":1}\\n\\n'))`)] as any, null, new AbortController().signal, fetchFlags(), vi.fn()) as RequestFinalResponse
+
+            expect(response.testResults).toEqual([{ description: 'body', passed: true }])
+            expect('bodyIncomplete' in response).toBe(false)
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+        })
+
+        // the store keeps the loading overlay for a body that ends at once, while scripts that take long still run
+        test('the end of the body is told before the scripts run, for a body cut short too', async() => {
+            vi.stubGlobal('fetch', async() => new Response(closedBody([jsonBody]), { headers: { 'content-type': 'application/json' } }))
+            const order: string[] = []
+            const setEnvironmentVariable = async() => {
+                order.push('script')
+            }
+            const plugins = [script(`rf.setEnvVar('seen', '1')`)] as any
+
+            await handleRequest(request(), {}, {}, undefined, setEnvironmentVariable, plugins, null, new AbortController().signal, fetchFlags(), (progress: { type: string }) => order.push(progress.type))
+            expect(order).toEqual(['head', 'data', 'end', 'script'])
+
+            order.length = 0
+            stubOpenBody([sseChunk])
+            const abortController = new AbortController()
+            const partial = await handleRequest(request(), {}, {}, undefined, setEnvironmentVariable, plugins, null, abortController.signal, fetchFlags(), (progress: { type: string }) => {
+                order.push(progress.type)
+                if(progress.type === 'data') {
+                    abortController.abort()
+                }
+            })
+            expect(partial).toMatchObject({ bodyIncomplete: 'cancelled' })
+            expect(order).toEqual(['head', 'data', 'end', 'script'])
+        })
+
+        test('a partial send still leaves out what a masked prompt went into', async() => {
+            (window as any).createPrompt = vi.fn(async() => 's3cret')
+            try {
+                const response = await sendCancelledAfterFirstChunk({ headers: [{ name: 'Authorization', value: `Bearer {% prompt(title='Token', mask=1) %}` }, { name: 'X-Trace', value: 't1' }] }, [])
+
+                expect(response.bodyIncomplete).toBe('cancelled')
+                expect(response.request.headers.Authorization).toBeUndefined()
+                expect(response.request.headers['X-Trace']).toBe('t1')
+                expect(response.request.maskedPromptOmitted).toEqual({ reason: 'masked-field', url: false, headerNames: ['Authorization'], body: false })
+                expect(JSON.stringify(response)).not.toContain('s3cret')
+            } finally {
+                delete (window as any).createPrompt
+            }
+        })
     })
 })
 

@@ -1,4 +1,4 @@
-import { toRaw } from 'vue'
+import { markRaw, toRaw } from 'vue'
 import { ActionContext, createStore } from 'vuex'
 import { nanoid } from 'nanoid'
 import {
@@ -66,9 +66,26 @@ import {
     RequestAuthentication,
     CollectionRunnerResult,
     PluginTestResult,
+    BodyIncomplete,
+    ResponseProgress,
+    ResponseStream,
 } from './global'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import { computeTargetIndex, isDropIntoOwnSubtree } from '@/utils/sidebar-drop'
+import { BODY_INCOMPLETE_MESSAGES, getStreamView, isSendReplaced, markSendReplaced } from '@/utils/response-stream'
+import { getResponseContentType } from '@/utils/response'
+
+// the sends still running on each tab, so a new send can cancel them
+const runningSends = new Map<string, Set<AbortController>>()
+
+// arrival times live only as long as their response does in memory
+function dropResponseChunkTimes(state: State, responses: { _id?: string }[] | undefined) {
+    responses?.forEach(response => {
+        if(response._id) {
+            delete state.responseChunkTimes[response._id]
+        }
+    })
+}
 
 async function loadResponses(state: State, tabId: string) {
     if(tabId in state.responses) {
@@ -330,6 +347,9 @@ export const store = createStore<State>({
             detachedTabs: [],
             activeTab: null,
             requestResponseStatus: {},
+            requestResponseStreams: {},
+            responseChunkTimes: {},
+            extractPathInputs: {},
             requestResponses: {},
             requestAbortController: {},
             responses: {},
@@ -688,6 +708,7 @@ export const store = createStore<State>({
         },
         async clearResponseHistory(state) {
             await deleteResponsesByCollectionId(state.activeTab.workspaceId, state.activeTab._id)
+            dropResponseChunkTimes(state, state.responses[state.activeTab._id])
             state.responses[state.activeTab._id] = []
             state.requestResponses[state.activeTab._id] = null
             state.requestResponseStatus[state.activeTab._id] = 'pending'
@@ -700,6 +721,7 @@ export const store = createStore<State>({
         async deleteCurrentlyActiveResponse(state) {
             const responseToDelete = state.requestResponses[state.activeTab._id]
             await deleteResponse(state.activeTab.workspaceId, responseToDelete.collectionId, responseToDelete._id)
+            dropResponseChunkTimes(state, [responseToDelete])
             state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseToDelete._id)
             if(state.responses[state.activeTab._id].length > 0) {
                 state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
@@ -863,10 +885,13 @@ export const store = createStore<State>({
                 context.state.detachedTabs = context.state.detachedTabs.filter(detachedTab => detachedTab._id !== childId)
                 // clear unneeded response cache
                 if(childId in context.state.responses) {
+                    dropResponseChunkTimes(context.state, context.state.responses[childId])
                     delete context.state.responses[childId]
                     delete context.state.requestResponses[childId]
                     delete context.state.requestResponseStatus[childId]
                 }
+                delete context.state.requestResponseStreams[childId]
+                delete context.state.extractPathInputs[childId]
             })
             context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
 
@@ -1261,18 +1286,42 @@ export const store = createStore<State>({
                 context.state.responses[collectionId].unshift(responseToSave)
                 if(context.state.responses[collectionId].length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
                     const responsesToDelete = context.state.responses[collectionId].splice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY)
+                    dropResponseChunkTimes(context.state, responsesToDelete)
                     const responseIdsToDelete = responsesToDelete.map(responseItem => responseItem._id)
                     await deleteResponsesByIds(workspaceId, responsesToDelete[0].collectionId, responseIdsToDelete)
                 }
                 await createResponse(workspaceId, structuredClone(responseToSave))
             }
         },
-        async sendRequest(context, activeTab: CollectionItem) {
+        // The user's Send passes cancelEarlierSends, so a send still running on the tab, which no control could reach
+        // once this one shows, stops and is not saved. Other sends, such as Send with interval and response tags,
+        // may overlap and each one is saved
+        async sendRequest(context, payload: CollectionItem | { collectionItem: CollectionItem, cancelEarlierSends: boolean }) {
+            const { collectionItem: activeTab, cancelEarlierSends } = 'collectionItem' in payload ? payload : { collectionItem: payload, cancelEarlierSends: false }
+
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
 
-            context.state.requestResponseStatus[activeTab._id] = 'loading'
+            const sendStartedAt = Date.now()
+            const tabId = activeTab._id
+
+            const tabSends = runningSends.get(tabId) ?? new Set<AbortController>()
+            runningSends.set(tabId, tabSends)
+            if(cancelEarlierSends) {
+                tabSends.forEach(earlierSend => {
+                    markSendReplaced(earlierSend.signal)
+                    earlierSend.abort()
+                })
+            }
+
+            // the newest send owns the tab's status, response and live view, an earlier one still arriving is only saved
+            const abortController = new AbortController()
+            tabSends.add(abortController)
+            context.state.requestAbortController[tabId] = abortController
+            const isNewestSend = () => context.state.requestAbortController[tabId] === abortController
+            delete context.state.requestResponseStreams[tabId]
+            context.state.requestResponseStatus[tabId] = 'loading'
 
             const { environment, parentHeaders, parentAuthentication, requestParentArray }: {
                 environment: any,
@@ -1328,17 +1377,136 @@ export const store = createStore<State>({
                 ...requestPlugins
             ]
 
-            context.state.requestAbortController[activeTab._id] = new AbortController()
-            const response = await handleRequest(activeTab, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, context.state.requestAbortController[activeTab._id].signal, context.state.flags)
+            // an earlier send on this tab that is still arriving, such as one from Send with interval, must not write into this one
+            const sendId = nanoid()
+            const currentStream = (): ResponseStream | undefined => {
+                const stream = context.state.requestResponseStreams[tabId]
+                return stream?.sendId === sendId ? stream : undefined
+            }
 
-            await context.dispatch('saveResponse', {
-                workspaceId: activeTab.workspaceId,
-                collectionId: activeTab._id,
-                response
-            })
+            // kept here as well as in the stream entry, so the arrival times survive a newer send replacing the entry
+            const chunkEnds: number[] = []
+            const chunkTimes: number[] = []
+            let receivedBytes = 0
+            let receivingTimer: ReturnType<typeof setTimeout> | undefined
+            let progressTimer: ReturnType<typeof setTimeout> | undefined
 
-            context.state.requestResponses[activeTab._id] = response
-            context.state.requestResponseStatus[activeTab._id] = 'loaded'
+            const showProgress = () => {
+                clearTimeout(progressTimer)
+                progressTimer = undefined
+                const stream = currentStream()
+                if(stream && stream.receivedBytes !== receivedBytes) {
+                    stream.receivedBytes = receivedBytes
+                    stream.revision++
+                }
+            }
+
+            const onResponseProgress = (progress: ResponseProgress) => {
+                if(progress.type === 'end') {
+                    // a body that ended keeps the loading overlay while scripts run, a shown one tells it has ended
+                    clearTimeout(receivingTimer)
+                    showProgress()
+                    const stream = currentStream()
+                    if(stream) {
+                        stream.endedAt = Date.now()
+                    }
+                    return
+                }
+
+                if(progress.type === 'head') {
+                    if(!isNewestSend()) {
+                        return
+                    }
+
+                    const view = getStreamView(getResponseContentType(progress.head), context.state.settings.customResponseFormats ?? [])
+
+                    context.state.requestResponseStreams[tabId] = {
+                        sendId,
+                        head: progress.head,
+                        view,
+                        headAt: Date.now(),
+                        receivedBytes: 0,
+                        chunks: markRaw([]),
+                        chunkTimes: markRaw(chunkTimes),
+                        revision: 0,
+                        endedAt: null,
+                    }
+
+                    // Most responses end at once, an event stream such as an MCP reply too, and keep the loading overlay
+                    // then show the result with no flash of the live view. The end of the body clears this timer
+                    receivingTimer = setTimeout(() => {
+                        if(currentStream()) {
+                            context.state.requestResponseStatus[tabId] = 'receiving'
+                        }
+                    }, 250)
+                    return
+                }
+
+                receivedBytes += progress.bytes.byteLength
+                chunkEnds.push(receivedBytes)
+                chunkTimes.push(Date.now() - sendStartedAt)
+
+                const stream = currentStream()
+                if(!stream) {
+                    return
+                }
+
+                stream.chunks.push(progress.bytes)
+
+                if(progressTimer === undefined) {
+                    progressTimer = setTimeout(showProgress, 100)
+                }
+            }
+
+            try {
+                const response = await handleRequest(activeTab, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, abortController.signal, context.state.flags, onResponseProgress)
+
+                // a body that ended before the newer Send is a whole response and is kept
+                if(isSendReplaced(abortController.signal) && 'bodyIncomplete' in response && response.bodyIncomplete === 'cancelled') {
+                    return response
+                }
+
+                // only while the body is the bytes that arrived, since a script can replace it
+                if('_id' in response && chunkEnds.length > 0 && response.buffer?.byteLength === receivedBytes) {
+                    context.state.responseChunkTimes[response._id] = markRaw({ chunkEnds, chunkTimes })
+                }
+
+                // A body cut short is kept in history only for a stream, where part of it is the point. Older versions
+                // read a saved response as whole, and a response tag there would read half a JSON body. Any other one is
+                // shown and not saved, as before streaming, when it was not kept at all
+                const keepsResponse = !('bodyIncomplete' in response) || response.bodyIncomplete === undefined
+                    || ['events', 'lines'].includes(getStreamView(getResponseContentType(response)))
+
+                if(keepsResponse) {
+                    await context.dispatch('saveResponse', {
+                        workspaceId: activeTab.workspaceId,
+                        collectionId: tabId,
+                        response
+                    })
+                }
+
+                if(isNewestSend()) {
+                    context.state.requestResponses[tabId] = response
+                    context.state.requestResponseStatus[tabId] = 'loaded'
+                }
+
+                // the response of this send, which a newer send on the tab may keep from being the one shown
+                return response
+            } finally {
+                tabSends.delete(abortController)
+                if(tabSends.size === 0) {
+                    runningSends.delete(tabId)
+                }
+                clearTimeout(receivingTimer)
+                clearTimeout(progressTimer)
+                if(currentStream()) {
+                    delete context.state.requestResponseStreams[tabId]
+                    // the receiving view has nothing left to show when the response could not be saved
+                    if(context.state.requestResponseStatus[tabId] === 'receiving') {
+                        context.state.requestResponseStatus[tabId] = 'loading'
+                    }
+                }
+            }
         },
         async createWorkspace(context, payload) {
             const newWorkspaceId = nanoid()
@@ -1910,21 +2078,20 @@ export const store = createStore<State>({
             })
 
             const startTime = Date.now()
-            await context.dispatch('sendRequest', currentRequest)
+            // the response of this send, not the one the tab shows, which another send on it can replace
+            const response = await context.dispatch('sendRequest', currentRequest)
             const timeTaken = Date.now() - startTime
 
-            // Check if request succeeded or failed by examining the response
-            const response = context.state.requestResponses[currentRequest._id]
-
             // Check for failure: either response error OR any failed tests
-            const hasResponseError = response && response.error
+            // a body cut short counts as a failed request, even when its tests passed
+            const hasResponseError = response && (response.error || response.bodyIncomplete)
             const hasFailedTests = response && response.testResults && response.testResults.some((test: PluginTestResult) => !test.passed)
 
             if (hasResponseError || hasFailedTests) {
                 // Request failed - determine error message
                 let errorMessage: string
                 if (hasResponseError) {
-                    errorMessage = response.error
+                    errorMessage = response.error || BODY_INCOMPLETE_MESSAGES[response.bodyIncomplete as BodyIncomplete]
                 } else {
                     const failedCount = response.testResults.filter((test: PluginTestResult) => !test.passed).length
                     errorMessage = `${failedCount} test(s) failed`

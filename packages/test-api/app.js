@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import jwt from 'jsonwebtoken'
 import * as Diff from 'diff'
 import multer from 'multer'
+import { addStreamingRoutes } from './streaming-routes.js'
 
 const upload = multer()
 
@@ -23,6 +24,8 @@ app.use((_req, res, next) => {
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition')
     next()
 })
+
+addStreamingRoutes(app)
 
 app.post('/upload-multipart', upload.any(), (req, res) => {
     res.send({

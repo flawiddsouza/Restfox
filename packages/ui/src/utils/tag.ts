@@ -7,6 +7,11 @@ import { jsonStringify } from '@/helpers'
 
 const cache = new Map<string, any>()
 
+// A response cut short holds part of its body, so a tag reads the newest whole one, as when only whole ones were saved
+async function getWholeResponses(workspaceId: string, collectionId: string) {
+    return (await getResponsesByCollectionId(workspaceId, collectionId)).filter(response => response.bodyIncomplete === undefined)
+}
+
 async function getResponseForRequest(
     collectionId: string,
     tagTrigger: boolean,
@@ -28,7 +33,7 @@ async function getResponseForRequest(
         await store.dispatch('sendRequest', request)
     }
 
-    let responses = await getResponsesByCollectionId(request.workspaceId, collectionId)
+    let responses = await getWholeResponses(request.workspaceId, collectionId)
     let latestResponse = responses[0]
 
     let refetchResponses = false
@@ -56,8 +61,9 @@ async function getResponseForRequest(
 
     if (refetchResponses) {
         await store.dispatch('sendRequest', request)
-        responses = await getResponsesByCollectionId(request.workspaceId, collectionId)
-        latestResponse = responses[responses.length - 1]
+        responses = await getWholeResponses(request.workspaceId, collectionId)
+        // newest first, as the database gives them
+        latestResponse = responses[0]
     }
 
     return latestResponse

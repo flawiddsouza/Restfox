@@ -141,12 +141,69 @@ function getAgentForRequest(urlParsed, disableSSLVerification, proxyUrl = null, 
     return agents.get(key)
 }
 
-async function handleSendRequest(data) {
+// a data message carries the chunks gathered until DATA_FLUSH_BYTES or DATA_FLUSH_DELAY ms after the first of them
+const DATA_FLUSH_BYTES = 256 * 1024
+const DATA_FLUSH_DELAY = 50
+
+// copies body chunks into fresh Uint8Arrays of their own, so a pushed message never carries a larger pooled buffer
+function createDataCoalescer(send) {
+    let pending = []
+    let pendingBytes = 0
+    let timer = null
+
+    function flush() {
+        clearTimeout(timer)
+        timer = null
+        if(pendingBytes === 0) {
+            return
+        }
+        const bytes = new Uint8Array(pendingBytes)
+        let offset = 0
+        for(const chunk of pending) {
+            bytes.set(chunk, offset)
+            offset += chunk.length
+        }
+        pending = []
+        pendingBytes = 0
+        send(bytes)
+    }
+
+    return {
+        push(chunk) {
+            if(chunk.length === 0) {
+                return
+            }
+            pending.push(chunk)
+            pendingBytes += chunk.length
+            if(pendingBytes >= DATA_FLUSH_BYTES) {
+                flush()
+            } else if(timer === null) {
+                timer = setTimeout(flush, DATA_FLUSH_DELAY)
+            }
+        },
+        flush,
+        discard() {
+            clearTimeout(timer)
+            timer = null
+            pending = []
+            pendingBytes = 0
+        },
+    }
+}
+
+// pushes head, then data messages, then end through emit. Before the head a failure pushes responseError, after it
+// bodyError, and a cancel after it pushes nothing more, since the renderer has already settled the send.
+async function handleSendRequest(data, emit) {
+    let requestAbortController = null
+    let startTime = null
+    let headEndTime = null
+    let coalescer = null
+
     try {
         const { requestId, url, method, headers, bodyHint, disableSSLVerification } = data
         let { body } = data
 
-        const requestAbortController = new AbortController()
+        requestAbortController = new AbortController()
         abortController[requestId] = requestAbortController
 
         if(cancelledRequestIds.has(requestId)) {
@@ -172,7 +229,7 @@ async function handleSendRequest(data) {
         const proxyUrl = await getProxyForRequest(urlParsed, proxySettings, resolveSystemProxy)
         const { headers: headersToSend, token: proxyToken } = proxyUrl !== null ? takeProxyAuthorization(headers) : { headers, token: null }
 
-        const startTime = new Date()
+        startTime = new Date()
 
         console.log({
             disableSSLVerification
@@ -186,45 +243,70 @@ async function handleSendRequest(data) {
             dispatcher: getAgentForRequest(urlParsed, disableSSLVerification, proxyUrl, proxyToken),
         }))
 
-        const headEndTime = new Date()
+        headEndTime = new Date()
 
-        const status = response.status
-        const statusText = response.statusText
-        const responseHeaders = [...response.headers.entries()]
+        emit({
+            event: 'head',
+            eventData: {
+                status: response.status,
+                statusText: response.statusText,
+                headers: [...response.headers.entries()],
+                headTimeTaken: headEndTime - startTime,
+                requestHeadersSent: proxyUrl !== null ? removeProxyCredentials(headersSent, headers) : headersSent,
+            },
+        })
 
-        const responseBlob = await response.blob()
+        coalescer = createDataCoalescer(bytes => {
+            // a timed flush can fire between a cancel and the body read failing on it
+            if(!requestAbortController.signal.aborted) {
+                emit({ event: 'data', eventData: bytes })
+            }
+        })
+
+        if(response.body) {
+            for await (const chunk of response.body) {
+                coalescer.push(chunk)
+            }
+        }
+
+        coalescer.flush()
 
         const endTime = new Date()
 
-        const mimeType = responseBlob.type
-        const buffer = await responseBlob.arrayBuffer()
-
-        const timeTaken = endTime - startTime
-        const headTimeTaken = headEndTime - startTime
-        const bodyTimeTaken = endTime - headEndTime
-
-        const responseToSend = {
-            status,
-            statusText,
-            headers: responseHeaders,
-            mimeType,
-            buffer: Array.from(new Uint8Array(buffer)),
-            timeTaken,
-            headTimeTaken,
-            bodyTimeTaken,
-            requestHeadersSent: proxyUrl !== null ? removeProxyCredentials(headersSent, headers) : headersSent,
-        }
-        return {
-            event: 'response',
-            eventData: responseToSend
-        }
+        emit({
+            event: 'end',
+            eventData: {
+                timeTaken: endTime - startTime,
+                bodyTimeTaken: endTime - headEndTime,
+            },
+        })
     } catch(e) {
-        console.error('request failed', e)
-        return {
-            event: 'responseError',
-            eventData: e.stack + (e.cause ? '\n' + e.cause?.stack : '')
+        if(headEndTime === null) {
+            console.error('request failed', e)
+            emit({
+                event: 'responseError',
+                eventData: e.stack + (e.cause ? '\n' + e.cause?.stack : '')
+            })
+            return
         }
+
+        if(requestAbortController.signal.aborted) {
+            return
+        }
+
+        console.error('response body failed', e)
+        coalescer?.flush()
+        const endTime = new Date()
+        emit({
+            event: 'bodyError',
+            eventData: {
+                message: e.message + (e.cause?.message ? ': ' + e.cause.message : ''),
+                timeTaken: endTime - startTime,
+                bodyTimeTaken: endTime - headEndTime,
+            },
+        })
     } finally {
+        coalescer?.discard()
         delete abortController[data.requestId]
         cancelledRequestIds.delete(data.requestId)
     }

@@ -24,6 +24,9 @@ import {
     CACertificates,
     ProxySettings,
     MaskedPromptOmitted,
+    BodyIncomplete,
+    ResponseHead,
+    ResponseProgressHandler,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -33,6 +36,9 @@ import { getPromptPreviewValue, handlePromptTag } from '@/utils/prompt-tag'
 import { handleTags } from '@/parsers/tag'
 import type { ParsedResult } from '@/parsers/tag'
 import { getSettingsFile, putSettingsFile, deleteSettingsFile } from '@/db'
+import { ResponseBodyCollector, getStreamView, isSendReplaced } from '@/utils/response-stream'
+import { getResponseContentType } from '@/utils/response'
+import { PROXY_FRAMES_CONTENT_TYPE, PROXY_FRAME_TYPE, readProxyFrames } from '@/utils/proxy-frames'
 
 // From: https://stackoverflow.com/a/67802481/4932305
 export function toTree(array: CollectionItem[]): CollectionItem[] {
@@ -492,11 +498,28 @@ export async function registerProxySettings(proxySettings: ProxySettings): Promi
     return responseBody.id
 }
 
+// Electron pushes the messages of every send on one channel, a send's handler is found by its request id
+const electronRequestEventHandlers = new Map<string, (message: any) => void>()
+let electronRequestEventsSource: unknown = null
+
+function listenToElectronRequestEvents() {
+    if(electronRequestEventsSource === window.electronIPC) {
+        return
+    }
+    electronRequestEventsSource = window.electronIPC
+    window.electronIPC.onRequestEvent((requestId: string, message: any) => {
+        electronRequestEventHandlers.get(requestId)?.(message)
+    })
+}
+
+// The response arrives as head, then body chunks, then end. A caller that passes onResponseProgress is told of each as it
+// arrives and, when a timeout, a cancel or a failure cuts the body short after the head, gets what arrived with
+// bodyIncomplete set. Any other caller, and every failure before the head, gets the whole response or the error as before
 export async function fetchWrapper(url: URL, method: string, headers: Record<string, string>, body: any, abortControllerSignal: AbortSignal, flags: {
     electronSwitchToChromiumFetch: boolean,
     disableSSLVerification: boolean,
     requestTimeout?: number
-}): Promise<RequestInitialResponse> {
+}, onResponseProgress?: ResponseProgressHandler): Promise<RequestInitialResponse> {
     const requestTimeoutRaw = flags.requestTimeout ?? 0
     const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
     let timedOut = false
@@ -520,6 +543,17 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
         }, requestTimeout)
 
         signal = timeoutController.signal
+    }
+
+    // why the body stopped, for a stop on this side: the timeout or the caller's cancel, otherwise the connection
+    const bodyIncompleteReason = (): BodyIncomplete => timedOut ? 'timedOut' : abortControllerSignal.aborted ? 'cancelled' : 'failed'
+
+    // what arrived before the body was cut short. A cancel or a timeout is shown in the panel, a failure is also logged
+    const partialResponse = async(collector: ResponseBodyCollector, reason: BodyIncomplete, error: unknown, end: { timeTaken?: number, bodyTimeTaken?: number } = {}) => {
+        if(reason === 'failed') {
+            console.error(error)
+        }
+        return await collector.result(end, reason)
     }
 
     try {
@@ -607,6 +641,9 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 'x-proxy-flag-timeout': requestTimeout.toString(),
                 // header names reach the server lowercased, by Node and by any HTTP/2 hop in front of it, a value keeps them as typed
                 'x-proxy-flag-header-names': JSON.stringify(Object.keys(headers)),
+                // the body comes back in frames as it arrives (utils/proxy-frames.ts), an older server ignores this
+                // and sends the whole response as JSON
+                'x-proxy-flag-stream': '1',
             }
 
             // Settings > Proxy, encoded since a header value holds only Latin-1 and a password may not. Never saved is
@@ -622,6 +659,7 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
 
             const caCertificates = await getSavedCACertificates()
 
+            // the frames reply as is, any other reply, which is everything before the upstream head, read as JSON
             const fetchFromProxy = async(caCertificatesId: string | null) => {
                 const response = await fetch('/proxy', {
                     method: 'POST',
@@ -630,14 +668,68 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                     signal
                 })
 
+                if((response.headers.get('content-type') ?? '').startsWith(PROXY_FRAMES_CONTENT_TYPE)) {
+                    return response
+                }
+
                 return await response.json()
             }
 
-            let responseBody = await fetchFromProxy(caCertificates ? await registerCACertificatesWithServer(caCertificates.certificates) : null)
+            const caCertificatesId = caCertificates ? await registerCACertificatesWithServer(caCertificates.certificates) : null
+            // timed from the send, as the other transports are, since the server answers only once the upstream head arrived
+            const collector = new ResponseBodyCollector(Date.now())
+            let responseBody = await fetchFromProxy(caCertificatesId)
 
             // the server restarted and forgot the certificates
-            if(responseBody.event === 'caCertificatesNotFound' && caCertificates) {
+            if(!(responseBody instanceof Response) && responseBody.event === 'caCertificatesNotFound' && caCertificates) {
                 responseBody = await fetchFromProxy(await registerCACertificatesWithServer(caCertificates.certificates, true))
+            }
+
+            if(responseBody instanceof Response) {
+                const textDecoder = new TextDecoder()
+                // the last frame, set by the frame callback
+                const last: {
+                    end: { timeTaken: number, bodyTimeTaken: number } | null,
+                    failure: { message: string, timedOut: boolean } | null,
+                } = { end: null, failure: null }
+
+                try {
+                    await readProxyFrames(responseBody.body!, frame => {
+                        if(frame.type === PROXY_FRAME_TYPE.HEAD) {
+                            const head: ResponseHead = JSON.parse(textDecoder.decode(frame.payload))
+                            collector.head(head)
+                            onResponseProgress?.({ type: 'head', head })
+                        } else if(frame.type === PROXY_FRAME_TYPE.DATA) {
+                            collector.push(frame.payload)
+                            onResponseProgress?.({ type: 'data', bytes: frame.payload })
+                        } else if(frame.type === PROXY_FRAME_TYPE.END) {
+                            last.end = JSON.parse(textDecoder.decode(frame.payload))
+                        } else if(frame.type === PROXY_FRAME_TYPE.ERROR) {
+                            last.failure = JSON.parse(textDecoder.decode(frame.payload))
+                        }
+                    })
+                } catch(e) {
+                    if(!onResponseProgress || !collector.hasHead) {
+                        throw e
+                    }
+                    return await partialResponse(collector, bodyIncompleteReason(), e)
+                }
+
+                if(last.end !== null) {
+                    return await collector.result(last.end)
+                }
+
+                // the server's timeout or a failed upstream ends the frames with an error frame, any other end is a lost connection
+                const error = new Error(last.failure?.message ?? 'The connection to the server closed before the response ended')
+                if(last.failure?.timedOut) {
+                    error.name = 'TimeoutError'
+                }
+
+                if(!onResponseProgress || !collector.hasHead) {
+                    throw error
+                }
+
+                return await partialResponse(collector, last.failure?.timedOut ? 'timedOut' : 'failed', error)
             }
 
             return await new Promise((resolve, reject) => {
@@ -685,13 +777,68 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 throw new DOMException('The user aborted a request.', 'AbortError')
             }
 
-            return await new Promise((resolve, reject) => {
+            listenToElectronRequestEvents()
+
+            return await new Promise<RequestInitialResponse>((resolve, reject) => {
                 const requestId = nanoid()
+                const collector = new ResponseBodyCollector(Date.now())
+                let settled = false
+
+                // the first outcome wins, later pushes for this request are dropped
+                const settle = (outcome: () => void) => {
+                    if(settled) {
+                        return
+                    }
+                    settled = true
+                    electronRequestEventHandlers.delete(requestId)
+                    // the store keeps the signal until the tab's next send, and this handler holds every received chunk
+                    signal.onabort = null
+                    try {
+                        outcome()
+                    } catch(e) {
+                        reject(e)
+                    }
+                }
 
                 signal.onabort = () => {
+                    if(settled) {
+                        return
+                    }
                     window.electronIPC.cancelRequest(requestId)
-                    reject(new DOMException('The user aborted a request.', 'AbortError'))
+                    settle(() => {
+                        if(onResponseProgress && collector.hasHead) {
+                            partialResponse(collector, bodyIncompleteReason(), null).then(resolve, reject)
+                        } else {
+                            reject(new DOMException('The user aborted a request.', 'AbortError'))
+                        }
+                    })
                 }
+
+                // the response arrives only as pushed messages, the invoke reply can land between them and carries nothing
+                electronRequestEventHandlers.set(requestId, (message: any) => {
+                    if(message.event === 'head') {
+                        const head: ResponseHead = message.eventData
+                        collector.head(head)
+                        onResponseProgress?.({ type: 'head', head })
+                    } else if(message.event === 'data') {
+                        const bytes: Uint8Array = message.eventData instanceof Uint8Array ? message.eventData : new Uint8Array(message.eventData)
+                        collector.push(bytes)
+                        onResponseProgress?.({ type: 'data', bytes })
+                    } else if(message.event === 'end') {
+                        settle(() => collector.result(message.eventData).then(resolve, reject))
+                    } else if(message.event === 'bodyError') {
+                        const { message: reason, timeTaken, bodyTimeTaken } = message.eventData
+                        settle(() => {
+                            if(onResponseProgress) {
+                                partialResponse(collector, 'failed', new Error(reason), { timeTaken, bodyTimeTaken }).then(resolve, reject)
+                            } else {
+                                reject(new Error(reason))
+                            }
+                        })
+                    } else if(message.event === 'responseError') {
+                        settle(() => reject(new Error(message.eventData)))
+                    }
+                })
 
                 window.electronIPC.sendRequest({
                     requestId,
@@ -701,22 +848,14 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                     body,
                     bodyHint,
                     disableSSLVerification: flags.disableSSLVerification,
-                }).then((data: any) => {
-                    if(data.event === 'response') {
-                        data.eventData.buffer = new Uint8Array(data.eventData.buffer).buffer
-                        resolve(data.eventData)
-                    }
-
-                    if(data.event === 'responseError') {
-                        reject(new Error(data.eventData))
-                    }
                 }).catch((error: any) => {
-                    reject(error)
+                    settle(() => reject(error))
                 })
             })
         }
 
-        const startTime = new Date()
+        const startTime = Date.now()
+        const collector = new ResponseBodyCollector(startTime)
 
         const response = await fetch(url, {
             method,
@@ -725,33 +864,38 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
             signal
         })
 
-        const headEndTime = new Date()
+        const headEndTime = Date.now()
 
-        const status = response.status
-        const statusText = response.statusText
-        const responseHeaders = [...response.headers.entries()]
-
-        const responseBlob = await response.blob()
-
-        const endTime = new Date()
-
-        const mimeType = responseBlob.type
-        const buffer = await responseBlob.arrayBuffer()
-
-        const timeTaken = Number(endTime) - Number(startTime)
-        const headTimeTaken = Number(headEndTime) - Number(startTime)
-        const bodyTimeTaken = Number(endTime) - Number(headEndTime)
-
-        return {
-            status,
-            statusText,
-            headers: responseHeaders,
-            mimeType,
-            buffer,
-            timeTaken,
-            headTimeTaken,
-            bodyTimeTaken,
+        const head: ResponseHead = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: [...response.headers.entries()],
+            headTimeTaken: headEndTime - startTime,
         }
+        collector.head(head)
+        onResponseProgress?.({ type: 'head', head })
+
+        try {
+            if(response.body !== null) {
+                const reader = response.body.getReader()
+                for(let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+                    collector.push(chunk.value)
+                    onResponseProgress?.({ type: 'data', bytes: chunk.value })
+                }
+            }
+        } catch(e) {
+            if(!onResponseProgress) {
+                throw e
+            }
+            return await partialResponse(collector, bodyIncompleteReason(), e)
+        }
+
+        const endTime = Date.now()
+
+        return await collector.result({
+            timeTaken: endTime - startTime,
+            bodyTimeTaken: endTime - headEndTime,
+        })
     } catch(e) {
         if(timedOut) {
             const error = new Error(`Request timed out after ${requestTimeout} ms`)
@@ -1021,6 +1165,21 @@ function setDefaultUserAgent(headers: Record<string, string>) {
     }
 }
 
+// names the plugin and the line that failed, and the error it threw
+function describePluginError(e: any, currentPlugin: string | null): { description: string, error: string } {
+    if(e?.message === 'Unable to parse plugin') {
+        return {
+            description: `Error in Plugin "${currentPlugin}"${e.lineNumber !== '' ? ' at line number ' + e.lineNumber : ''}`,
+            error: `${e.originalError.name}: ${e.originalError.message}`,
+        }
+    }
+
+    return {
+        description: `Error in Plugin "${currentPlugin}"`,
+        error: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+    }
+}
+
 export async function handleRequest(
     request: CollectionItem,
     environment: any,
@@ -1034,7 +1193,8 @@ export async function handleRequest(
         electronSwitchToChromiumFetch: boolean,
         disableSSLVerification: boolean,
         requestTimeout?: number
-    }
+    },
+    onResponseProgress?: ResponseProgressHandler
 ) {
     const state: HandleRequestState = {
         currentPlugin: null,
@@ -1049,7 +1209,8 @@ export async function handleRequest(
 
         setDefaultUserAgent(headers)
 
-        const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags)
+        const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags, onResponseProgress)
+        onResponseProgress?.({ type: 'end' })
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
         const headersSent = response.requestHeadersSent ?? undefined
@@ -1134,18 +1295,43 @@ export async function handleRequest(
             responseToSend.request.original.authentication = JSON.parse(JSON.stringify(request.authentication))
         }
 
-        for(const plugin of plugins) {
+        // only set on a body cut short, so a complete one is saved as before
+        if(response.bodyIncomplete !== undefined) {
+            responseToSend.bodyIncomplete = response.bodyIncomplete
+        }
+
+        // A body cut short runs the scripts only when it is a stream, where part of it is the point. Any other one skips
+        // them, as when a body cut short was not kept, so no script sets a variable from half a body. A send a newer
+        // Send replaced is thrown away, so its scripts must not set a variable the new send reads either
+        const runsPostRequestScripts = responseToSend.bodyIncomplete === undefined
+            || (!isSendReplaced(abortControllerSignal) && ['events', 'lines'].includes(getStreamView(getResponseContentType(responseToSend))))
+        const postRequestPlugins = runsPostRequestScripts ? plugins : []
+
+        for(const plugin of postRequestPlugins) {
             const { expose } = createResponseContextForPlugin(responseToSend, environment, setEnvironmentVariable, state.testResults, plugin.collectionId, send)
 
             state.currentPlugin = plugin.type === 'script' ? 'Script: Post Request' : `${plugin.name} (Post Request)`
 
-            await usePlugin(expose, {
-                name: state.currentPlugin,
-                code: typeof plugin.code === 'object' ? plugin.code.post_request : plugin.code,
-                parentPathForReadFile: workspaceLocation,
-            })
+            try {
+                await usePlugin(expose, {
+                    name: state.currentPlugin,
+                    code: typeof plugin.code === 'object' ? plugin.code.post_request : plugin.code,
+                    parentPathForReadFile: workspaceLocation,
+                })
 
-            responseToSend = { ...responseToSend, buffer: expose.context.response.getBody() }
+                responseToSend = { ...responseToSend, buffer: expose.context.response.getBody() }
+            } catch(e: any) {
+                // An endless stream only ends cut short, so scripts run on what arrived. One that fails on it, such as
+                // by reading half a JSON body, keeps the received part and is reported as a failed test instead. The
+                // scripts after it do not run, as after an error on a complete body
+                if(responseToSend.bodyIncomplete === undefined) {
+                    throw e
+                }
+                const pluginError = describePluginError(e, state.currentPlugin)
+                console.error(`${pluginError.description}\n\n${pluginError.error}`)
+                state.testResults.push({ description: pluginError.description, passed: false, error: pluginError.error })
+                break
+            }
         }
 
         responseToSend.testResults = state.testResults
@@ -1174,7 +1360,8 @@ export async function handleRequest(
             }
 
             if(e.message === 'Unable to parse plugin') {
-                error = `Error in Plugin "${state.currentPlugin}"${e.lineNumber !== '' ? ' at line number ' + e.lineNumber : ''}\n\n${e.originalError.name}: ${e.originalError.message}`
+                const pluginError = describePluginError(e, state.currentPlugin)
+                error = `${pluginError.description}\n\n${pluginError.error}`
             }
 
             if(e.cause === 'display-error') {

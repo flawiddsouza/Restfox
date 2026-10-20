@@ -80,7 +80,7 @@
                     <div style="padding-top: 1rem">
                         <div style="margin-bottom: var(--label-margin-bottom);">Request Timeout (ms)</div>
                         <input type="number" min="0" step="1000" v-model.number="requestTimeout" class="full-width-input" placeholder="0">
-                        <div style="margin-top: 0.3rem;">Abort a request if it does not complete within this many milliseconds. Set to <span class="code">0</span> for no timeout (unlimited).</div>
+                        <div style="margin-top: 0.3rem;">Abort a request if it does not complete within this many milliseconds. Set to <span class="code">0</span> for no timeout (unlimited). The timeout also cuts short a response that is still arriving, such as an event stream.</div>
                     </div>
 
                     <template v-if="flags.isElectron || flags.isWebStandalone">

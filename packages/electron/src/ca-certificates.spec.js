@@ -4,7 +4,8 @@ import tls from 'node:tls'
 import { X509Certificate } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { handleSendRequest, setCustomCACertificates } from './request.js'
+import { setCustomCACertificates } from './request.js'
+import { collectRequestEvents } from './collect-request-events.js'
 import { trustSystemCACertificates, parseCACertificates, getCACertificatesWithCustom, isCertificateTrustedByCustomCA } from './ca-certificates.js'
 
 const filesDir = path.join(__dirname, '..', '..', 'test-api', 'files')
@@ -35,8 +36,8 @@ function startServer(key, cert) {
     })
 }
 
-function send(url) {
-    return handleSendRequest({
+async function send(url) {
+    const { result } = await collectRequestEvents({
         requestId: 'spec',
         url,
         method: 'GET',
@@ -45,6 +46,7 @@ function send(url) {
         bodyHint: null,
         disableSSLVerification: false,
     })
+    return result
 }
 
 test('trusts a server signed by the custom CA certificates, and stops once they are removed', async() => {

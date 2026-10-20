@@ -1,4 +1,4 @@
-import { RequestFinalResponse } from '@/global'
+import { RequestInitialResponseHeader } from '@/global'
 import { jsonStringify } from '@/helpers'
 import { JSONPath } from 'jsonpath-plus'
 import xpath from 'xpath'
@@ -52,7 +52,7 @@ export function filterXmlResponse(buffer: BufferSource, query: string) {
     }
 }
 
-export function getResponseContentType(response: RequestFinalResponse) {
+export function getResponseContentType(response: { headers?: RequestInitialResponseHeader[] } | null | undefined) {
     if(!response || response.headers === undefined) {
         return ''
     }

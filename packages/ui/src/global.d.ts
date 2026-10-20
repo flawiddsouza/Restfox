@@ -92,6 +92,26 @@ export interface RequestBody {
 
 export type RequestInitialResponseHeader = [string, string]
 
+// why a response holds only part of its body, stored in history, so a value never changes meaning
+export type BodyIncomplete = 'cancelled' | 'timedOut' | 'failed'
+
+export interface ResponseHead {
+    status: number
+    statusText: string
+    headers: RequestInitialResponseHeader[]
+    headTimeTaken: number
+    requestHeadersSent?: RequestInitialResponseHeader[] | null
+}
+
+export type ResponseProgress =
+    | { type: 'head', head: ResponseHead }
+    // never changed by the receiver
+    | { type: 'data', bytes: Uint8Array }
+    // the body is over, whole or cut short, and scripts may still run on it
+    | { type: 'end' }
+
+export type ResponseProgressHandler = (progress: ResponseProgress) => void
+
 export interface RequestInitialResponse {
     status: number
     statusText: string
@@ -103,6 +123,63 @@ export interface RequestInitialResponse {
     bodyTimeTaken?: number
     // request headers as they went over the wire, null or absent when the transport cannot report them
     requestHeadersSent?: RequestInitialResponseHeader[] | null
+    // absent means the whole body arrived
+    bodyIncomplete?: BodyIncomplete
+}
+
+export type ResponseStreamView = 'events' | 'lines' | 'text' | 'bytes'
+
+export interface ResponseStream {
+    sendId: string
+    head: ResponseHead
+    view: ResponseStreamView
+    // Date.now() at head
+    headAt: number
+    // refreshed at most every 100 ms
+    receivedBytes: number
+    // markRaw, append-only
+    chunks: Uint8Array[]
+    // markRaw, append-only, one per chunk: ms since the send started when that chunk arrived
+    chunkTimes: number[]
+    // bumped with receivedBytes
+    revision: number
+    // Date.now() when the body was over, null while it arrives
+    endedAt: number | null
+}
+
+// what the user did in an event list, carried over when one list replaces another for the same response
+export interface EventListViewState {
+    // the item shown in the detail pane
+    selectedIndex: number | null
+    // the path the user typed for this request, null until they type one
+    extractPathInput: string | null
+    // null until the list was scrolled
+    scrollTop: number | null
+    // the list follows the newest event, null until known: a live list starts following, a finished one does not
+    stickToBottom: boolean | null
+}
+
+// when each part of a body arrived, kept in memory for responses received since the app started, never saved
+export interface ResponseChunkTimes {
+    // byte offset in the body where each chunk ends
+    chunkEnds: number[]
+    // ms since the send started when each chunk arrived
+    chunkTimes: number[]
+}
+
+export interface EventStreamItem {
+    // 0-based, in arrival order
+    index: number
+    // SSE: data lines joined with \n, lines: the line text
+    data: string
+    // SSE event field when present
+    event?: string
+    id?: string
+    retry?: number
+    // SSE ':' line, data holds the text after ':'
+    comment?: boolean
+    // not closed by a blank line (SSE) or a newline (lines) when the body ended
+    incomplete?: boolean
 }
 
 export interface RequestFinalResponse {
@@ -130,6 +207,8 @@ export interface RequestFinalResponse {
     createdAt: number
     testResults: any[]
     name?: string
+    // absent means the whole body arrived
+    bodyIncomplete?: BodyIncomplete
 }
 
 // Settings > CA Certificates
@@ -205,7 +284,13 @@ export interface State {
     tabs: CollectionItem[]
     detachedTabs: CollectionItem[]
     activeTab: any | null
+    // 'loading', 'receiving', 'loaded' or 'pending', in memory only
     requestResponseStatus: { [key: string]: string }
+    requestResponseStreams: { [tabId: string]: ResponseStream }
+    // keyed by response _id, markRaw values, dropped with the response
+    responseChunkTimes: { [responseId: string]: ResponseChunkTimes }
+    // the extracted-text path the user typed for a request's event lists, in memory only, '' when cleared
+    extractPathInputs: { [requestId: string]: string }
     requestResponses: { [key: string]: any | null }
     requestAbortController: { [key: string]: AbortController }
     responses: { [key: string]: any[] }

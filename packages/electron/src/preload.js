@@ -46,4 +46,9 @@ electronIPC.workspaceChanged = (callback) => {
     ipcRenderer.on('workspaceChanged', (_, ...args) => callback(...args))
 }
 
+// head, data, end, bodyError and responseError messages of every sendRequest
+electronIPC.onRequestEvent = (callback) => {
+    ipcRenderer.on('requestEvent', (_, requestId, message) => callback(requestId, message))
+}
+
 contextBridge.exposeInMainWorld('electronIPC', electronIPC)
