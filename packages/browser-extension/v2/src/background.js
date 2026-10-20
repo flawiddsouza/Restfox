@@ -112,12 +112,29 @@ browser.pageAction.onClicked.addListener(handleAction)
 let abortController = new Map()
 let cancelledRequestIds = new Set()
 
+// the request body as fetch takes it, from the plain values a message can carry
+function requestBody(body, bodyHint) {
+    if(bodyHint === 'FormData') {
+        const formData = new FormData()
+        for(const item of body) {
+            const value = typeof item[1] !== 'object' ? item[1] : new File([new Uint8Array(item[1].buffer)], item[1].name, { type: item[1].type })
+            formData.append(item[0], value)
+        }
+        return formData
+    }
+
+    if(bodyHint === 'File') {
+        return new File([new Uint8Array(body.buffer)], body.name, { type: body.type })
+    }
+
+    return body
+}
+
 async function handleSendRequest(message, sendResponse) {
     const { eventId } = message
 
     try {
         const { url, method, headers, bodyHint } = message.eventData
-        let { body } = message.eventData
 
         const requestAbortController = new AbortController()
         abortController.set(eventId, requestAbortController)
@@ -127,18 +144,7 @@ async function handleSendRequest(message, sendResponse) {
             cancelledRequestIds.delete(eventId)
         }
 
-        if(bodyHint === 'FormData') {
-            const formData = new FormData()
-            for(const item of body) {
-                const value = typeof item[1] !== 'object' ? item[1] : new File([new Uint8Array(item[1].buffer)], item[1].name, { type: item[1].type })
-                formData.append(item[0], value)
-            }
-            body = formData
-        }
-
-        if(bodyHint === 'File') {
-            body = new File([new Uint8Array(body.buffer)], body.name, { type: body.type })
-        }
+        const body = requestBody(message.eventData.body, bodyHint)
 
         const startTime = new Date()
 
@@ -194,6 +200,75 @@ async function handleSendRequest(message, sendResponse) {
     }
 }
 
+// a request sent over a port, whose response goes back in parts as it arrives: responseHead, responseData for each
+// chunk, then responseEnd or responseBodyError, or responseError when it fails before the head. The page
+// disconnecting the port, by a cancel or by closing, aborts it
+function handleStreamingRequest(port) {
+    const requestAbortController = new AbortController()
+    port.onDisconnect.addListener(() => requestAbortController.abort())
+
+    // the page may have disconnected meanwhile
+    const post = message => {
+        try {
+            port.postMessage(message)
+        } catch {}
+    }
+
+    port.onMessage.addListener(async({ eventData }) => {
+        const { url, method, headers, bodyHint } = eventData
+
+        const startTime = new Date()
+        let response
+        let headEndTime
+
+        try {
+            response = await fetch(url, {
+                method,
+                headers,
+                body: method !== 'GET' ? requestBody(eventData.body, bodyHint) : undefined,
+                signal: requestAbortController.signal
+            })
+            headEndTime = new Date()
+        } catch(e) {
+            post({ event: 'responseError', eventData: e.message })
+            return
+        }
+
+        post({
+            event: 'responseHead',
+            eventData: {
+                status: response.status,
+                statusText: response.statusText,
+                headers: [...response.headers.entries()],
+                headTimeTaken: headEndTime - startTime,
+            }
+        })
+
+        try {
+            if(response.body !== null) {
+                const reader = response.body.getReader()
+                for(let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+                    // a message carries plain values, the content script makes the bytes again
+                    post({ event: 'responseData', eventData: Array.from(chunk.value) })
+                }
+            }
+        } catch(e) {
+            const endTime = new Date()
+            post({ event: 'responseBodyError', eventData: { message: e.message, timeTaken: endTime - startTime, bodyTimeTaken: endTime - headEndTime } })
+            return
+        }
+
+        const endTime = new Date()
+        post({ event: 'responseEnd', eventData: { timeTaken: endTime - startTime, bodyTimeTaken: endTime - headEndTime } })
+    })
+}
+
+function connectHandler(port) {
+    if(port.name === 'sendRequest') {
+        handleStreamingRequest(port)
+    }
+}
+
 function messageHandler(message, _sender, sendResponse) {
     if(message.event === 'sendRequest') {
         handleSendRequest(message, sendResponse)
@@ -212,3 +287,4 @@ function messageHandler(message, _sender, sendResponse) {
 }
 
 browser.runtime.onMessage.addListener(messageHandler)
+browser.runtime.onConnect.addListener(connectHandler)

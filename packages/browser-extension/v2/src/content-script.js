@@ -5,7 +5,55 @@ function init() {
 
     window.contentScriptLoaded = true
 
+    // the open port of each request sent with stream, by eventId
+    const streamingRequests = new Map()
+
+    // the response comes back in parts as it arrives, each passed on to the page with the request's eventId
+    const sendStreamingRequest = ({ eventId, eventData }) => {
+        const port = browser.runtime.connect({ name: 'sendRequest' })
+        streamingRequests.set(eventId, port)
+        let headReceived = false
+
+        port.onMessage.addListener(receivedMessage => {
+            if(receivedMessage.event === 'responseHead') {
+                headReceived = true
+            }
+
+            if(receivedMessage.event === 'responseData') {
+                receivedMessage.eventData = new Uint8Array(receivedMessage.eventData)
+            }
+
+            if(receivedMessage.event === 'responseError') {
+                receivedMessage.eventData = new Error(receivedMessage.eventData)
+            }
+
+            window.postMessage({ ...receivedMessage, eventId })
+
+            if(['responseEnd', 'responseBodyError', 'responseError'].includes(receivedMessage.event)) {
+                streamingRequests.delete(eventId)
+                port.disconnect()
+            }
+        })
+
+        // the extension was reloaded, updated or turned off before the response ended
+        port.onDisconnect.addListener(() => {
+            if(!streamingRequests.has(eventId)) {
+                return
+            }
+            streamingRequests.delete(eventId)
+            const reason = 'The Restfox CORS Helper extension stopped before the response ended'
+            window.postMessage(headReceived ? { event: 'responseBodyError', eventId, eventData: { message: reason } } : { event: 'responseError', eventId, eventData: new Error(reason) })
+        })
+
+        port.postMessage({ eventData })
+    }
+
     window.addEventListener('message', message => {
+        if(message.data.event === 'sendRequest' && message.data.stream) {
+            sendStreamingRequest(message.data)
+            return
+        }
+
         if(message.data.event === 'sendRequest') {
             browser.runtime.sendMessage(message.data, receivedMessage => {
                 if(receivedMessage.event === 'response') {
@@ -21,7 +69,14 @@ function init() {
         }
 
         if(message.data.event === 'cancelRequest') {
-            browser.runtime.sendMessage(message.data)
+            const port = streamingRequests.get(message.data.eventId)
+            if(port) {
+                // the background aborts the request when its port disconnects
+                streamingRequests.delete(message.data.eventId)
+                port.disconnect()
+            } else {
+                browser.runtime.sendMessage(message.data)
+            }
         }
     })
 

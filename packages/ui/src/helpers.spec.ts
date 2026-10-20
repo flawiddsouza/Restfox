@@ -935,6 +935,234 @@ describe('Streaming responses', () => {
         })
     })
 
+    describe('CORS Helper extension', () => {
+        // the page's message listeners, which the edge runtime's window cannot dispatch to
+        const messageListeners = new Set<(message: { data: unknown }) => void>()
+
+        // what the extension's content script posts to the page
+        const reply = (data: unknown) => [...messageListeners].forEach(listener => listener({ data }))
+
+        // the page's own postMessage, standing in for the content script, which reads what the page posts
+        const stubExtension = () => {
+            const posted: any[] = []
+            const postMessage = vi.spyOn(window, 'postMessage').mockImplementation((message: any) => {
+                posted.push(message)
+            })
+            const sent = () => posted.find(message => message.event === 'sendRequest')
+            return { posted, postMessage, sent }
+        }
+
+        beforeEach(() => {
+            messageListeners.clear()
+            vi.spyOn(window, 'addEventListener').mockImplementation((type: string, listener: any) => {
+                if(type === 'message') {
+                    messageListeners.add(listener)
+                }
+            })
+            vi.spyOn(window, 'removeEventListener').mockImplementation((type: string, listener: any) => {
+                if(type === 'message') {
+                    messageListeners.delete(listener)
+                }
+            })
+        })
+
+        const head = { status: 200, statusText: 'OK', headers: [['content-type', 'Application/JSON; Charset=UTF-8']], headTimeTaken: 5 }
+        const end = { timeTaken: 12, bodyTimeTaken: 7 }
+
+        // what an extension before 1.1.0 replies, the whole response with a mimeType from blob()
+        const wholeResponse = (bytes: Uint8Array) => ({
+            status: 200,
+            statusText: 'OK',
+            headers: head.headers,
+            mimeType: 'application/json;charset=utf-8',
+            buffer: new Uint8Array(bytes).buffer,
+            timeTaken: 12,
+            headTimeTaken: 5,
+            bodyTimeTaken: 7,
+        })
+
+        const replyInParts = (eventId: string, bytes: Uint8Array) => {
+            reply({ event: 'responseHead', eventId, eventData: head })
+            unevenChunks(bytes).forEach(chunk => reply({ event: 'responseData', eventId, eventData: chunk }))
+            reply({ event: 'responseEnd', eventId, eventData: end })
+        }
+
+        beforeEach(() => {
+            (window as WindowWithExtensionHook).__EXTENSION_HOOK__ = 'Restfox CORS Helper Enabled'
+        })
+
+        const send = async(onResponseProgress?: ReturnType<typeof vi.fn>, signal = new AbortController().signal, requestTimeout = 0) => {
+            const promise = fetchWrapper(requestUrl, 'GET', {}, null, signal, fetchFlags(requestTimeout), onResponseProgress)
+            // the message is posted once the body is ready to go
+            await vi.waitFor(() => expect(window.postMessage).toHaveBeenCalled())
+            return promise
+        }
+
+        test('asks for the response in parts and posts the request as before', async() => {
+            const { sent } = stubExtension()
+            const promise = fetchWrapper(requestUrl, 'POST', { 'X-Trace': 't1' }, new File(['ab'], 'a.txt', { type: 'text/plain' }), new AbortController().signal, fetchFlags())
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+
+            expect(sent()).toEqual({
+                event: 'sendRequest',
+                eventId: expect.any(String),
+                stream: true,
+                eventData: {
+                    url: 'https://example.com/',
+                    method: 'POST',
+                    headers: { 'X-Trace': 't1' },
+                    body: { name: 'a.txt', type: 'text/plain', buffer: [97, 98] },
+                    bodyHint: 'File',
+                },
+            })
+
+            replyInParts(sent().eventId, jsonBody)
+            await promise
+        })
+
+        for(const [bodyName, bytes] of [['JSON', jsonBody], ['binary', binaryBody]] as const) {
+            test(`a ${bodyName} response in parts gives exactly what an extension before 1.1.0 gave whole, with or without a progress handler`, async() => {
+                const expected = wholeResponse(bytes)
+
+                for(const onResponseProgress of [undefined, vi.fn()]) {
+                    const { sent, postMessage } = stubExtension()
+                    const promise = send(onResponseProgress)
+                    await vi.waitFor(() => expect(sent()).toBeDefined())
+                    replyInParts(sent().eventId, bytes)
+                    const response = await promise
+
+                    expect(Object.keys(response).sort()).toEqual(Object.keys(expected).sort())
+                    expect(response).toEqual(expected)
+                    expect(new Uint8Array(response.buffer)).toEqual(bytes)
+                    if(onResponseProgress) {
+                        expect(onResponseProgress.mock.calls[0][0]).toEqual({ type: 'head', head })
+                        expect(progressBytes(onResponseProgress)).toEqual(bytes)
+                    }
+                    postMessage.mockRestore()
+                }
+            })
+        }
+
+        test('the whole response from an extension before 1.1.0 is taken as before, and one before 1.0.9 without an eventId too', async() => {
+            for(const withEventId of [true, false]) {
+                const { sent, postMessage } = stubExtension()
+                const onResponseProgress = vi.fn()
+                const promise = send(onResponseProgress)
+                await vi.waitFor(() => expect(sent()).toBeDefined())
+                const expected = wholeResponse(jsonBody)
+                reply({ event: 'response', ...(withEventId ? { eventId: sent().eventId } : {}), eventData: expected })
+
+                expect(await promise).toEqual(expected)
+                expect(onResponseProgress).not.toHaveBeenCalled()
+                postMessage.mockRestore()
+            }
+        })
+
+        test('the parts of another request are not taken', async() => {
+            const { sent } = stubExtension()
+            const promise = send(vi.fn())
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+
+            replyInParts('another-request', encoder.encode('{"other":true}'))
+            replyInParts(sent().eventId, jsonBody)
+
+            expect(new Uint8Array((await promise).buffer)).toEqual(jsonBody)
+        })
+
+        test('a cancel after the head keeps what arrived, tells the extension and ignores later parts, without a handler it rejects as before', async() => {
+            const { sent, posted } = stubExtension()
+            const abortController = new AbortController()
+            const onResponseProgress = vi.fn()
+            const promise = send(onResponseProgress, abortController.signal)
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+            const { eventId } = sent()
+
+            reply({ event: 'responseHead', eventId, eventData: { ...head, headers: [['content-type', 'text/event-stream']] } })
+            reply({ event: 'responseData', eventId, eventData: sseChunk })
+            abortController.abort()
+            const response = await promise
+
+            expect(posted).toContainEqual({ event: 'cancelRequest', eventId })
+            expect(response.bodyIncomplete).toBe('cancelled')
+            expect(response.mimeType).toBe('text/event-stream')
+            expect(new Uint8Array(response.buffer)).toEqual(sseChunk)
+
+            const callsBefore = onResponseProgress.mock.calls.length
+            reply({ event: 'responseData', eventId, eventData: encoder.encode('late') })
+            reply({ event: 'responseEnd', eventId, eventData: end })
+            expect(onResponseProgress.mock.calls.length).toBe(callsBefore)
+
+            const abortWithoutHandler = new AbortController()
+            const withoutHandler = send(undefined, abortWithoutHandler.signal)
+            await vi.waitFor(() => expect(posted.filter(message => message.event === 'sendRequest').length).toBe(2))
+            abortWithoutHandler.abort()
+            await expect(withoutHandler).rejects.toMatchObject({ name: 'AbortError' })
+        })
+
+        test('a timeout after the head keeps what arrived, marked timedOut, before the head it is a TimeoutError', async() => {
+            const { sent, posted } = stubExtension()
+            const promise = send(vi.fn(), new AbortController().signal, 50)
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+            reply({ event: 'responseHead', eventId: sent().eventId, eventData: head })
+            reply({ event: 'responseData', eventId: sent().eventId, eventData: jsonBody })
+
+            const response = await promise
+            expect(response.bodyIncomplete).toBe('timedOut')
+            expect(new Uint8Array(response.buffer)).toEqual(jsonBody)
+
+            const beforeHead = send(vi.fn(), new AbortController().signal, 50)
+            await expect(beforeHead).rejects.toMatchObject({ name: 'TimeoutError' })
+            expect(posted.filter(message => message.event === 'cancelRequest').length).toBe(2)
+        })
+
+        test('a body error keeps what arrived, marked failed, with one line in Logs, and rejects without a handler', async() => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+            for(const onResponseProgress of [vi.fn(), undefined]) {
+                const { sent, postMessage } = stubExtension()
+                const promise = send(onResponseProgress)
+                await vi.waitFor(() => expect(sent()).toBeDefined())
+                reply({ event: 'responseHead', eventId: sent().eventId, eventData: head })
+                reply({ event: 'responseData', eventId: sent().eventId, eventData: jsonBody })
+                // the extension stopping before the end sends no timings
+                reply({ event: 'responseBodyError', eventId: sent().eventId, eventData: onResponseProgress ? { message: 'network error', timeTaken: 30, bodyTimeTaken: 25 } : { message: 'network error' } })
+
+                if(onResponseProgress) {
+                    const response = await promise
+                    expect(response).toMatchObject({ bodyIncomplete: 'failed', timeTaken: 30, bodyTimeTaken: 25, headTimeTaken: 5 })
+                    expect(new Uint8Array(response.buffer)).toEqual(jsonBody)
+                    expect(consoleError).toHaveBeenCalledTimes(1)
+                } else {
+                    await expect(promise).rejects.toMatchObject({ message: 'network error' })
+                }
+                postMessage.mockRestore()
+            }
+        })
+
+        test('a failure before the head rejects with the extension\'s error, as before', async() => {
+            const { sent } = stubExtension()
+            const promise = send(vi.fn())
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+            reply({ event: 'responseError', eventId: sent().eventId, eventData: new Error('Failed to fetch') })
+            await expect(promise).rejects.toMatchObject({ message: 'Failed to fetch' })
+        })
+
+        // the store keeps a tab's abort controller until its next send, so a handler left on its signal would keep the body
+        test('a finished send leaves no handler on the signal, which would keep what arrived in memory', async() => {
+            const { sent, posted } = stubExtension()
+            const abortController = new AbortController()
+            const promise = send(vi.fn(), abortController.signal)
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+            replyInParts(sent().eventId, jsonBody)
+            await promise
+            expect(abortController.signal.onabort).toBeNull()
+            expect(messageListeners.size).toBe(0)
+
+            abortController.abort()
+            expect(posted.filter(message => message.event === 'cancelRequest')).toEqual([])
+        })
+    })
+
     describe('web-standalone', () => {
         const encodeFrame = (type: number, payload: Uint8Array) => {
             const frame = new Uint8Array(5 + payload.byteLength)

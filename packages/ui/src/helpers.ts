@@ -589,12 +589,84 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                 throw new DOMException('The user aborted a request.', 'AbortError')
             }
 
-            return await new Promise((resolve, reject) => {
+            return await new Promise<RequestInitialResponse>((resolve, reject) => {
                 const eventId = generateId()
+                const collector = new ResponseBodyCollector(Date.now())
+                let settled = false
+
+                // the first outcome wins, later messages for this request are dropped
+                const settle = (outcome: () => void) => {
+                    if(settled) {
+                        return
+                    }
+                    settled = true
+                    window.removeEventListener('message', messageHandler)
+                    // the store keeps the signal until the tab's next send, and this handler holds every received chunk
+                    signal.onabort = null
+                    try {
+                        outcome()
+                    } catch(e) {
+                        reject(e)
+                    }
+                }
+
+                const messageHandler = (message: MessageEvent) => {
+                    // an extension before 1.0.9 in Chrome and 1.0.4 in Firefox sends its reply without the eventId
+                    if(message.data?.eventId !== undefined && message.data.eventId !== eventId) {
+                        return
+                    }
+
+                    // an extension older than 1.1.0 ignores stream and sends the whole response at once
+                    if(message.data?.event === 'response') {
+                        settle(() => resolve(message.data.eventData))
+                    } else if(message.data?.event === 'responseHead') {
+                        const head: ResponseHead = message.data.eventData
+                        collector.head(head)
+                        onResponseProgress?.({ type: 'head', head })
+                    } else if(message.data?.event === 'responseData') {
+                        const bytes: Uint8Array = message.data.eventData
+                        collector.push(bytes)
+                        onResponseProgress?.({ type: 'data', bytes })
+                    } else if(message.data?.event === 'responseEnd') {
+                        settle(() => collector.result(message.data.eventData).then(resolve, reject))
+                    } else if(message.data?.event === 'responseBodyError') {
+                        const { message: reason, timeTaken, bodyTimeTaken } = message.data.eventData
+                        settle(() => {
+                            if(onResponseProgress) {
+                                partialResponse(collector, 'failed', new Error(reason), { timeTaken, bodyTimeTaken }).then(resolve, reject)
+                            } else {
+                                reject(new Error(reason))
+                            }
+                        })
+                    } else if(message.data?.event === 'responseError') {
+                        settle(() => reject(message.data.eventData))
+                    }
+                }
+
+                window.addEventListener('message', messageHandler)
+
+                signal.onabort = () => {
+                    if(settled) {
+                        return
+                    }
+                    window.postMessage({
+                        event: 'cancelRequest',
+                        eventId,
+                    })
+                    settle(() => {
+                        if(onResponseProgress && collector.hasHead) {
+                            partialResponse(collector, bodyIncompleteReason(), null).then(resolve, reject)
+                        } else {
+                            reject(new DOMException('The user aborted a request.', 'AbortError'))
+                        }
+                    })
+                }
 
                 window.postMessage({
                     event: 'sendRequest',
                     eventId,
+                    // asks for the response in parts as it arrives, as responseHead, responseData and responseEnd
+                    stream: true,
                     eventData: {
                         url: url.toString(),
                         method,
@@ -603,33 +675,6 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
                         bodyHint
                     }
                 })
-
-                const messageHandler = (message: any) => {
-                    if (message.data.eventId !== undefined && message.data.eventId !== eventId) {
-                        return
-                    }
-
-                    if(message.data.event === 'response') {
-                        resolve(message.data.eventData)
-                        window.removeEventListener('message',  messageHandler)
-                    }
-
-                    if(message.data.event === 'responseError') {
-                        reject(message.data.eventData)
-                        window.removeEventListener('message',  messageHandler)
-                    }
-                }
-
-                window.addEventListener('message',  messageHandler)
-
-                signal.onabort = () => {
-                    window.postMessage({
-                        event: 'cancelRequest',
-                        eventId,
-                    })
-                    reject(new DOMException('The user aborted a request.', 'AbortError'))
-                    window.removeEventListener('message',  messageHandler)
-                }
             })
         }
 
