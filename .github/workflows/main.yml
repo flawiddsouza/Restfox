@@ -123,6 +123,15 @@ jobs:
         run: |
           npm ci
           npm run build-snap
+      # electron-builder 26.15.0 to 26.15.6 left the snap template packed, so the build passed and every snap failed
+      # at launch with "desktop-init.sh: No such file or directory"
+      - name: Check the snap holds its startup scripts
+        run: |
+          sudo apt-get install -y squashfs-tools
+          unsquashfs -l ./packages/electron/dist/*.snap > snap-files.txt
+          for f in desktop-init.sh desktop-common.sh desktop-gnome-specific.sh; do
+            grep -qx "squashfs-root/$f" snap-files.txt || { echo "The snap is missing $f"; exit 1; }
+          done
       - name: Install Snapcraft
         run: |
           sudo apt-get install snapd
