@@ -76,6 +76,7 @@
 import { findItemInTreeById } from '../helpers'
 import ContextMenu from './ContextMenu.vue'
 import constants from '@/constants'
+import { clearSkipPersistingActiveTabAfterUpdate } from '@/utils/skip-persisting-active-tab'
 
 export default {
     name: 'SidebarItem',
@@ -210,6 +211,7 @@ export default {
                         this.$store.state.skipPersistingActiveTab = true
                     }
                     tab.name = this.newSidebarItemName
+                    clearSkipPersistingActiveTabAfterUpdate(this.$store.state)
                 }
             }
 

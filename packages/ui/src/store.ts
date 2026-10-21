@@ -53,6 +53,7 @@ import {
     createPlugins,
 } from './db'
 import { nextTick } from 'vue'
+import { clearSkipPersistingActiveTabAfterUpdate } from '@/utils/skip-persisting-active-tab'
 import constants from './constants'
 import { emitter } from './event-bus'
 import {
@@ -1846,6 +1847,9 @@ export const store = createStore<State>({
 
             context.state.skipPersistingActiveTab = true
             loadWorkspaceTabs(context)
+            // the skip is for the reloaded tab alone. A tab reloaded under a new id, as after a rename in a file
+            // workspace, is never saved, so the skip would otherwise drop the user's next change
+            clearSkipPersistingActiveTabAfterUpdate(context.state)
 
             context.commit('persistActiveWorkspaceTabs')
         },
