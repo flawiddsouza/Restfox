@@ -32,13 +32,15 @@ function getContextMenuPostion(x, y, contextMenuElement, yOffset = 0, width = nu
     var menuPostion = {}
     var menuDimension = {}
 
-    menuDimension.x = width || contextMenuElement.offsetWidth
+    // a width narrower than the menu's min-width is drawn at the min-width
+    menuDimension.x = width ? Math.max(width, parseFloat(getComputedStyle(contextMenuElement).minWidth) || 0) : contextMenuElement.offsetWidth
     menuDimension.y = contextMenuElement.offsetHeight
     mousePosition.x = x
     mousePosition.y = y
 
     if(mousePosition.x + menuDimension.x > window.innerWidth + document.body.scrollLeft) {
-        menuPostion.x = mousePosition.x - menuDimension.x
+        // a menu under a control moves left only as far as it must, so it stays under the control
+        menuPostion.x = width ? window.innerWidth + document.body.scrollLeft - menuDimension.x : mousePosition.x - menuDimension.x
     } else {
         menuPostion.x = mousePosition.x
     }

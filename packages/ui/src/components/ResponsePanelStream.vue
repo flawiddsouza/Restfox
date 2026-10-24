@@ -11,8 +11,8 @@
                     <span class="bold">{{ stream.head.status }}</span>
                     {{ statusText }}
                 </div>
-                <div class="tag ml-0_6rem" title="Time since the request started">{{ humanFriendlyTime(elapsed) }}</div>
-                <div class="tag ml-0_6rem" :title="stream.endedAt === null ? 'Received so far' : 'Received'">{{ humanFriendlySize(stream.receivedBytes) }}</div>
+                <div class="tag ml-0_6rem" :class="{ 'tag-running': stream.endedAt === null }" title="Time since the request started">{{ stream.endedAt === null ? humanFriendlyRunningTime(elapsed) : humanFriendlyTime(elapsed) }}</div>
+                <div class="tag ml-0_6rem" :class="{ 'tag-running': stream.endedAt === null }" :title="stream.endedAt === null ? 'Received so far' : 'Received'">{{ humanFriendlySize(stream.receivedBytes) }}</div>
                 <div class="tag ml-0_6rem" v-if="itemCountLabel">{{ itemCountLabel }}</div>
             </div>
             <!-- once the body is over only scripts and the save are left, which Stop cannot stop -->
@@ -70,6 +70,7 @@ import type { EventListViewState, EventStreamItem, ResponseStream } from '@/glob
 import ResponseEventList from './ResponseEventList.vue'
 import {
     getStatusText,
+    humanFriendlyRunningTime,
     humanFriendlySize,
     humanFriendlyTime,
     responseStatusColorMapping,
@@ -192,6 +193,7 @@ export default {
         clearInterval(this.clockTimer)
     },
     methods: {
+        humanFriendlyRunningTime,
         humanFriendlySize,
         humanFriendlyTime,
         responseStatusColorMapping,

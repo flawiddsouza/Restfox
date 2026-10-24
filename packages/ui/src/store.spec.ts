@@ -35,7 +35,7 @@ vi.mock('./helpers', async(importOriginal) => {
     return { ...original, handleRequest: vi.fn() }
 })
 
-import { createPlugin, createResponse, deletePlugin, getResponsesByCollectionId, updatePlugin } from './db'
+import { createPlugin, createResponse, deletePlugin, getResponsesByCollectionId, updatePlugin, updateResponse } from './db'
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, Workspace } from './global'
 import { store } from './store'
 import { INHERITED_AUTHENTICATION_TYPE, handleRequest } from './helpers'
@@ -788,5 +788,26 @@ describe('Collection Runner with a body cut short', () => {
 
         finishUserSend?.({ _id: 'user-response', collectionId: 'running', status: 200, statusText: 'OK', headers: [], buffer, testResults: [] })
         await userSent
+    })
+})
+
+
+describe('renaming response history', () => {
+    const activeTab = { _id: 'active-tab', _type: 'request', name: 'Active', parentId: null, workspaceId: 'workspace-a' } as CollectionItem
+    const response = (id: string) => ({ _id: id, collectionId: activeTab._id, name: null, buffer: '', request: { original: {} } }) as any
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        store.state.activeTab = activeTab
+        store.state.responses[activeTab._id] = [response('response-1'), response('response-2')]
+    })
+
+    test('renameCurrentlyActiveResponse renames the history entry too when the shown one is a copy, as after a send', async() => {
+        // saveResponse keeps a copy of the entry it shows
+        store.state.requestResponses[activeTab._id] = { ...store.state.responses[activeTab._id][0] }
+        store.commit('renameCurrentlyActiveResponse', 'Renamed')
+        await vi.waitFor(() => expect(updateResponse).toHaveBeenCalledOnce())
+
+        expect(store.state.responses[activeTab._id].map((entry: any) => entry.name)).toEqual(['Renamed', null])
     })
 })

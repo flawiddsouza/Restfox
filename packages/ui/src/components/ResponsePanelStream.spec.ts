@@ -189,7 +189,9 @@ test('address bar shows status, a ticking elapsed time and the size', async() =>
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
     const panel = mountStream()
     await panel.receive(chatEvent('a'))
+    // a running time moves by steps and keeps its width, so the tags after it stay put as it ticks
     expect(panel.tags()).toEqual(['200 OK', '300 ms', `${encoder.encode(chatEvent('a')).byteLength} B`, '1 event'])
+    expect(panel.element.querySelector('.tag-running')!.textContent!.trim()).toBe('300 ms')
 
     vi.advanceTimersByTime(2000)
     await nextTick()
@@ -223,6 +225,7 @@ test('once the body ended, while scripts run, Stop is gone, since nothing is lef
     vi.advanceTimersByTime(3000)
     await nextTick()
     expect(panel.tags()[1]).toBe('1.3 s')
+    expect(panel.element.querySelector('.tag-running')).toBeNull()
 
     panel.unmount()
 })

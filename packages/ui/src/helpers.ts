@@ -2071,6 +2071,12 @@ export function humanFriendlyTime(milliseconds: number) {
     return `${number} ${unit}`
 }
 
+// A time that is still counting, as humanFriendlyTime shows it once it stops, rounded down to a tenth of a second, so
+// each tick moves it by a tenth whenever the tick lands
+export function humanFriendlyRunningTime(milliseconds: number) {
+    return humanFriendlyTime(Math.floor(milliseconds / 100) * 100)
+}
+
 export function getObjectPaths(object: object): string[] {
     const paths: any[] = []
 

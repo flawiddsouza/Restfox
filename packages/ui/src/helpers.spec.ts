@@ -32,6 +32,8 @@ import {
     SendResolver,
     describeMaskedPromptOmitted,
     saveCACertificates,
+    humanFriendlyRunningTime,
+    humanFriendlyTime,
 } from './helpers'
 import { forgetPromptValues } from './utils/prompt-tag'
 import { markSendReplaced } from './utils/response-stream'
@@ -2937,5 +2939,14 @@ describe('Prompt tag', () => {
             // a text that is not sent never asks, apart from a path parameter's name, which the url is searched for
             expect(notSentButAsked).toEqual(['0:request.pathParameters.0.name'])
         })
+    })
+})
+
+describe('humanFriendlyRunningTime', () => {
+    test('moves by a tenth of a second per tick whatever the tick lands on, as the stopped time shows it', () => {
+        // ticks of a little over 100 ms, as a timer lands
+        expect([1404, 1505, 1606, 1707].map(humanFriendlyRunningTime)).toEqual(['1.4 s', '1.5 s', '1.6 s', '1.7 s'])
+        expect([0, 305, 1000, 4250, 12_345, 65_400].map(humanFriendlyRunningTime)).toEqual(['0 ms', '300 ms', '1000 ms', '4.2 s', '12.3 s', '1.09 m'])
+        expect([305, 4250, 65_400].map(humanFriendlyTime)).toEqual(['305 ms', '4.25 s', '1.09 m'])
     })
 })

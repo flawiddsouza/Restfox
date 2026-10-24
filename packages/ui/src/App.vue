@@ -194,7 +194,8 @@ export default {
                 return
             }
 
-            if(checkHotkeyAgainstKeyEvent(hotkeys.SEND_REQUEST, event)) {
+            // only an HTTP request is sent here. A socket, a folder or a type only a newer version knows has nothing to send
+            if(checkHotkeyAgainstKeyEvent(hotkeys.SEND_REQUEST, event) && this.activeTab._type === 'request') {
                 event.preventDefault()
                 event.stopPropagation()
 

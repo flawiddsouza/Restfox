@@ -699,6 +699,16 @@ select {
     background: var(--sidebar-item-active-color);
 }
 
+/* a value that changes while it shows, such as a running time or a growing size, keeps its width, so the tags after
+   it stay put */
+.tag.tag-running {
+    font-variant-numeric: tabular-nums;
+    /* the text alone, as panels give tags different padding: the widest values, such as "2047.9 KB", are 9ch */
+    box-sizing: content-box;
+    min-width: 9ch;
+    text-align: center;
+}
+
 .tag.green {
     background: #75ba24;
     color: white;

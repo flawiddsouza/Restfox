@@ -717,6 +717,11 @@ export const store = createStore<State>({
         async renameCurrentlyActiveResponse(state, newResponseName) {
             const activeResponse = state.requestResponses[state.activeTab._id]
             activeResponse.name = newResponseName !== '' ? newResponseName : null
+            // the history entry, which is a copy of the one shown once a send saved it
+            const historyEntry = state.responses[state.activeTab._id]?.find(response => response._id === activeResponse._id)
+            if(historyEntry) {
+                historyEntry.name = activeResponse.name
+            }
             await updateResponse(state.activeTab.workspaceId, activeResponse.collectionId, activeResponse._id, { name: activeResponse.name })
         },
         async deleteCurrentlyActiveResponse(state) {
