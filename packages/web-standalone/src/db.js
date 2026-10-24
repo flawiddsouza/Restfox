@@ -243,7 +243,8 @@ async function createCollections(workspace, collections) {
 async function updateIdMapForChildren(oldBasePath, newBasePath, workspaceLocation, ignoreId = null) {
     const idMap = getIdMap(workspaceLocation)
     for (const [id, pathValue] of idMap) {
-        if (pathValue.startsWith(oldBasePath) && id !== ignoreId) {
+        // the folder and what is in it, not a folder beside it whose name starts the same, such as Folder2 for Folder
+        if ((pathValue === oldBasePath || pathValue.startsWith(oldBasePath + path.sep)) && id !== ignoreId) {
             const newPathValue = pathValue.replace(oldBasePath, newBasePath)
             idMap.set(id, newPathValue)
         }

@@ -25,7 +25,8 @@ const port = process.env.PORT || 4004
 
 app.use(express.static('public'))
 
-app.use('/api/', express.json({ limit: '50mb' }))
+// File workspace data has no HTTP body size cap, as in the desktop app.
+app.use('/api/', express.json({ limit: Infinity }))
 
 function apiRoute(handler) {
     return async (req, res) => {

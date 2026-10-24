@@ -7,8 +7,17 @@ const helpers = require('./helpers')
 const fileUtils = require('./file-utils')
 const constants = require('./constants')
 
-const idMap = new Map()
+// item ids to paths, one map per workspace location, so a workspace other than the open one, such as one whose call
+// ends after the user switched away, reads and writes its own files when another workspace has an item at the same path
+const workspaceIdMaps = new Map()
 const fsLog = []
+
+function getIdMap(workspaceLocation) {
+    if (!workspaceIdMaps.has(workspaceLocation)) {
+        workspaceIdMaps.set(workspaceLocation, new Map())
+    }
+    return workspaceIdMaps.get(workspaceLocation)
+}
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []
@@ -144,6 +153,8 @@ async function getCollectionForWorkspace(workspace, type) {
         type,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     try {
         let idMapBeforeClear = null
 
@@ -226,6 +237,8 @@ function getCollectionById(workspace, collectionId) {
         collectionId,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(collectionId)
     const collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
 
@@ -237,6 +250,8 @@ async function createCollection(workspace, collection) {
         workspace,
         collection,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     dbHelpers.serializeRequestFiles(collection)
 
@@ -336,6 +351,8 @@ async function createCollections(workspace, collections) {
         collections,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const results = []
 
     for (const collection of collections) {
@@ -393,9 +410,11 @@ async function createCollections(workspace, collections) {
     }
 }
 
-async function updateIdMapForChildren(oldBasePath, newBasePath, ignoreId = null) {
+async function updateIdMapForChildren(oldBasePath, newBasePath, workspaceLocation, ignoreId = null) {
+    const idMap = getIdMap(workspaceLocation)
     for (const [id, pathValue] of idMap) {
-        if (pathValue.startsWith(oldBasePath) && id !== ignoreId) {
+        // the folder and what is in it, not a folder beside it whose name starts the same, such as Folder2 for Folder
+        if ((pathValue === oldBasePath || pathValue.startsWith(oldBasePath + path.sep)) && id !== ignoreId) {
             const newPathValue = pathValue.replace(oldBasePath, newBasePath)
             idMap.set(id, newPathValue)
         }
@@ -407,7 +426,7 @@ async function updateIdMapForChildren(oldBasePath, newBasePath, ignoreId = null)
         const newItemPath = path.join(newBasePath, item.name)
 
         if (item.isDirectory()) {
-            await updateIdMapForChildren(oldItemPath, newItemPath, ignoreId)
+            await updateIdMapForChildren(oldItemPath, newItemPath, workspaceLocation, ignoreId)
         }
     }
 }
@@ -418,6 +437,8 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         collectionId,
         updatedFields,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     const collectionPath = idMap.get(collectionId)
 
@@ -480,7 +501,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         } else {
             // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
             // and will error out when trying to update them
-            await updateIdMapForChildren(renameFrom, renameTo, collectionId)
+            await updateIdMapForChildren(renameFrom, renameTo, workspace.location, collectionId)
         }
 
         console.log(`Renamed ${renameFrom} to ${renameTo}`)
@@ -540,7 +561,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         } else {
             // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
             // and will error out when trying to update them
-            await updateIdMapForChildren(renameFrom, renameTo)
+            await updateIdMapForChildren(renameFrom, renameTo, workspace.location)
         }
 
         console.log(`Moved ${renameFrom} to ${renameTo}`)
@@ -653,6 +674,8 @@ async function deleteCollectionsByWorkspaceId(workspace) {
         workspace,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const items = await fs.readdir(workspace.location, { withFileTypes: true })
     for (const item of items) {
         const itemPath = path.join(workspace.location, item.name)
@@ -687,6 +710,8 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
         workspace,
         collectionIds,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     try {
         let collectionItemsToDelete = []
@@ -748,6 +773,8 @@ async function getResponsesByCollectionId(workspace, collectionId) {
         collectionId,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(collectionId)
 
     // if it's a folder, we don't have responses
@@ -778,6 +805,8 @@ async function createResponse(workspace, response) {
         response,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(response.collectionId)
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
@@ -805,6 +834,8 @@ async function updateResponse(workspace, collectionId, responseId, updatedFields
         updatedFields,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(collectionId)
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
@@ -831,6 +862,8 @@ async function deleteResponse(workspace, collectionId, responseId) {
         collectionId,
         responseId,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     const collectionPath = idMap.get(collectionId)
 
@@ -863,6 +896,8 @@ async function deleteResponsesByIds(workspace, collectionId, responseIds) {
         responseIds,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(collectionId)
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
@@ -881,6 +916,8 @@ async function deleteResponsesByCollectionIds(workspace, collectionIds) {
         workspace,
         collectionIds,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
@@ -918,6 +955,8 @@ async function deleteResponsesByCollectionId(workspace, collectionId) {
         collectionId,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(collectionId)
 
     const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
@@ -931,6 +970,8 @@ async function getWorkspacePlugins(workspace) {
     logMethodCall('getWorkspacePlugins', {
         workspace,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     const items = []
 
@@ -985,6 +1026,8 @@ async function createPlugin(workspace, plugin) {
         plugin,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     let pluginPath = ''
     if (plugin.collectionId) {
         const collectionPath = idMap.get(plugin.collectionId)
@@ -1027,6 +1070,8 @@ async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
         updatedFields,
     })
 
+    const idMap = getIdMap(workspace.location)
+
     const collectionPath = idMap.get(collectionId)
 
     let pluginPath = null
@@ -1062,6 +1107,8 @@ async function deletePlugin(workspace, collectionId, pluginId) {
         collectionId,
         pluginId,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     // If collectionId is null, it means it's a workspace plugin
     if (collectionId === null) {
@@ -1125,6 +1172,8 @@ async function deletePluginsByCollectionIds(workspace, collectionIds) {
         workspace,
         collectionIds,
     })
+
+    const idMap = getIdMap(workspace.location)
 
     for (const collectionId of collectionIds) {
         const collectionPath = idMap.get(collectionId)
