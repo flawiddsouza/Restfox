@@ -1178,14 +1178,16 @@ test('a unary call shows that it waits at once, as an HTTP send does, and a clie
 test('a saved call is dated when it ended, as an HTTP response is', async() => {
     const store = createStore()
     const item = grpcItem({ grpc: { service: 'demo.v1.Demo', method: 'Count' } })
-    const startedAt = Date.now()
+    // the clock is set rather than waited on, as a timer can fire a millisecond before Date.now has moved as far
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
 
     await startGrpcCallForItem(store, item)
-    await new Promise(resolve => setTimeout(resolve, 30))
+    now.mockReturnValue(1_000_030)
     startedCalls[0].emit({ type: 'status', code: 0, name: 'OK', details: '', trailers: [] })
     await settle()
+    now.mockRestore()
 
-    expect(savedResponses[0].createdAt).toBeGreaterThanOrEqual(startedAt + 30)
+    expect(savedResponses[0].createdAt).toBe(1_000_030)
 })
 
 test('DEADLINE_EXCEEDED the server sends long before Restfox\'s own deadline is the server\'s status, not a time out', async() => {
