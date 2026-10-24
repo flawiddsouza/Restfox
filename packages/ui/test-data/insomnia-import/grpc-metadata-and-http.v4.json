@@ -1,0 +1,661 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-08-25T00:00:00.000Z",
+  "__export_source": "apollo-storage:handcrafted",
+  "resources": [
+    {
+      "_id": "wrk_apollostorage",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "ApolloStorage API",
+      "description": "GCS-inspired, event-sourced object store.\n\nHTTP surface on {{ _.base_url }} (health, metrics, admin blob-gc) \u2014 these run in the Collection Runner. gRPC ObjectApi on {{ _.grpc_url }} uses the embedded object_api.proto (the Collection Runner does not drive gRPC; use these requests manually).\n\nAuth is off by default. To exercise it, set AUTH_ENABLED=true on the server, put a token in the `auth_token` environment variable, and enable the Bearer auth / gRPC `authorization` metadata on the write requests.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_apollo_base",
+      "_type": "environment",
+      "parentId": "wrk_apollostorage",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "grpc_url": "localhost:8443",
+        "auth_token": "",
+        "bucket": "demo-bucket",
+        "object": "hello.txt"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "grpc_url",
+          "auth_token",
+          "bucket",
+          "object"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1
+    },
+    {
+      "_id": "env_apollo_local",
+      "_type": "environment",
+      "parentId": "env_apollo_base",
+      "name": "Local (dev)",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "grpc_url": "localhost:8443"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "grpc_url"
+        ]
+      },
+      "color": "#7d69cb",
+      "isPrivate": false,
+      "metaSortKey": 1
+    },
+    {
+      "_id": "pf_apollo_objectapi",
+      "_type": "proto_file",
+      "parentId": "wrk_apollostorage",
+      "name": "object_api.proto",
+      "protoText": "syntax = \"proto3\";\n\npackage apollostorage.grpc;\n\n// Client-facing object API (object-api spec, design D7/D16). Payload transfer is\n// streamed with a header-then-chunks framing.\nservice ObjectApi {\n  rpc CreateBucket(CreateBucketRequest) returns (BucketResponse);\n  rpc DeleteBucket(DeleteBucketRequest) returns (BucketResponse);\n\n  // First message MUST be `header`; every subsequent message a `chunk`.\n  rpc PutObject(stream PutObjectRequest) returns (PutObjectResponse);\n\n  // Emits a `header` message, then `chunk` messages.\n  rpc GetObject(GetObjectRequest) returns (stream GetObjectResponse);\n\n  rpc HeadObject(HeadObjectRequest) returns (ObjectMetadata);\n  rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse);\n\n  // Listing (served from the read model; eventually consistent).\n  rpc ListBuckets(ListBucketsRequest) returns (ListBucketsResponse);\n  rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);\n}\n\nmessage ListBucketsRequest {\n  int32 page_size = 1;\n  string page_token = 2;\n}\n\nmessage ListBucketsResponse {\n  repeated string buckets = 1;\n  string next_page_token = 2;\n}\n\nmessage ListObjectsRequest {\n  string bucket = 1;\n  string prefix = 2;\n  int32 page_size = 3;\n  string page_token = 4;\n}\n\nmessage ListObjectsResponse {\n  repeated ObjectEntry objects = 1;\n  string next_page_token = 2;\n}\n\nmessage ObjectEntry {\n  string object = 1;\n  int64 generation = 2;\n  int64 size = 3;\n  string content_type = 4;\n  string crc32c = 5;\n  string md5 = 6;\n}\n\nmessage CreateBucketRequest { string bucket = 1; }\nmessage DeleteBucketRequest { string bucket = 1; }\nmessage BucketResponse { string bucket = 1; }\n\nmessage PutObjectRequest {\n  oneof payload {\n    PutHeader header = 1;\n    bytes chunk = 2;\n  }\n}\n\nmessage PutHeader {\n  string bucket = 1;\n  string object = 2;\n  string content_type = 3;\n  // Optional expected checksums; empty string means \"not provided\".\n  string expected_crc32c = 4;\n  string expected_md5 = 5;\n}\n\nmessage PutObjectResponse {\n  int64 generation = 1;\n  string crc32c = 2;\n  string md5 = 3;\n  int64 size = 4;\n}\n\nmessage GetObjectRequest {\n  string bucket = 1;\n  string object = 2;\n}\n\nmessage GetObjectResponse {\n  oneof payload {\n    ObjectMetadata header = 1;\n    bytes chunk = 2;\n  }\n}\n\nmessage HeadObjectRequest {\n  string bucket = 1;\n  string object = 2;\n}\n\nmessage ObjectMetadata {\n  string bucket = 1;\n  string object = 2;\n  string content_type = 3;\n  int64 size = 4;\n  string crc32c = 5;\n  string md5 = 6;\n  int64 generation = 7;\n}\n\nmessage DeleteObjectRequest {\n  string bucket = 1;\n  string object = 2;\n}\n\nmessage DeleteObjectResponse {\n  string bucket = 1;\n  string object = 2;\n}\n"
+    },
+    {
+      "_id": "fld_apollo_http",
+      "_type": "request_group",
+      "parentId": "wrk_apollostorage",
+      "name": "HTTP (runnable)",
+      "description": "Health, metrics, and the admin blob-GC sweep. Safe to run top-to-bottom in the Collection Runner.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -100
+    },
+    {
+      "_id": "fld_apollo_grpc",
+      "_type": "request_group",
+      "parentId": "wrk_apollostorage",
+      "name": "gRPC \u2014 ObjectApi",
+      "description": "Object lifecycle over gRPC (h2c on port 8443). Not driven by the Collection Runner \u2014 send these manually.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -50
+    },
+    {
+      "_id": "req_apollo_health",
+      "_type": "request",
+      "parentId": "fld_apollo_http",
+      "name": "Health",
+      "description": "Liveness/readiness probe. 200 {\"status\":\"UP\"} while serving; 503 DOWN during shutdown.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/health",
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "body": {},
+      "metaSortKey": -100,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_metrics",
+      "_type": "request",
+      "parentId": "fld_apollo_http",
+      "name": "Metrics (Prometheus)",
+      "description": "Prometheus text exposition. Unauthenticated (operational telemetry only). 404 if metrics are disabled.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/metrics",
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "body": {},
+      "metaSortKey": -90,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_gc_dry",
+      "_type": "request",
+      "parentId": "fld_apollo_http",
+      "name": "Blob GC \u2014 dry run",
+      "description": "Reconciliation sweep, REPORT ONLY (nothing deleted). 404 unless blob-gc is enabled; 401/403 when auth is on and the token is missing/read-scoped.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/admin/blob-gc",
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -80,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_gc_delete",
+      "_type": "request",
+      "parentId": "fld_apollo_http",
+      "name": "Blob GC \u2014 delete (destructive)",
+      "description": "DESTRUCTIVE: reclaims aged orphan blobs + stale .tmp debris. Requires a WRITE-scoped token when auth is on.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/admin/blob-gc",
+      "parameters": [
+        {
+          "name": "delete",
+          "value": "true",
+          "disabled": false,
+          "description": "Set true to actually delete; omit/false for a dry run."
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -70,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "greq_apollo_createbucket",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "CreateBucket",
+      "description": "Create a bucket (write-scoped). Idempotent-ish: returns the bucket name.",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/CreateBucket",
+      "body": {
+        "text": "{\n  \"bucket\": \"{{ _.bucket }}\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -100
+    },
+    {
+      "_id": "greq_apollo_listbuckets",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "ListBuckets",
+      "description": "List buckets (read-scoped; served from the read model, eventually consistent).",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/ListBuckets",
+      "body": {
+        "text": "{\n  \"pageSize\": 100,\n  \"pageToken\": \"\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -95
+    },
+    {
+      "_id": "greq_apollo_putobject",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "PutObject (client stream)",
+      "description": "Client-streaming upload. FIRST message MUST be this `header`; then send one or more `chunk` messages, e.g. {\"chunk\":\"aGVsbG8=\"} (bytes are base64). Close the stream to commit.",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/PutObject",
+      "body": {
+        "text": "{\n  \"header\": {\n    \"bucket\": \"{{ _.bucket }}\",\n    \"object\": \"{{ _.object }}\",\n    \"contentType\": \"text/plain\",\n    \"expectedCrc32c\": \"\",\n    \"expectedMd5\": \"\"\n  }\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -90
+    },
+    {
+      "_id": "greq_apollo_listobjects",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "ListObjects",
+      "description": "List objects in a bucket (read-scoped).",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/ListObjects",
+      "body": {
+        "text": "{\n  \"bucket\": \"{{ _.bucket }}\",\n  \"prefix\": \"\",\n  \"pageSize\": 100,\n  \"pageToken\": \"\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -85
+    },
+    {
+      "_id": "greq_apollo_headobject",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "HeadObject",
+      "description": "Fetch object metadata without the payload (read-scoped).",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/HeadObject",
+      "body": {
+        "text": "{\n  \"bucket\": \"{{ _.bucket }}\",\n  \"object\": \"{{ _.object }}\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -80
+    },
+    {
+      "_id": "greq_apollo_getobject",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "GetObject (server stream)",
+      "description": "Server-streaming download: first response is the metadata `header`, then `chunk` messages (base64 bytes).",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/GetObject",
+      "body": {
+        "text": "{\n  \"bucket\": \"{{ _.bucket }}\",\n  \"object\": \"{{ _.object }}\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -75
+    },
+    {
+      "_id": "greq_apollo_deleteobject",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "DeleteObject",
+      "description": "Delete an object (write-scoped).",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/DeleteObject",
+      "body": {
+        "text": "{\n  \"bucket\": \"{{ _.bucket }}\",\n  \"object\": \"{{ _.object }}\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -70
+    },
+    {
+      "_id": "greq_apollo_deletebucket",
+      "_type": "grpc_request",
+      "parentId": "fld_apollo_grpc",
+      "name": "DeleteBucket",
+      "description": "Delete a bucket (write-scoped).",
+      "url": "{{ _.grpc_url }}",
+      "protoFileId": "pf_apollo_objectapi",
+      "protoMethodName": "/apollostorage.grpc.ObjectApi/DeleteBucket",
+      "body": {
+        "text": "{\n  \"bucket\": \"{{ _.bucket }}\"\n}"
+      },
+      "metadata": [
+        {
+          "name": "authorization",
+          "value": "Bearer {{ _.auth_token }}",
+          "disabled": true,
+          "description": "Enable when the server has AUTH_ENABLED=true."
+        }
+      ],
+      "metaSortKey": -65
+    },
+    {
+      "_id": "fld_apollo_rest",
+      "_type": "request_group",
+      "parentId": "wrk_apollostorage",
+      "name": "REST object API (/v1)",
+      "description": "The plain RESTful bucket/object API. Same event-sourced core as gRPC \u2014 shared generations, checksums and effects. Bearer token required for every operation when auth is enabled (write scope for mutations).",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_apollo_buckets_list",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "List buckets",
+      "description": "Paginated bucket listing from the read model. Optional pageSize / pageToken.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/v1/buckets",
+      "parameters": [
+        {
+          "id": "pair_pagesize",
+          "name": "pageSize",
+          "value": "",
+          "disabled": true
+        },
+        {
+          "id": "pair_pagetoken",
+          "name": "pageToken",
+          "value": "",
+          "disabled": true
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -100,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_bucket_create",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "Create bucket",
+      "description": "Creates the bucket. 201 on success, 409 if it already exists. Write scope.",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}",
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -90,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_bucket_delete",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "Delete bucket",
+      "description": "Deletes an EMPTY bucket. 204 on success, 404 if missing. Write scope. Destructive.",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}",
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -80,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_objects_list",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "List objects",
+      "description": "Objects in the bucket, served from the read model \u2014 EVENTUALLY CONSISTENT, so a fresh upload may take a moment to appear. Optional prefix / pageSize / pageToken.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}/objects",
+      "parameters": [
+        {
+          "id": "pair_prefix",
+          "name": "prefix",
+          "value": "",
+          "disabled": true
+        },
+        {
+          "id": "pair_opagesize",
+          "name": "pageSize",
+          "value": "",
+          "disabled": true
+        },
+        {
+          "id": "pair_opagetoken",
+          "name": "pageToken",
+          "value": "",
+          "disabled": true
+        }
+      ],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -70,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_object_put",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "Upload object",
+      "description": "Streams the RAW request body as the object payload (not multipart). Responds 201 with the X-Apollo-* metadata headers. Optionally send X-Apollo-Crc32c AND X-Apollo-Md5 to have the server enforce an expected checksum (412 on mismatch). Swap this body to 'File' to upload a real file.",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}/objects/{{ _.object }}",
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_ct_put",
+          "name": "Content-Type",
+          "value": "text/plain"
+        },
+        {
+          "id": "pair_crc_put",
+          "name": "X-Apollo-Crc32c",
+          "value": "",
+          "disabled": true
+        },
+        {
+          "id": "pair_md5_put",
+          "name": "X-Apollo-Md5",
+          "value": "",
+          "disabled": true
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {
+        "mimeType": "text/plain",
+        "text": "hello from insomnia\n"
+      },
+      "metaSortKey": -60,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_object_get",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "Download object",
+      "description": "Streams the object bytes back, with the X-Apollo-* metadata headers. 404 if absent. Responses carry an ETag; enable the If-None-Match header and paste it back to revalidate cheaply.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}/objects/{{ _.object }}",
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_inm_get",
+          "name": "If-None-Match",
+          "value": "",
+          "disabled": true,
+          "description": "Paste the ETag from a previous response to revalidate: a match returns 304 with no body, resolved from metadata without reading the payload."
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -50,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_object_head",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "Head object (metadata only)",
+      "description": "Metadata as X-Apollo-* headers with no body \u2014 generation, size, crc32c, md5.",
+      "method": "HEAD",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}/objects/{{ _.object }}",
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -40,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_object_delete",
+      "_type": "request",
+      "parentId": "fld_apollo_rest",
+      "name": "Delete object",
+      "description": "Deletes the object. 204 on success, 404 if absent. Write scope. Destructive.",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/v1/buckets/{{ _.bucket }}/objects/{{ _.object }}",
+      "parameters": [],
+      "headers": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.auth_token }}",
+        "disabled": false
+      },
+      "body": {},
+      "metaSortKey": -30,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_docs",
+      "_type": "request",
+      "parentId": "fld_apollo_http",
+      "name": "API docs (Swagger UI)",
+      "description": "The interactive documentation page, served by Apollo itself from classpath assets (renders offline). Unauthenticated. Best opened in a browser rather than read here.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/docs",
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "body": {},
+      "metaSortKey": -40,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_apollo_docs_spec",
+      "_type": "request",
+      "parentId": "fld_apollo_http",
+      "name": "OpenAPI document",
+      "description": "The OpenAPI document backing the docs page \u2014 the same artifact as docs/rest-api.openapi.yaml. Unauthenticated.",
+      "method": "GET",
+      "url": "{{ _.base_url }}/docs/openapi.yaml",
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "body": {},
+      "metaSortKey": -30,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    }
+  ]
+}

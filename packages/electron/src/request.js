@@ -4,7 +4,7 @@ const { Socket } = require('net')
 const dnsPromises = require('dns').promises
 const { withSentHeadersCapture } = require('./sent-headers-capture.js')
 const { getCACertificatesWithCustom } = require('./ca-certificates.js')
-const { getProxyForRequest, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } = require('./proxy.js')
+const { getProxyForRequest, getProxyForGrpc, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } = require('./proxy.js')
 
 let abortController = {}
 let cancelledRequestIds = new Set()
@@ -63,6 +63,11 @@ function setProxySettings(settings, systemProxyResolver) {
         agent.close().catch(() => {})
     }
     agents.clear()
+}
+
+// the proxy Settings > Proxy picks for a url, null for none, as for requests
+function getProxyForGrpcServer(authority) {
+    return getProxyForGrpc(authority, proxySettings, resolveSystemProxy)
 }
 
 function getAgentForRequest(urlParsed, disableSSLVerification, proxyUrl = null, proxyToken = null) {
@@ -327,4 +332,5 @@ module.exports = {
     setCustomCACertificates,
     getCustomCACertificates,
     setProxySettings,
+    getProxyForGrpcServer,
 }

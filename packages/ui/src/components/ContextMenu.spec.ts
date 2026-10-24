@@ -15,9 +15,9 @@ test('a menu given a width narrower than its least width stays inside the window
     document.body.appendChild(element)
     const app = createApp({
         render: () => h(ContextMenu, {
-            options: [{ type: 'option', label: 'A longer menu option', value: 'a' }],
+            options: [{ type: 'option', label: 'DEADLINE_EXCEEDED (4)', value: 'a' }],
             show: props.show,
-            // a dropdown 199 px wide at the right edge of the window
+            // a dropdown 199 px wide at the right edge of the window, as the gRPC response history's
             x: 1081,
             y: 40,
             width: 199,

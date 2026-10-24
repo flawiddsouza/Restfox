@@ -14,6 +14,17 @@ function createTimeoutError(what) {
     return Object.assign(new Error(`${what} did not answer within ${limits.tunnelTimeoutMs / 1000} s`), { code: 'ETIMEDOUT' })
 }
 
+// destroys what is opening the tunnel once the signal aborts, as when its caller stopped waiting for it. Gives the
+// function that stops watching the signal
+function destroyOnAbort(signal, destroyable) {
+    const onAbort = () => destroyable.destroy(Object.assign(new Error('The tunnel was no longer needed'), { code: 'ABORT_ERR' }))
+    if(signal?.aborted) {
+        onAbort()
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    return () => signal?.removeEventListener('abort', onAbort)
+}
+
 function getProxyAuthorization(proxyUrl) {
     if(!proxyUrl.username) {
         return null
@@ -95,9 +106,10 @@ function getSocks5Address(host) {
 }
 
 // RFC 1928 with a username and password login from RFC 1929
-async function openSocks5Tunnel(proxyUrl, host, port) {
+async function openSocks5Tunnel(proxyUrl, host, port, signal) {
     const socket = net.connect(Number(proxyUrl.port) || 1080, proxyUrl.hostname)
     const timer = setTimeout(() => socket.destroy(createTimeoutError('The SOCKS5 proxy')), limits.tunnelTimeoutMs)
+    const stopWatchingSignal = destroyOnAbort(signal, socket)
 
     try {
         await new Promise((resolve, reject) => {
@@ -106,6 +118,7 @@ async function openSocks5Tunnel(proxyUrl, host, port) {
         })
     } catch(e) {
         clearTimeout(timer)
+        stopWatchingSignal()
         throw e
     }
 
@@ -147,27 +160,31 @@ async function openSocks5Tunnel(proxyUrl, host, port) {
         throw e
     } finally {
         clearTimeout(timer)
+        stopWatchingSignal()
     }
 }
 
-// a socket to host:port, through the proxy or, bypassed, directly
-function openTunnel(proxyUrl, host, port, tlsOptions) {
+// a socket to host:port, through the proxy or, bypassed, directly. The signal, when given, stops opening it
+function openTunnel(proxyUrl, host, port, tlsOptions, signal = null) {
     if(proxyUrl === null) {
         return new Promise((resolve, reject) => {
             const socket = net.connect(Number(port), host, () => {
                 clearTimeout(timer)
+                stopWatchingSignal()
                 resolve(socket)
             })
             const timer = setTimeout(() => socket.destroy(createTimeoutError(`${host}:${port}`)), limits.tunnelTimeoutMs)
+            const stopWatchingSignal = destroyOnAbort(signal, socket)
             socket.once('error', error => {
                 clearTimeout(timer)
+                stopWatchingSignal()
                 reject(error)
             })
         })
     }
 
     if(proxyUrl.protocol === 'socks5:' || proxyUrl.protocol === 'socks:') {
-        return openSocks5Tunnel(proxyUrl, host, port)
+        return openSocks5Tunnel(proxyUrl, host, port, signal)
     }
 
     return new Promise((resolve, reject) => {
@@ -182,9 +199,11 @@ function openTunnel(proxyUrl, host, port, tlsOptions) {
 
         // destroying the request closes its connection to the proxy, and gives the error below
         const timer = setTimeout(() => connectRequest.destroy(createTimeoutError('The proxy')), limits.tunnelTimeoutMs)
+        const stopWatchingSignal = destroyOnAbort(signal, connectRequest)
 
         connectRequest.once('connect', (response, socket, head) => {
             clearTimeout(timer)
+            stopWatchingSignal()
             if(response.statusCode !== 200) {
                 socket.destroy()
                 reject(Object.assign(new Error(`The proxy answered ${response.statusCode}`), { statusCode: response.statusCode }))
@@ -197,6 +216,7 @@ function openTunnel(proxyUrl, host, port, tlsOptions) {
         })
         connectRequest.once('error', error => {
             clearTimeout(timer)
+            stopWatchingSignal()
             reject(error)
         })
         connectRequest.end()

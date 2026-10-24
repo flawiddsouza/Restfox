@@ -1,5 +1,12 @@
 export default [
     {
+        text: 'Requests',
+        collapsed: false,
+        items: [
+            { text: 'gRPC', link: '/grpc' },
+        ]
+    },
+    {
         text: 'Plugins',
         collapsed: false,
         items: [

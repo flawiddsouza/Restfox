@@ -14,7 +14,8 @@ class AlertConfirmPrompt extends HTMLElement {
         this.attachShadow({ mode: 'open' })
     }
 
-    createDialog = (type: 'prompt' | 'confirm' | 'alert', title: string, defaultValue = '', selectList = [], options?: PromptOptions) => {
+    // confirmLabel names what the primary button does, such as Remove, where OK would not say it
+    createDialog = (type: 'prompt' | 'confirm' | 'alert', title: string, defaultValue = '', selectList = [], options?: PromptOptions, confirmLabel = 'OK') => {
         const div = document.createElement('div')
 
         let inputHtml = ''
@@ -60,7 +61,7 @@ class AlertConfirmPrompt extends HTMLElement {
                 <div>${escapeHtml(title)}</div>
                 ${inputHtml}
                 <div style="margin-top: 1rem; text-align: right; user-select: none;">
-                    <button class="dialog-primary-button" id="dialog-confirm">OK</button>
+                    <button class="dialog-primary-button" id="dialog-confirm">${escapeHtml(confirmLabel)}</button>
                     ${type !== 'alert' ? '<button class="dialog-secondary-button" id="dialog-cancel">Cancel</button>' : ''}
                 </div>
             </div>
@@ -175,8 +176,8 @@ class AlertConfirmPrompt extends HTMLElement {
         return this.createDialog('prompt', title, defaultValue, selectList, options)
     }
 
-    createConfirm = (title: string) => {
-        return this.createDialog('confirm', title)
+    createConfirm = (title: string, confirmLabel?: string) => {
+        return this.createDialog('confirm', title, '', [], undefined, confirmLabel)
     }
 
     createAlert = (message: string) => {
@@ -232,7 +233,7 @@ class AlertConfirmPrompt extends HTMLElement {
             background: var(--primary-background-color);
             color: var(--primary-text-color);
             border: none;
-            width: 75px;
+            min-width: 75px;
         }
 
         .dialog-primary-button:hover {

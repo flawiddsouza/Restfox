@@ -27,17 +27,20 @@ import {
     BodyIncomplete,
     ResponseHead,
     ResponseProgressHandler,
+    GrpcProtoFile,
+    GrpcSettings,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
 import constants from '@/constants'
 import { handleResponseTag } from '@/utils/tag'
-import { getPromptPreviewValue, handlePromptTag } from '@/utils/prompt-tag'
+import { MASKED_PREVIEW, getPromptPreviewValue, handlePromptTag } from '@/utils/prompt-tag'
 import { handleTags } from '@/parsers/tag'
 import type { ParsedResult } from '@/parsers/tag'
 import { getSettingsFile, putSettingsFile, deleteSettingsFile } from '@/db'
 import { ResponseBodyCollector, getStreamView, isSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
+import { isGrpcTarget, parseGrpcTarget } from '@/utils/grpc'
 import { PROXY_FRAMES_CONTENT_TYPE, PROXY_FRAME_TYPE, readProxyFrames } from '@/utils/proxy-frames'
 
 // From: https://stackoverflow.com/a/67802481/4932305
@@ -98,7 +101,7 @@ async function substituteEnvironmentVariablesWith(
     environment: any,
     string: string,
     options: { tagTrigger?: boolean, noError?: boolean, resolvePromptTags?: boolean, promptTagsOnly?: boolean, workspaceId?: string },
-    send?: { cacheId: string, handlePromptTag: (parsedTag: ParsedResult) => Promise<string> }
+    send?: { cacheId: string, handlePromptTag: (parsedTag: ParsedResult) => Promise<string>, throwIfStopped: () => void }
 ) {
     const { tagTrigger = true, noError = false, resolvePromptTags = true, promptTagsOnly = false } = options
 
@@ -133,7 +136,13 @@ async function substituteEnvironmentVariablesWith(
 
     const handlePromptTagForString = async(parsedTag: ParsedResult) => send ? send.handlePromptTag(parsedTag) : getPromptPreviewValue(parsedTag, options.workspaceId)
 
-    substitutedString = await handleTags(handleResponseTag, substitutedString, tagTrigger, send?.cacheId, noError, handlePromptTagForString, resolvePromptTags, !promptTagsOnly)
+    // a send that was stopped sends no request of a response tag still to come in the text
+    const handleResponseTagForString = async(parsedTag: ParsedResult, tagTrigger: boolean, cacheId: string | undefined) => {
+        send?.throwIfStopped()
+        return handleResponseTag(parsedTag, tagTrigger, cacheId, options.workspaceId)
+    }
+
+    substitutedString = await handleTags(handleResponseTagForString, substitutedString, tagTrigger, send?.cacheId, noError, handlePromptTagForString, resolvePromptTags, !promptTagsOnly)
 
     return substitutedString
 }
@@ -146,13 +155,18 @@ export type SendPart = 'url' | 'body' | { header: string } | 'unsaved'
 // One send of a request, or one preparation of it such as generated code. Prompt tags ask only through it, and each
 // text it resolves names the part of the send it goes into, so a masked prompt's value never reaches a saved copy
 export class SendResolver {
-    // what Ask keeps is kept per workspace
-    constructor(readonly workspaceId: string) {}
+    // what Ask keeps is kept per workspace. tagTrigger false has response tags read the saved response and never send
+    // their request, for a resolve the user did not ask for. Once signal aborts, as when the send is cancelled, no text
+    // starts resolving and no prompt or response tag in a text still resolving goes on, so neither a prompt nor a
+    // response tag's request comes after the cancel
+    constructor(readonly workspaceId: string, readonly tagTrigger = true, readonly signal: AbortSignal | null = null) {}
 
     // response tags keep their response for the send by it
     readonly cacheId = nanoid()
     // the values this send was given, so a prompt used twice in one send asks once
     private readonly promptValues = new Map<string, Promise<string>>()
+    // the values masked prompts gave this send, to be hidden in text written from them, such as an error
+    private readonly maskedValues = new Set<string>()
     private maskedUrl = false
     private maskedBody = false
     // a header is left out by the name it was sent with, and named in the note with masked values hidden
@@ -194,17 +208,25 @@ export class SendResolver {
             return null
         }
 
+        const nameResolvedMasked = nameMasked ? await this.substitute(environment, name, () => undefined, { hideMasked: true, promptTagsOnly }) : nameResolved
         if(nameMasked) {
-            this.omitHeader(nameResolved, await this.substitute(environment, name, () => undefined, { hideMasked: true, promptTagsOnly }))
+            this.omitHeader(nameResolved, nameResolvedMasked)
         }
 
         const valuesResolved: string[] = []
+        const valuesResolvedMasked: string[] = []
 
         for(const value of values) {
-            valuesResolved.push(await this.substitute(environment, value, () => this.omit({ header: nameResolved }), { promptTagsOnly }))
+            let valueMasked = false
+            const valueResolved = await this.substitute(environment, value, () => {
+                valueMasked = true
+                this.omit({ header: nameResolved })
+            }, { promptTagsOnly })
+            valuesResolved.push(valueResolved)
+            valuesResolvedMasked.push(valueMasked ? await this.substitute(environment, value, () => undefined, { hideMasked: true, promptTagsOnly }) : valueResolved)
         }
 
-        return { nameResolved, valuesResolved }
+        return { nameResolved, valuesResolved, nameResolvedMasked, valuesResolvedMasked }
     }
 
     // A pre-request script may read what a text resolved to. Once it reads a masked prompt's value it may have put it
@@ -228,16 +250,35 @@ export class SendResolver {
     }
 
     // the text as this send resolved it, and with masked prompt values hidden, which is what may be shown and saved
-    async resolveWithMasked(environment: any, text: string) {
+    async resolveWithMasked(environment: any, text: string, part: SendPart = 'unsaved') {
         let maskedPromptUsed = false
         const textResolved = await this.substitute(environment, text, () => {
             maskedPromptUsed = true
+            this.omit(part)
         })
 
         // resolved again from what this send's tags gave, so nothing asks or is sent twice
         const textResolvedMasked = maskedPromptUsed ? await this.substitute(environment, text, () => undefined, { hideMasked: true }) : textResolved
 
-        return { textResolved, textResolvedMasked }
+        return { textResolved, textResolvedMasked, maskedPromptUsed }
+    }
+
+    // A text written from what this send resolved, such as an error a library or a server wrote, with each masked
+    // prompt value hidden. The longest first, so one inside another is hidden whole
+    hideMaskedValues(text: string) {
+        let hidden = text
+        for(const value of [...this.maskedValues].sort((a, b) => b.length - a.length)) {
+            if(value !== '') {
+                hidden = hidden.split(value).join(MASKED_PREVIEW)
+            }
+        }
+        return hidden
+    }
+
+    // whether a masked prompt gave this send a value, after which history keeps only texts Restfox wrote without the
+    // send's texts in them
+    get tookMaskedValue() {
+        return this.maskedValues.size > 0
     }
 
     get maskedPromptOmitted(): MaskedPromptOmitted | null {
@@ -288,11 +329,30 @@ export class SendResolver {
         }
     }
 
-    private substitute(environment: any, text: string, onMaskedPrompt: () => void, { hideMasked = false, promptTagsOnly = false } = {}) {
-        return substituteEnvironmentVariablesWith(environment, text, { promptTagsOnly }, {
+    private async substitute(environment: any, text: string, onMaskedPrompt: () => void, { hideMasked = false, promptTagsOnly = false } = {}) {
+        this.throwIfStopped()
+        return substituteEnvironmentVariablesWith(environment, text, { promptTagsOnly, tagTrigger: this.tagTrigger, workspaceId: this.workspaceId }, {
             cacheId: this.cacheId,
-            handlePromptTag: parsedTag => handlePromptTag(parsedTag, this.workspaceId, this.promptValues, onMaskedPrompt, hideMasked),
+            throwIfStopped: () => this.throwIfStopped(),
+            handlePromptTag: async parsedTag => {
+                this.throwIfStopped()
+                let masked = false
+                const value = await handlePromptTag(parsedTag, this.workspaceId, this.promptValues, () => {
+                    masked = true
+                    onMaskedPrompt()
+                }, hideMasked, this.signal)
+                if(masked) {
+                    this.maskedValues.add(value)
+                }
+                return value
+            },
         })
+    }
+
+    private throwIfStopped() {
+        if(this.signal?.aborted) {
+            throw new Error('The send was stopped')
+        }
     }
 
     private omit(part: SendPart) {
@@ -303,6 +363,10 @@ export class SendResolver {
         } else if(part !== 'unsaved') {
             this.omitHeader(part.header, part.header)
         }
+    }
+
+    headerTookMaskedValue(name: string) {
+        return this.maskedHeaders.some(header => header.nameSent.toLowerCase() === name.toLowerCase())
     }
 
     // a header named first keeps its place, the later spelling of the same name is the same header
@@ -974,7 +1038,9 @@ export async function createRequestData(
     plugins: Plugin[],
     workspaceLocation: string | null,
     // a caller that saves the send, or resolves more of it, passes its own
-    send = new SendResolver(request.workspaceId)
+    send = new SendResolver(request.workspaceId),
+    // keyed by the sent name, so masked names that become identical still keep their own entries
+    headersMasked?: Map<string, [string, string]>
 ): Promise<CreateRequestDataReturn> {
     for(const plugin of plugins) {
         const { expose } = await createRequestContextForPlugin(send, request, environment, setEnvironmentVariable, state.testResults, plugin.collectionId)
@@ -1105,7 +1171,7 @@ export async function createRequestData(
 
     // sets a header whatever case an earlier one of the same name was typed in, the header keeps its place and takes
     // the later spelling, as in Insomnia
-    const setHeader = (headerName: string, headerValue: string) => {
+    const setHeader = (headerName: string, headerValue: string, headerNameMasked = headerName, headerValueMasked = headerValue) => {
         const existingHeaderName = findHeaderName(headers, headerName)
 
         if(existingHeaderName !== undefined && existingHeaderName !== headerName) {
@@ -1116,13 +1182,19 @@ export async function createRequestData(
         }
 
         headers[headerName] = headerValue
+        if(headersMasked) {
+            if(existingHeaderName !== undefined) {
+                headersMasked.delete(existingHeaderName)
+            }
+            headersMasked.set(headerName, [headerNameMasked, headerValueMasked])
+        }
     }
 
     // sent as written, as they always were, apart from prompt tags
     if('GLOBAL_HEADERS' in environment) {
         for(const [name, value] of Object.entries(environment.GLOBAL_HEADERS)) {
             const header = typeof value === 'string' ? await send.resolveHeader(environment, name, [value], () => false, true) : null
-            setHeader(header?.nameResolved ?? name, header?.valuesResolved[0] ?? value as string)
+            setHeader(header?.nameResolved ?? name, header?.valuesResolved[0] ?? value as string, header?.nameResolvedMasked ?? name, header?.valuesResolvedMasked[0] ?? value as string)
         }
     }
 
@@ -1141,9 +1213,9 @@ export async function createRequestData(
             const existingHeaderName = findHeaderName(headers, headerName)
             if(existingHeaderName !== undefined) {
                 //allow multiple headers with the same name by concatenating the values with ", " | https://www.rfc-editor.org/rfc/rfc9110.html#section-5.2
-                setHeader(headerName, `${headers[existingHeaderName]}, ${headerValue}`)
+                setHeader(headerName, `${headers[existingHeaderName]}, ${headerValue}`, resolvedHeader.nameResolvedMasked, `${headersMasked?.get(existingHeaderName)?.[1] ?? headers[existingHeaderName]}, ${resolvedHeader.valuesResolvedMasked[0]}`)
             } else {
-                setHeader(headerName, headerValue)
+                setHeader(headerName, headerValue, resolvedHeader.nameResolvedMasked, resolvedHeader.valuesResolvedMasked[0])
             }
         }
     }
@@ -1153,20 +1225,25 @@ export async function createRequestData(
         const parentHeader = await send.resolveHeader(environment, name, values, headerName => findHeaderName(headers, headerName) !== undefined)
 
         if(parentHeader !== null) {
-            headers[parentHeader.nameResolved] = parentHeader.valuesResolved.join(', ')
+            setHeader(parentHeader.nameResolved, parentHeader.valuesResolved.join(', '), parentHeader.nameResolvedMasked, parentHeader.valuesResolvedMasked.join(', '))
         }
     }
 
     const setAuthentication = async(authentication: RequestAuthentication) => {
         const existingHeaderName = findHeaderName(headers, 'Authorization')
-        const authorization = await resolveAuthentication(send, authentication, environment, existingHeaderName ?? 'Authorization')
+        let authorizationMasked: string | undefined
+        const authorization = await resolveAuthentication(send, authentication, environment, existingHeaderName ?? 'Authorization', headersMasked ? value => {
+            authorizationMasked = value
+        } : undefined)
 
         // a typed Authorization header and the Auth tab's are sent together, as the transports joined them when the
         // typed one was a separate lowercase key
         if(existingHeaderName !== undefined) {
-            headers[existingHeaderName] = `${headers[existingHeaderName]}, ${authorization}`
+            const headerMasked = headersMasked?.get(existingHeaderName)
+            setHeader(existingHeaderName, `${headers[existingHeaderName]}, ${authorization}`, headerMasked?.[0] ?? existingHeaderName, authorizationMasked === '' ? '' : `${headerMasked?.[1] ?? headers[existingHeaderName]}, ${authorizationMasked ?? authorization}`)
         } else {
             headers['Authorization'] = authorization
+            headersMasked?.set('Authorization', ['Authorization', authorizationMasked ?? String(authorization)])
         }
     }
 
@@ -1533,8 +1610,12 @@ function convertInsomniaV5ToV4Resources(file: any): any[] {
                 walk(item.children, _id)
             } else if('method' in item) {
                 resources.push({ ...common, _type: 'request', url: item.url, method: item.method, body: item.body ?? {}, parameters: item.parameters, headers: item.headers, authentication: item.authentication, pathParameters: item.pathParameters })
+            } else if('reflectionApi' in item) {
+                // v5 leaves the proto files out, so the protoFileId names none in the file and the request uses server
+                // reflection until files are added
+                resources.push({ ...common, _type: 'grpc_request', url: item.url, protoFileId: item.protoFileId, protoMethodName: item.protoMethodName, metadata: item.metadata, body: item.body })
             }
-            // gRPC, WebSocket and Socket.IO requests have nothing the importer maps them to and are left out
+            // WebSocket and Socket.IO requests have nothing the importer maps them to and are left out
         }
     }
 
@@ -1543,8 +1624,118 @@ function convertInsomniaV5ToV4Resources(file: any): any[] {
     return resources
 }
 
+// The files a gRPC request's proto file is compiled with. Insomnia keeps a proto file on its own or in a folder tree it
+// imported whole, which it writes out with the top folder as the root, so a path leaves that folder's name out. The
+// request's file comes first
+function getInsomniaProtoFiles(resources: any[], protoFileId: string | undefined): GrpcProtoFile[] {
+    const protoFile = resources.find(resource => resource._type === 'proto_file' && resource._id === protoFileId)
+
+    if(!protoFile) {
+        return []
+    }
+
+    const protoDirectories = new Map<string, any>(resources.filter(resource => resource._type === 'proto_directory').map(resource => [resource._id, resource]))
+
+    // the folders from the top one down to the file's
+    const getDirectories = (resource: any) => {
+        const directories: any[] = []
+        for(let directory = protoDirectories.get(resource.parentId); directory; directory = protoDirectories.get(directory.parentId)) {
+            directories.unshift(directory)
+        }
+        return directories
+    }
+
+    const getPath = (resource: any) => [...getDirectories(resource).slice(1).map(directory => directory.name), resource.name].join('/')
+
+    const rootDirectory = getDirectories(protoFile)[0]
+
+    if(!rootDirectory) {
+        return [{ path: protoFile.name, text: protoFile.protoText ?? '' }]
+    }
+
+    const otherFiles = resources.filter(resource => resource._type === 'proto_file' && resource !== protoFile && getDirectories(resource)[0] === rootDirectory)
+
+    return [protoFile, ...otherFiles].map(resource => ({ path: getPath(resource), text: resource.protoText ?? '' }))
+}
+
+const URL_SCHEME_REGEX = /^[a-z][a-z0-9+.-]*:\/\//i
+
+// Insomnia uses TLS for a gRPC address only when it starts with grpcs://, and port 443 when it names none. Restfox also
+// uses TLS for https:// and for an address with no scheme whose host is not loopback, such as 0.0.0.0:50051, and port
+// 80 without TLS, so such an address gets grpc:// and a plaintext one with no port gets :443. One that starts with a
+// variable is left as it is, as its value is set in Restfox, where the scheme and port can go too
+function convertInsomniaGrpcUrl(url: string) {
+    const address = url.trim()
+    if(address === '' || /^{[{%]/.test(address) || /^grpcs:\/\//i.test(address)) {
+        return url
+    }
+    // a variable or tag further on, such as the port, stands in as a number, which leaves the scheme and host as typed
+    const target = parseGrpcTarget(address.replace(/{{[^{}]*}}|{%[^{}]*%}/g, '1'))
+    if(!isGrpcTarget(target)) {
+        return url
+    }
+    const rest = address.replace(URL_SCHEME_REGEX, '')
+    const hostAndPort = rest.split('/')[0]
+    const hasPort = /:[^:\]]+$/.test(hostAndPort)
+    // a variable in the host may hold the port too
+    if((hasPort && !target.tls) || (!hasPort && /{[{%]/.test(hostAndPort))) {
+        return url
+    }
+    return `grpc://${hasPort ? rest : `${hostAndPort}:443${rest.slice(hostAndPort.length)}`}`
+}
+
+// Insomnia sends a gRPC request with its own metadata only, no folder auth, so the item stores None for auth. Its
+// folders' headers are kept on the folders for their HTTP requests, and Restfox sends them with the gRPC item too
+function convertInsomniaGrpcRequest(item: any, resources: any[]): Omit<CollectionItem, 'parentId' | 'workspaceId'> {
+    const grpc: GrpcSettings = {}
+
+    // such as /demo.v1.Greeter/SayHello, or /Greeter/SayHello for a proto file without a package
+    const methodPath = /^\/?([^/]+)\/([^/]+)$/.exec(item.protoMethodName ?? '')
+    if(methodPath) {
+        grpc.service = methodPath[1]
+        grpc.method = methodPath[2]
+    }
+
+    const protoFiles = getInsomniaProtoFiles(resources, item.protoFileId)
+    if(protoFiles.length > 0) {
+        grpc.protoFiles = protoFiles
+    }
+
+    return {
+        _id: item._id,
+        _type: 'grpc',
+        name: item.name,
+        url: convertInsomniaGrpcUrl(item.url ?? ''),
+        grpc,
+        ...(typeof item.body?.text === 'string' ? { body: { mimeType: 'application/json', text: item.body.text } } : {}),
+        headers: convertInsomniaHeaders(item.metadata),
+        authentication: { type: 'none' },
+        description: item.description || undefined,
+    }
+}
+
+// a gRPC message as Insomnia writes it, for the method of the .proto files, in ProtoJSON, as the gRPC engine rewrites it
+export type InsomniaGrpcMessageConverter = (spec: { protoFiles: GrpcProtoFile[], service: string, method: string, text: string }) => Promise<string>
+
+// Insomnia writes some values of a gRPC message in another form than ProtoJSON, which Restfox sends, such as a BoolValue
+// as {"value": true}. convertGrpcMessage rewrites them from the request's .proto files. Without them, or where the
+// builds cannot run gRPC, the message is kept as written
+async function convertInsomniaGrpcMessages(collection: CollectionItem[], convertGrpcMessage: InsomniaGrpcMessageConverter) {
+    for(const item of flattenTree(collection) as CollectionItem[]) {
+        const { protoFiles, service, method } = item.grpc ?? {}
+        if(item._type !== 'grpc' || !protoFiles?.length || !service || !method || typeof item.body?.text !== 'string') {
+            continue
+        }
+        try {
+            item.body.text = await convertGrpcMessage({ protoFiles, service, method, text: item.body.text })
+        } catch(error) {
+            console.warn(`${item.name}: its message is kept as Insomnia wrote it, as it could not be read with its .proto files: ${error instanceof Error ? error.message : String(error)}`)
+        }
+    }
+}
+
 // the Import dialog hands over a parsed .json file as an object and any other file as the File itself
-export async function convertInsomniaFileToRestfoxCollection(file: any, workspaceId: string) {
+export async function convertInsomniaFileToRestfoxCollection(file: any, workspaceId: string, convertGrpcMessage: InsomniaGrpcMessageConverter | null = null) {
     let data = file
 
     if(typeof file?.text === 'function') {
@@ -1560,7 +1751,13 @@ export async function convertInsomniaFileToRestfoxCollection(file: any, workspac
         throw new Error('Not an Insomnia export: expected an Insomnia collection or design document export')
     }
 
-    return convertInsomniaExportToRestfoxCollection(data, workspaceId)
+    const collection = convertInsomniaExportToRestfoxCollection(data, workspaceId)
+
+    if(convertGrpcMessage !== null) {
+        await convertInsomniaGrpcMessages(collection, convertGrpcMessage)
+    }
+
+    return collection
 }
 
 export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId: string) {
@@ -1568,9 +1765,15 @@ export function convertInsomniaExportToRestfoxCollection(json: any, workspaceId:
 
     const workspace = json.resources.find((item: any) => item._type === 'workspace')
 
-    // other resource types, such as environments or gRPC and WebSocket requests, have nothing here they map to
-    json.resources.filter((item: any) => ['workspace', 'request_group', 'request'].includes(item._type)).forEach((item: any) => {
-        if(item._type === 'workspace' || item._type === 'request_group') {
+    // other resource types, such as environments or WebSocket requests, have nothing here they map to
+    json.resources.filter((item: any) => ['workspace', 'request_group', 'request', 'grpc_request'].includes(item._type)).forEach((item: any) => {
+        if(item._type === 'grpc_request') {
+            collection.push({
+                ...convertInsomniaGrpcRequest(item, json.resources),
+                parentId: item.parentId === '__WORKSPACE_ID__' && !workspace ? null : item.parentId,
+                workspaceId
+            })
+        } else if(item._type === 'workspace' || item._type === 'request_group') {
             let parentId = item.parentId
 
             if(item.parentId === '__WORKSPACE_ID__' && !workspace) {
@@ -1677,7 +1880,9 @@ function importRestfoxV1(collections: CollectionItem[], workspaceId: string, wor
                 sortOrder: item.sortOrder
             })
         } else {
-            if(item._type === 'socket') {
+            // every item but an HTTP request is kept whole, a type only a newer version knows too, so its own data is
+            // there when a version that knows it opens it
+            if(item._type !== 'request' && item._type !== undefined) {
                 collection.push({
                     ...item,
                     workspaceId,
@@ -2470,6 +2675,11 @@ export function getVersion(): string {
     return version
 }
 
+// the self-hosted build, whose server makes gRPC calls for the page
+export function isWebStandaloneBuild() {
+    return import.meta.env.MODE === 'web-standalone'
+}
+
 // Names the build this page is, for page view analytics
 export function getBuild(): 'desktop' | 'web-standalone' | 'extension' | 'web' {
     if(import.meta.env.MODE === 'desktop-electron') {
@@ -2803,20 +3013,24 @@ export function describeOAuthTokenError(error: any, accessTokenUrl: string): str
 }
 
 // headerName is the header the auth is sent in
-export async function resolveAuthentication(send: SendResolver, authentication: RequestAuthentication, environment: any, headerName: string) {
+export async function resolveAuthentication(send: SendResolver, authentication: RequestAuthentication, environment: any, headerName: string, onResolvedMasked?: (value: string) => void) {
     const part = { header: headerName }
 
     if(authentication.type === 'basic') {
-        return generateBasicAuthString(
-            await send.resolve(environment, authentication.username ?? '', part),
-            await send.resolve(environment, authentication.password ?? '', part)
-        )
+        const username = await send.resolveWithMasked(environment, authentication.username ?? '', part)
+        const password = await send.resolveWithMasked(environment, authentication.password ?? '', part)
+        const authorization = generateBasicAuthString(username.textResolved, password.textResolved)
+        onResolvedMasked?.(username.maskedPromptUsed || password.maskedPromptUsed ? '' : authorization)
+        return authorization
     }
 
     if(authentication.type === 'bearer' || authentication.type === 'oauth2') {
         const authenticationBearerPrefix = authentication.prefix !== undefined && authentication.prefix !== '' ? authentication.prefix : 'Bearer'
         const authenticationBearerToken = authentication.token !== undefined ? authentication.token : ''
-        return `${await send.resolve(environment, authenticationBearerPrefix, part)} ${await send.resolve(environment, authenticationBearerToken, part)}`
+        const prefix = await send.resolveWithMasked(environment, authenticationBearerPrefix, part)
+        const token = await send.resolveWithMasked(environment, authenticationBearerToken, part)
+        onResolvedMasked?.(`${prefix.textResolvedMasked} ${token.textResolvedMasked}`)
+        return `${prefix.textResolved} ${token.textResolved}`
     }
 }
 
@@ -3219,6 +3433,184 @@ export function getSpaces(value: string | number): string {
 
 export function deepClone(obj: any) {
     return JSON.parse(JSON.stringify(obj))
+}
+
+// A gRPC item in the shape createRequestData resolves, so its metadata carries the headers and auth it inherits. The
+// url is the server's address, which is not an HTTP url, so it is resolved on its own
+function grpcItemAsRequest(grpcRequest: CollectionItem, message: string): CollectionItem {
+    return {
+        ...grpcRequest,
+        _type: 'request',
+        method: 'POST',
+        url: 'http://grpc.invalid/',
+        parameters: [],
+        pathParameters: [],
+        body: { mimeType: 'application/json', text: message },
+    }
+}
+
+// A gRPC item's metadata, with the headers and auth it inherits, resolved as a request's headers are. A call also sends
+// Settings > Global User Agent, or Restfox's own, when the item sets none
+export async function resolveGrpcMetadata(
+    grpcRequest: CollectionItem,
+    environment: any,
+    parentHeaders: Record<string, string[]>,
+    parentAuthentication: RequestAuthentication | undefined,
+    workspaceLocation: string | null,
+    send: SendResolver,
+    { defaultUserAgent = false, metadataMasked }: { defaultUserAgent?: boolean, metadataMasked?: [string, string][] } = {}
+): Promise<[string, string][]> {
+    const state: HandleRequestState = {
+        currentPlugin: null,
+        testResults: []
+    }
+
+    // the message is resolved on its own, a stream's only when it is sent
+    const headersMasked = metadataMasked ? new Map<string, [string, string]>() : undefined
+    const { headers } = await createRequestData(state, grpcItemAsRequest(grpcRequest, ''), environment, parentHeaders, parentAuthentication, null, [], workspaceLocation, send, headersMasked)
+
+    if(defaultUserAgent) {
+        const userAgentHeaderName = findHeaderName(headers, 'user-agent')
+        const usesDefaultUserAgent = userAgentHeaderName !== undefined && !headers[userAgentHeaderName]
+        setDefaultUserAgent(headers)
+        if(userAgentHeaderName !== undefined && usesDefaultUserAgent) {
+            headersMasked?.set(userAgentHeaderName, [headersMasked.get(userAgentHeaderName)?.[0] ?? userAgentHeaderName, headers[userAgentHeaderName]])
+        }
+    }
+
+    return Object.entries(headers).map(([name, value]) => {
+        const valueResolved = String(value)
+        const [nameMasked, valueMasked] = headersMasked?.get(name) ?? [name, valueResolved]
+        // binary metadata and Basic auth encode their values, so a masked value leaves the whole value out
+        const valueSaved = name.trim().toLowerCase().endsWith('-bin') && send.headerTookMaskedValue(name) ? '' : valueMasked
+        metadataMasked?.push([nameMasked, valueSaved])
+        return [name, valueResolved]
+    })
+}
+
+// What a gRPC item sends, resolved as a call resolves it
+export async function createGrpcRequestData(
+    grpcRequest: CollectionItem,
+    environment: any,
+    parentHeaders: Record<string, string[]>,
+    parentAuthentication: RequestAuthentication | undefined,
+    workspaceLocation: string | null
+) {
+    const send = new SendResolver(grpcRequest.workspaceId)
+    return {
+        url: await send.resolve(environment, grpcRequest.url ?? '', 'url'),
+        metadata: await resolveGrpcMetadata(grpcRequest, environment, parentHeaders, parentAuthentication, workspaceLocation, send),
+        message: await send.resolve(environment, grpcRequest.body?.text ?? '{}', 'body'),
+    }
+}
+
+// a word the shell takes as it is, quoted only when it has to be
+function quoteShellWord(text: string) {
+    if(/^[A-Za-z0-9_@%+=:,./-]+$/.test(text)) {
+        return text
+    }
+
+    return `'${text.replaceAll('\'', '\'\\\'\'')}'`
+}
+
+// Metadata a call leaves out, as the engine does (packages/electron/src/grpc.js): names gRPC or HTTP/2 set themselves,
+// the connection-specific ones HTTP/2 refuses, and the reserved grpc- ones
+const GRPC_RESERVED_METADATA_NAMES = ['content-type', 'te', 'host', 'connection', 'keep-alive', 'proxy-connection', 'transfer-encoding', 'upgrade', 'http2-settings']
+
+function isGrpcMetadataSent(name: string) {
+    const key = name.trim().toLowerCase()
+    return key !== '' && !key.startsWith(':') && !key.startsWith('grpc-') && !GRPC_RESERVED_METADATA_NAMES.includes(key)
+}
+
+// each .proto file as grpcurl finds it: the folder it searches and the path from there. A call matches an import to
+// the file of that path, to one whose path ends with it, as when the folder picked is above the one the imports
+// start from, or to one whose path it ends with, as when files are picked on their own. grpcurl only finds an import
+// at its path inside a folder it searches, so a file is named by the path its imports use
+function getGrpcurlProtoPaths(protoFiles: GrpcProtoFile[]) {
+    const found = new Map<string, { folder: string, path: string }>()
+
+    for(const protoFile of protoFiles) {
+        for(const [, importPath] of protoFile.text.matchAll(/^\s*import\s+(?:weak\s+|public\s+)?["']([^"']+)["']\s*;/gm)) {
+            const imported = protoFiles.find(file => file.path === importPath)
+                ?? protoFiles.find(file => file.path.endsWith(`/${importPath}`))
+                ?? protoFiles.find(file => importPath.endsWith(`/${file.path}`))
+            if(imported && !found.has(imported.path)) {
+                const folder = imported.path.endsWith(`/${importPath}`) ? imported.path.slice(0, -importPath.length - 1) : '.'
+                found.set(imported.path, { folder, path: importPath })
+            }
+        }
+    }
+
+    const folders = [...found.values()].map(({ folder }) => folder).filter(folder => folder !== '.')
+
+    return protoFiles.map(protoFile => {
+        const imported = found.get(protoFile.path)
+        if(imported) {
+            return imported
+        }
+        // a file nothing imports, found from the folder the others are
+        const folder = folders.find(folder => protoFile.path.startsWith(`${folder}/`))
+        return folder ? { folder, path: protoFile.path.slice(folder.length + 1) } : { folder: '.', path: protoFile.path }
+    })
+}
+
+// Copy as grpcurl. grpcurl reads proto files from disk, so with .proto files the command names their paths, which
+// it finds in the folder it runs in, where the user keeps their own copy of the files
+export function generateGrpcurlCommand(
+    grpcRequest: CollectionItem,
+    resolved: { target: { address: string, tls: boolean }, metadata: [string, string][], message: string, disableSSLVerification: boolean }
+) {
+    const { service, method, protoFiles } = grpcRequest.grpc ?? {}
+
+    if(!service || !method) {
+        throw new Error('Choose a method first')
+    }
+
+    const words = ['grpcurl']
+
+    if(!resolved.target.tls) {
+        words.push('-plaintext')
+    } else if(resolved.disableSSLVerification) {
+        words.push('-insecure')
+    }
+
+    // grpcurl drops a User-Agent given with -H and takes it only as -user-agent. The call sends the last row's
+    let userAgent: string | null = null
+
+    for(const [name, value] of resolved.metadata) {
+        if(name.trim().toLowerCase() === 'user-agent') {
+            userAgent = value
+        } else if(isGrpcMetadataSent(name)) {
+            // rows of one -bin name come joined with a comma, which the call sends as separate values and grpcurl
+            // would take as one
+            const values = name.trim().toLowerCase().endsWith('-bin') ? value.split(',').map(part => part.trim()) : [value]
+            for(const oneValue of values) {
+                words.push('-H', quoteShellWord(`${name}: ${oneValue}`))
+            }
+        }
+    }
+
+    if(userAgent !== null) {
+        words.push('-user-agent', quoteShellWord(userAgent))
+    }
+
+    if(resolved.message.trim() !== '') {
+        words.push('-d', quoteShellWord(resolved.message))
+    }
+
+    if(protoFiles && protoFiles.length > 0) {
+        const protoPaths = getGrpcurlProtoPaths(protoFiles)
+        for(const folder of new Set(protoPaths.map(({ folder }) => folder))) {
+            words.push('-import-path', quoteShellWord(folder))
+        }
+        for(const path of new Set(protoPaths.map(({ path }) => path))) {
+            words.push('-proto', quoteShellWord(path))
+        }
+    }
+
+    words.push(quoteShellWord(resolved.target.address), quoteShellWord(`${service}/${method}`))
+
+    return words.join(' ')
 }
 
 export function getAllHttpRequestsInFolder(folder: CollectionItem): CollectionItem[] {

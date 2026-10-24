@@ -35,10 +35,19 @@ vi.mock('./helpers', async(importOriginal) => {
     return { ...original, handleRequest: vi.fn() }
 })
 
-import { createPlugin, createResponse, deletePlugin, getResponsesByCollectionId, updatePlugin, updateResponse } from './db'
+const grpcTransport = vi.hoisted(() => ({
+    isGrpcAvailable: vi.fn(() => true),
+    loadGrpcSchema: vi.fn(),
+    startGrpcCall: vi.fn(),
+}))
+
+vi.mock('./utils/grpc-transport', () => grpcTransport)
+
+import { createPlugin, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getCollectionForWorkspace, getResponsesByCollectionId, updatePlugin, updateResponse } from './db'
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, Workspace } from './global'
 import { store } from './store'
 import { INHERITED_AUTHENTICATION_TYPE, handleRequest } from './helpers'
+import { type GrpcLiveCall, getGrpcItemKey, grpcCalls, resetGrpcCalls, startGrpcCallForItem } from './utils/grpc-calls'
 
 function scriptPlugin(id: string, code: { pre_request: string, post_request: string }): Plugin {
     return {
@@ -791,23 +800,274 @@ describe('Collection Runner with a body cut short', () => {
     })
 })
 
+describe('setActiveTab', () => {
+    beforeEach(() => {
+        // the tab is scrolled into view, where the page has one
+        vi.stubGlobal('document', { querySelector: () => null })
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace' } as Workspace
+        store.state.activeTab = null
+    })
 
-describe('renaming response history', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
+    test('an item of a type only a newer version knows opens as it is, its url and parameters untouched', async() => {
+        const newer = { _id: 'newer-1', _type: 'newer-kind', workspaceId: 'workspace-id', url: 'x://y?a=1', parameters: [] } as unknown as CollectionItem
+        await store.dispatch('setActiveTab', newer)
+        expect(newer.url).toBe('x://y?a=1')
+        expect(newer.parameters).toEqual([])
+    })
+
+    test('an HTTP request with a query its parameters lack gets them, as it always has', async() => {
+        const request = { _id: 'request-1', _type: 'request', workspaceId: 'workspace-id', url: 'http://example.test/?a=1', parameters: [] } as unknown as CollectionItem
+        await store.dispatch('setActiveTab', request)
+        expect(request.parameters).toEqual([{ name: 'a', value: '1' }])
+    })
+})
+
+describe('response history mutations given an item other than the active tab', () => {
     const activeTab = { _id: 'active-tab', _type: 'request', name: 'Active', parentId: null, workspaceId: 'workspace-a' } as CollectionItem
-    const response = (id: string) => ({ _id: id, collectionId: activeTab._id, name: null, buffer: '', request: { original: {} } }) as any
+    const grpcItem = { _id: 'grpc-item', _type: 'grpc', name: 'gRPC', parentId: null, workspaceId: 'workspace-b' } as unknown as CollectionItem
+    const response = (id: string, collectionId: string) => ({ _id: id, collectionId, name: null, buffer: '', request: { original: {} } }) as any
 
     beforeEach(() => {
         vi.clearAllMocks()
         store.state.activeTab = activeTab
-        store.state.responses[activeTab._id] = [response('response-1'), response('response-2')]
+        store.state.responses[activeTab._id] = [response('active-1', activeTab._id)]
+        store.state.requestResponses[activeTab._id] = store.state.responses[activeTab._id][0]
+        store.state.requestResponseStatus[activeTab._id] = 'loaded'
+        store.state.responses[grpcItem._id] = [response('grpc-1', grpcItem._id), response('grpc-2', grpcItem._id)]
+        store.state.requestResponses[grpcItem._id] = store.state.responses[grpcItem._id][0]
+        store.state.requestResponseStatus[grpcItem._id] = 'loaded'
+    })
+
+    const expectActiveTabUntouched = () => {
+        expect(store.state.responses[activeTab._id].map((entry: any) => entry._id)).toEqual(['active-1'])
+        expect(store.state.requestResponses[activeTab._id]).toMatchObject({ _id: 'active-1', name: null })
+        expect(store.state.requestResponseStatus[activeTab._id]).toBe('loaded')
+    }
+
+    test('clearResponseHistory clears the given item\'s history only', async() => {
+        store.commit('clearResponseHistory', grpcItem)
+        await vi.waitFor(() => expect(store.state.responses[grpcItem._id]).toEqual([]))
+
+        expect(deleteResponsesByCollectionId).toHaveBeenCalledOnce()
+        expect(deleteResponsesByCollectionId).toHaveBeenCalledWith('workspace-b', 'grpc-item')
+        expect(store.state.requestResponses[grpcItem._id]).toBeNull()
+        expect(store.state.requestResponseStatus[grpcItem._id]).toBe('pending')
+        expectActiveTabUntouched()
+    })
+
+    test('deleteCurrentlyActiveResponse deletes the given item\'s shown entry only', async() => {
+        store.commit('deleteCurrentlyActiveResponse', grpcItem)
+        await vi.waitFor(() => expect(store.state.responses[grpcItem._id].map((entry: any) => entry._id)).toEqual(['grpc-2']))
+
+        expect(deleteResponse).toHaveBeenCalledOnce()
+        expect(deleteResponse).toHaveBeenCalledWith('workspace-b', 'grpc-item', 'grpc-1')
+        expect(store.state.requestResponses[grpcItem._id]._id).toBe('grpc-2')
+        expect(store.state.requestResponseStatus[grpcItem._id]).toBe('loaded')
+        expectActiveTabUntouched()
+    })
+
+    test('renameCurrentlyActiveResponse renames the given item\'s shown entry only', async() => {
+        store.commit('renameCurrentlyActiveResponse', { name: 'Renamed', collectionItem: grpcItem })
+        await vi.waitFor(() => expect(updateResponse).toHaveBeenCalledOnce())
+
+        expect(updateResponse).toHaveBeenCalledWith('workspace-b', 'grpc-item', 'grpc-1', { name: 'Renamed' })
+        expect(store.state.requestResponses[grpcItem._id].name).toBe('Renamed')
+        expect(store.state.responses[grpcItem._id][1].name).toBeNull()
+        expectActiveTabUntouched()
     })
 
     test('renameCurrentlyActiveResponse renames the history entry too when the shown one is a copy, as after a send', async() => {
         // saveResponse keeps a copy of the entry it shows
-        store.state.requestResponses[activeTab._id] = { ...store.state.responses[activeTab._id][0] }
-        store.commit('renameCurrentlyActiveResponse', 'Renamed')
+        store.state.requestResponses[grpcItem._id] = { ...store.state.responses[grpcItem._id][0] }
+        store.commit('renameCurrentlyActiveResponse', { name: 'Renamed', collectionItem: grpcItem })
         await vi.waitFor(() => expect(updateResponse).toHaveBeenCalledOnce())
 
-        expect(store.state.responses[activeTab._id].map((entry: any) => entry.name)).toEqual(['Renamed', null])
+        expect(store.state.responses[grpcItem._id].map((entry: any) => entry.name)).toEqual(['Renamed', null])
     })
+})
+
+describe('refreshWorkspaceCollection with running gRPC calls', () => {
+    const item = (id: string) => ({ _id: id, _type: 'grpc', name: id, parentId: null, workspaceId: 'workspace-id' }) as unknown as CollectionItem
+    const runningCall = (id: string) => ({ id, phase: 'open' }) as unknown as GrpcLiveCall
+    const itemKey = (id: string) => getGrpcItemKey({ workspaceId: 'workspace-id', _id: id })
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        resetGrpcCalls()
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace' } as Workspace
+        store.commit('setCollection', [item('Renamed.json'), item('Gone.json')])
+    })
+
+    afterEach(() => {
+        resetGrpcCalls()
+    })
+
+    test('a call moves to its item\'s new id, and one whose new id the reloaded collection lacks is not moved there', async() => {
+        grpcCalls[itemKey('Renamed.json')] = runningCall('call-renamed')
+        grpcCalls[itemKey('Gone.json')] = runningCall('call-gone')
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({
+            collection: [item('Renamed Again.json')],
+            workspace: null,
+            // the map also holds an item whose file went away outside Restfox
+            idMap: new Map([['Renamed.json', 'Renamed Again.json'], ['Gone.json', 'Not In Collection.json']]),
+        } as any)
+
+        await store.dispatch('refreshWorkspaceCollection')
+
+        expect(grpcCalls[itemKey('Renamed Again.json')]?.id).toBe('call-renamed')
+        expect(grpcCalls[itemKey('Renamed.json')]).toBeUndefined()
+        expect(grpcCalls[itemKey('Not In Collection.json')]).toBeUndefined()
+        expect(grpcCalls[itemKey('Gone.json')]).toBeUndefined()
+    })
+})
+
+describe('a gRPC call of an item whose history was never loaded', () => {
+    const item = { _id: 'grpc-unloaded', _type: 'grpc', name: 'Demo/SayHello', parentId: null, workspaceId: 'workspace-id', url: 'localhost:50051', grpc: { service: 'demo.v1.Demo', method: 'SayHello' }, body: { mimeType: 'application/json', text: '{}' } } as unknown as CollectionItem
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        resetGrpcCalls()
+        vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: null, name: 'Workspace' } as unknown as Workspace
+        store.commit('setCollection', [item])
+        delete store.state.responses[item._id]
+        delete store.state.requestResponses[item._id]
+        delete store.state.requestResponseStatus[item._id]
+        grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [{ name: 'demo.v1.Demo', methods: [{ name: 'SayHello', path: '/demo.v1.Demo/SayHello', requestStream: false, responseStream: false, inputType: 'A', outputType: 'B', example: '{}' }] }] })
+        grpcTransport.startGrpcCall.mockImplementation((_spec: unknown, onEvent: (event: any) => void) => {
+            setTimeout(() => {
+                onEvent({ type: 'connected', time: 1 })
+                onEvent({ type: 'received', json: '{"a":1}', time: 3 })
+                onEvent({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 4 })
+            })
+            return { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+        })
+    })
+
+    afterEach(() => {
+        resetGrpcCalls()
+        vi.unstubAllGlobals()
+    })
+
+    // such as a tab never opened in the main window, detached into a window of its own: its history first loads with
+    // the save, which reads it from the database while the call is already shown
+    test('stays shown once it ends, and is the first entry of its history', async() => {
+        vi.mocked(getResponsesByCollectionId).mockImplementation(() => new Promise(resolve => setTimeout(() => resolve([]), 5)))
+
+        await startGrpcCallForItem(store, item)
+        await vi.waitFor(() => expect(createResponse).toHaveBeenCalledOnce())
+
+        const callId = grpcCalls[getGrpcItemKey(item)].id
+        expect(store.state.responses[item._id].map((entry: any) => entry._id)).toEqual([callId])
+        expect(store.state.requestResponses[item._id]?._id).toBe(callId)
+        expect(store.state.requestResponseStatus[item._id]).toBe('loaded')
+    })
+})
+
+describe('gRPC calls of two file workspaces with an item at the same path', () => {
+    const item = (workspaceId: string, id = 'Chat.json') => ({ _id: id, _type: 'grpc', name: 'Chat', parentId: null, workspaceId, url: 'localhost:50051', grpc: { service: 'demo.v1.Demo', method: 'Chat' }, body: { mimeType: 'application/json', text: '{}' } }) as unknown as CollectionItem
+    const historyEntryB = { _id: 'b-1', collectionId: 'Chat.json', createdAt: 1, grpc: { events: [] } }
+    let onEventA: (event: any) => void
+    let callA: { send: ReturnType<typeof vi.fn>, end: ReturnType<typeof vi.fn>, cancel: ReturnType<typeof vi.fn> }
+
+    const showHistoryB = () => {
+        store.state.responses['Chat.json'] = [historyEntryB]
+        store.state.requestResponses['Chat.json'] = historyEntryB
+        store.state.requestResponseStatus['Chat.json'] = 'loaded'
+    }
+
+    beforeEach(async() => {
+        vi.clearAllMocks()
+        resetGrpcCalls()
+        vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+        grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [{ name: 'demo.v1.Demo', methods: [{ name: 'Chat', path: '/demo.v1.Demo/Chat', requestStream: true, responseStream: true, inputType: 'A', outputType: 'B', example: '{}' }] }] })
+        grpcTransport.startGrpcCall.mockImplementation((_spec: unknown, onEvent: (event: any) => void) => {
+            onEventA = onEvent
+            callA = { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+            return callA
+        })
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as any)
+
+        store.state.activeWorkspace = { _id: 'wA', _type: 'file', name: 'A', environment: {}, dotEnv: {} } as unknown as Workspace
+        store.commit('setCollection', [item('wA')])
+        await startGrpcCallForItem(store, item('wA'))
+        onEventA({ type: 'connected', time: 1 })
+
+        // the other workspace opened, its item's history loaded
+        store.state.activeWorkspace = { _id: 'wB', _type: 'file', name: 'B', environment: {}, dotEnv: {} } as unknown as Workspace
+        store.commit('setCollection', [item('wB')])
+        showHistoryB()
+    })
+
+    afterEach(() => {
+        resetGrpcCalls()
+        vi.unstubAllGlobals()
+        delete store.state.responses['Chat.json']
+        delete store.state.requestResponses['Chat.json']
+        delete store.state.requestResponseStatus['Chat.json']
+    })
+
+    // the first workspace's call ends and is saved there, under its own item, and the open workspace's item still
+    // shows its own history
+    const expectCallASavedInItsWorkspace = async() => {
+        expect(callA.cancel).not.toHaveBeenCalled()
+        onEventA({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+        await vi.waitFor(() => expect(createResponse).toHaveBeenCalledOnce())
+        expect(createResponse).toHaveBeenCalledWith('wA', expect.objectContaining({ collectionId: 'Chat.json' }))
+        expect(store.state.responses['Chat.json']).toEqual([historyEntryB])
+        expect(store.state.requestResponses['Chat.json']).toEqual(historyEntryB)
+    }
+
+    test('deleting the item in the other workspace leaves the call running', async() => {
+        await store.dispatch('deleteCollectionItem', item('wB'))
+        showHistoryB()
+        await expectCallASavedInItsWorkspace()
+    })
+
+    test('renaming the item in the other workspace leaves the call with its own item', async() => {
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({ collection: [item('wB', 'Talk.json')], workspace: null, idMap: new Map([['Chat.json', 'Talk.json']]) } as any)
+        await store.dispatch('refreshWorkspaceCollection')
+        await expectCallASavedInItsWorkspace()
+    })
+
+    test('the call ending while the other workspace is open is saved in its own workspace only', async() => {
+        await expectCallASavedInItsWorkspace()
+    })
+})
+
+
+test('a history load finishing after a workspace switch saves only to the call workspace', async() => {
+    vi.clearAllMocks()
+    const collectionId = 'Chat.json'
+    const savedA = { _id: 'a-old', collectionId, createdAt: 1, grpc: { events: [] } }
+    const savedB = { _id: 'b-old', collectionId, createdAt: 2, grpc: { events: [] } }
+    const response = { _id: 'a-new', collectionId, createdAt: 3, grpc: { events: [] } }
+    const originalWorkspace = store.state.activeWorkspace
+    let finishLoad!: (responses: any[]) => void
+    vi.mocked(getResponsesByCollectionId).mockReturnValueOnce(new Promise(resolve => finishLoad = resolve)).mockResolvedValue([response, savedA] as any)
+    store.state.activeWorkspace = { _id: 'wA' } as Workspace
+    delete store.state.responses[collectionId]
+    delete store.state.requestResponses[collectionId]
+    try {
+        const saving = store.dispatch('saveResponse', { workspaceId: 'wA', collectionId, response })
+        await vi.waitFor(() => expect(getResponsesByCollectionId).toHaveBeenCalledWith('wA', collectionId))
+        store.state.activeWorkspace = { _id: 'wB' } as Workspace
+        store.state.responses[collectionId] = [savedB]
+        store.state.requestResponses[collectionId] = savedB
+        finishLoad([savedA])
+        await saving
+        expect(createResponse).toHaveBeenCalledWith('wA', response)
+        expect(store.state.responses[collectionId]).toEqual([savedB])
+        expect(store.state.requestResponses[collectionId]).toEqual(savedB)
+    } finally {
+        store.state.activeWorkspace = originalWorkspace
+        delete store.state.responses[collectionId]
+        delete store.state.requestResponses[collectionId]
+    }
 })

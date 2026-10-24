@@ -43,6 +43,7 @@
         "build-appx": "electron-builder --windows appx"
     },
     "dependencies": {
+        "@grpc/grpc-js": "^1.14.6",
         "chokidar": "^3.6.0",
         "dotenv": "^16.4.5",
         "electron-context-menu": "^3.6.1",
@@ -52,6 +53,7 @@
         "jsonfile": "^4.0.0",
         "mkdirp": "^0.5.1",
         "open": "^10.1.0",
+        "protobufjs": "^8.8.1",
         "undici": "^8.11.2",
         "update-electron-app": "^2.0.1"
     },

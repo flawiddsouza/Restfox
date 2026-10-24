@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none" stroke="#000" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="18" y="78" width="220" height="100" rx="18"/>
+    <path d="M58 40h140M178 22l20 18-20 18"/>
+    <path d="M198 216H58M78 198l-20 18 20 18"/>
+    <text x="128" y="149" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="70" font-weight="bold" fill="#000" stroke="none">gRPC</text>
+</svg>

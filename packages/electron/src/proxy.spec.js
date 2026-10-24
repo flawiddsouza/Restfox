@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { isBypassed, parseResolvedProxy, getProxyForRequest, getChromiumProxyConfig, takeProxyAuthorization, getProxyAgentOptions } from './proxy.js'
+import { isBypassed, parseResolvedProxy, getProxyForRequest, getProxyForGrpc, getChromiumProxyConfig, takeProxyAuthorization, getProxyAgentOptions } from './proxy.js'
 
 test('a bypass entry covers the host and its subdomains, with or without a leading dot or star', () => {
     for(const entry of ['example.com', '.example.com', '*.example.com']) {
@@ -49,6 +49,20 @@ test('the environment proxy follows the scheme and NO_PROXY, lowercase names fir
     expect(await getProxyForRequest(new URL('http://api.test/'), null, null, env)).toBe('http://lower.test:1')
     expect(await getProxyForRequest(new URL('https://api.test/'), null, null, env)).toBe('http://secure.test:2')
     expect(await getProxyForRequest(new URL('https://a.internal.test/'), null, null, env)).toBe(null)
+})
+
+test('a gRPC call, with or without TLS, takes HTTPS_PROXY and HTTP_PROXY when it is unset, and asks the system as for https://', async() => {
+    const both = { http_proxy: 'plain.test:1', HTTPS_PROXY: 'http://secure.test:2', NO_PROXY: 'internal.test' }
+    expect(await getProxyForGrpc('api.test:50051', null, null, both)).toBe('http://secure.test:2')
+    expect(await getProxyForGrpc('api.test:50051', null, null, { HTTP_PROXY: 'plain.test:1' })).toBe('http://plain.test:1')
+    expect(await getProxyForGrpc('a.internal.test:50051', null, null, both)).toBe(null)
+    expect(await getProxyForGrpc('api.test:50051', null, null, {})).toBe(null)
+
+    const asked = []
+    expect(await getProxyForGrpc('[::1]:50051', null, async url => asked.push(url) && 'PROXY os-proxy.test:3128', both)).toBe(null)
+    expect(await getProxyForGrpc('api.test:50051', null, async url => asked.push(url) && 'PROXY os-proxy.test:3128', both)).toBe('http://os-proxy.test:3128')
+    expect(asked).toEqual(['https://api.test:50051/'])
+    expect(await getProxyForGrpc('api.test:50051', { mode: 'custom', url: 'custom.test:3' }, null, both)).toBe('http://custom.test:3/')
 })
 
 test('Off connects directly whatever the system or environment say', async() => {

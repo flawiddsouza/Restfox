@@ -8,7 +8,7 @@
             <div class="create-request">
                 <p>Create a new request</p>
                 <div class="icons">
-                    <img :src="`images/${constants.REQUESTS[key].type}-icon.png`" :alt="constants.REQUESTS[key].alt" :title="constants.REQUESTS[key].title" @click="createRequest(constants.REQUESTS[key].type)" v-for="key in Object.keys(constants.REQUESTS)">
+                    <img :src="constants.REQUESTS[key].icon" :alt="constants.REQUESTS[key].alt" :title="constants.REQUESTS[key].title" @click="createRequest(constants.REQUESTS[key].type)" v-for="key in Object.keys(constants.REQUESTS)">
                 </div>
             </div>
         </div>
@@ -16,12 +16,14 @@
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddGraphQLRequestModal v-model:showModal="addGraphQLRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddSocketModal v-model:showModal="addSocketModalShow" :parent-id="addSocketModalParentId" />
+    <AddGrpcRequestModal v-model:showModal="addGrpcRequestModalShow" :parent-id="null" />
 </template>
 
 <script>
 import AddRequestModal from '@/components/modals/AddRequestModal.vue'
 import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
 import AddSocketModal from '@/components/modals/AddSocketModal.vue'
+import AddGrpcRequestModal from '@/components/modals/AddGrpcRequestModal.vue'
 import constants from '@/constants'
 
 export default {
@@ -37,10 +39,12 @@ export default {
             addGraphQLRequestModalShow: false,
             addSocketModalShow: false,
             addSocketModalParentId: null,
+            addGrpcRequestModalShow: false,
         }
     },
     components: {
         AddSocketModal,
+        AddGrpcRequestModal,
         AddGraphQLRequestModal,
         AddRequestModal
     },
@@ -58,6 +62,10 @@ export default {
             if(type === constants.REQUESTS.websocket.type) {
                 this.addRequestModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
                 this.addSocketModalShow = true
+            }
+
+            if(type === constants.REQUESTS.grpc.type) {
+                this.addGrpcRequestModalShow = true
             }
         }
     }

@@ -1,0 +1,344 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-08-19T20:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v9.0.0",
+  "resources": [
+    {
+      "_id": "req_listar_tareas_grpc",
+      "parentId": "fld_grpc_tareas",
+      "modified": 1692468000000,
+      "created": 1692468000000,
+      "url": "{{ _.grpc_server }}",
+      "name": "ListarTareas",
+      "description": "Obtiene lista paginada de tareas via gRPC",
+      "method": "GET",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"limite\": 10,\n  \"desplazamiento\": 0\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692468000000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/ListarTareas",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_obtener_tarea_grpc",
+      "parentId": "fld_grpc_tareas",
+      "modified": 1692468100000,
+      "created": 1692468100000,
+      "url": "{{ _.grpc_server }}",
+      "name": "ObtenerTarea",
+      "description": "Obtiene una tarea específica por ID via gRPC",
+      "method": "GET",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"id\": \"{{ _.tarea_id_ejemplo }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467900000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/ObtenerTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_crear_tarea_grpc",
+      "parentId": "fld_grpc_tareas",
+      "modified": 1692468200000,
+      "created": 1692468200000,
+      "url": "{{ _.grpc_server }}",
+      "name": "CrearTarea",
+      "description": "Crea una nueva tarea via gRPC",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"titulo\": \"Tarea creada desde Insomnia\",\n  \"descripcion\": \"Esta tarea fue creada usando Insomnia para probar el servicio gRPC\",\n  \"prioridad\": 4,\n  \"completada\": false\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467800000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/CrearTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_actualizar_tarea_grpc",
+      "parentId": "fld_grpc_tareas",
+      "modified": 1692468300000,
+      "created": 1692468300000,
+      "url": "{{ _.grpc_server }}",
+      "name": "ActualizarTarea",
+      "description": "Actualiza una tarea completa via gRPC",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"id\": \"{{ _.tarea_id_ejemplo }}\",\n  \"titulo\": \"Tarea actualizada desde Insomnia\",\n  \"descripcion\": \"Esta tarea fue actualizada usando Insomnia gRPC\",\n  \"prioridad\": 5,\n  \"completada\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467700000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/ActualizarTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_modificar_tarea_grpc",
+      "parentId": "fld_grpc_tareas",
+      "modified": 1692468400000,
+      "created": 1692468400000,
+      "url": "{{ _.grpc_server }}",
+      "name": "ModificarTarea (PATCH)",
+      "description": "Modifica campos específicos de una tarea via gRPC",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"id\": \"{{ _.tarea_id_ejemplo }}\",\n  \"completada\": {\n    \"value\": true\n  },\n  \"prioridad\": {\n    \"value\": 2\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467600000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/ModificarTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_eliminar_tarea_grpc",
+      "parentId": "fld_grpc_tareas",
+      "modified": 1692468500000,
+      "created": 1692468500000,
+      "url": "{{ _.grpc_server }}",
+      "name": "EliminarTarea",
+      "description": "Elimina una tarea via gRPC",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"id\": \"{{ _.tarea_id_ejemplo }}\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467500000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/EliminarTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_validacion_titulo_grpc",
+      "parentId": "fld_grpc_validaciones",
+      "modified": 1692468600000,
+      "created": 1692468600000,
+      "url": "{{ _.grpc_server }}",
+      "name": "Validación: Título Vacío",
+      "description": "Prueba validación de título requerido",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"titulo\": \"\",\n  \"descripcion\": \"Tarea sin título para probar validación\",\n  \"prioridad\": 3\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467400000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/CrearTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_validacion_prioridad_grpc",
+      "parentId": "fld_grpc_validaciones",
+      "modified": 1692468700000,
+      "created": 1692468700000,
+      "url": "{{ _.grpc_server }}",
+      "name": "Validación: Prioridad Inválida",
+      "description": "Prueba validación de prioridad fuera de rango",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/grpc",
+        "text": "{\n  \"titulo\": \"Tarea con prioridad inválida\",\n  \"descripcion\": \"Esta tarea tiene prioridad 10, debe fallar\",\n  \"prioridad\": 10\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "id": "pair_content_type",
+          "name": "Content-Type",
+          "value": "application/grpc"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": -1692467300000,
+      "isPrivate": false,
+      "settingStoreCookies": false,
+      "settingSendCookies": false,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "protoFileId": "pf_tareas_proto",
+      "protoMethodName": "tareas.ServicioTareas/CrearTarea",
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "fld_grpc_tareas",
+      "parentId": "wrk_hackathon_grpc",
+      "modified": 1692467000000,
+      "created": 1692467000000,
+      "name": "Operaciones CRUD gRPC",
+      "description": "Endpoints gRPC directos para gestionar tareas",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1692467000000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_grpc_validaciones",
+      "parentId": "wrk_hackathon_grpc",
+      "modified": 1692467100000,
+      "created": 1692467100000,
+      "name": "Validaciones gRPC",
+      "description": "Pruebas de validación directas en gRPC",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1692466900000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "wrk_hackathon_grpc",
+      "parentId": null,
+      "modified": 1692466000000,
+      "created": 1692466000000,
+      "name": "Hackathon - Servidor gRPC Tareas",
+      "description": "Colección para probar directamente el servidor gRPC de tareas",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_grpc_produccion",
+      "parentId": "wrk_hackathon_grpc",
+      "modified": 1692466000000,
+      "created": 1692466000000,
+      "name": "Servidor gRPC Producción",
+      "data": {
+        "grpc_server": "172.16.2.231:50051",
+        "tarea_id_ejemplo": "copiar-desde-listar-tareas"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "grpc_server",
+          "tarea_id_ejemplo"
+        ]
+      },
+      "color": "#2ecc71",
+      "isPrivate": false,
+      "metaSortKey": 1692466000000,
+      "_type": "environment"
+    },
+    {
+      "_id": "pf_tareas_proto",
+      "parentId": "wrk_hackathon_grpc",
+      "modified": 1692466000000,
+      "created": 1692466000000,
+      "name": "tareas.proto",
+      "protoText": "syntax = \"proto3\";\n\npackage tareas;\n\nimport \"google/protobuf/wrappers.proto\";\n\nmessage Tarea {\n  string id = 1;\n  string titulo = 2;\n  string descripcion = 3;\n  int32 prioridad = 4;\n  bool completada = 5;\n  string fecha_creacion = 6;\n  string fecha_actualizacion = 7;\n}\n\nmessage ObtenerTareaRequest { string id = 1; }\nmessage ListarTareasRequest { int32 limite = 1; int32 desplazamiento = 2; }\nmessage ListarTareasResponse { repeated Tarea datos = 1; int32 total = 2; }\n\nmessage CrearTareaRequest {\n  string titulo = 1;\n  string descripcion = 2;\n  int32 prioridad = 3;\n  bool completada = 4;\n}\nmessage ActualizarTareaRequest {\n  string id = 1;\n  string titulo = 2;\n  string descripcion = 3;\n  int32 prioridad = 4;\n  bool completada = 5;\n}\nmessage ModificarTareaRequest {\n  string id = 1;\n  google.protobuf.StringValue titulo = 2;\n  google.protobuf.StringValue descripcion = 3;\n  google.protobuf.Int32Value prioridad = 4;\n  google.protobuf.BoolValue completada = 5;\n}\nmessage EliminarTareaRequest { string id = 1; }\nmessage Vacio {}\n\nservice ServicioTareas {\n  rpc ObtenerTarea(ObtenerTareaRequest) returns (Tarea);\n  rpc ListarTareas(ListarTareasRequest) returns (ListarTareasResponse);\n  rpc CrearTarea(CrearTareaRequest) returns (Tarea);\n  rpc ActualizarTarea(ActualizarTareaRequest) returns (Tarea);\n  rpc ModificarTarea(ModificarTareaRequest) returns (Tarea);\n  rpc EliminarTarea(EliminarTareaRequest) returns (Vacio);\n}",
+      "_type": "proto_file"
+    }
+  ]
+}

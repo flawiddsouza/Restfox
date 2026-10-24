@@ -2,7 +2,7 @@
     <form @submit.prevent="showModalComp = false" v-if="showModalComp">
         <modal :title="title" v-model="showModalComp" width="600px">
             <label>
-                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name <span style="color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket'">(also rename by double-clicking in sidebar)</span></div>
+                <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom)">Name <span style="color: var(--modal-tip-text-color); font-weight: normal; font-style: italic;" v-if="collectionItem._type === 'request' || collectionItem._type === 'socket' || collectionItem._type === 'grpc'">(also rename by double-clicking in sidebar)</span></div>
                 <input type="text" class="full-width-input" v-model="collectionItem.name" :placeholder="placeholder" spellcheck="false" required v-focus>
             </label>
 
@@ -78,6 +78,10 @@ export default {
                 return 'Socket Properties'
             }
 
+            if(this.collectionItem._type === 'grpc') {
+                return 'gRPC Request Properties'
+            }
+
             return ''
         },
         placeholder() {
@@ -91,6 +95,10 @@ export default {
 
             if(this.collectionItem._type === 'socket') {
                 return 'Socket Name'
+            }
+
+            if(this.collectionItem._type === 'grpc') {
+                return 'gRPC Request Name'
             }
 
             return ''

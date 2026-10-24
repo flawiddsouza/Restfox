@@ -27,7 +27,7 @@
             <span class="nav-label">Socket</span>
         </div>
         <div
-            v-if="isRequest"
+            v-if="hasResponsePanel"
             class="nav-item"
             :class="{ active: activeMobilePanel === 'response' }"
             @click="setPanel('response')"
@@ -76,8 +76,8 @@ export default {
         activeTab() {
             return this.$store.state.activeTab
         },
-        isRequest() {
-            return this.activeTab?._type === 'request'
+        hasResponsePanel() {
+            return this.activeTab?._type === 'request' || this.activeTab?._type === 'grpc'
         },
         isSocket() {
             return this.activeTab?._type === 'socket'
@@ -134,7 +134,7 @@ export default {
         },
     },
     watch: {
-        isRequest(val) {
+        hasResponsePanel(val) {
             if(!val && this.activeMobilePanel === 'response') {
                 this.$store.commit('setActiveMobilePanel', 'content')
             }

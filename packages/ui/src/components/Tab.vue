@@ -1,5 +1,5 @@
 <template>
-    <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="collectionItem && collectionItem._type === 'request' && (!isMobile || activeMobilePanel !== 'collections')" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
+    <section class="request-response-panels" :class="{ 'top-bottom': requestResponseLayoutTopBottom, 'left-right': !requestResponseLayoutTopBottom }" v-resizable.top-bottom="requestResponseLayoutTopBottom" v-show="collectionItem && (collectionItem._type === 'request' || collectionItem._type === 'grpc') && (!isMobile || activeMobilePanel !== 'collections')" :key="'request-panel-layout-' + requestResponseLayoutTopBottom" @resized="requestPanelResized">
         <section
             class="request-panel" :data-min-width-px="!requestResponseLayoutTopBottom ? 250 : 100" :style="{
                 'flexGrow': requestPanelRatio,
@@ -9,7 +9,13 @@
             v-show="!isMobile || activeMobilePanel === 'content'"
         >
             <KeepAlive>
+                <GrpcRequestPanel
+                    v-if="collectionItem?._type === 'grpc'"
+                    :active-tab="collectionItem"
+                    :key="'grpc-request-panel-' + collectionItem._id"
+                />
                 <RequestPanel
+                    v-else
                     :active-tab="collectionItem"
                     :key="'request-panel-' + collectionItem?._id"
                 />
@@ -27,7 +33,13 @@
             v-show="!isMobile || activeMobilePanel === 'response'"
         >
             <KeepAlive>
+                <GrpcResponsePanel
+                    v-if="collectionItem?._type === 'grpc'"
+                    :active-tab="collectionItem"
+                    :key="'grpc-response-panel-' + collectionItem._id"
+                />
                 <ResponsePanel
+                    v-else
                     :active-tab="collectionItem"
                     :key="'response-panel-' + collectionItem?._id"
                 />
@@ -45,6 +57,10 @@
         <FolderPanel :collection-item="collectionItem" />
     </section>
 
+    <section class="request-response-panels" v-if="collectionItem && !KNOWN_TYPES.includes(collectionItem._type) && (!isMobile || activeMobilePanel !== 'collections')">
+        <div class="tab-unknown-type">This request was made with a newer version of Restfox. Update Restfox to open it.</div>
+    </section>
+
     <section class="request-response-panels" v-if="!collectionItem && (!isMobile || activeMobilePanel !== 'collections')">
         <NewRequestShortcutPanel></NewRequestShortcutPanel>
     </section>
@@ -56,6 +72,8 @@ import { CollectionItem } from '@/globals'
 import RequestPanel from '@/components/RequestPanel.vue'
 import ResponsePanel from '@/components/ResponsePanel.vue'
 import SocketPanel from '@/components/SocketPanel.vue'
+import GrpcRequestPanel from '@/components/GrpcRequestPanel.vue'
+import GrpcResponsePanel from '@/components/GrpcResponsePanel.vue'
 import { vResizable } from '@/directives/vResizable'
 import { Store, useStore } from 'vuex'
 import { findItemInTreeById } from '@/helpers'
@@ -76,6 +94,8 @@ const props = defineProps<{
 const store: Store<State> = useStore()
 const { isMobile } = useMobile()
 const activeMobilePanel = computed(() => store.state.activeMobilePanel)
+// the item types this version has a panel for
+const KNOWN_TYPES = ['request', 'socket', 'grpc', 'request_group']
 
 // watch
 watch(() => props.collectionItem, (newValue, oldValue) => {
@@ -116,6 +136,11 @@ watch(() => props.collectionItem, (newValue, oldValue) => {
 </script>
 
 <style scoped>
+.tab-unknown-type {
+    padding: 1rem;
+    color: var(--tip-text-color);
+}
+
 .request-panel {
     overflow: auto;
     display: grid;

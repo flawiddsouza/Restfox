@@ -1,0 +1,11 @@
+{
+    "type": "module",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "@grpc/grpc-js": "^1.14.6",
+        "@grpc/proto-loader": "^0.8.1",
+        "@grpc/reflection": "^1.0.4"
+    }
+}

@@ -1,0 +1,185 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: Vektor TMS
+meta:
+  id: wrk_0f75f80a2f7148459e0136dca77603ef
+  created: 1773828636754
+  modified: 1773828636754
+  description: ""
+collection:
+  - url: localhost:8080
+    name: CreateShipment
+    meta:
+      id: greq_a5cc772dca014dd0b91a135f3619993a
+      created: 1773828645843
+      modified: 1773829040066
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645843
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001",
+          "origin": "Almaty",
+          "destination": "Astana",
+          "driver": {
+            "id": "driver-1",
+            "name": "Jane Doe"
+          },
+          "unit": {
+            "id": "unit-1",
+            "registration_number": "123ABC02"
+          },
+          "shipment_amount_minor": 10000,
+          "driver_revenue_minor": 6000
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/CreateShipment
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+  - url: localhost:8080
+    name: GetShipment
+    meta:
+      id: greq_42370f38e3214aa9a03f42789da255a8
+      created: 1773829075123
+      modified: 1773829164848
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645793
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001"
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/GetShipment
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+  - url: localhost:8080
+    name: AddShipmentStatusEvent - Picked Up
+    meta:
+      id: greq_42fd5da55eff4c4182e160d2ad93b057
+      created: 1773829128572
+      modified: 1773829562728
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645743
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001",
+          "status": "SHIPMENT_STATUS_PICKED_UP"
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/AddShipmentStatusEvent
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+  - url: localhost:8080
+    name: GetShipmentHistory
+    meta:
+      id: greq_9b51a774a17044e193ae4a15bf19bbe0
+      created: 1773829269867
+      modified: 1773829301555
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645643
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001"
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/GetShipmentHistory
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+  - url: localhost:8080
+    name: AddShipmentStatusEvent - In Transit
+    meta:
+      id: greq_9560396a011f4d4a9ed570355c3eb89e
+      created: 1773829390936
+      modified: 1773829420918
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645693
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001",
+          "status": "SHIPMENT_STATUS_IN_TRANSIT"
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/AddShipmentStatusEvent
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+  - url: localhost:8080
+    name: AddShipmentStatusEvent - Delivered
+    meta:
+      id: greq_30b9a17027da4c118196e243737514ee
+      created: 1773829439549
+      modified: 1773829470491
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645668
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001",
+          "status": "SHIPMENT_STATUS_DELIVERED"
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/AddShipmentStatusEvent
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+  - url: localhost:8080
+    name: AddShipmentStatusEvent - Cancelled
+    meta:
+      id: greq_2768287c9aa0468d9e84da5fa2e3174f
+      created: 1773829529673
+      modified: 1773829578183
+      isPrivate: false
+      description: ""
+      sortKey: -1773828645655.5
+    body:
+      text: |-
+        {
+          "reference_number": "REF-001",
+          "status": "SHIPMENT_STATUS_CANCELLED"
+        }
+    protoFileId: pf_783211607a5c4b3ab86f54b06d4226ad
+    protoMethodName: /shipment.v1.ShipmentService/AddShipmentStatusEvent
+    reflectionApi:
+      enabled: false
+      url: https://buf.build
+      apiKey: ""
+      module: buf.build/connectrpc/eliza
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_731d19cbd31c5ef77762e65a33e99098313c8ff3
+    created: 1773828636756
+    modified: 1773828636756
+environments:
+  name: Base Environment
+  meta:
+    id: env_731d19cbd31c5ef77762e65a33e99098313c8ff3
+    created: 1773828636755
+    modified: 1773828636755
+    isPrivate: false

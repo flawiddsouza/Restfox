@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package demo.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+enum Color {
+    COLOR_UNSPECIFIED = 0;
+    COLOR_RED = 1;
+    COLOR_GREEN = 2;
+}
+
+message Point {
+    int32 x = 1;
+    int32 y = 2;
+}
+
+// one field of each kind, echoed back by Everything
+message Everything {
+    int64 int64_value = 1;
+    uint64 uint64_value = 2;
+    double double_value = 3;
+    bool bool_value = 4;
+    bytes bytes_value = 5;
+    Color color = 6;
+    repeated string tags = 7;
+    map<string, int32> counts = 8;
+    Point point = 9;
+    oneof choice {
+        string choice_text = 10;
+        int32 choice_number = 11;
+    }
+    optional string maybe = 12;
+    google.protobuf.Timestamp created_at = 13;
+    google.protobuf.Duration timeout = 14;
+    google.protobuf.Struct attributes = 15;
+    google.protobuf.Any extra = 16;
+    google.protobuf.StringValue nickname = 17;
+    google.protobuf.Int64Value big_wrapper = 18;
+    string snake_case_name = 19;
+    repeated Point points = 20;
+}

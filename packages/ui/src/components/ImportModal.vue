@@ -98,6 +98,7 @@ import {
     getSavedRequestTimeout
 } from '@/helpers'
 import { convertPostmanExportToRestfoxCollection, isPostmanDataDump, isPostmanVariablesFile, mergePostmanGlobals } from '@/parsers/postman'
+import { convertInsomniaGrpcMessage, isGrpcAvailable } from '@/utils/grpc-transport'
 import yaml from 'js-yaml'
 import Modal from '@/components/Modal.vue'
 import { getCollectionForWorkspace } from '@/db'
@@ -381,7 +382,7 @@ export default {
                             }
 
                         } else if(this.importFrom === 'Insomnia') {
-                            collectionTree = collectionTree.concat(await convertInsomniaFileToRestfoxCollection(json, this.activeWorkspace._id))
+                            collectionTree = collectionTree.concat(await convertInsomniaFileToRestfoxCollection(json, this.activeWorkspace._id, isGrpcAvailable() ? convertInsomniaGrpcMessage : null))
 
                         } else if(this.importFrom === 'Restfox') {
                             const { newCollectionTree, newPlugins } = convertRestfoxExportToRestfoxCollection(json, this.activeWorkspace._id)

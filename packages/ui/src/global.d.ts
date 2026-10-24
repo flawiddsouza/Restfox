@@ -24,7 +24,7 @@ export interface InstallInfo {
 
 export interface CollectionItem {
     _id: string
-    _type: 'request' | 'request_group' | 'socket'
+    _type: 'request' | 'request_group' | 'socket' | 'grpc'
     name: string
     children?: CollectionItem[]
     parentId: string | null
@@ -43,6 +43,72 @@ export interface CollectionItem {
     sortOrder?: number
     plugins?: any // this property is only present in the collection export, never in the actual request
     collapsed?: boolean
+    grpc?: GrpcSettings
+}
+
+// a gRPC item's choices, every field optional and absent meaning its default
+export interface GrpcSettings {
+    // fully qualified, such as demo.v1.Greeter
+    service?: string
+    method?: string
+    // absent or empty means server reflection
+    protoFiles?: GrpcProtoFile[]
+}
+
+export interface GrpcProtoFile {
+    // relative to the folder the user picked, or the file name when picked alone, with / separators
+    path: string
+    text: string
+}
+
+export type GrpcCallKind = 'unary' | 'serverStream' | 'clientStream' | 'bidiStream'
+
+export type GrpcMetadata = [string, string][]
+
+export interface GrpcStatus {
+    code: number
+    name: string
+    details: string
+    errorDetails?: string
+}
+
+export interface GrpcCallResultEvent {
+    type: 'sent' | 'received'
+    json?: string
+    // received bytes, base64, only when decoding failed or left out fields
+    bytes?: string
+    decodeError?: string
+    // unique paths in wire order, e.g. ['2', 'point.5', 'items.3', 'labels.value.4']; absent when none
+    unknownFields?: string[]
+    // a sent message whose text took a masked prompt value, left out of history
+    omitted?: boolean
+    time: number
+}
+
+// a finished gRPC call, saved in response history as { _id, collectionId, createdAt, grpc }
+export interface GrpcCallResult {
+    url: string
+    service: string
+    method: string
+    // absent for a call that ended before its method was known, shown as a unary call
+    kind?: GrpcCallKind
+    events: GrpcCallResultEvent[]
+    sentMetadata?: GrpcMetadata
+    headers: GrpcMetadata
+    trailers: GrpcMetadata
+    status: GrpcStatus | null
+    error?: string
+    timeTaken: number
+    ended: 'completed' | 'cancelled' | 'timedOut' | 'failed'
+}
+
+export interface GrpcFinalResponse {
+    _id: string
+    collectionId: string
+    createdAt: number
+    // Rename Current Response's
+    name?: string | null
+    grpc: GrpcCallResult
 }
 
 export interface RequestAuthentication {

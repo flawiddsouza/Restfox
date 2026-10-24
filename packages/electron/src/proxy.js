@@ -155,6 +155,17 @@ async function getProxyForRequest(url, proxySettings, resolveSystemProxy = null,
     return systemProxy ?? getEnvironmentProxy(url, env)
 }
 
+// A gRPC call's proxy, for the server at authority, host:port. The system is asked as for an https:// address, as gRPC
+// runs over HTTP/2, and the environment gives HTTPS_PROXY, or HTTP_PROXY when that is unset, with or without TLS, as
+// grpc-js reads them
+function getProxyForGrpc(authority, proxySettings, resolveSystemProxy = null, env = process.env) {
+    const grpcEnv = {
+        https_proxy: env.https_proxy ?? env.HTTPS_PROXY ?? env.http_proxy ?? env.HTTP_PROXY,
+        no_proxy: env.no_proxy ?? env.NO_PROXY,
+    }
+    return getProxyForRequest(new URL(`https://${authority}`), proxySettings, resolveSystemProxy, grpcEnv)
+}
+
 // the same setting for Chromium's own connections, WebSocket, Socket.IO and Chromium fetch, through session.setProxy.
 // Custom goes to the loopback relay on relayPort, which passes connections to the proxy (proxy-relay.js). Chromium
 // matches a bypass entry exactly, so each also gets its subdomains as the list above means
@@ -234,6 +245,7 @@ module.exports = {
     isBypassed,
     parseResolvedProxy,
     getProxyForRequest,
+    getProxyForGrpc,
     getChromiumProxyConfig,
     takeProxyAuthorization,
     getProxyAgentOptions,

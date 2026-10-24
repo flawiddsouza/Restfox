@@ -32,6 +32,11 @@ import {
     SendResolver,
     describeMaskedPromptOmitted,
     saveCACertificates,
+    createGrpcRequestData,
+    generateGrpcurlCommand,
+    convertCollectionsFromRestfoxToPostman,
+    convertCollectionsFromRestfoxToInsomnia,
+    flattenTree,
     humanFriendlyRunningTime,
     humanFriendlyTime,
 } from './helpers'
@@ -2417,10 +2422,136 @@ describe('Insomnia import', () => {
             { _id: 'fld_1', _type: 'request_group', parentId: null, name: 'Folder' },
             request({}),
             { _id: 'ws_1', _type: 'websocket_request', parentId: 'fld_1', name: 'Socket', url: 'wss://example.test/' },
-            { _id: 'grpc_1', _type: 'grpc_request', parentId: 'fld_1', name: 'gRPC', url: 'example.test:443' },
         ]
         const [restfoxFolder] = await convertInsomniaFileToRestfoxCollection({ resources }, 'w')
         expect(restfoxFolder.children!.map(item => item.name)).toEqual(['Request'])
+    })
+
+    const fixture = (name: string) => readFile(path.join(process.cwd(), 'test-data', 'insomnia-import', name), 'utf-8')
+
+    test('a v4 gRPC request keeps its method and message, and its proto file with the rest of the folder tree it was added in', async() => {
+        const json = JSON.parse(await fixture('grpc-proto-directories.v4.json'))
+        const [workspaceFolder] = await convertInsomniaFileToRestfoxCollection(json, 'w')
+        const grpcFolder = workspaceFolder.children!.find(item => item.name === 'template-connect-go_grpc')!
+        const httpFolder = workspaceFolder.children!.find(item => item.name === 'template-connect-go_http')!
+
+        expect(httpFolder.children!.map(item => item._type)).toEqual(['request', 'request'])
+
+        const greet = grpcFolder.children!.find(item => item.name === 'GreetHandler')!
+        expect(greet).toMatchObject({
+            _type: 'grpc',
+            url: 'localhost:9090',
+            grpc: { service: 'greet.v1.GreetService', method: 'Greet' },
+            body: { mimeType: 'application/json', text: '{\n    "name": "World"\n}' },
+            headers: [],
+            authentication: { type: 'none' },
+            parentId: grpcFolder._id,
+            workspaceId: 'w',
+        })
+        // paths leave out the top folder, as Insomnia compiles them from inside it, and the request's file comes first
+        expect(greet.grpc!.protoFiles!.map(file => file.path)).toEqual(['greet/v1/greet.proto', 'templateconnectgo/v1/store.proto'])
+        expect(greet.grpc!.protoFiles![0].text).toMatch(/^syntax = "proto3";\n\npackage greet\.v1;/)
+
+        const store = grpcFolder.children!.find(item => item.name === 'StoreListHandler')!
+        expect(store.grpc).toMatchObject({ service: 'templateconnectgo.v1.StoreService', method: 'ListStores' })
+        expect(store.grpc!.protoFiles!.map(file => file.path)).toEqual(['templateconnectgo/v1/store.proto', 'greet/v1/greet.proto'])
+        expect(store.body!.text).toContain('"search_query": "\u7530"')
+    })
+
+    test('a v4 gRPC request keeps its metadata as headers, disabled ones too, and its description', async() => {
+        const json = JSON.parse(await fixture('grpc-metadata-and-http.v4.json'))
+        const [workspaceFolder] = await convertInsomniaFileToRestfoxCollection(json, 'w')
+        const items: CollectionItem[] = flattenTree([workspaceFolder])
+        const createBucket = items.find(item => item.name === 'CreateBucket')!
+
+        expect(createBucket).toMatchObject({
+            _type: 'grpc',
+            url: '{{ _.grpc_url }}',
+            grpc: { service: 'apollostorage.grpc.ObjectApi', method: 'CreateBucket' },
+            headers: [{ name: 'authorization', value: 'Bearer {{ _.auth_token }}', description: 'Enable when the server has AUTH_ENABLED=true.', disabled: true }],
+        })
+        expect(createBucket.description).toMatch(/^Create a bucket/)
+        // a file added on its own is compiled by its name
+        expect(createBucket.grpc!.protoFiles!.map(file => file.path)).toEqual(['object_api.proto'])
+        expect(items.filter(item => item._type === 'grpc')).toHaveLength(8)
+        expect(items.filter(item => item._type === 'request')).toHaveLength(14)
+    })
+
+    test('a v5 gRPC request keeps its method and message, and uses server reflection as v5 leaves its proto file out', async() => {
+        const [workspaceFolder] = await convertInsomniaFileToRestfoxCollection(file(await fixture('grpc.v5.yaml')), 'w')
+        const items = workspaceFolder.children!
+
+        expect(items.map(item => [item._type, item.name, item.grpc?.service, item.grpc?.method])).toEqual([
+            ['grpc', 'CreateShipment', 'shipment.v1.ShipmentService', 'CreateShipment'],
+            ['grpc', 'GetShipment', 'shipment.v1.ShipmentService', 'GetShipment'],
+            ['grpc', 'AddShipmentStatusEvent - Picked Up', 'shipment.v1.ShipmentService', 'AddShipmentStatusEvent'],
+            ['grpc', 'GetShipmentHistory', 'shipment.v1.ShipmentService', 'GetShipmentHistory'],
+            ['grpc', 'AddShipmentStatusEvent - In Transit', 'shipment.v1.ShipmentService', 'AddShipmentStatusEvent'],
+            ['grpc', 'AddShipmentStatusEvent - Delivered', 'shipment.v1.ShipmentService', 'AddShipmentStatusEvent'],
+            ['grpc', 'AddShipmentStatusEvent - Cancelled', 'shipment.v1.ShipmentService', 'AddShipmentStatusEvent'],
+        ])
+        expect(items[1]).toMatchObject({ name: 'GetShipment', url: 'localhost:8080', body: { mimeType: 'application/json', text: '{\n  "reference_number": "REF-001"\n}' }, headers: [], authentication: { type: 'none' } })
+        expect(items.every(item => item.grpc!.protoFiles === undefined)).toBe(true)
+    })
+
+    test('a gRPC message goes through the converter the Import dialog gives, with its method and .proto files, and stays as written when that fails or there are no .proto files', async() => {
+        const exported = JSON.parse(await fixture('grpc-address-in-environment.v4.json'))
+        const convert = vi.fn(async({ method, text }: { method: string, text: string }) => method === 'EliminarTarea' ? Promise.reject(new Error('no such method')) : `converted ${text}`)
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        try {
+            const items = (flattenTree(await convertInsomniaFileToRestfoxCollection(exported, 'w', convert)) as CollectionItem[]).filter(item => item._type === 'grpc')
+            const written = (name: string) => exported.resources.find((resource: any) => resource.name === name).body.text
+            const patch = items.find(item => item.name === 'ModificarTarea (PATCH)')!
+            expect(patch.body!.text).toBe(`converted ${written('ModificarTarea (PATCH)')}`)
+            expect(convert).toHaveBeenCalledWith({ protoFiles: patch.grpc!.protoFiles, service: 'tareas.ServicioTareas', method: 'ModificarTarea', text: written('ModificarTarea (PATCH)') })
+            expect(items.find(item => item.name === 'EliminarTarea')!.body!.text).toBe(written('EliminarTarea'))
+            expect(warn).toHaveBeenCalledWith('EliminarTarea: its message is kept as Insomnia wrote it, as it could not be read with its .proto files: no such method')
+        } finally {
+            warn.mockRestore()
+        }
+
+        convert.mockClear()
+        const withoutProtoFiles = { _id: 'greq_1', _type: 'grpc_request', parentId: '__WORKSPACE_ID__', name: 'Call', url: 'grpc://localhost:50051', protoMethodName: '/demo.v1.Demo/SayHello', metadata: [], body: { text: '{"name": {"value": "x"}}' } }
+        const [call] = await convertInsomniaFileToRestfoxCollection({ resources: [withoutProtoFiles] }, 'w', convert)
+        expect(call.body!.text).toBe('{"name": {"value": "x"}}')
+        expect(convert).not.toHaveBeenCalled()
+    })
+
+    test('a gRPC address with no scheme, which Insomnia calls without TLS, gets grpc:// where Restfox would use TLS', async() => {
+        const unspecified = (flattenTree(await convertInsomniaFileToRestfoxCollection(JSON.parse(await fixture('grpc-unspecified-address.v4.json')), 'w')) as CollectionItem[])
+            .filter(item => item._type === 'grpc')
+        expect(unspecified).toHaveLength(6)
+        expect(unspecified.every(item => item.url === 'grpc://0.0.0.0:50051')).toBe(true)
+
+        // an address that starts with a variable is left as it is, its value is set in Restfox
+        const inEnvironment = (flattenTree(await convertInsomniaFileToRestfoxCollection(JSON.parse(await fixture('grpc-address-in-environment.v4.json')), 'w')) as CollectionItem[])
+            .filter(item => item._type === 'grpc')
+        expect(inEnvironment).toHaveLength(8)
+        expect(inEnvironment.every(item => item.url === '{{ _.grpc_server }}')).toBe(true)
+        expect(inEnvironment[0].grpc).toMatchObject({ service: 'tareas.ServicioTareas', method: 'ListarTareas' })
+
+        const grpcRequest = (url: string) => ({ _id: 'greq_1', _type: 'grpc_request', parentId: '__WORKSPACE_ID__', name: 'Call', url, protoMethodName: '', metadata: [], body: { text: '{}' } })
+        const urlOf = async(url: string) => (await convertInsomniaFileToRestfoxCollection({ resources: [grpcRequest(url)] }, 'w'))[0].url
+        expect(await urlOf('https://api.example.com')).toBe('grpc://api.example.com:443')
+        expect(await urlOf('HTTPS://api.example.com:8443')).toBe('grpc://api.example.com:8443')
+        expect(await urlOf('api.example.com:{{ _.port }}')).toBe('grpc://api.example.com:{{ _.port }}')
+        // with no port Insomnia calls 443, where Restfox would call 80 without TLS
+        expect(await urlOf('localhost')).toBe('grpc://localhost:443')
+        expect(await urlOf('grpc://myserver/')).toBe('grpc://myserver:443/')
+        // a variable in the host may hold the port, so none is added
+        expect(await urlOf('grpc://{{ _.host }}')).toBe('grpc://{{ _.host }}')
+        // ones Restfox also calls without TLS, or with TLS as Insomnia does, stay as they are
+        expect(await urlOf('localhost:{{ _.port }}')).toBe('localhost:{{ _.port }}')
+        expect(await urlOf('http://localhost:50051')).toBe('http://localhost:50051')
+        expect(await urlOf('grpcs://api.example.com')).toBe('grpcs://api.example.com')
+        expect(await urlOf('{{ _.host }}:50051')).toBe('{{ _.host }}:50051')
+        expect(await urlOf('unix:/tmp/grpc.sock')).toBe('unix:/tmp/grpc.sock')
+    })
+
+    test('a gRPC request with no method or proto file chosen imports with none', async() => {
+        const resources = [{ _id: 'greq_1', _type: 'grpc_request', parentId: '__WORKSPACE_ID__', name: 'New gRPC Request', url: '', protoFileId: '', protoMethodName: '', metadata: [], body: { text: '{}' } }]
+        const [item] = await convertInsomniaFileToRestfoxCollection({ resources }, 'w')
+        expect(item).toMatchObject({ _type: 'grpc', parentId: null, url: '', grpc: {}, body: { mimeType: 'application/json', text: '{}' } })
     })
 
     test('an OAuth 2.0 request keeps the fields Insomnia names differently', async() => {
@@ -2477,6 +2608,32 @@ describe('Restfox export and import', () => {
         expect(collection[1].plugins).toEqual([requestScript])
     })
 
+    const grpcItem: CollectionItem = { _id: 'g', _type: 'grpc', parentId: 'f', workspaceId: 'w', name: 'Say Hello', url: 'localhost:50051', grpc: { service: 'demo.v1.Demo', method: 'SayHello', protoFiles: [{ path: 'demo/v1/demo.proto', text: 'syntax = "proto3";' }] }, body: { mimeType: 'application/json', text: '{"name":"a"}' }, headers: [{ name: 'x-key', value: 'k' }], authentication: { type: 'bearer', token: 't' }, description: 'grpc docs', sortOrder: 1 }
+
+    test('a gRPC item is imported whole', () => {
+        const { newCollectionTree } = importInto([folder, grpcItem])
+        expect(newCollectionTree[0].children![0]).toEqual({ ...grpcItem, workspaceId: 'w2' })
+    })
+
+    test('a gRPC item with only the fields an older export could hold imports as it was', () => {
+        const { newCollectionTree } = importInto([{ _id: 'g', _type: 'grpc', parentId: null, workspaceId: 'w', name: 'g' }])
+        expect(newCollectionTree[0]).toEqual({ _id: 'g', _type: 'grpc', parentId: null, workspaceId: 'w2', name: 'g' })
+    })
+
+    test('an item of a type only a newer version knows is imported whole, an HTTP request still as before', () => {
+        const newer = { _id: 'n', _type: 'newer-kind', parentId: null, workspaceId: 'w', name: 'From Later', settings: { deep: [1, 2] } } as unknown as CollectionItem
+        const { newCollectionTree } = importInto([newer, { ...request, parentId: null, extra: 'dropped' } as unknown as CollectionItem])
+        expect(newCollectionTree.find(item => item._id === 'n')).toEqual({ ...newer, workspaceId: 'w2' })
+        expect(newCollectionTree.find(item => item._id === 'r')).not.toHaveProperty('extra')
+    })
+
+    test('Postman and Insomnia exports leave gRPC items out', async() => {
+        const collection = prepareCollectionForExport([folder, { ...request, body: { mimeType: 'application/json', text: '{}' } }, grpcItem], [], false)
+        expect(JSON.stringify(await convertCollectionsFromRestfoxToPostman(collection))).not.toContain('Say Hello')
+        const insomniaExport = await convertCollectionsFromRestfoxToInsomnia(collection)
+        expect(insomniaExport.resources.map((resource: any) => resource._type)).toEqual(['workspace', 'request_group', 'request'])
+    })
+
     test('a file workspace export round trips with fields and scripts intact', () => {
         const exported = prepareCollectionForExport([folder, request], [requestScript, workspaceScript], true)
         const { newCollectionTree, newPlugins } = importInto(exported, [workspaceScript])
@@ -2488,6 +2645,83 @@ describe('Restfox export and import', () => {
             ['workspace script', null, 'w2'],
             ['request script', importedRequest._id, 'w2'],
         ])
+    })
+})
+
+describe('gRPC items', () => {
+    const grpcItem = (fields: Partial<CollectionItem> = {}) => ({ _id: 'g', _type: 'grpc', workspaceId: 'w', parentId: null, name: 'Say Hello', url: '{{ host }}:50051', grpc: { service: 'demo.v1.Demo', method: 'SayHello' }, body: { mimeType: 'application/json', text: '{"name": "{{ name }}"}' }, headers: [{ name: 'x-key', value: '{{ key }}' }, { name: 'x-off', value: 'no', disabled: true }], ...fields }) as CollectionItem
+    const environment = { host: 'localhost', name: 'Restfox', key: 'k1' }
+
+    test('a send resolves the address, the message and the metadata, with the folders\' headers and auth', async() => {
+        const resolved = await createGrpcRequestData(grpcItem(), environment, { 'x-folder': ['f'] }, { type: 'bearer', token: 'folder-token' }, null)
+        expect(resolved).toEqual({
+            url: 'localhost:50051',
+            message: '{"name": "Restfox"}',
+            metadata: [['x-key', 'k1'], ['x-folder', 'f'], ['Authorization', 'Bearer folder-token']],
+        })
+    })
+
+    test('a send with no message sends the empty message', async() => {
+        const resolved = await createGrpcRequestData(grpcItem({ body: undefined, headers: undefined }), {}, {}, undefined, null)
+        expect(resolved).toEqual({ url: '{{ host }}:50051', message: '{}', metadata: [] })
+    })
+
+    const plaintext = { address: 'localhost:50051', tls: false }
+
+    test('Copy as grpcurl names the server, the method, the metadata and the message', () => {
+        expect(generateGrpcurlCommand(grpcItem(), { target: plaintext, metadata: [['x-key', 'k1'], ['Authorization', 'Bearer t']], message: '{"name": "it\'s"}', disableSSLVerification: false }))
+            .toBe('grpcurl -plaintext -H \'x-key: k1\' -H \'Authorization: Bearer t\' -d \'{"name": "it\'\\\'\'s"}\' localhost:50051 demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl gives each value of a -bin name its own -H, as the call sends them, and keeps text values joined', () => {
+        expect(generateGrpcurlCommand(grpcItem(), { target: plaintext, metadata: [['Trace-Bin', 'YQ==, Yg=='], ['x-list', 'a, b']], message: '', disableSSLVerification: false }))
+            .toBe('grpcurl -plaintext -H \'Trace-Bin: YQ==\' -H \'Trace-Bin: Yg==\' -H \'x-list: a, b\' localhost:50051 demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl uses TLS unless the address is plaintext, and skips verification only when Settings do', () => {
+        const tls = { address: 'api.example.com:443', tls: true }
+        expect(generateGrpcurlCommand(grpcItem(), { target: tls, metadata: [], message: '', disableSSLVerification: false })).toBe('grpcurl api.example.com:443 demo.v1.Demo/SayHello')
+        expect(generateGrpcurlCommand(grpcItem(), { target: tls, metadata: [], message: '', disableSSLVerification: true })).toBe('grpcurl -insecure api.example.com:443 demo.v1.Demo/SayHello')
+        expect(generateGrpcurlCommand(grpcItem(), { target: plaintext, metadata: [], message: '', disableSSLVerification: true })).toBe('grpcurl -plaintext localhost:50051 demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl names the proto files the user keeps beside it, and leaves out metadata gRPC sets itself', () => {
+        const item = grpcItem({ grpc: { service: 'demo.v1.Demo', method: 'SayHello', protoFiles: [{ path: 'demo/v1/demo.proto', text: '' }, { path: 'my protos/types.proto', text: '' }] } })
+        expect(generateGrpcurlCommand(item, { target: { address: '[::1]:50051', tls: false }, metadata: [['Content-Type', 'application/json'], ['te', 'trailers']], message: '{}', disableSSLVerification: false }))
+            .toBe('grpcurl -plaintext -d \'{}\' -import-path . -proto demo/v1/demo.proto -proto \'my protos/types.proto\' \'[::1]:50051\' demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl names each proto file by the path its imports use, from the folder they are found in', () => {
+        const demo = 'syntax = "proto3";\npackage demo.v1;\nimport "demo/v1/types.proto";\nimport "google/protobuf/empty.proto";\n'
+        const call = (protoFiles: { path: string, text: string }[]) => generateGrpcurlCommand(
+            grpcItem({ grpc: { service: 'demo.v1.Demo', method: 'SayHello', protoFiles } }),
+            { target: plaintext, metadata: [], message: '', disableSSLVerification: false },
+        )
+
+        // a folder picked above the folder the imports start from
+        expect(call([{ path: 'protos/demo/v1/demo.proto', text: demo }, { path: 'protos/demo/v1/types.proto', text: '' }]))
+            .toBe('grpcurl -plaintext -import-path protos -proto demo/v1/demo.proto -proto demo/v1/types.proto localhost:50051 demo.v1.Demo/SayHello')
+        // files picked on their own, without the folders their imports name
+        expect(call([{ path: 'demo.proto', text: demo }, { path: 'types.proto', text: '' }]))
+            .toBe('grpcurl -plaintext -import-path . -proto demo.proto -proto demo/v1/types.proto localhost:50051 demo.v1.Demo/SayHello')
+        // a folder picked at the folder the imports start from
+        expect(call([{ path: 'demo/v1/demo.proto', text: demo }, { path: 'demo/v1/types.proto', text: '' }]))
+            .toBe('grpcurl -plaintext -import-path . -proto demo/v1/demo.proto -proto demo/v1/types.proto localhost:50051 demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl leaves out the metadata a call leaves out', () => {
+        const metadata: [string, string][] = [['grpc-timeout', '5S'], ['Keep-Alive', 'timeout=5'], [' :authority', 'x'], ['Transfer-Encoding', 'chunked'], ['x-kept', '1']]
+        expect(generateGrpcurlCommand(grpcItem(), { target: plaintext, metadata, message: '', disableSSLVerification: false })).toBe('grpcurl -plaintext -H \'x-kept: 1\' localhost:50051 demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl gives a User-Agent row as -user-agent, as grpcurl drops a User-Agent -H, the last row as the call does', () => {
+        const metadata: [string, string][] = [['User-Agent', 'first/1'], ['x-kept', '1'], [' user-agent ', 'my app/2']]
+        expect(generateGrpcurlCommand(grpcItem(), { target: plaintext, metadata, message: '', disableSSLVerification: false }))
+            .toBe('grpcurl -plaintext -H \'x-kept: 1\' -user-agent \'my app/2\' localhost:50051 demo.v1.Demo/SayHello')
+    })
+
+    test('Copy as grpcurl needs a method', () => {
+        expect(() => generateGrpcurlCommand(grpcItem({ grpc: {} }), { target: plaintext, metadata: [], message: '', disableSSLVerification: false })).toThrow('Choose a method first')
     })
 })
 
@@ -2663,6 +2897,30 @@ describe('Prompt tag', () => {
         expect([sent.headers?.['X-Var'], sent.headers?.['X-Tag'], sent.headers?.['X-Prompt']]).toEqual(['{{TOKEN}}', '{% uuid() %}', 'p'])
     })
 
+    test('a prompt waiting behind another box does not open once its send is stopped, unless another send waits for the same ask once prompt', async() => {
+        const opened: string[] = []
+        let answerFirst: (value: string) => void = () => undefined
+        ;(window as any).createPrompt = vi.fn((title: string) => {
+            opened.push(title)
+            return title === 'First' ? new Promise(resolve => answerFirst = resolve) : Promise.resolve(`typed in ${title}`)
+        })
+        const stopped = new AbortController()
+        const first = new SendResolver('w').resolve({}, `{% prompt(title='First') %}`, 'url')
+        const waiting = new SendResolver('w', true, stopped.signal).resolve({}, `{% prompt(title='Waiting') %}`, 'url')
+        const sharedByStopped = new SendResolver('w', true, stopped.signal).resolve({}, `{% prompt(title='Shared once', ask='once') %}`, 'url')
+        const sharedByRunning = new SendResolver('w').resolve({}, `{% prompt(title='Shared once', ask='once') %}`, 'url')
+        await new Promise(resolve => setTimeout(resolve))
+
+        stopped.abort()
+        answerFirst('a')
+        expect(await first).toBe('a')
+        await expect(waiting).rejects.toThrow('The send was stopped')
+        expect(await sharedByRunning).toBe('typed in Shared once')
+        await sharedByStopped.catch(() => undefined)
+        expect(opened).toEqual(['First', 'Shared once'])
+        forgetPromptValues()
+    })
+
     test('a url left out goes from the sent headers too: HTTP/2 :path and :authority, and host', async() => {
         const response = { url: 'https://example.test/a', request: { method: 'GET', query: '?k=S3CRET', headers: {}, headersSent: [[':method', 'GET'], [':path', '/a?k=S3CRET'], [':authority', 'example.test'], [':scheme', 'https'], ['host', 'example.test'], ['x-trace', 't1']], body: null, original: {} } } as unknown as RequestFinalResponse
         answers = ['S3CRET']
@@ -2749,6 +3007,7 @@ describe('Prompt tag', () => {
         expect(await substituteEnvironmentVariablesForSend({ HOST: 'h1' }, text, 'w')).toEqual({
             textResolved: '{ "pin": "4321", "user": "ada", "host": "h1" }',
             textResolvedMasked: '{ "pin": "******", "user": "ada", "host": "h1" }',
+            maskedPromptUsed: true,
         })
         // shown without asking again
         expect(createPrompt).toHaveBeenCalledTimes(2)

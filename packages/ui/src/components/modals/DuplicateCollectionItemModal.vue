@@ -60,7 +60,12 @@ export default {
                 return 'Duplicate Socket'
             }
 
-            return ''
+            if(this.collectionItemToDuplicate._type === 'grpc') {
+                return 'Duplicate gRPC Request'
+            }
+
+            // a type only a newer version knows
+            return 'Duplicate Request'
         },
         placeholder() {
             if(this.collectionItemToDuplicate._type === 'request_group') {
@@ -75,7 +80,11 @@ export default {
                 return 'New Socket Name'
             }
 
-            return ''
+            if(this.collectionItemToDuplicate._type === 'grpc') {
+                return 'New gRPC Request Name'
+            }
+
+            return 'New Request Name'
         }
     },
     watch: {

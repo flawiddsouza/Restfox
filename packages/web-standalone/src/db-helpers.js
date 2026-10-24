@@ -329,13 +329,17 @@ function deserializeRequestFiles(collection) {
 }
 
 async function serializeRequestResponseFiles(response) {
-    response.buffer = Buffer.from(response.buffer).toString('base64')
+    // a gRPC call's entry, or one of a kind only a newer version knows, may have no body, so only the parts it has are converted
+    if(response.buffer !== undefined) {
+        response.buffer = Buffer.from(response.buffer).toString('base64')
+    }
 
-    if(response.request && response.request.body && response.request.body.buffer instanceof ArrayBuffer) {
+    if(response.request?.body && response.request.body.buffer instanceof ArrayBuffer) {
         response.request.body = fileUtils.transformFileObjectToSaveableFileObject(response.request.body)
     }
 
-    if(response.request && response.request.original.body) {
+    // an entry of a kind only a newer version knows may have a body but no request, or one without an original
+    if(response.request?.original?.body) {
         if(response.request.original.body.fileName && response.request.original.body.fileName.buffer instanceof ArrayBuffer) {
             response.request.original.body.fileName = fileUtils.transformFileObjectToSaveableFileObject(response.request.original.body.fileName)
         }
@@ -351,13 +355,16 @@ async function serializeRequestResponseFiles(response) {
 }
 
 function deserializeRequestResponseFiles(response) {
-    response.buffer = Array.from(Buffer.from(response.buffer, 'base64'))
+    // a gRPC call's entry, or one of a kind only a newer version knows, may have no body, so only the parts it has are converted
+    if(response.buffer !== undefined) {
+        response.buffer = Array.from(Buffer.from(response.buffer, 'base64'))
+    }
 
-    if(response.request.body && typeof response.request.body.buffer === 'string') {
+    if(response.request?.body && typeof response.request.body.buffer === 'string') {
         response.request.body = fileUtils.transformSavedFileObjectToFileObject(response.request.body)
     }
 
-    if(response.request.original.body) {
+    if(response.request?.original?.body) {
         if(response.request.original.body.fileName && typeof response.request.original.body.fileName.buffer === 'string') {
             response.request.original.body.fileName = fileUtils.transformSavedFileObjectToFileObject(response.request.original.body.fileName)
         }

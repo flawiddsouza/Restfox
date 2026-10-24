@@ -143,7 +143,7 @@
                                     <div style="margin-top: 0.3rem;">Hosts to connect to directly, separated by commas, such as <span class="code">internal.example.com</span> or <span class="code">10.0.0.0/8</span>. Each covers its subdomains too, and <span class="code">*</span> covers every host.</div>
                                 </div>
                             </template>
-                            <div style="margin-top: 0.3rem;">Applies to requests, scripts, WebSocket and Socket.IO. localhost always connects directly.</div>
+                            <div style="margin-top: 0.3rem;">Applies to requests, scripts, gRPC, WebSocket and Socket.IO. localhost always connects directly.</div>
                         </div>
 
                         <div style="padding-top: 1rem" v-if="flags.isElectron">
@@ -218,6 +218,7 @@
 
 <script>
 import Modal from '@/components/Modal.vue'
+import { emitter } from '@/event-bus'
 import constants from '../../constants'
 import { getSavedRequestTimeout, getSavedCACertificates, saveCACertificates, caCertificatesFileToPEM, registerCACertificates, getVersion, DEFAULT_PROXY_SETTINGS, getSavedProxySettings, getProxyUrlError } from '@/helpers'
 
@@ -324,6 +325,7 @@ export default {
         },
         indentSize() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.INDENT_SIZE, this.indentSize)
+            emitter.emit('editor_indent_size')
         },
         showTabs() {
             localStorage.setItem(constants.LOCAL_STORAGE_KEY.SHOW_TABS, this.showTabs)

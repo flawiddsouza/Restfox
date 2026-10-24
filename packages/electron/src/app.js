@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron')
 const { resolve } = require('path')
 const fs = require('fs')
+const net = require('net')
 const contextMenu = require('electron-context-menu')
 const log = require('electron-log/main')
 const open = import('open')
@@ -10,7 +11,7 @@ const helpers = require('./helpers')
 const TaskQueue = require('./task-queue')
 const updateElectronApp = require('update-electron-app')
 const windowStateKeeper = require('./utils/window-state')
-const { trustSystemCACertificates } = require('./ca-certificates')
+const { trustSystemCACertificates, getCACertificatesWithCustom } = require('./ca-certificates')
 const { getInstallKind } = require('./install-kind')
 
 Object.assign(console, log.functions)
@@ -116,32 +117,34 @@ app.whenReady().then(async() => {
         await installExtension(VUEJS_DEVTOOLS)
     }
 
-    // the sends still running for each window. A reload or close leaves nothing to stop them, and a response that
-    // stays open, such as an event stream, would run on here, so they are cancelled then
-    const runningSendIds = new Map()
+    // the sends and gRPC calls still running for each window, as the functions that cancel them. A reload or close
+    // leaves nothing to stop them, and a response that stays open, such as an event stream, would run on here, so they
+    // are cancelled then
+    const runningCancels = new Map()
 
-    function trackSend(sender, requestId) {
-        let requestIds = runningSendIds.get(sender)
-        if(!requestIds) {
-            requestIds = new Set()
-            runningSendIds.set(sender, requestIds)
+    function trackRunning(sender, cancel) {
+        let cancels = runningCancels.get(sender)
+        if(!cancels) {
+            cancels = new Set()
+            runningCancels.set(sender, cancels)
             const cancelAll = () => {
-                requestIds.forEach(id => requests.cancelRequest(id))
-                requestIds.clear()
+                const cancelsNow = [...cancels]
+                cancels.clear()
+                cancelsNow.forEach(cancelOne => cancelOne())
             }
             sender.on('did-navigate', cancelAll)
             sender.once('destroyed', () => {
                 cancelAll()
-                runningSendIds.delete(sender)
+                runningCancels.delete(sender)
             })
         }
-        requestIds.add(requestId)
-        return () => requestIds.delete(requestId)
+        cancels.add(cancel)
+        return () => cancels.delete(cancel)
     }
 
     // the response reaches the renderer as pushed requestEvent messages, the invoke reply carries nothing
     ipcMain.handle('sendRequest', async(event, data) => {
-        const untrackSend = trackSend(event.sender, data.requestId)
+        const untrackSend = trackRunning(event.sender, () => requests.cancelRequest(data.requestId))
         try {
             await requests.handleSendRequest(data, message => {
                 if(!event.sender.isDestroyed()) {
@@ -153,6 +156,131 @@ app.whenReady().then(async() => {
         }
     })
     ipcMain.handle('cancelRequest', (_, ...args) => requests.cancelRequest(...args))
+
+    // a gRPC call's connection follows Settings > Disable SSL Verification, CA Certificates and Proxy, picked per
+    // connection as for requests. openTunnel gives a socket through the proxy, or null to connect directly, and stops
+    // opening it once its signal, when given, aborts
+    function getGrpcConnection(disableSSLVerification) {
+        const customCACertificates = requests.getCustomCACertificates()
+        // for an https:// proxy
+        const tlsOptions = {
+            rejectUnauthorized: !disableSSLVerification,
+            ...(customCACertificates.length > 0 ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
+        }
+
+        return {
+            rejectUnauthorized: !disableSSLVerification,
+            caCertificates: customCACertificates,
+            openTunnel: async(host, port, signal) => {
+                const authority = net.isIP(host) === 6 ? `[${host}]:${port}` : `${host}:${port}`
+                const proxyUrl = await requests.getProxyForGrpcServer(authority)
+                return proxyUrl !== null ? require('./proxy-tunnel').openTunnel(new URL(proxyUrl), host, port, tlsOptions, signal) : null
+            },
+        }
+    }
+
+    // loaded on the first gRPC use, so starting the app does not load protobufjs
+    const getGrpcEngine = () => require('./grpc')
+
+    // the running methods loads by the renderer's load id, so grpcCancelSchemaLoad can stop one
+    const grpcSchemaLoads = new Map()
+
+    // answers { schema } or { error, code }, since a rejected invoke reaches the renderer without the error's code
+    ipcMain.handle('grpcLoadSchema', async(event, spec) => {
+        const abortController = new AbortController()
+        const untrackLoad = trackRunning(event.sender, () => abortController.abort())
+        const loadId = spec.loadId
+        if(loadId !== undefined) {
+            grpcSchemaLoads.set(loadId, abortController)
+        }
+        try {
+            const schema = await getGrpcEngine().loadSchema({
+                target: spec.target,
+                connection: getGrpcConnection(spec.disableSSLVerification === true),
+                metadata: spec.metadata ?? [],
+                protoFiles: spec.protoFiles ?? null,
+                timeoutMs: spec.timeoutMs ?? 0,
+                signal: abortController.signal,
+            })
+            return { schema }
+        } catch(e) {
+            // with the gRPC status of a load that ended with one, such as UNAVAILABLE for a server that could not be
+            // reached
+            return { error: e.message, code: e.code ?? null, ...(e.messageWithoutValues === undefined ? {} : { errorWithoutValues: e.messageWithoutValues }), ...(e.grpcCode === undefined ? {} : { grpcStatus: { code: e.grpcCode, name: getGrpcEngine().getStatusName(e.grpcCode) } }) }
+        } finally {
+            untrackLoad()
+            if(grpcSchemaLoads.get(loadId) === abortController) {
+                grpcSchemaLoads.delete(loadId)
+            }
+        }
+    })
+
+    // the load closes its connection and answers with an error
+    ipcMain.handle('grpcCancelSchemaLoad', (_, loadId) => grpcSchemaLoads.get(loadId)?.abort())
+
+    // answers { text } or { error }, see convertInsomniaMessage
+    ipcMain.handle('grpcConvertInsomniaMessage', (_, spec) => {
+        try {
+            return { text: getGrpcEngine().convertInsomniaMessage(spec) }
+        } catch(e) {
+            return { error: e.message }
+        }
+    })
+
+    // the running gRPC calls by the renderer's call id
+    const grpcCalls = new Map()
+
+    // the call's events reach the renderer as pushed grpcEvent messages, the invoke reply carries nothing. A status or
+    // error event ends the call, anything the engine emits after it is dropped
+    ipcMain.handle('grpcStartCall', (event, spec) => {
+        const { callId } = spec
+        const sender = event.sender
+        const startTime = Date.now()
+        let ended = false
+
+        if(grpcCalls.has(callId)) {
+            throw new Error(`A gRPC call with the id ${callId} is already running`)
+        }
+
+        const untrackCall = trackRunning(sender, () => grpcCalls.get(callId)?.cancel())
+
+        const emit = grpcEvent => {
+            if(ended) {
+                return
+            }
+            if(grpcEvent.type === 'status' || grpcEvent.type === 'error') {
+                ended = true
+                grpcCalls.delete(callId)
+                untrackCall()
+            }
+            if(!sender.isDestroyed()) {
+                sender.send('grpcEvent', callId, grpcEvent)
+            }
+        }
+
+        try {
+            const call = getGrpcEngine().startCall({
+                target: spec.target,
+                connection: getGrpcConnection(spec.disableSSLVerification === true),
+                metadata: spec.metadata ?? [],
+                protoFiles: spec.protoFiles ?? null,
+                service: spec.service,
+                method: spec.method,
+                deadlineMs: spec.deadlineMs ?? 0,
+                messages: spec.messages ?? [],
+            }, emit)
+
+            grpcCalls.set(callId, call)
+        } catch(e) {
+            emit({ type: 'error', message: e.message, time: Date.now() - startTime })
+        }
+    })
+
+    ipcMain.handle('grpcSendMessage', (_, callId, json) => grpcCalls.get(callId)?.send(json))
+
+    ipcMain.handle('grpcEndCall', (_, callId) => grpcCalls.get(callId)?.end())
+
+    ipcMain.handle('grpcCancelCall', (_, callId) => grpcCalls.get(callId)?.cancel())
 
     const operationQueue = new TaskQueue()
 
@@ -266,7 +394,7 @@ app.whenReady().then(async() => {
 
     app.on('certificate-error', helpers.handleCertificateError)
 
-    ipcMain.handle('updateElectronApp', (_) => {
+    ipcMain.handle('updateElectronApp', () => {
         console.log('ipcMain: updateElectronApp')
         updateElectronApp()
     })

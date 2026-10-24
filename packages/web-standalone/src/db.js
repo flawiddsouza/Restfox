@@ -171,7 +171,9 @@ async function createCollection(workspace, collection) {
             }
         }
 
-        if (collection._type === 'request' || collection._type === 'socket') {
+        // every type but a folder is one file, a type only a newer version knows too, so a duplicate or import made
+        // here keeps it whole rather than leaving it out
+        if (collection._type !== 'request_group') {
             if (collection.parentId) {
                 collectionPath = path.join(idMap.get(collection.parentId), `${collectionName}.json`)
             } else {
@@ -343,7 +345,7 @@ async function updateCollection(workspace, collectionId, updatedFields) {
         return { error: null }
     }
 
-    if (updatedFields._type === 'request' || updatedFields._type === 'socket') {
+    if (updatedFields._type === 'request' || updatedFields._type === 'socket' || updatedFields._type === 'grpc') {
         delete updatedFields._id
         delete updatedFields.parentId
         delete updatedFields.workspaceId

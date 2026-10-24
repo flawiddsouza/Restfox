@@ -397,20 +397,7 @@
                     ></CodeMirrorEditor>
                 </div>
             </template>
-            <div style="height: 100%; display: grid; grid-template-rows: auto 1fr; overflow: auto;" v-if="activeRequestPanelTab === 'Docs'">
-                <template v-if="editDescription">
-                    <div>
-                        <button class="button" @click="editDescription = false" style="margin-bottom: 1rem">Preview</button>
-                    </div>
-                    <textarea v-model="activeTab.description" style="width: 100%; height: 100%; padding: 0.5rem;" spellcheck="false"></textarea>
-                </template>
-                <template v-else>
-                    <div>
-                        <button class="button" @click="editDescription = true" style="margin-bottom: 1rem">Edit</button>
-                    </div>
-                    <div v-html="renderMarkdown(activeTab.description ?? '')" style="overflow: auto;"></div>
-                </template>
-            </div>
+            <RequestPanelDocs v-if="activeRequestPanelTab === 'Docs'" :collection-item="activeTab" v-model:editing="editDescription" />
         </div>
         <ContextMenu
             :options="requestBodyList"
@@ -460,27 +447,17 @@ import {
 } from '@/helpers'
 import * as queryParamsSync from '@/utils/query-params-sync'
 import constants from '@/constants'
-import { marked } from 'marked'
 import HttpMethodModal from '@/components/modals/HttpMethodModal.vue'
 import GraphQLSchemaFetcher from '@/components/GraphQLSchemaFetcher.vue'
 import GenerateCodeModal from '@/components/modals/GenerateCodeModal.vue'
 import EditTagModal from '@/components/modals/EditTagModal.vue'
+import RequestPanelDocs from '@/components/RequestPanelDocs.vue'
 import { formatSdl } from 'format-graphql'
 import { generateTestScripts } from '@/utils/generate-test-scripts'
 
-const renderer = new marked.Renderer()
-
-renderer.link = (...args) => {
-    const link = marked.Renderer.prototype.link.apply(this, args)
-    return link.replace('<a', `<a target="_blank" rel="noopener noreferrer"`)
-}
-
-marked.setOptions({
-    renderer: renderer
-})
-
 export default {
     components: {
+        RequestPanelDocs,
         GenerateCodeModal,
         ContextMenu,
         CodeMirrorSingleLine,
@@ -966,9 +943,6 @@ export default {
         },
         handleQueryParametersChange() {
             queryParamsSync.onParametersChange(this.activeTab)
-        },
-        renderMarkdown(markdown) {
-            return marked.parse(markdown)
         },
         handleScriptSave: debounce((_this, script) => {
             _this.$store.dispatch('saveRequestScript', script)

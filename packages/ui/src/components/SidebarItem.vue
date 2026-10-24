@@ -23,6 +23,9 @@
         <template v-if="sidebarItem._type === 'socket'">
             <div class="sidebar-item-method" :class="`request-method--SOCK`">SOCK</div>
         </template>
+        <template v-if="sidebarItem._type === 'grpc'">
+            <div class="sidebar-item-method request-method--GRPC">gRPC</div>
+        </template>
         <div style="width: 100%; margin-right: 0.5rem">
             <div v-if="!showInputToRenameRequest">
                 {{ sidebarItem.name }}
@@ -150,7 +153,8 @@ export default {
             return methods[method] || method
         },
         handleSidebarItemClick(event, sidebarItem) {
-            if(sidebarItem._type === 'request' || sidebarItem._type === 'socket') {
+            // any item but a folder, a type only a newer version knows too, opens in a tab
+            if(sidebarItem._type !== 'request_group') {
                 this.$store.dispatch('addTab', sidebarItem)
             }
 
@@ -166,7 +170,7 @@ export default {
             }
         },
         handleSidebarItemDoubleClick(sidebarItem) {
-            if(sidebarItem._type === 'request' || sidebarItem._type === 'socket') {
+            if(sidebarItem._type !== 'request_group') {
                 this.newSidebarItemName = sidebarItem.name
                 this.showInputToRenameRequest = true
             }

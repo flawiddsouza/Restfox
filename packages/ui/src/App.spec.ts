@@ -28,6 +28,8 @@ test('Ctrl+Enter sends an HTTP request tab', () => {
 test.each([
     ['a socket', 'socket'],
     ['a folder', 'request_group'],
+    // a gRPC panel handles the shortcut itself
+    ['a gRPC request', 'grpc'],
     ['a type only a newer version knows', 'some-future-type'],
 ])('Ctrl+Enter sends nothing for %s', (_label, _type) => {
     const { dispatch, commit, event } = pressSendRequestHotkey({ _id: 'item1', _type, name: 'Item' })

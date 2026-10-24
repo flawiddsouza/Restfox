@@ -376,17 +376,28 @@ export default {
         http: {
             title: 'HTTP Request',
             alt: 'HTTP Request',
-            type: 'http-request'
+            type: 'http-request',
+            icon: 'images/http-request-icon.png'
         },
         graphql: {
             title: 'GraphQL Request',
             alt: 'GraphQL Request',
-            type: 'graphql-request'
+            type: 'graphql-request',
+            icon: 'images/graphql-request-icon.png'
         },
         websocket: {
             title: 'Websocket Request',
             alt: 'Websocket Request',
-            type: 'websocket-request'
+            type: 'websocket-request',
+            icon: 'images/websocket-request-icon.png'
+        },
+        grpc: {
+            title: 'gRPC Request',
+            alt: 'gRPC Request',
+            type: 'grpc-request',
+            icon: 'images/grpc-request-icon.svg'
         }
-    }
+    },
+    // also the name a gRPC item keeps until a method is chosen, which then renames it
+    GRPC_REQUEST_DEFAULT_NAME: 'New gRPC Request',
 }

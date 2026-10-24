@@ -36,6 +36,7 @@
     <AddRequestModal v-model:showModal="addRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddGraphQLRequestModal v-model:showModal="addGraphQLRequestModalShow" :parent-id="addRequestModalParentId" />
     <AddSocketModal v-model:showModal="addSocketModalShow" :parent-id="addSocketModalParentId" />
+    <AddGrpcRequestModal v-model:showModal="addGrpcRequestModalShow" :parent-id="addGrpcRequestModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
     <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
     <PluginManagerModal v-model:showModal="pluginManagerShow" :collection-item="pluginManagerCollectionItem" />
@@ -54,6 +55,7 @@ import ContextMenu from './ContextMenu.vue'
 import MobileBottomSheet from '@/components/MobileBottomSheet.vue'
 import AddRequestModal from './modals/AddRequestModal.vue'
 import AddSocketModal from './modals/AddSocketModal.vue'
+import AddGrpcRequestModal from './modals/AddGrpcRequestModal.vue'
 import AddFolderModal from './modals/AddFolderModal.vue'
 import EnvironmentModal from './modals/EnvironmentModal.vue'
 import PluginManagerModal from './modals/PluginManagerModal.vue'
@@ -63,7 +65,8 @@ import GenerateCodeModal from './modals/GenerateCodeModal.vue'
 import CollectionRunnerModal from './modals/CollectionRunnerModal.vue'
 import CollectionRunnerProgressModal from './modals/CollectionRunnerProgressModal.vue'
 import { mapState } from 'vuex'
-import { flattenTree, exportRestfoxCollection, prepareCollectionForExport, deepClone } from '@/helpers'
+import { flattenTree, exportRestfoxCollection, prepareCollectionForExport, deepClone, createGrpcRequestData, generateGrpcurlCommand } from '@/helpers'
+import { parseGrpcTarget } from '@/utils/grpc'
 import { resolveSidebarDropTarget } from '@/utils/sidebar-drop'
 import { generateCode } from '@/utils/generate-code'
 import AddGraphQLRequestModal from '@/components/modals/AddGraphQLRequestModal.vue'
@@ -75,6 +78,7 @@ export default {
         AddRequestModal,
         AddGraphQLRequestModal,
         AddSocketModal,
+        AddGrpcRequestModal,
         AddFolderModal,
         EnvironmentModal,
         PluginManagerModal,
@@ -97,6 +101,8 @@ export default {
             addRequestModalParentId: null,
             addSocketModalShow: false,
             addSocketModalParentId: null,
+            addGrpcRequestModalShow: false,
+            addGrpcRequestModalParentId: null,
             addFolderModalShow: false,
             addFolderModalParentId: null,
             contextMenuX: null,
@@ -136,6 +142,13 @@ export default {
                     'type': 'option',
                     'label': 'GraphQL Request',
                     'value': 'New GraphQL Request',
+                    'icon': 'fa fa-plus-circle',
+                    'class': 'context-menu-item-with-left-padding'
+                },
+                {
+                    'type': 'option',
+                    'label': 'gRPC Request',
+                    'value': 'New gRPC Request',
                     'icon': 'fa fa-plus-circle',
                     'class': 'context-menu-item-with-left-padding'
                 },
@@ -197,6 +210,9 @@ export default {
             }
             if (item._type === 'socket') {
                 return `SOCK ${item.name}`
+            }
+            if (item._type === 'grpc') {
+                return `gRPC ${item.name}`
             }
             return item.name
         },
@@ -267,19 +283,31 @@ export default {
                 return []
             }
 
-            if(this.activeSidebarItemForContextMenu._type === 'request' || this.activeSidebarItemForContextMenu._type === 'socket') {
+            if(this.activeSidebarItemForContextMenu._type === 'request' || this.activeSidebarItemForContextMenu._type === 'socket' || this.activeSidebarItemForContextMenu._type === 'grpc') {
                 let contextMenuOptions = [
                     ...this.getCommonActions(this.activeSidebarItemForContextMenu._type),
                     ...this.itemProperties
                 ]
 
-                if(this.activeSidebarItemForContextMenu._type === 'socket') {
+                if(this.activeSidebarItemForContextMenu._type === 'socket' || this.activeSidebarItemForContextMenu._type === 'grpc') {
                     const optionsToRemove = [
                         'Copy as Curl',
                         'Generate Code',
                         'Plugins'
                     ]
                     contextMenuOptions = contextMenuOptions.filter(option => !optionsToRemove.includes(option.value))
+                }
+
+                if(this.activeSidebarItemForContextMenu._type === 'grpc') {
+                    // after Export, where Copy as Curl sits for a request
+                    const exportIndex = contextMenuOptions.findIndex(option => option.value === 'Export')
+                    contextMenuOptions.splice(exportIndex + 1, 0, {
+                        'type': 'option',
+                        'label': 'Copy as grpcurl',
+                        'value': 'Copy as grpcurl',
+                        'icon': 'fa fa-copy',
+                        'class': 'context-menu-item-with-left-padding'
+                    })
                 }
 
                 return contextMenuOptions
@@ -314,7 +342,9 @@ export default {
                 ]
             }
 
-            return []
+            // a type only a newer version knows gets what works on any item
+            return this.getCommonActions(this.activeSidebarItemForContextMenu._type)
+                .filter(option => !['Copy as Curl', 'Generate Code', 'Plugins'].includes(option.value))
         }
     },
     watch: {
@@ -378,6 +408,36 @@ export default {
                 }
             }
 
+            if(clickedSidebarItem === 'Copy as grpcurl') {
+                const grpcRequest = deepClone(this.activeSidebarItemForContextMenu)
+                let grpcurlCommand
+                try {
+                    const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: grpcRequest })
+                    // the command is shown, never saved
+                    const grpcRequestData = await createGrpcRequestData(grpcRequest, environment, parentHeaders, parentAuthentication, this.$store.state.activeWorkspace?.location ?? null)
+                    const target = parseGrpcTarget(grpcRequestData.url)
+                    if('error' in target) {
+                        throw new Error(target.error)
+                    }
+                    grpcurlCommand = generateGrpcurlCommand(grpcRequest, {
+                        target,
+                        metadata: grpcRequestData.metadata,
+                        message: grpcRequestData.message,
+                        disableSSLVerification: this.$store.state.flags.disableSSLVerification,
+                    })
+                } catch (e) {
+                    // the command could not be made, such as with no method chosen
+                    this.$toast.error(`Cannot copy as grpcurl: ${e.message}`)
+                    return
+                }
+                try {
+                    await navigator.clipboard.writeText(grpcurlCommand)
+                    this.$toast.success('Copied to clipboard')
+                } catch (e) {
+                    this.$toast.error(`Failed to copy to clipboard: ${e.message}`)
+                }
+            }
+
             if(clickedSidebarItem === 'Generate Code') {
                 this.generateCodeModalCollectionItem = deepClone(this.activeSidebarItemForContextMenu)
                 this.generateCodeModalShow = true
@@ -396,6 +456,11 @@ export default {
             if(clickedSidebarItem === 'New Socket') {
                 this.addSocketModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
                 this.addSocketModalShow = true
+            }
+
+            if(clickedSidebarItem === 'New gRPC Request') {
+                this.addGrpcRequestModalParentId = this.activeSidebarItemForContextMenu ? this.activeSidebarItemForContextMenu._id : null
+                this.addGrpcRequestModalShow = true
             }
 
             if(clickedSidebarItem === 'New Folder') {

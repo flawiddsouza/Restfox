@@ -1,0 +1,214 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2023-01-07T13:13:21.228Z",
+  "__export_source": "insomnia.desktop.app:v2022.6.0",
+  "resources": [
+    {
+      "_id": "greq_9fe84dadf36d4d05af9bd69d6648a237",
+      "parentId": "fld_052da3a98721488faa7e498c06200951",
+      "modified": 1673097121931,
+      "created": 1673088032148,
+      "url": "localhost:9090",
+      "name": "GreetHandler",
+      "description": "",
+      "protoFileId": "pf_7d90035ac4bd487c8a7ef7ec25d138c6",
+      "protoMethodName": "/greet.v1.GreetService/Greet",
+      "metadata": [],
+      "body": {
+        "text": "{\n    \"name\": \"World\"\n}"
+      },
+      "metaSortKey": -1673088032148,
+      "isPrivate": false,
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "fld_052da3a98721488faa7e498c06200951",
+      "parentId": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "modified": 1673087849905,
+      "created": 1673087849905,
+      "name": "template-connect-go_grpc",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1673087849905,
+      "_type": "request_group"
+    },
+    {
+      "_id": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "parentId": null,
+      "modified": 1673087736774,
+      "created": 1673087678163,
+      "name": "template-connect-go",
+      "description": "",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "greq_2267f7f5681b4f418c0f94e21b8820b8",
+      "parentId": "fld_052da3a98721488faa7e498c06200951",
+      "modified": 1673097118809,
+      "created": 1673087820073,
+      "url": "localhost:9090",
+      "name": "StoreListHandler",
+      "description": "",
+      "protoFileId": "pf_b9881dbe491b4ebfbfc4659ea5e7cecb",
+      "protoMethodName": "/templateconnectgo.v1.StoreService/ListStores",
+      "metadata": [],
+      "body": {
+        "text": "{\n    \"search_query\": \"田\",\n    \"company_cd\": 1\n}"
+      },
+      "metaSortKey": -1673087842447,
+      "isPrivate": false,
+      "_type": "grpc_request"
+    },
+    {
+      "_id": "req_7d08ba6f1755459290e6960275a0b125",
+      "parentId": "fld_2700803de26146b4bddcad0052474d92",
+      "modified": 1673097108435,
+      "created": 1673087736770,
+      "url": "localhost:8080/store?search_query=田&company_cd=1",
+      "name": "StoreListHandler",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1673087736770,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "fld_2700803de26146b4bddcad0052474d92",
+      "parentId": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "modified": 1673087736773,
+      "created": 1673087736773,
+      "name": "template-connect-go_http",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1673087736773,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_d5f46f66b09143b086068b8be63a1104",
+      "parentId": "fld_2700803de26146b4bddcad0052474d92",
+      "modified": 1673097115479,
+      "created": 1673087736768,
+      "url": "localhost:8080/hello",
+      "name": "HelloHandler",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "metaSortKey": -1673087736768,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "env_fb50b145a2d741f54b5aad0b5ab8f2ac60ff5735",
+      "parentId": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "modified": 1673087678181,
+      "created": 1673087678181,
+      "name": "Base Environment",
+      "data": {},
+      "dataPropertyOrder": null,
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1673087678181,
+      "_type": "environment"
+    },
+    {
+      "_id": "jar_fb50b145a2d741f54b5aad0b5ab8f2ac60ff5735",
+      "parentId": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "modified": 1673087678182,
+      "created": 1673087678182,
+      "name": "Default Jar",
+      "cookies": [],
+      "_type": "cookie_jar"
+    },
+    {
+      "_id": "spc_9c16b274177a4f35a1b393527f56158b",
+      "parentId": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "modified": 1673087678172,
+      "created": 1673087678172,
+      "fileName": "template-connect-go",
+      "contents": "",
+      "contentType": "yaml",
+      "_type": "api_spec"
+    },
+    {
+      "_id": "pd_34365ef26e674ff4a06483f77cfe6ff5",
+      "parentId": "wrk_1ad1e47503e341edbebefd847fdd4586",
+      "modified": 1673087808489,
+      "created": 1673087808489,
+      "name": "proto",
+      "_type": "proto_directory"
+    },
+    {
+      "_id": "pd_7f30a2a715ca4bfebd010cf1578a969a",
+      "parentId": "pd_34365ef26e674ff4a06483f77cfe6ff5",
+      "modified": 1673087808488,
+      "created": 1673087808488,
+      "name": "greet",
+      "_type": "proto_directory"
+    },
+    {
+      "_id": "pd_317a09447c2e49e5a2b7342844b40c31",
+      "parentId": "pd_34365ef26e674ff4a06483f77cfe6ff5",
+      "modified": 1673087808489,
+      "created": 1673087808489,
+      "name": "templateconnectgo",
+      "_type": "proto_directory"
+    },
+    {
+      "_id": "pd_c0855874a1224686900dd11e88ed3312",
+      "parentId": "pd_7f30a2a715ca4bfebd010cf1578a969a",
+      "modified": 1673087808487,
+      "created": 1673087808487,
+      "name": "v1",
+      "_type": "proto_directory"
+    },
+    {
+      "_id": "pd_fb24026a1c7744baa965991ef73a3730",
+      "parentId": "pd_317a09447c2e49e5a2b7342844b40c31",
+      "modified": 1673087808489,
+      "created": 1673087808489,
+      "name": "v1",
+      "_type": "proto_directory"
+    },
+    {
+      "_id": "pf_7d90035ac4bd487c8a7ef7ec25d138c6",
+      "parentId": "pd_c0855874a1224686900dd11e88ed3312",
+      "modified": 1673087808485,
+      "created": 1673087808485,
+      "name": "greet.proto",
+      "protoText": "syntax = \"proto3\";\n\npackage greet.v1;\n\noption go_package = \"github.com/MatsuoTakuro/my-template-connect-go/gen/greet/v1;greetv1\";\n\nmessage GreetRequest {\n  string name = 1;\n}\n\nmessage GreetResponse {\n  string greeting = 1;\n}\n\nservice GreetService {\n  rpc Greet(GreetRequest) returns (GreetResponse) {}\n}\n",
+      "_type": "proto_file"
+    },
+    {
+      "_id": "pf_b9881dbe491b4ebfbfc4659ea5e7cecb",
+      "parentId": "pd_fb24026a1c7744baa965991ef73a3730",
+      "modified": 1673087808488,
+      "created": 1673087808488,
+      "name": "store.proto",
+      "protoText": "syntax = \"proto3\";\n\npackage templateconnectgo.v1;\n\noption go_package = \"github.com/MatsuoTakuro/my-template-connect-go/gen/templateconnectgo/v1;storev1\";\n\nservice StoreService {\n  rpc ListStores(ListStoresRequest) returns (ListStoresResponse) {}\n}\n\nmessage ListStoresRequest {\n  string search_query = 1;\n  int32 company_cd = 2;\n}\n\nmessage ListStoresResponse {\n  message Store {\n    int32 store_cd = 1;\n    int32 company_cd = 2;\n    string store_name = 3;\n    string address = 4;\n    double latitude = 5;\n    double longitude = 6;\n  }\n  repeated Store stores = 1;\n}\n",
+      "_type": "proto_file"
+    }
+  ]
+}

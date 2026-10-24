@@ -89,6 +89,7 @@ html {
     --method-patch: #c49804;
     --method-options: #2bc2f0;
     --method-head: #267aba;
+    --method-grpc: #12a594;
     --socket-header-background-color: #edf2f7;
     --socket-button-background-color: cadetblue;
     --socket-input-disabled-background-color: #fafbfd;
@@ -188,6 +189,7 @@ html.theme-dark {
     --method-patch: #fcca25;
     --method-options: #2bc2f0;
     --method-head: #267aba;
+    --method-grpc: #3fd0bf;
     --socket-header-background-color: var(--sidebar-item-active-color);
     --socket-button-background-color: #2c3f40;
     --socket-input-disabled-background-color: #2d2d2d;
@@ -287,6 +289,7 @@ html.theme-dracula {
     --method-patch: #ffb86c;
     --method-options: #8be9fd;
     --method-head: #6272a4;
+    --method-grpc: #f1fa8c;
     --socket-header-background-color: #44475a;
     --socket-button-background-color: #6272a4;
     --socket-input-disabled-background-color: #44475a;
@@ -367,6 +370,10 @@ body {
 
 .request-method--HEAD {
     color: var(--method-head) !important;
+}
+
+.request-method--GRPC {
+    color: var(--method-grpc) !important;
 }
 
 /* firefox fixes */

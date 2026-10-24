@@ -35,6 +35,13 @@ const ipcFunctions = [
     'setProxy',
     'updateElectronApp',
     'getInstallInfo',
+    'grpcLoadSchema',
+    'grpcCancelSchemaLoad',
+    'grpcConvertInsomniaMessage',
+    'grpcStartCall',
+    'grpcSendMessage',
+    'grpcEndCall',
+    'grpcCancelCall',
 ]
 
 const electronIPC = ipcFunctions.reduce((acc, funcName) => {
@@ -49,6 +56,11 @@ electronIPC.workspaceChanged = (callback) => {
 // head, data, end, bodyError and responseError messages of every sendRequest
 electronIPC.onRequestEvent = (callback) => {
     ipcRenderer.on('requestEvent', (_, requestId, message) => callback(requestId, message))
+}
+
+// connected, headers, sent, sendError, received, then one status or error event of every grpcStartCall
+electronIPC.onGrpcEvent = (callback) => {
+    ipcRenderer.on('grpcEvent', (_, callId, grpcEvent) => callback(callId, grpcEvent))
 }
 
 contextBridge.exposeInMainWorld('electronIPC', electronIPC)

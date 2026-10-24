@@ -27,6 +27,7 @@ import {
     getBuild,
 } from './helpers'
 import { getAnalyticsPageUrl, sendPageView } from '@/utils/analytics'
+import { forgetFailedGrpcSchemaLoads } from '@/utils/grpc-calls'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
 
@@ -75,31 +76,42 @@ export default {
         },
         '$store.state.flags.disableSSLVerification'() {
             if(import.meta.env.MODE === 'desktop-electron') {
-                window.electronIPC.setDisableSSLVerification(this.$store.state.flags.disableSSLVerification)
+                this.forgetFailedGrpcSchemaLoadsOnceApplied(window.electronIPC.setDisableSSLVerification(this.$store.state.flags.disableSSLVerification))
+            } else {
+                forgetFailedGrpcSchemaLoads()
             }
         },
         '$store.state.flags.caCertificates'() {
             if(import.meta.env.MODE === 'desktop-electron') {
-                this.sendCACertificatesToElectron()
+                this.forgetFailedGrpcSchemaLoadsOnceApplied(this.sendCACertificatesToElectron())
+            } else {
+                forgetFailedGrpcSchemaLoads()
             }
         },
         '$store.state.flags.proxy'() {
             if(import.meta.env.MODE === 'desktop-electron') {
-                this.sendProxyToElectron()
+                this.forgetFailedGrpcSchemaLoadsOnceApplied(this.sendProxyToElectron())
+            } else {
+                forgetFailedGrpcSchemaLoads()
             }
         }
     },
     methods: {
+        // a gRPC method load that failed may have failed for the setting that changed, so the next one tries again, once
+        // the Electron main process, which makes the connection, has the setting
+        forgetFailedGrpcSchemaLoadsOnceApplied(applied) {
+            Promise.resolve(applied).catch(() => undefined).finally(() => forgetFailedGrpcSchemaLoads())
+        },
         sendProxyToElectron() {
             const proxy = this.$store.state.flags.proxy
 
             // a plain copy, IPC cannot send the store's reactive object
-            window.electronIPC.setProxy(proxy ? { ...getProxySettingsInUse(proxy) } : null).catch(error => {
+            return window.electronIPC.setProxy(proxy ? { ...getProxySettingsInUse(proxy) } : null).catch(error => {
                 console.error('Settings > Proxy:', error.message)
             })
         },
         sendCACertificatesToElectron() {
-            window.electronIPC.setCACertificates(this.$store.state.flags.caCertificates?.certificates ?? null).then(({ error }) => {
+            return window.electronIPC.setCACertificates(this.$store.state.flags.caCertificates?.certificates ?? null).then(({ error }) => {
                 if(error) {
                     console.error(`Settings > CA Certificates > ${this.$store.state.flags.caCertificates?.fileName}: ${error}`)
                 }
@@ -194,7 +206,8 @@ export default {
                 return
             }
 
-            // only an HTTP request is sent here. A socket, a folder or a type only a newer version knows has nothing to send
+            // only an HTTP request is sent here. A gRPC panel does its own action on the shortcut, and a socket, a folder
+            // or a type only a newer version knows has nothing to send
             if(checkHotkeyAgainstKeyEvent(hotkeys.SEND_REQUEST, event) && this.activeTab._type === 'request') {
                 event.preventDefault()
                 event.stopPropagation()

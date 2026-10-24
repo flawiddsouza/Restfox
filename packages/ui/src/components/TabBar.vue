@@ -15,7 +15,7 @@
             draggable="true"
             @contextmenu.prevent="handleTabContextMenu($event, tab)"
         >
-            <span :class="`request-method--${getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
+            <span :class="`request-method--${tab._type === 'grpc' ? 'GRPC' : getTabMethodName(tab)}`">{{ getTabMethodName(tab) }}</span> <template v-if="tab._id in sidebarItemTemporaryName">{{ sidebarItemTemporaryName[tab._id] }}</template><template v-else>{{ tab.name }}</template>
             <span class="tab-more-btn" @click.stop="handleTabMoreBtn($event, tab)">⋮</span>
             <span style="margin-left: 0.5rem" @click.stop="closeTab(tab)" class="tab-close"><i class="fas fa-times"></i></span>
         </div>
@@ -242,9 +242,12 @@ export default {
                 return 'SOCK'
             }
 
-            if(tab._type === 'request_group') {
-                return ''
+            if(tab._type === 'grpc') {
+                return 'gRPC'
             }
+
+            // a folder, or a type only a newer version knows
+            return ''
         },
         scrollTabs(event) {
             this.$refs.tabContainer.scrollLeft += event.deltaY

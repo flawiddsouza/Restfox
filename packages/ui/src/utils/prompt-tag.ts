@@ -8,12 +8,14 @@ const rememberedValues = new Map<string, string>() // Ask once, until the app cl
 const lastValues = new Map<string, string>() // Ask every send, pre-filled
 // Ask once while its box is open, so another send waits for the same answer
 const onceValuesAsked = new Map<string, Promise<string>>()
+// the stop signals of the sends waiting for such a box, which opens while one of them still runs
+const onceValuesWaiting = new Map<string, Set<AbortSignal | null>>()
 
 // one box at a time, a send can reach several prompts at once
 let dialogQueue: Promise<unknown> = Promise.resolve()
 
 // plain characters, which a url keeps as they are, so a saved url shows them in every version
-const MASKED_PREVIEW = '******'
+export const MASKED_PREVIEW = '******'
 
 function readParameters(parsedTag: ParsedResult, workspaceId?: string) {
     const text = (name: string) => {
@@ -41,8 +43,14 @@ function getRememberedValue(parsedTag: ParsedResult, workspaceId: string | undef
     return ask === 'once' && keptKey !== undefined ? rememberedValues.get(keptKey) : undefined
 }
 
-function askForValue(title: string, defaultValue: string, label: string, mask: boolean): Promise<string | null> {
-    const dialog = dialogQueue.then(() => window.createPrompt(title, defaultValue, [], { label: label === '' ? undefined : label, mask }))
+// isWanted is asked when the box's turn comes, so a box queued for a send stopped since never opens
+function askForValue(title: string, defaultValue: string, label: string, mask: boolean, isWanted: () => boolean): Promise<string | null> {
+    const dialog = dialogQueue.then(() => {
+        if (!isWanted()) {
+            throw new Error('The send was stopped')
+        }
+        return window.createPrompt(title, defaultValue, [], { label: label === '' ? undefined : label, mask })
+    })
     dialogQueue = dialog.catch(() => undefined)
     return dialog
 }
@@ -61,8 +69,8 @@ export function getPromptPreviewValue(parsedTag: ParsedResult, workspaceId: stri
 
 // A prompt in a send of a request in workspaceId. sendValues are the values this send was given, so a prompt used twice in one send asks once.
 // onMaskedPrompt tells the text being resolved that a masked value went into it. hideMasked shows a send's text once it
-// is resolved: masked values as ******, the others as this send resolved them
-export async function handlePromptTag(parsedTag: ParsedResult, workspaceId: string, sendValues: Map<string, Promise<string>>, onMaskedPrompt: () => void, hideMasked: boolean): Promise<string> {
+// is resolved: masked values as ******, the others as this send resolved them. signal aborts when the send is stopped
+export async function handlePromptTag(parsedTag: ParsedResult, workspaceId: string, sendValues: Map<string, Promise<string>>, onMaskedPrompt: () => void, hideMasked: boolean, signal: AbortSignal | null = null): Promise<string> {
     const { promptKey, title, label, defaultValue, mask, ask } = readParameters(parsedTag)
     const keptKey = JSON.stringify([workspaceId, parsedTag])
 
@@ -80,18 +88,27 @@ export async function handlePromptTag(parsedTag: ParsedResult, workspaceId: stri
         return rememberedValue
     }
 
-    const sendValue = sendValues.get(promptKey) ?? (ask === 'once' ? onceValuesAsked.get(keptKey) : undefined)
+    const sendValue = sendValues.get(promptKey)
 
     if (sendValue !== undefined) {
-        sendValues.set(promptKey, sendValue)
         return sendValue
     }
+
+    const onceValue = ask === 'once' ? onceValuesAsked.get(keptKey) : undefined
+
+    if (onceValue !== undefined) {
+        onceValuesWaiting.get(keptKey)?.add(signal)
+        sendValues.set(promptKey, onceValue)
+        return onceValue
+    }
+
+    const waiting = new Set([signal])
 
     const boxValue = (ask === 'prefill' ? lastValues.get(keptKey) : undefined) ?? defaultValue
 
     const boxTitle = title === '' ? 'Enter value' : title
 
-    const valuePromise = askForValue(boxTitle, boxValue, label, mask).then(value => {
+    const valuePromise = askForValue(boxTitle, boxValue, label, mask, () => [...waiting].some(waitingSignal => !waitingSignal?.aborted)).then(value => {
         if (value === null) {
             throw new PromptCancelledError(`Prompt "${boxTitle}" was cancelled`, { cause: 'display-error' })
         }
@@ -111,7 +128,11 @@ export async function handlePromptTag(parsedTag: ParsedResult, workspaceId: stri
 
     if (ask === 'once') {
         onceValuesAsked.set(keptKey, valuePromise)
-        valuePromise.catch(() => undefined).finally(() => onceValuesAsked.delete(keptKey))
+        onceValuesWaiting.set(keptKey, waiting)
+        valuePromise.catch(() => undefined).finally(() => {
+            onceValuesAsked.delete(keptKey)
+            onceValuesWaiting.delete(keptKey)
+        })
     }
 
     return valuePromise

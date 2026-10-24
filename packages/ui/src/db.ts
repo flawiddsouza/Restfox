@@ -336,11 +336,12 @@ function deserializeRequestFiles(collection: Partial<CollectionItem>) {
 }
 
 async function serializeRequestResponseFiles(response: RequestFinalResponse) {
-    if(response.request && response.request.body instanceof File) {
+    if(response.request?.body instanceof File) {
         response.request.body = await transformFileToFileObject(response.request.body)
     }
 
-    if(response.request && response.request.original.body) {
+    // an entry of a kind only a newer version knows may have a body but no request, or one without an original
+    if(response.request?.original?.body) {
         if(response.request.original.body.fileName && response.request.original.body.fileName instanceof File) {
             response.request.original.body.fileName = await transformFileToFileObject(response.request.original.body.fileName)
         }
@@ -358,15 +359,16 @@ async function serializeRequestResponseFiles(response: RequestFinalResponse) {
 }
 
 function deserializeRequestResponseFiles(response: RequestFinalResponse) {
+    // a gRPC call's entry, or one of a kind only a newer version knows, may have no body, which stays absent
     if(Array.isArray(response.buffer)) {
         response.buffer = new Uint8Array(response.buffer as unknown as number[]).buffer
     }
 
-    if(response.request.body && (response.request.body.buffer instanceof Uint8Array || Array.isArray(response.request.body.buffer))) {
+    if(response.request?.body && (response.request.body.buffer instanceof Uint8Array || Array.isArray(response.request.body.buffer))) {
         response.request.body = transformFileObjectToFile(response.request.body) ?? undefined
     }
 
-    if(response.request.original.body) {
+    if(response.request?.original?.body) {
         if(response.request.original.body.fileName && 'buffer' in response.request.original.body.fileName && (response.request.original.body.fileName.buffer instanceof Uint8Array || Array.isArray(response.request.original.body.fileName.buffer))) {
             response.request.original.body.fileName = transformFileObjectToFile(response.request.original.body.fileName) ?? undefined
         }

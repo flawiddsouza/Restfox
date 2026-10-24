@@ -3,6 +3,7 @@ import { fetch, Agent, ProxyAgent } from 'undici'
 import { once } from 'events'
 import http from 'http'
 import https from 'https'
+import { isIP } from 'net'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { pathToFileURL } from 'url'
@@ -12,7 +13,7 @@ import * as helpers from './src/helpers.js'
 import TaskQueue from './src/task-queue.js'
 import { withSentHeadersCapture } from './src/sent-headers-capture.js'
 import { trustSystemCACertificates, parseCACertificates, getCACertificatesWithCustom } from './src/ca-certificates.js'
-import { getProxyForRequest, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } from './src/proxy.js'
+import { getProxyForRequest, getProxyForGrpc, takeProxyAuthorization, getProxyAgentOptions, removeProxyCredentials } from './src/proxy.js'
 import { PROXY_FRAMES_CONTENT_TYPE, PROXY_FRAME_TYPE, encodeProxyFrame, encodeProxyJsonFrame } from './src/proxy-frames.js'
 
 trustSystemCACertificates()
@@ -593,6 +594,196 @@ function relaySocketUpgradeDirectly(req, socket, head, target) {
 
     upstreamRequest.end()
 }
+
+// gRPC calls, made here with grpc-js since a page cannot make them. The engine is loaded on the first gRPC use, so
+// starting the server does not load protobufjs
+const loadGrpcEngine = () => import('./src/grpc.js')
+const loadProxyTunnel = () => import('./src/proxy-tunnel.js')
+
+// gRPC messages and proto files have no HTTP body size cap, as in the desktop app.
+app.use('/grpc/', express.json({ limit: Infinity }))
+
+// a call's connection follows Settings > Disable SSL Verification, CA Certificates and Proxy, named by the ids the UI
+// registered, as for /proxy and relayed sockets. Throws with a code the UI answers by registering them again, when the
+// server has forgotten them after a restart
+function getGrpcConnection(spec) {
+    const disableSSLVerification = spec.disableSSLVerification === true
+    const customCACertificatesId = spec.caCertificatesId ?? null
+    const proxySettingsId = spec.proxySettingsId ?? null
+
+    if(customCACertificatesId !== null && !customCACertificatesById.has(customCACertificatesId)) {
+        throw Object.assign(new Error('The CA certificates are no longer registered with the server'), { code: 'CA_CERTIFICATES_NOT_FOUND' })
+    }
+
+    if(proxySettingsId !== null && !proxySettingsById.has(proxySettingsId)) {
+        throw Object.assign(new Error('The proxy setting is no longer registered with the server'), { code: 'PROXY_SETTINGS_NOT_FOUND' })
+    }
+
+    const customCACertificates = customCACertificatesById.get(customCACertificatesId) ?? []
+    // none named is System, this server's HTTP_PROXY, HTTPS_PROXY and NO_PROXY
+    const proxySettings = proxySettingsId !== null ? proxySettingsById.get(proxySettingsId) : null
+    // for an https:// proxy
+    const tlsOptions = {
+        rejectUnauthorized: !disableSSLVerification,
+        ...(customCACertificates.length > 0 ? { ca: getCACertificatesWithCustom(customCACertificates) } : {}),
+    }
+
+    return {
+        rejectUnauthorized: !disableSSLVerification,
+        caCertificates: customCACertificates,
+        openTunnel: async(host, port, signal) => {
+            const authority = isIP(host) === 6 ? `[${host}]:${port}` : `${host}:${port}`
+            const proxyUrl = await getProxyForGrpc(authority, proxySettings)
+            return proxyUrl !== null ? (await loadProxyTunnel()).openTunnel(new URL(proxyUrl), host, port, tlsOptions, signal) : null
+        },
+    }
+}
+
+// answers { schema } or { error, code }
+app.post('/grpc/schema', async(req, res) => {
+    const spec = req.body ?? {}
+    // a page that went away, such as by a reload, no longer waits for the load
+    const abortController = new AbortController()
+    res.on('close', () => abortController.abort())
+
+    try {
+        const schema = await (await loadGrpcEngine()).loadSchema({
+            target: spec.target,
+            connection: getGrpcConnection(spec),
+            metadata: spec.metadata ?? [],
+            protoFiles: spec.protoFiles ?? null,
+            timeoutMs: spec.timeoutMs ?? 0,
+            signal: abortController.signal,
+        })
+        res.json({ schema })
+    } catch(e) {
+        // with the gRPC status of a load that ended with one, such as UNAVAILABLE for a server that could not be reached
+        res.json({ error: e.message, code: e.code ?? null, ...(e.messageWithoutValues === undefined ? {} : { errorWithoutValues: e.messageWithoutValues }), ...(e.grpcCode === undefined ? {} : { grpcStatus: { code: e.grpcCode, name: (await loadGrpcEngine()).getStatusName(e.grpcCode) } }) })
+    }
+})
+
+// answers { text } or { error }, see convertInsomniaMessage
+app.post('/grpc/insomnia-message', async(req, res) => {
+    const { protoFiles, service, method, text } = req.body ?? {}
+    try {
+        res.json({ text: (await loadGrpcEngine()).convertInsomniaMessage({ protoFiles, service, method, text }) })
+    } catch(e) {
+        res.json({ error: e.message })
+    }
+})
+
+// the running calls by the UI's call id
+const grpcCalls = new Map()
+
+// the call's events as they happen, one JSON object per line, ending with its one status or error event. A failure
+// before the call starts, such as forgotten CA certificates, is a JSON { error, code } reply instead. The call is
+// cancelled when the UI goes away
+app.post('/grpc/call', async(req, res) => {
+    const spec = req.body ?? {}
+    const callId = spec.callId
+
+    if(typeof callId !== 'string' || callId === '') {
+        res.status(400).json({ error: 'The call has no callId' })
+        return
+    }
+
+    if(grpcCalls.has(callId)) {
+        res.status(409).json({ error: `A gRPC call with the id ${callId} is already running` })
+        return
+    }
+
+    let connection
+    let grpcEngine
+
+    try {
+        connection = getGrpcConnection(spec)
+        grpcEngine = await loadGrpcEngine()
+    } catch(e) {
+        res.json({ error: e.message, code: e.code ?? null })
+        return
+    }
+
+    // another request with this id may have started while the engine loaded
+    if(grpcCalls.has(callId)) {
+        res.status(409).json({ error: `A gRPC call with the id ${callId} is already running` })
+        return
+    }
+
+    res.writeHead(200, {
+        'content-type': 'application/x-ndjson',
+        'cache-control': 'no-cache, no-transform',
+        // nginx buffers a proxied reply unless told not to, which would hold back the call's events
+        'x-accel-buffering': 'no',
+    })
+    // the UI sends a stream's messages once the reply has started, by then the call is registered
+    res.flushHeaders()
+
+    const startTime = Date.now()
+    let ended = false
+
+    const emit = grpcEvent => {
+        if(ended) {
+            return
+        }
+        const terminal = grpcEvent.type === 'status' || grpcEvent.type === 'error'
+        if(terminal) {
+            ended = true
+            grpcCalls.delete(callId)
+        }
+        if(!res.writableEnded && !res.destroyed) {
+            res.write(JSON.stringify(grpcEvent) + '\n')
+            if(terminal) {
+                res.end()
+            }
+        }
+    }
+
+    res.on('close', () => {
+        if(!ended) {
+            grpcCalls.get(callId)?.cancel()
+        }
+    })
+
+    try {
+        const call = grpcEngine.startCall({
+            target: spec.target,
+            connection,
+            metadata: spec.metadata ?? [],
+            protoFiles: spec.protoFiles ?? null,
+            service: spec.service,
+            method: spec.method,
+            deadlineMs: spec.deadlineMs ?? 0,
+            messages: spec.messages ?? [],
+        }, emit)
+
+        grpcCalls.set(callId, call)
+        // the UI went away while the call started
+        if(res.destroyed) {
+            call.cancel()
+        }
+    } catch(e) {
+        emit({ type: 'error', message: e.message, time: Date.now() - startTime })
+    }
+})
+
+function grpcCallRoute(handler) {
+    return (req, res) => {
+        const call = grpcCalls.get(req.params.callId)
+
+        if(!call) {
+            res.status(404).json({ error: 'The call has ended' })
+            return
+        }
+
+        handler(call, req.body ?? {})
+        res.json({})
+    }
+}
+
+// a message for a client or bidi stream, the call's events tell whether it was sent
+app.post('/grpc/call/:callId/send', grpcCallRoute((call, { json }) => call.send(String(json ?? ''))))
+app.post('/grpc/call/:callId/end', grpcCallRoute(call => call.end()))
+app.post('/grpc/call/:callId/cancel', grpcCallRoute(call => call.cancel()))
 
 // Workspace / collection routes
 app.post('/api/getWorkspaceAtLocation',           apiRoute(({ location, getEnvironments }) => db.getWorkspaceAtLocation(location, getEnvironments)))

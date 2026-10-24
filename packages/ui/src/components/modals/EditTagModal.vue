@@ -348,7 +348,7 @@ async function getAllRequests() {
     prependParentTitleToChildTitle(collection)
     collection = flattenTree(collection)
 
-    collection = collection.filter((item) => item._type === 'request' && item._id !== props.activeTab._id)
+    collection = collection.filter((item) => (item._type === 'request' || item._type === 'grpc') && item._id !== props.activeTab._id)
 
     collectionItems.value = collection
 }
@@ -404,11 +404,15 @@ async function generatePreview(tagTrigger = false) {
         preview.value = 'Loading...'
     }
 
-    preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, {
-        tagTrigger,
-        noError: true,
-        workspaceId: store.state.activeWorkspace._id,
-    })
+    try {
+        preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, {
+            tagTrigger,
+            noError: true,
+            workspaceId: store.state.activeWorkspace._id,
+        })
+    } catch(error) {
+        preview.value = error instanceof Error ? error.message : String(error)
+    }
 }
 
 onBeforeMount(() => {

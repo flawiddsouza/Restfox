@@ -16,7 +16,7 @@
         <div class="right-nav-container">
             <a href="#" @click.prevent="cycleTheme()" class="bl theme-selector">Theme: {{ getThemeName(theme) }}</a>
             <div v-if="nav === 'collection'" style="height: 100%;">
-                <template v-if="activeTab && activeTab._type === 'request'">
+                <template v-if="activeTab && (activeTab._type === 'request' || activeTab._type === 'grpc')">
                     <a href="#" @click.prevent="requestResponseLayout = 'top-bottom'" v-if="requestResponseLayout === 'left-right'" class="bl view-switcher">View: Column</a>
                     <a href="#" @click.prevent="requestResponseLayout = 'left-right'" v-else class="bl view-switcher">View: Row</a>
                 </template>

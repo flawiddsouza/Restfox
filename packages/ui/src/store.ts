@@ -75,6 +75,7 @@ import * as queryParamsSync from '@/utils/query-params-sync'
 import { computeTargetIndex, isDropIntoOwnSubtree } from '@/utils/sidebar-drop'
 import { BODY_INCOMPLETE_MESSAGES, getStreamView, isSendReplaced, markSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
+import { forgetGrpcCallsForItems, forgetGrpcCallsForWorkspace, moveGrpcCallsToNewItemIds } from '@/utils/grpc-calls'
 
 // the sends still running on each tab, so a new send can cancel them
 const runningSends = new Map<string, Set<AbortController>>()
@@ -97,12 +98,19 @@ async function loadResponses(state: State, tabId: string) {
         throw new Error('activeWorkspace is null')
     }
 
-    state.responses[tabId] = await getResponsesByCollectionId(state.activeWorkspace._id, tabId)
+    const workspaceId = state.activeWorkspace._id
+    const responses = await getResponsesByCollectionId(workspaceId, tabId)
+    if(state.activeWorkspace?._id !== workspaceId) {
+        return
+    }
+    state.responses[tabId] = responses
+    // a response shown while the history loaded, such as a gRPC call that ended and is being saved, stays shown
+    if((tabId in state.requestResponses) && state.requestResponses[tabId] !== null) {
+        return
+    }
     if(state.responses[tabId].length > 0) {
-        if((tabId in state.requestResponses) === false || (tabId in state.requestResponses && state.requestResponses[tabId] === null)) {
-            state.requestResponses[tabId] = state.responses[tabId][0]
-            state.requestResponseStatus[tabId] = 'loaded'
-        }
+        state.requestResponses[tabId] = state.responses[tabId][0]
+        state.requestResponseStatus[tabId] = 'loaded'
     } else {
         state.requestResponses[tabId] = null
         state.requestResponseStatus[tabId] = 'pending'
@@ -117,8 +125,9 @@ function setActiveTab(state: State, tab: CollectionItem, scrollSidebarItemIntoVi
 
     console.log('setActiveTab', tab._id)
 
-    // migrating old unsynced query params to new format
-    if('url' in tab || 'parameters' in tab) {
+    // migrating old unsynced query params to new format, for the types that had them: a gRPC item's url is a server
+    // address with no query, and a type only a newer version knows is never changed
+    if((tab._type === 'request' || tab._type === 'socket') && ('url' in tab || 'parameters' in tab)) {
         queryParamsSync.migrateOldData(tab)
     }
 
@@ -707,34 +716,39 @@ export const store = createStore<State>({
                 state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
             }
         },
-        async clearResponseHistory(state) {
-            await deleteResponsesByCollectionId(state.activeTab.workspaceId, state.activeTab._id)
-            dropResponseChunkTimes(state, state.responses[state.activeTab._id])
-            state.responses[state.activeTab._id] = []
-            state.requestResponses[state.activeTab._id] = null
-            state.requestResponseStatus[state.activeTab._id] = 'pending'
+        // These act on the active tab's item, or on the one given, such as a panel's in a window of its own, whose item
+        // is not the main window's active tab
+        async clearResponseHistory(state, collectionItem?: CollectionItem) {
+            const item = collectionItem ?? state.activeTab
+            await deleteResponsesByCollectionId(item.workspaceId, item._id)
+            dropResponseChunkTimes(state, state.responses[item._id])
+            state.responses[item._id] = []
+            state.requestResponses[item._id] = null
+            state.requestResponseStatus[item._id] = 'pending'
         },
-        async renameCurrentlyActiveResponse(state, newResponseName) {
-            const activeResponse = state.requestResponses[state.activeTab._id]
+        async renameCurrentlyActiveResponse(state, payload: string | { name: string, collectionItem: CollectionItem }) {
+            const { name: newResponseName, collectionItem: item } = typeof payload === 'string' ? { name: payload, collectionItem: state.activeTab } : payload
+            const activeResponse = state.requestResponses[item._id]
             activeResponse.name = newResponseName !== '' ? newResponseName : null
             // the history entry, which is a copy of the one shown once a send saved it
-            const historyEntry = state.responses[state.activeTab._id]?.find(response => response._id === activeResponse._id)
+            const historyEntry = state.responses[item._id]?.find(response => response._id === activeResponse._id)
             if(historyEntry) {
                 historyEntry.name = activeResponse.name
             }
-            await updateResponse(state.activeTab.workspaceId, activeResponse.collectionId, activeResponse._id, { name: activeResponse.name })
+            await updateResponse(item.workspaceId, activeResponse.collectionId, activeResponse._id, { name: activeResponse.name })
         },
-        async deleteCurrentlyActiveResponse(state) {
-            const responseToDelete = state.requestResponses[state.activeTab._id]
-            await deleteResponse(state.activeTab.workspaceId, responseToDelete.collectionId, responseToDelete._id)
+        async deleteCurrentlyActiveResponse(state, collectionItem?: CollectionItem) {
+            const item = collectionItem ?? state.activeTab
+            const responseToDelete = state.requestResponses[item._id]
+            await deleteResponse(item.workspaceId, responseToDelete.collectionId, responseToDelete._id)
             dropResponseChunkTimes(state, [responseToDelete])
-            state.responses[state.activeTab._id] = state.responses[state.activeTab._id].filter(response => response._id !== responseToDelete._id)
-            if(state.responses[state.activeTab._id].length > 0) {
-                state.requestResponses[state.activeTab._id] = state.responses[state.activeTab._id][0]
-                state.requestResponseStatus[state.activeTab._id] = 'loaded'
+            state.responses[item._id] = state.responses[item._id].filter(response => response._id !== responseToDelete._id)
+            if(state.responses[item._id].length > 0) {
+                state.requestResponses[item._id] = state.responses[item._id][0]
+                state.requestResponseStatus[item._id] = 'loaded'
             } else {
-                state.requestResponses[state.activeTab._id] = null
-                state.requestResponseStatus[state.activeTab._id] = 'pending'
+                state.requestResponses[item._id] = null
+                state.requestResponseStatus[item._id] = 'pending'
             }
         },
         persistActiveWorkspaceTabs(state) {
@@ -873,6 +887,8 @@ export const store = createStore<State>({
             }
 
             const childIds = getChildIds(context.state.collection, collectionItem._id)
+            // first, so a call that ends meanwhile saves no response for a deleted item
+            forgetGrpcCallsForItems(collectionItem.workspaceId, childIds)
             await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
             await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
             context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
@@ -1010,7 +1026,7 @@ export const store = createStore<State>({
                 context.state.plugins.workspace = context.state.plugins.workspace.concat(plugins)
             }
 
-            if(newCollectionItem._type === 'request' || newCollectionItem._type === 'socket') {
+            if(newCollectionItem._type === 'request' || newCollectionItem._type === 'socket' || newCollectionItem._type === 'grpc') {
                 context.dispatch('addTab', newCollectionItem)
             }
 
@@ -1051,6 +1067,22 @@ export const store = createStore<State>({
                     _id: nanoid(),
                     _type: 'socket',
                     name: payload.name,
+                    parentId: payload.parentId,
+                    workspaceId: context.state.activeWorkspace._id
+                }
+            }
+
+            if(payload.type === 'grpc') {
+                newCollectionItem = {
+                    _id: nanoid(),
+                    _type: 'grpc',
+                    name: payload.name,
+                    url: '',
+                    body: {
+                        mimeType: 'application/json',
+                        text: '{}'
+                    },
+                    grpc: {},
                     parentId: payload.parentId,
                     workspaceId: context.state.activeWorkspace._id
                 }
@@ -1107,7 +1139,7 @@ export const store = createStore<State>({
                 })
             }
 
-            if(payload.type === 'request' || payload.type === 'socket') {
+            if(payload.type === 'request' || payload.type === 'socket' || payload.type === 'grpc') {
                 context.dispatch('addTab', newCollectionItem)
             }
 
@@ -1285,8 +1317,19 @@ export const store = createStore<State>({
             if(response._id) {
                 const responseToSave = structuredClone(toRaw(response))
 
-                if(collectionId in context.state.responses === false) {
+                if(context.state.activeWorkspace?._id === workspaceId && collectionId in context.state.responses === false) {
                     await loadResponses(context.state, collectionId)
+                }
+
+                // such as a gRPC call that ended after its workspace was left. The history in memory is the open
+                // workspace's, where another file workspace's item can have the same id
+                if(context.state.activeWorkspace?._id !== workspaceId) {
+                    await createResponse(workspaceId, structuredClone(responseToSave))
+                    const responsesSaved = await getResponsesByCollectionId(workspaceId, collectionId)
+                    if(responsesSaved.length > constants.DEFAULT_LIMITS.RESPONSE_HISTORY) {
+                        await deleteResponsesByIds(workspaceId, collectionId, responsesSaved.slice(constants.DEFAULT_LIMITS.RESPONSE_HISTORY).map(responseItem => responseItem._id))
+                    }
+                    return
                 }
 
                 context.state.responses[collectionId].unshift(responseToSave)
@@ -1556,6 +1599,8 @@ export const store = createStore<State>({
             context.state.workspaces.sort((a, b) => b.updatedAt - a.updatedAt)
         },
         async deleteWorkspace(context, workspaceId) {
+            // first, so a call that ends meanwhile saves no response for a deleted item
+            forgetGrpcCallsForWorkspace(workspaceId)
             const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
             await deleteResponsesByCollectionIds(workspaceId, collectionIds)
             await deletePluginsByCollectionIds(workspaceId, collectionIds)
@@ -1570,6 +1615,7 @@ export const store = createStore<State>({
             })
         },
         async closeWorkspace(context, workspaceId) {
+            forgetGrpcCallsForWorkspace(workspaceId)
             const collectionIds = await getAllCollectionIdsForGivenWorkspace(workspaceId)
             collectionIds.forEach(collectionId => {
                 context.commit('closeTab', collectionId)
@@ -1828,6 +1874,15 @@ export const store = createStore<State>({
             }
 
             const { collection, workspace, idMap } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+            // a running gRPC call follows its item to a new id, as after a rename or a move in a file workspace, and
+            // stops when its item is gone, as nothing could stop or show it then
+            const collectionIds = new Set(collection.map((item: CollectionItem) => item._id))
+            if(idMap) {
+                // the map also holds items whose files went away outside Restfox, which the collection no longer has
+                moveGrpcCallsToNewItemIds(context.state.activeWorkspace._id, context.state.collection.map(item => item._id), new Map([...idMap].filter(([, newId]) => collectionIds.has(newId))))
+            } else {
+                forgetGrpcCallsForItems(context.state.activeWorkspace._id, context.state.collection.map(item => item._id).filter(id => !collectionIds.has(id)))
+            }
             context.commit('setCollection', collection)
             context.state.idMap = idMap
 

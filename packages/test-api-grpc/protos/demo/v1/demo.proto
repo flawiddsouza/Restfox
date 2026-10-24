@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package demo.v1;
+
+import "demo/v1/types.proto";
+import "google/protobuf/empty.proto";
+
+service Demo {
+    // echoes request metadata named x-echo-* back as response headers and trailers. The name "slow" waits 3 s
+    rpc SayHello(HelloRequest) returns (HelloReply);
+    // fails with the given status code and message, with a google.rpc.BadRequest in grpc-status-details-bin
+    rpc Fail(FailRequest) returns (google.protobuf.Empty);
+    // sends 1 to "to", one every interval_ms. "to" 0 never ends
+    rpc Count(CountRequest) returns (stream CountReply);
+    // adds up the values sent
+    rpc Sum(stream SumRequest) returns (SumReply);
+    // answers each message with "echo: " and its text
+    rpc Chat(stream ChatMessage) returns (stream ChatMessage);
+    // echoes the message
+    rpc Everything(demo.v1.Everything) returns (demo.v1.Everything);
+}
+
+message HelloRequest {
+    string name = 1;
+}
+
+message HelloReply {
+    string message = 1;
+}
+
+message FailRequest {
+    int32 code = 1;
+    string message = 2;
+}
+
+message CountRequest {
+    int32 to = 1;
+    int32 interval_ms = 2;
+}
+
+message CountReply {
+    int32 n = 1;
+}
+
+message SumRequest {
+    int64 value = 1;
+}
+
+message SumReply {
+    int64 total = 1;
+    int32 count = 2;
+}
+
+message ChatMessage {
+    string text = 1;
+}
