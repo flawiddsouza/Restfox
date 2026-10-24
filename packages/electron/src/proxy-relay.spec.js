@@ -4,6 +4,7 @@ import http from 'node:http'
 import tls from 'node:tls'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { startProxyRelay } from './proxy-relay.js'
 import { startForwardProxy, startSocks5Proxy, closeTestProxies } from './test-proxies.js'
 
@@ -12,6 +13,9 @@ const readFixture = name => fs.readFileSync(path.join(filesDir, name), 'utf8')
 // an https:// proxy's certificate for localhost, signed by test-ca.crt, a CA in no trust store, like a company's
 const httpsProxyTls = { key: readFixture('test-ca-localhost.key'), cert: readFixture('test-ca-localhost.crt') + readFixture('test-ca.crt') }
 const trustingTestCA = { rejectUnauthorized: true, ca: [...tls.rootCertificates, readFixture('test-ca.crt')] }
+
+// the relay's own copy of the tunnel module, which it loads with require
+const { limits } = createRequire(import.meta.url)('./proxy-tunnel.js')
 
 const closables = []
 
@@ -154,4 +158,23 @@ test('a proxy refusing the login is passed on to Chromium as 407', async() => {
     const relay = await startRelay(`http://user:wrong@127.0.0.1:${refusing.address().port}`)
 
     expect(await exchangeThroughRelay(relay, 'api.relay-spec.test:443', 'hello')).toBe('status 407')
+})
+
+test('a proxy that takes the connection and never answers fails the tunnel after the time limit, through CONNECT and SOCKS5, rather than leaving it waiting', async() => {
+    const silent = net.createServer(socket => socket.on('error', () => {}))
+    closables.push(silent)
+    await new Promise(resolve => silent.listen(0, '127.0.0.1', resolve))
+    const { port } = silent.address()
+    limits.tunnelTimeoutMs = 300
+
+    try {
+        for(const proxyUrl of [`http://127.0.0.1:${port}`, `socks5://127.0.0.1:${port}`]) {
+            const relay = await startRelay(proxyUrl)
+            const started = Date.now()
+            expect(await exchangeThroughRelay(relay, 'api.relay-spec.test:443', 'hello')).toBe('status 502')
+            expect(Date.now() - started).toBeLessThan(3000)
+        }
+    } finally {
+        limits.tunnelTimeoutMs = 10000
+    }
 })
