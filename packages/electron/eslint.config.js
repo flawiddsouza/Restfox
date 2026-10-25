@@ -10,7 +10,7 @@ module.exports = tseslint.config(
     js.configs.recommended,
     ...tseslint.configs.recommended,
     {
-        files: ['src/**/*.{js,ts}'],
+        files: ['src/**/*.{js,ts}', 'shared/**/*.js'],
         plugins: {
             '@stylistic': stylistic,
         },
@@ -37,10 +37,17 @@ module.exports = tseslint.config(
         },
     },
     {
-        // vitest specs and TypeScript files use import syntax
-        files: ['src/**/*.spec.js', 'src/**/*.ts'],
+        // specs, TypeScript and shared modules use import syntax
+        files: ['src/**/*.spec.js', 'src/**/*.ts', 'shared/**/*.js'],
         languageOptions: {
             sourceType: 'module',
+        },
+    },
+    {
+        // the runtime adapter supplies protobufjs's CommonJS resolver
+        files: ['shared/grpc-schema.js'],
+        rules: {
+            '@typescript-eslint/no-require-imports': 'off',
         },
     },
 )

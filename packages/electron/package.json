@@ -33,7 +33,7 @@
     },
     "scripts": {
         "start": "electron-forge start",
-        "dev": "nodemon --watch src --ext js --ignore \"*.spec.js\" --exec \"npm start\"",
+        "dev": "nodemon --watch src --watch shared --ext js --ignore \"*.spec.js\" --exec \"npm start\"",
         "test": "vitest",
         "lint": "eslint src/*.ts",
         "lint-fix": "eslint src/*.ts --fix",

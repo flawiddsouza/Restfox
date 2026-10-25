@@ -1,19 +1,6 @@
-// packages/web-standalone/src/helpers.js
+export { readFile, removePrefixFromString } from '../../electron/shared/helpers.js'
 import fs from 'fs/promises'
 import path from 'path'
-import { platform } from 'os'
-import * as fileUtils from './file-utils.js'
-
-export function removePrefixFromString(str, prefix) {
-    if (str.startsWith(prefix)) {
-        let result = str.slice(prefix.length)
-        if (platform() === 'win32') {
-            result = result.replaceAll(path.win32.sep, path.posix.sep)
-        }
-        return result
-    }
-    return str
-}
 
 export async function browseDirectory(dirPath) {
     let resolvedPath = dirPath ? path.resolve(dirPath) : process.cwd()
@@ -39,30 +26,5 @@ export async function browseDirectory(dirPath) {
         currentPath: resolvedPath,
         parentPath: parentPath !== resolvedPath ? parentPath : null,
         directories,
-    }
-}
-
-export async function readFile(filePath, workspaceLocation = null) {
-    let resolved = ''
-    let exists = false
-
-    if (workspaceLocation !== null) {
-        resolved = path.resolve(path.join(workspaceLocation, filePath))
-        exists = await fileUtils.pathExists(resolved)
-    }
-
-    if (!exists) {
-        resolved = path.resolve(filePath)
-        exists = await fileUtils.pathExists(resolved)
-    }
-
-    if (!exists) {
-        return { error: `Cannot find file: ${resolved}`, content: null }
-    }
-
-    try {
-        return { error: null, content: await fs.readFile(resolved, 'utf8') }
-    } catch (error) {
-        return { error: error.message + ' ' + resolved, content: null }
     }
 }

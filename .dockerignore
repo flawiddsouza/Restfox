@@ -5,6 +5,7 @@
 !.git
 !docs
 !packages/electron/package.json
+!packages/electron/shared
 !packages/ui
 !packages/web-standalone
 **/node_modules

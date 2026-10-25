@@ -1,0 +1,31 @@
+name: Test web-standalone
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - packages/electron/shared/**
+      - packages/web-standalone/**
+  pull_request:
+    branches: ["main"]
+    paths:
+      - packages/electron/shared/**
+      - packages/web-standalone/**
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+        run:
+          working-directory: ./packages/web-standalone
+    steps:
+    - uses: actions/checkout@v7
+    - name: Use Node.js 26
+      uses: actions/setup-node@v7
+      with:
+        node-version: 26
+        cache: 'npm'
+        cache-dependency-path: './packages/web-standalone/package-lock.json'
+    - run: npm ci
+    # the shared code must run on web-standalone's own packages, which are all the Docker image has
+    - run: node --test shared-imports.test.js
