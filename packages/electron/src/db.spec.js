@@ -1,5 +1,6 @@
 import { test, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import db from './db.js'
@@ -44,6 +45,146 @@ function grpcItem() {
 function readJson(name) {
     return JSON.parse(fs.readFileSync(path.join(workspace.location, name), 'utf8'))
 }
+
+const pluginScopes = ['request', 'folder', 'workspace']
+
+for (const writer of ['createPlugin', 'createPlugins', 'updatePlugin', 'deletePlugin', 'single-field', 'socket messages']) {
+    test(`${writer} fails on a read error without changing the file`, async() => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, 'request')
+        let targetPath = pluginPath
+        let write = () => writePlugin(workspace, collectionId, writer)
+        if (writer === 'single-field') {
+            targetPath = path.join(workspace.location, 'Item.json')
+            write = () => db.updateCollection(workspace, collectionId, { sortOrder: 2 })
+        }
+        if (writer === 'socket messages') {
+            targetPath = path.join(workspace.location, 'Item.messages.json')
+            write = () => db.updateCollection(workspace, collectionId, { _type: 'socket', clients: [{ id: 'client', messages: [] }] })
+        }
+        fs.writeFileSync(targetPath, '[]\n')
+        const readFile = fsPromises.readFile
+        const error = Object.assign(new Error('Cannot read file'), { code: 'EACCES' })
+        vi.spyOn(fsPromises, 'readFile').mockImplementation((filePath, ...args) => {
+            if (filePath === targetPath) {
+                return Promise.reject(error)
+            }
+            return readFile(filePath, ...args)
+        })
+        if (writer === 'single-field') {
+            expect((await write()).error).toMatch(/Cannot read file/)
+        } else {
+            await expect(write()).rejects.toThrow(/^Not saved, as .+ cannot be read: Cannot read file$/)
+        }
+        expect(fs.readFileSync(targetPath, 'utf8')).toBe('[]\n')
+    })
+}
+
+
+async function pluginTarget(workspace, scope) {
+    if (scope === 'workspace') {
+        return { collectionId: null, pluginPath: path.join(workspace.location, '_.plugins.json') }
+    }
+    const { newCollectionId } = await db.createCollection(workspace, {
+        _id: 'item', _type: scope === 'folder' ? 'request_group' : 'request',
+        name: 'Item', parentId: null, workspaceId: workspace._id,
+    })
+    return {
+        collectionId: newCollectionId,
+        pluginPath: path.join(workspace.location, scope === 'folder' ? 'Item/_.plugins.json' : 'Item.plugins.json'),
+    }
+}
+
+const conflict = '<<<<<<< HEAD\n[{"_id":"ours","code":"ours"}]\n=======\n[{"_id":"theirs","code":"theirs"}]\n>>>>>>> branch\n'
+
+function writePlugin(workspace, collectionId, writer) {
+    const plugin = { _id: 'ours', name: 'Changed', code: 'changed', workspaceId: workspace._id, collectionId }
+    if (writer === 'createPlugin') {
+        return db.createPlugin(workspace, plugin)
+    }
+    if (writer === 'createPlugins') {
+        return db.createPlugins(workspace, [plugin])
+    }
+    if (writer === 'updatePlugin') {
+        return db.updatePlugin(workspace, collectionId, plugin._id, { code: plugin.code })
+    }
+    return db.deletePlugin(workspace, collectionId, plugin._id)
+}
+
+for (const scope of pluginScopes) {
+    for (const writer of ['createPlugin', 'createPlugins', 'updatePlugin', 'deletePlugin']) {
+        test(`${writer} rejects conflicted ${scope} plugins without changing the file`, async() => {
+            const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+            fs.writeFileSync(pluginPath, conflict)
+            await expect(writePlugin(workspace, collectionId, writer)).rejects.toThrow(/^Not saved, as .+ cannot be read: .+ is not valid JSON/)
+            expect(fs.readFileSync(pluginPath, 'utf8')).toBe(conflict)
+        })
+    }
+
+    for (const writer of ['createPlugin', 'createPlugins']) {
+        test(`${writer} creates missing ${scope} plugins`, async() => {
+            const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+            await writePlugin(workspace, collectionId, writer)
+            expect(JSON.parse(fs.readFileSync(pluginPath, 'utf8')).map(plugin => plugin._id)).toEqual(['ours'])
+        })
+    }
+
+    test(`updatePlugin rejects a missing id in ${scope} plugins`, async() => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+        await expect(db.updatePlugin(workspace, collectionId, 'absent', { code: 'changed' })).rejects.toThrow()
+        expect(fs.existsSync(pluginPath)).toBe(false)
+    })
+
+    test(`updatePlugin rejects an absent id in an existing ${scope} plugins file`, async() => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+        fs.writeFileSync(pluginPath, '[]\n')
+        await expect(db.updatePlugin(workspace, collectionId, 'absent', { code: 'changed' })).rejects.toThrow(/not found/)
+        expect(fs.readFileSync(pluginPath, 'utf8')).toBe('[]\n')
+    })
+
+    test(`deletePlugin succeeds for absent ${scope} plugins`, async() => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+        await db.deletePlugin(workspace, collectionId, 'absent')
+        expect(fs.existsSync(pluginPath)).toBe(false)
+        fs.writeFileSync(pluginPath, '[]\n')
+        await db.deletePlugin(workspace, collectionId, 'absent')
+        expect(fs.readFileSync(pluginPath, 'utf8')).toBe('[]\n')
+    })
+}
+
+for (const scope of ['request', 'folder']) {
+    test(`single-field updates return an error for conflicted ${scope} config without changing the file`, async() => {
+        const { collectionId } = await pluginTarget(workspace, scope)
+        const configPath = path.join(workspace.location, scope === 'folder' ? 'Item/_.json' : 'Item.json')
+        fs.writeFileSync(configPath, conflict)
+        const result = await db.updateCollection(workspace, collectionId, { sortOrder: 2 })
+        expect(result.error).toMatch(/^Not saved, as .+ cannot be read: .+ is not valid JSON/)
+        expect(fs.readFileSync(configPath, 'utf8')).toBe(conflict)
+    })
+}
+
+test('single-field updates create missing folder config', async() => {
+    const { collectionId } = await pluginTarget(workspace, 'folder')
+    await db.updateCollection(workspace, collectionId, { sortOrder: 2 })
+    expect(readJson('Item/_.json')).toEqual({ sortOrder: 2 })
+})
+
+test('socket saves reject conflicted messages without changing either file', async() => {
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'socket', _type: 'socket', name: 'Socket', parentId: null })
+    const itemPath = path.join(workspace.location, 'Socket.json')
+    const messagesPath = path.join(workspace.location, 'Socket.messages.json')
+    const item = fs.readFileSync(itemPath, 'utf8')
+    fs.writeFileSync(messagesPath, conflict)
+    await expect(db.updateCollection(workspace, newCollectionId, { _type: 'socket', clients: [{ id: 'client', messages: ['new'] }] })).rejects.toThrow(/^Not saved, as .+ cannot be read: .+ is not valid JSON/)
+    expect(fs.readFileSync(messagesPath, 'utf8')).toBe(conflict)
+    expect(fs.readFileSync(itemPath, 'utf8')).toBe(item)
+})
+
+test('socket saves create missing messages', async() => {
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'socket', _type: 'socket', name: 'Socket', parentId: null })
+    await db.updateCollection(workspace, newCollectionId, { _type: 'socket', clients: [{ id: 'client', messages: ['new'] }] })
+    expect(readJson('Socket.messages.json')).toEqual({ client: ['new'] })
+})
+
 
 test('a gRPC item is stored in its own item file, like a request', async() => {
     const result = await db.createCollection(workspace, grpcItem())

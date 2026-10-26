@@ -944,9 +944,10 @@ export default {
         handleQueryParametersChange() {
             queryParamsSync.onParametersChange(this.activeTab)
         },
-        handleScriptSave: debounce((_this, script) => {
-            _this.$store.dispatch('saveRequestScript', script)
-            console.log('Script saved')
+        handleScriptSave: debounce(async(_this, script) => {
+            if(await _this.$store.dispatch('saveRequestScript', script)) {
+                console.log('Script saved')
+            }
         }, 500),
         toggleMethodSelectorDropdown(event) {
             toggleDropdown(event, this.methodSelectorDropdownState)

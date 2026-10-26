@@ -80,6 +80,10 @@ import { forgetGrpcCallsForItems, forgetGrpcCallsForWorkspace, moveGrpcCallsToNe
 // the sends still running on each tab, so a new send can cancel them
 const runningSends = new Map<string, Set<AbortController>>()
 
+// script plugins kept in memory whose first save failed, so the editor keeps what was typed and the next edit creates
+// them again rather than updating a plugin storage does not hold
+const scriptPluginsNotSaved = new Set<string>()
+
 // arrival times live only as long as their response does in memory
 function dropResponseChunkTimes(state: State, responses: { _id?: string }[] | undefined) {
     responses?.forEach(response => {
@@ -87,6 +91,13 @@ function dropResponseChunkTimes(state: State, responses: { _id?: string }[] | un
             delete state.responseChunkTimes[response._id]
         }
     })
+}
+
+// a write the storage refused, such as one to a file it cannot read, which it leaves as it is
+function reportUpdateError(result: { error: string | null } | undefined) {
+    if(result?.error) {
+        emitter.emit('error', result.error)
+    }
 }
 
 async function loadResponses(state: State, tabId: string) {
@@ -579,7 +590,7 @@ export const store = createStore<State>({
                     throw new Error('activeWorkspace is null')
                 }
 
-                await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment })
+                reportUpdateError(await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment }))
             }
         },
         async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
@@ -622,16 +633,20 @@ export const store = createStore<State>({
                 updatedAt: new Date().getTime()
             }
 
-            if(newPlugin.workspaceId === null && newPlugin.collectionId === null) {
-                await createPlugin(newPlugin)
-                state.plugins.global.push(newPlugin)
-            } else {
-                if(state.activeWorkspace === null) {
-                    throw new Error('activeWorkspace is null')
-                }
+            try {
+                if(newPlugin.workspaceId === null && newPlugin.collectionId === null) {
+                    await createPlugin(newPlugin)
+                    state.plugins.global.push(newPlugin)
+                } else {
+                    if(state.activeWorkspace === null) {
+                        throw new Error('activeWorkspace is null')
+                    }
 
-                await createPlugin(newPlugin, state.activeWorkspace._id)
-                state.plugins.workspace.push(newPlugin)
+                    await createPlugin(newPlugin, state.activeWorkspace._id)
+                    state.plugins.workspace.push(newPlugin)
+                }
+            } catch(error: any) {
+                emitter.emit('error', error.message)
             }
         },
         async updatePlugin(state, plugin) {
@@ -642,78 +657,79 @@ export const store = createStore<State>({
                 updatedAt: new Date().getTime()
             }
 
-            const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
+            try {
+                const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
+                const previousWorkspaceId = foundPlugin.workspaceId
+                const newWorkspaceId = plugin.workspaceId
 
-            const previousWorkspaceId = foundPlugin.workspaceId
-            const newWorkspaceId = plugin.workspaceId
-
-            foundPlugin.name = updatePluginData.name
-            foundPlugin.code = updatePluginData.code
-            foundPlugin.workspaceId = updatePluginData.workspaceId
-            foundPlugin.updatedAt = updatePluginData.updatedAt
-
-            // plugin scope changed from global to workspace
-            if(!previousWorkspaceId && newWorkspaceId) {
-                state.plugins.global = state.plugins.global.filter(item => item._id !== foundPlugin._id)
-                state.plugins.workspace.push(foundPlugin)
-
-                if(state.activeWorkspace?._type === 'file') {
+                // plugin scope changed from global to workspace
+                if(!previousWorkspaceId && newWorkspaceId && state.activeWorkspace?._type === 'file') {
+                    await createPlugin({ ...toRaw(foundPlugin), ...updatePluginData }, newWorkspaceId)
                     await deletePlugin(plugin._id)
-                    await createPlugin(toRaw(foundPlugin), state.activeWorkspace._id)
-                    return
-                }
-            }
+                // plugin scope changed from workspace to global
+                } else if(previousWorkspaceId && !newWorkspaceId && state.activeWorkspace?._type === 'file') {
+                    await createPlugin({ ...toRaw(foundPlugin), ...updatePluginData })
+                    await deletePlugin(plugin._id, previousWorkspaceId, foundPlugin.collectionId ?? null)
+                } else if(newWorkspaceId === null && !foundPlugin.collectionId) {
+                    await updatePlugin(plugin._id, updatePluginData)
+                } else {
+                    if(state.activeWorkspace === null) {
+                        throw new Error('activeWorkspace is null')
+                    }
 
-            // plugin scope changed from workspace to global
-            if(previousWorkspaceId && !newWorkspaceId) {
-                state.plugins.workspace = state.plugins.workspace.filter(item => item._id !== foundPlugin._id)
-                state.plugins.global.push(foundPlugin)
-
-                if(state.activeWorkspace?._type === 'file') {
-                    await deletePlugin(plugin._id, state.activeWorkspace._id)
-                    await createPlugin(toRaw(foundPlugin))
-                    return
-                }
-            }
-
-            if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
-                await updatePlugin(plugin._id, updatePluginData)
-            } else {
-                if(state.activeWorkspace === null) {
-                    throw new Error('activeWorkspace is null')
+                    await updatePlugin(plugin._id, updatePluginData, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
                 }
 
-                await updatePlugin(plugin._id, updatePluginData, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+                Object.assign(foundPlugin, updatePluginData)
+
+                if(!previousWorkspaceId && newWorkspaceId) {
+                    state.plugins.global = state.plugins.global.filter(item => item._id !== foundPlugin._id)
+                    state.plugins.workspace.push(foundPlugin)
+                }
+                if(previousWorkspaceId && !newWorkspaceId) {
+                    state.plugins.workspace = state.plugins.workspace.filter(item => item._id !== foundPlugin._id)
+                    state.plugins.global.push(foundPlugin)
+                }
+            } catch(error: any) {
+                emitter.emit('error', error.message)
             }
         },
         async updatePluginStatus(state, plugin) {
-            const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
+            try {
+                const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
 
-            if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
-                await updatePlugin(plugin._id, { enabled: plugin.enabled })
-            } else {
-                if(state.activeWorkspace === null) {
-                    throw new Error('activeWorkspace is null')
+                if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
+                    await updatePlugin(plugin._id, { enabled: plugin.enabled })
+                } else {
+                    if(state.activeWorkspace === null) {
+                        throw new Error('activeWorkspace is null')
+                    }
+
+                    await updatePlugin(plugin._id, { enabled: plugin.enabled }, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
                 }
 
-                await updatePlugin(plugin._id, { enabled: plugin.enabled }, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+                foundPlugin.enabled = plugin.enabled
+            } catch(error: any) {
+                emitter.emit('error', error.message)
             }
-
-            foundPlugin.enabled = plugin.enabled
         },
         async deletePlugin(state, pluginId) {
-            const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === pluginId)
+            try {
+                const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === pluginId)
 
-            if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
-                await deletePlugin(pluginId)
-                state.plugins.global = state.plugins.global.filter(plugin => plugin._id !== pluginId)
-            } else {
-                if(state.activeWorkspace === null) {
-                    throw new Error('activeWorkspace is null')
+                if(foundPlugin.workspaceId === null && !foundPlugin.collectionId) {
+                    await deletePlugin(pluginId)
+                    state.plugins.global = state.plugins.global.filter(plugin => plugin._id !== pluginId)
+                } else {
+                    if(state.activeWorkspace === null) {
+                        throw new Error('activeWorkspace is null')
+                    }
+
+                    await deletePlugin(pluginId, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+                    state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
                 }
-
-                await deletePlugin(pluginId, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
-                state.plugins.workspace = state.plugins.workspace.filter(plugin => plugin._id !== pluginId)
+            } catch(error: any) {
+                emitter.emit('error', error.message)
             }
         },
         // These act on the active tab's item, or on the one given, such as a panel's in a window of its own, whose item
@@ -990,7 +1006,7 @@ export const store = createStore<State>({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
                 })
             } else {
                 const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
@@ -998,7 +1014,7 @@ export const store = createStore<State>({
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
                 })
             }
 
@@ -1022,8 +1038,13 @@ export const store = createStore<State>({
             })
 
             if(plugins.length > 0) {
-                await createPlugins(plugins, collectionItem.workspaceId)
-                context.state.plugins.workspace = context.state.plugins.workspace.concat(plugins)
+                // the item is saved, so a failed script copy is reported and the duplicate still opens
+                try {
+                    await createPlugins(plugins, collectionItem.workspaceId)
+                    context.state.plugins.workspace = context.state.plugins.workspace.concat(plugins)
+                } catch(error: any) {
+                    emitter.emit('error', error.message)
+                }
             }
 
             if(newCollectionItem._type === 'request' || newCollectionItem._type === 'socket' || newCollectionItem._type === 'grpc') {
@@ -1128,14 +1149,14 @@ export const store = createStore<State>({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
                 })
             } else {
                 context.state.collectionTree.splice(0, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index })
+                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
                 })
             }
 
@@ -1221,7 +1242,8 @@ export const store = createStore<State>({
                 sortOrderUpdates.push(updateCollection(item.workspaceId, item._id, { sortOrder: index }))
             })
 
-            await Promise.all(sortOrderUpdates)
+            const sortOrderResults = await Promise.all(sortOrderUpdates)
+            sortOrderResults.forEach(reportUpdateError)
 
             if(context.state.activeWorkspace?._type === 'file') {
                 context.dispatch('refreshWorkspace')
@@ -1246,49 +1268,67 @@ export const store = createStore<State>({
             })
             const [scriptPlugin, ...duplicateScriptPlugins] = scriptPlugins
 
-            if(duplicateScriptPlugins.length > 0) {
-                const duplicateIds = new Set(duplicateScriptPlugins.map(plugin => plugin._id))
-                context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => !duplicateIds.has(plugin._id))
-            }
-
             const scriptCode = {
                 pre_request: code.pre_request,
                 post_request: code.post_request,
             }
             const updatedAt = new Date().getTime()
 
-            if(scriptPlugin) {
-                scriptPlugin.name = null
-                scriptPlugin.code = scriptCode
-                scriptPlugin.updatedAt = updatedAt
+            try {
+                if(scriptPlugin && !scriptPluginsNotSaved.has(scriptPlugin._id)) {
+                    await updatePlugin(scriptPlugin._id, {
+                        name: null,
+                        code: scriptCode,
+                        workspaceId: scriptPlugin.workspaceId,
+                        updatedAt,
+                    }, workspaceId, collectionId)
 
-                await updatePlugin(scriptPlugin._id, {
-                    name: null,
-                    code: scriptCode,
-                    workspaceId: scriptPlugin.workspaceId,
-                    updatedAt,
-                }, workspaceId, collectionId)
-            } else {
-                const newPlugin: Plugin = {
-                    _id: nanoid(),
-                    type: 'script',
-                    name: null,
-                    code: scriptCode,
-                    workspaceId: null,
-                    collectionId,
-                    enabled: true,
-                    createdAt: updatedAt,
-                    updatedAt,
+                    scriptPlugin.name = null
+                    scriptPlugin.code = scriptCode
+                    scriptPlugin.updatedAt = updatedAt
+                } else if(scriptPlugin) {
+                    scriptPlugin.code = scriptCode
+                    scriptPlugin.updatedAt = updatedAt
+                    // marked saved before the wait, as a first create is, so another edit meanwhile updates it
+                    scriptPluginsNotSaved.delete(scriptPlugin._id)
+                    try {
+                        await createPlugin(toRaw(scriptPlugin), workspaceId)
+                    } catch(error) {
+                        scriptPluginsNotSaved.add(scriptPlugin._id)
+                        throw error
+                    }
+                } else {
+                    const newPlugin: Plugin = {
+                        _id: nanoid(),
+                        type: 'script',
+                        name: null,
+                        code: scriptCode,
+                        workspaceId: null,
+                        collectionId,
+                        enabled: true,
+                        createdAt: updatedAt,
+                        updatedAt,
+                    }
+
+                    // Reserve the script plugin before persistence so another edit cannot create a
+                    // second plugin while the filesystem write is still in progress.
+                    context.state.plugins.workspace.push(newPlugin)
+                    try {
+                        await createPlugin(newPlugin, workspaceId)
+                    } catch(error) {
+                        scriptPluginsNotSaved.add(newPlugin._id)
+                        throw error
+                    }
                 }
 
-                // Reserve the script plugin before persistence so another edit cannot create a
-                // second plugin while the filesystem write is still in progress.
-                context.state.plugins.workspace.push(newPlugin)
-                await createPlugin(newPlugin, workspaceId)
-            }
-
-            for(const duplicatePlugin of duplicateScriptPlugins) {
-                await deletePlugin(duplicatePlugin._id, workspaceId, collectionId)
+                for(const duplicatePlugin of duplicateScriptPlugins) {
+                    await deletePlugin(duplicatePlugin._id, workspaceId, collectionId)
+                    context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => plugin._id !== duplicatePlugin._id)
+                }
+                return true
+            } catch(error: any) {
+                emitter.emit('error', error.message)
+                return false
             }
         },
         async getEnvironmentForRequest(context, { collectionItem, includeSelf = false }): Promise<{
@@ -1846,8 +1886,13 @@ export const store = createStore<State>({
                     plugin.createdAt = new Date().getTime()
                     plugin.updatedAt = new Date().getTime()
                 })
-                await createPlugins(plugins, context.state.activeWorkspace._id)
-                context.state.plugins.workspace.push(...plugins)
+                // the items are saved, so a failed script copy is reported and the import still shows them
+                try {
+                    await createPlugins(plugins, context.state.activeWorkspace._id)
+                    context.state.plugins.workspace.push(...plugins)
+                } catch(error: any) {
+                    emitter.emit('error', error.message)
+                }
             }
 
             const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
@@ -1999,15 +2044,25 @@ export const store = createStore<State>({
                 }
 
                 if('headers' in propertiesToUpdate) {
-                    await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
                         headers
                     })
+
+                    if(result.error) {
+                        emitter.emit('error', result.error)
+                        return result
+                    }
                 }
 
                 if('authentication' in propertiesToUpdate) {
-                    await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
                         authentication
                     })
+
+                    if(result.error) {
+                        emitter.emit('error', result.error)
+                        return result
+                    }
                 }
             } else {
                 await updateCollection(context.state.activeWorkspace._id, collectionId, propertiesToUpdate)

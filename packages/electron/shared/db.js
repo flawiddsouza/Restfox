@@ -5,6 +5,18 @@ import constants from './constants.js'
 
 const { logMethodCall } = helpers
 
+async function readFileJson(filePath, emptyValue) {
+    try {
+        return JSON.parse(await fs.readFile(filePath, 'utf8'))
+    } catch (err) {
+        if (err.code !== 'ENOENT') {
+            // such as a file holding git merge conflict markers, which writing over would lose
+            throw new Error(`Not saved, as ${filePath} cannot be read: ${err.message}`, { cause: err })
+        }
+        return emptyValue
+    }
+}
+
 export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher = () => null) {
     // item ids to paths, one map per workspace location, so a workspace other than the open one, such as one whose call
     // ends after the user switched away, reads and writes its own files when another workspace has an item at the same path
@@ -511,11 +523,15 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 collectionPathCopy = path.join(collectionPath, constants.FILES.FOLDER_CONFIG)
             }
 
-            let collectionExisting = {}
+            let collectionExisting
 
             try {
-                collectionExisting = JSON.parse(await fs.readFile(collectionPathCopy, 'utf8'))
-            } catch {}
+                collectionExisting = await readFileJson(collectionPathCopy, {})
+            } catch (err) {
+                return {
+                    error: err.message,
+                }
+            }
 
             const collectionUpdated = {
                 ...collectionExisting,
@@ -540,10 +556,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
             if (updatedFields._type === 'socket') {
                 if (updatedFields.clients) {
-                    let existingMessages = {}
-                    try {
-                        existingMessages = JSON.parse(await fs.readFile(collectionPath.replace('.json', constants.FILES.MESSAGES), 'utf8'))
-                    } catch {}
+                    const existingMessages = await readFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), {})
                     const clientIds = []
                     for(const client of updatedFields.clients) {
                         existingMessages[client.id] = client.messages
@@ -932,23 +945,14 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             pluginPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
         }
 
-        try {
-            let existingPlugins = []
-            try {
-                existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
-            } catch (err) {
-                // If file doesn't exist, we will create a new one
-            }
+        const existingPlugins = await readFileJson(pluginPath, [])
 
-            delete plugin.workspaceId
-            delete plugin.collectionId
+        delete plugin.workspaceId
+        delete plugin.collectionId
 
-            existingPlugins.push(plugin)
-            await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Create plugin`)
-            console.log(`Plugin created at: ${pluginPath}`)
-        } catch (err) {
-            console.error(`Error creating plugin in: ${pluginPath}`, err)
-        }
+        existingPlugins.push(plugin)
+        await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Create plugin`)
+        console.log(`Plugin created at: ${pluginPath}`)
     }
 
     async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
@@ -971,23 +975,19 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
         }
 
-        try {
-            const existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
-            const pluginIndex = existingPlugins.findIndex(plugin => plugin._id === pluginId)
+        const existingPlugins = await readFileJson(pluginPath, [])
+        const pluginIndex = existingPlugins.findIndex(plugin => plugin._id === pluginId)
 
-            if (pluginIndex !== -1) {
-                delete updatedFields.workspaceId
-                delete updatedFields.collectionId
-
-                existingPlugins[pluginIndex] = { ...existingPlugins[pluginIndex], ...updatedFields }
-                await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Update plugin`)
-                console.log(`Plugin ${pluginId} updated in ${pluginPath}`)
-            } else {
-                console.log(`Plugin ${pluginId} not found for update in ${pluginPath}`)
-            }
-        } catch (err) {
-            console.error(`Error updating plugin ${pluginId} in ${pluginPath}`, err)
+        if (pluginIndex === -1) {
+            throw new Error(`Plugin ${pluginId} not found for update in ${pluginPath}`)
         }
+
+        delete updatedFields.workspaceId
+        delete updatedFields.collectionId
+
+        existingPlugins[pluginIndex] = { ...existingPlugins[pluginIndex], ...updatedFields }
+        await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Update plugin`)
+        console.log(`Plugin ${pluginId} updated in ${pluginPath}`)
     }
 
     async function deletePlugin(workspace, collectionId, pluginId) {
@@ -999,45 +999,24 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const idMap = getIdMap(workspace.location)
 
-        // If collectionId is null, it means it's a workspace plugin
-        if (collectionId === null) {
-            const workspacePluginsPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
-            try {
-                let existingPlugins = JSON.parse(await fs.readFile(workspacePluginsPath, 'utf8'))
-                const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
+        const collectionPath = idMap.get(collectionId)
+        const pluginPath = collectionId === null
+            ? path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
+            : collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
 
-                if (filteredPlugins.length < existingPlugins.length) {
-                    if (filteredPlugins.length === 0) {
-                        await fileUtils.deleteFileOrFolder(workspacePluginsPath, fsLog, `Delete workspace plugins`)
-                        console.log(`All workspace plugins deleted: ${workspace.location}`)
-                    } else {
-                        await fileUtils.writeFileJson(workspacePluginsPath, filteredPlugins, fsLog, `Delete plugin`)
-                        console.log(`Plugin ${pluginId} deleted in ${workspacePluginsPath}`)
-                    }
-                } else {
-                    console.log(`Plugin ${pluginId} not found for deletion in ${workspacePluginsPath}`)
-                }
-            } catch (err) {
-                console.error(`Error deleting plugin ${pluginId} in ${workspacePluginsPath}`, err)
-            }
+        const existingPlugins = await readFileJson(pluginPath, [])
+        const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
+
+        if (filteredPlugins.length === existingPlugins.length) {
             return
         }
 
-        const collectionPath = idMap.get(collectionId)
-        const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
-
-        try {
-            let existingPlugins = JSON.parse(await fs.readFile(pluginPath, 'utf8'))
-            const filteredPlugins = existingPlugins.filter(plugin => plugin._id !== pluginId)
-
-            if (filteredPlugins.length < existingPlugins.length) {
-                await fileUtils.writeFileJson(pluginPath, filteredPlugins, fsLog, `Delete plugin`)
-                console.log(`Plugin ${pluginId} deleted in${pluginPath}`)
-            } else {
-                console.log(`Plugin ${pluginId} not found for deletion in ${pluginPath}`)
-            }
-        } catch (err) {
-            console.error(`Error deleting plugin ${pluginId} in ${pluginPath}`, err)
+        if (collectionId === null && filteredPlugins.length === 0) {
+            await fileUtils.deleteFileOrFolder(pluginPath, fsLog, `Delete workspace plugins`)
+            console.log(`All workspace plugins deleted: ${workspace.location}`)
+        } else {
+            await fileUtils.writeFileJson(pluginPath, filteredPlugins, fsLog, `Delete plugin`)
+            console.log(`Plugin ${pluginId} deleted in ${pluginPath}`)
         }
     }
 

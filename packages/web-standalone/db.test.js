@@ -1,4 +1,5 @@
 import fs from 'fs'
+import fsPromises from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import test from 'node:test'
@@ -54,6 +55,146 @@ function grpcItem(workspace) {
 }
 
 const readJson = (workspace, name) => JSON.parse(fs.readFileSync(path.join(workspace.location, name), 'utf8'))
+
+const pluginScopes = ['request', 'folder', 'workspace']
+
+for (const writer of ['createPlugin', 'createPlugins', 'updatePlugin', 'deletePlugin', 'single-field', 'socket messages']) {
+    test(`${writer} fails on a read error without changing the file`, t => withWorkspace(async workspace => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, 'request')
+        let targetPath = pluginPath
+        let write = () => writePlugin(workspace, collectionId, writer)
+        if (writer === 'single-field') {
+            targetPath = path.join(workspace.location, 'Item.json')
+            write = () => db.updateCollection(workspace, collectionId, { sortOrder: 2 })
+        }
+        if (writer === 'socket messages') {
+            targetPath = path.join(workspace.location, 'Item.messages.json')
+            write = () => db.updateCollection(workspace, collectionId, { _type: 'socket', clients: [{ id: 'client', messages: [] }] })
+        }
+        fs.writeFileSync(targetPath, '[]\n')
+        const readFile = fsPromises.readFile
+        const error = Object.assign(new Error('Cannot read file'), { code: 'EACCES' })
+        t.mock.method(fsPromises, 'readFile', (filePath, ...args) => {
+            if (filePath === targetPath) {
+                return Promise.reject(error)
+            }
+            return readFile(filePath, ...args)
+        })
+        if (writer === 'single-field') {
+            assert.match((await write()).error, /Cannot read file/)
+        } else {
+            await assert.rejects(write(), { message: /^Not saved, as .+ cannot be read: Cannot read file$/ })
+        }
+        assert.equal(fs.readFileSync(targetPath, 'utf8'), '[]\n')
+    }))
+}
+
+
+async function pluginTarget(workspace, scope) {
+    if (scope === 'workspace') {
+        return { collectionId: null, pluginPath: path.join(workspace.location, '_.plugins.json') }
+    }
+    const { newCollectionId } = await db.createCollection(workspace, {
+        _id: 'item', _type: scope === 'folder' ? 'request_group' : 'request',
+        name: 'Item', parentId: null, workspaceId: workspace._id,
+    })
+    return {
+        collectionId: newCollectionId,
+        pluginPath: path.join(workspace.location, scope === 'folder' ? 'Item/_.plugins.json' : 'Item.plugins.json'),
+    }
+}
+
+const conflict = '<<<<<<< HEAD\n[{"_id":"ours","code":"ours"}]\n=======\n[{"_id":"theirs","code":"theirs"}]\n>>>>>>> branch\n'
+
+function writePlugin(workspace, collectionId, writer) {
+    const plugin = { _id: 'ours', name: 'Changed', code: 'changed', workspaceId: workspace._id, collectionId }
+    if (writer === 'createPlugin') {
+        return db.createPlugin(workspace, plugin)
+    }
+    if (writer === 'createPlugins') {
+        return db.createPlugins(workspace, [plugin])
+    }
+    if (writer === 'updatePlugin') {
+        return db.updatePlugin(workspace, collectionId, plugin._id, { code: plugin.code })
+    }
+    return db.deletePlugin(workspace, collectionId, plugin._id)
+}
+
+for (const scope of pluginScopes) {
+    for (const writer of ['createPlugin', 'createPlugins', 'updatePlugin', 'deletePlugin']) {
+        test(`${writer} rejects conflicted ${scope} plugins without changing the file`, () => withWorkspace(async workspace => {
+            const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+            fs.writeFileSync(pluginPath, conflict)
+            await assert.rejects(writePlugin(workspace, collectionId, writer), { message: /^Not saved, as .+ cannot be read: .+ is not valid JSON/ })
+            assert.equal(fs.readFileSync(pluginPath, 'utf8'), conflict)
+        }))
+    }
+
+    for (const writer of ['createPlugin', 'createPlugins']) {
+        test(`${writer} creates missing ${scope} plugins`, () => withWorkspace(async workspace => {
+            const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+            await writePlugin(workspace, collectionId, writer)
+            assert.deepEqual(JSON.parse(fs.readFileSync(pluginPath, 'utf8')).map(plugin => plugin._id), ['ours'])
+        }))
+    }
+
+    test(`updatePlugin rejects a missing id in ${scope} plugins`, () => withWorkspace(async workspace => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+        await assert.rejects(db.updatePlugin(workspace, collectionId, 'absent', { code: 'changed' }))
+        assert.equal(fs.existsSync(pluginPath), false)
+    }))
+
+    test(`updatePlugin rejects an absent id in an existing ${scope} plugins file`, () => withWorkspace(async workspace => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+        fs.writeFileSync(pluginPath, '[]\n')
+        await assert.rejects(db.updatePlugin(workspace, collectionId, 'absent', { code: 'changed' }), /not found/)
+        assert.equal(fs.readFileSync(pluginPath, 'utf8'), '[]\n')
+    }))
+
+    test(`deletePlugin succeeds for absent ${scope} plugins`, () => withWorkspace(async workspace => {
+        const { collectionId, pluginPath } = await pluginTarget(workspace, scope)
+        await db.deletePlugin(workspace, collectionId, 'absent')
+        assert.equal(fs.existsSync(pluginPath), false)
+        fs.writeFileSync(pluginPath, '[]\n')
+        await db.deletePlugin(workspace, collectionId, 'absent')
+        assert.equal(fs.readFileSync(pluginPath, 'utf8'), '[]\n')
+    }))
+}
+
+for (const scope of ['request', 'folder']) {
+    test(`single-field updates return an error for conflicted ${scope} config without changing the file`, () => withWorkspace(async workspace => {
+        const { collectionId } = await pluginTarget(workspace, scope)
+        const configPath = path.join(workspace.location, scope === 'folder' ? 'Item/_.json' : 'Item.json')
+        fs.writeFileSync(configPath, conflict)
+        const result = await db.updateCollection(workspace, collectionId, { sortOrder: 2 })
+        assert.match(result.error, /^Not saved, as .+ cannot be read: .+ is not valid JSON/)
+        assert.equal(fs.readFileSync(configPath, 'utf8'), conflict)
+    }))
+}
+
+test('single-field updates create missing folder config', () => withWorkspace(async workspace => {
+    const { collectionId } = await pluginTarget(workspace, 'folder')
+    await db.updateCollection(workspace, collectionId, { sortOrder: 2 })
+    assert.deepEqual(readJson(workspace, 'Item/_.json'), { sortOrder: 2 })
+}))
+
+test('socket saves reject conflicted messages without changing either file', () => withWorkspace(async workspace => {
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'socket', _type: 'socket', name: 'Socket', parentId: null })
+    const itemPath = path.join(workspace.location, 'Socket.json')
+    const messagesPath = path.join(workspace.location, 'Socket.messages.json')
+    const item = fs.readFileSync(itemPath, 'utf8')
+    fs.writeFileSync(messagesPath, conflict)
+    await assert.rejects(db.updateCollection(workspace, newCollectionId, { _type: 'socket', clients: [{ id: 'client', messages: ['new'] }] }), { message: /^Not saved, as .+ cannot be read: .+ is not valid JSON/ })
+    assert.equal(fs.readFileSync(messagesPath, 'utf8'), conflict)
+    assert.equal(fs.readFileSync(itemPath, 'utf8'), item)
+}))
+
+test('socket saves create missing messages', () => withWorkspace(async workspace => {
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'socket', _type: 'socket', name: 'Socket', parentId: null })
+    await db.updateCollection(workspace, newCollectionId, { _type: 'socket', clients: [{ id: 'client', messages: ['new'] }] })
+    assert.deepEqual(readJson(workspace, 'Socket.messages.json'), { client: ['new'] })
+}))
+
 
 test('a request type only a newer version knows is created as its own file, loads back whole and takes its history', () => withWorkspace(async workspace => {
     // as a duplicate or an import of a workspace that holds one does

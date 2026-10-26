@@ -43,9 +43,10 @@ const grpcTransport = vi.hoisted(() => ({
 
 vi.mock('./utils/grpc-transport', () => grpcTransport)
 
-import { createPlugin, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getCollectionForWorkspace, getResponsesByCollectionId, updatePlugin, updateResponse } from './db'
+import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getCollectionForWorkspace, getResponsesByCollectionId, updateCollection, updatePlugin, updateResponse } from './db'
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, Workspace } from './global'
 import { store } from './store'
+import { emitter } from './event-bus'
 import { INHERITED_AUTHENTICATION_TYPE, handleRequest } from './helpers'
 import { type GrpcLiveCall, getGrpcItemKey, grpcCalls, resetGrpcCalls, startGrpcCallForItem } from './utils/grpc-calls'
 
@@ -66,12 +67,79 @@ function scriptPlugin(id: string, code: { pre_request: string, post_request: str
 describe('saveRequestScript', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        vi.spyOn(emitter, 'emit')
         store.state.activeWorkspace = {
             _id: 'workspace-id',
             _type: 'file',
             name: 'Workspace',
         } as Workspace
         store.state.plugins.workspace = []
+    })
+
+    afterEach(() => vi.restoreAllMocks())
+
+    test('reports a failed create, keeps the typed script and creates it again on the next edit', async() => {
+        vi.mocked(createPlugin).mockRejectedValueOnce(new Error('Cannot read plugins'))
+        const script = (preRequest: string) => ({ collectionId: 'request-id', code: { pre_request: preRequest, post_request: '' } })
+
+        expect(await store.dispatch('saveRequestScript', script('new'))).toBe(false)
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot read plugins')
+        // the script editor shows this plugin, so dropping it would clear what was typed
+        expect(store.state.plugins.workspace.map(plugin => plugin.code.pre_request)).toEqual(['new'])
+
+        expect(await store.dispatch('saveRequestScript', script('newer'))).toBe(true)
+        expect(createPlugin).toHaveBeenCalledTimes(2)
+        expect(vi.mocked(createPlugin).mock.calls[1][0]).toMatchObject({ _id: store.state.plugins.workspace[0]._id, code: script('newer').code })
+        expect(updatePlugin).not.toHaveBeenCalled()
+
+        expect(await store.dispatch('saveRequestScript', script('newest'))).toBe(true)
+        expect(createPlugin).toHaveBeenCalledTimes(2)
+        expect(updatePlugin).toHaveBeenCalledOnce()
+        expect(store.state.plugins.workspace).toHaveLength(1)
+    })
+
+    test('an edit made while a failed script is created again updates it rather than creating it twice', async() => {
+        vi.mocked(createPlugin).mockRejectedValueOnce(new Error('Cannot read plugins'))
+        const script = (preRequest: string) => ({ collectionId: 'request-id', code: { pre_request: preRequest, post_request: '' } })
+        expect(await store.dispatch('saveRequestScript', script('new'))).toBe(false)
+        let finishCreate!: () => void
+        vi.mocked(createPlugin).mockImplementationOnce(() => new Promise<void>(resolve => finishCreate = resolve))
+
+        const retried = store.dispatch('saveRequestScript', script('newer'))
+        const edited = store.dispatch('saveRequestScript', script('newest'))
+        finishCreate()
+
+        expect(await retried).toBe(true)
+        expect(await edited).toBe(true)
+        expect(createPlugin).toHaveBeenCalledTimes(2)
+        expect(updatePlugin).toHaveBeenCalledOnce()
+    })
+
+    test('reports a failed update and keeps the saved script', async() => {
+        const plugin = scriptPlugin('primary', { pre_request: 'saved', post_request: '' })
+        store.state.plugins.workspace = [plugin]
+        vi.mocked(updatePlugin).mockRejectedValueOnce(new Error('Cannot update plugins'))
+
+        expect(await store.dispatch('saveRequestScript', {
+            collectionId: 'request-id', code: { pre_request: 'new', post_request: '' },
+        })).toBe(false)
+
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot update plugins')
+        expect(store.state.plugins.workspace[0].code).toEqual({ pre_request: 'saved', post_request: '' })
+    })
+
+    test('reports a failed duplicate delete and keeps the duplicate in memory', async() => {
+        store.state.plugins.workspace = [
+            scriptPlugin('primary', { pre_request: '', post_request: '' }),
+            scriptPlugin('duplicate', { pre_request: '', post_request: 'saved' }),
+        ]
+        vi.mocked(deletePlugin).mockRejectedValueOnce(new Error('Cannot delete plugins'))
+
+        expect(await store.dispatch('saveRequestScript', {
+            collectionId: 'request-id', code: { pre_request: 'new', post_request: '' },
+        })).toBe(false)
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot delete plugins')
+        expect(store.state.plugins.workspace.map(plugin => plugin._id)).toEqual(['primary', 'duplicate'])
     })
 
     test('updates the primary script and removes stale duplicates', async() => {
@@ -139,6 +207,89 @@ describe('saveRequestScript', () => {
             post_request: '',
         })
     })
+})
+
+describe('Plugins modal mutations', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.spyOn(emitter, 'emit')
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace' } as Workspace
+        store.state.plugins.global = []
+        store.state.plugins.workspace = []
+    })
+
+    afterEach(() => vi.restoreAllMocks())
+
+    for(const scope of ['global', 'workspace'] as const) {
+        const plugin = () => ({
+            ...scriptPlugin('plugin', { pre_request: 'saved', post_request: '' }),
+            name: 'Saved', collectionId: null, workspaceId: scope === 'global' ? null : 'workspace-id',
+        })
+
+        for(const mutation of ['addPlugin', 'updatePlugin', 'updatePluginStatus', 'deletePlugin']) {
+            test(`reports a failed ${mutation} in ${scope} scope and preserves memory`, async() => {
+                const saved = plugin()
+                if(mutation !== 'addPlugin') {
+                    store.state.plugins[scope] = [saved]
+                }
+                const before = JSON.parse(JSON.stringify(store.state.plugins))
+                const operation = mutation === 'addPlugin' ? createPlugin : mutation === 'deletePlugin' ? deletePlugin : updatePlugin
+                vi.mocked(operation).mockRejectedValueOnce(new Error('Storage failed'))
+
+                store.commit(mutation, mutation === 'deletePlugin' ? saved._id : { ...saved, name: 'Changed', enabled: false })
+
+                await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', 'Storage failed'))
+                expect(store.state.plugins).toEqual(before)
+            })
+        }
+
+        test(`a failed scope move from ${scope} keeps the original copy and plugin`, async() => {
+            const saved = plugin()
+            store.state.plugins[scope] = [saved]
+            const before = JSON.parse(JSON.stringify(store.state.plugins))
+            vi.mocked(createPlugin).mockRejectedValueOnce(new Error('Cannot create destination'))
+
+            store.commit('updatePlugin', { ...saved, name: 'Changed', workspaceId: scope === 'global' ? 'workspace-id' : null })
+
+            await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot create destination'))
+            expect(deletePlugin).not.toHaveBeenCalled()
+            expect(store.state.plugins).toEqual(before)
+        })
+
+        test(`a scope move from ${scope} creates first and keeps memory unchanged if deleting the old copy fails`, async() => {
+            const saved = plugin()
+            store.state.plugins[scope] = [saved]
+            const before = JSON.parse(JSON.stringify(store.state.plugins))
+            let finishCreate!: () => void
+            vi.mocked(createPlugin).mockImplementationOnce(() => new Promise<void>(resolve => finishCreate = resolve))
+            vi.mocked(deletePlugin).mockRejectedValueOnce(new Error('Cannot delete source'))
+
+            store.commit('updatePlugin', { ...saved, name: 'Changed', workspaceId: scope === 'global' ? 'workspace-id' : null })
+            expect(createPlugin).toHaveBeenCalledOnce()
+            expect(deletePlugin).not.toHaveBeenCalled()
+            expect(store.state.plugins).toEqual(before)
+            finishCreate()
+
+            await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot delete source'))
+            expect(deletePlugin).toHaveBeenCalledOnce()
+            expect(store.state.plugins).toEqual(before)
+        })
+
+        test(`a successful scope move from ${scope} updates memory after storage succeeds`, async() => {
+            const saved = plugin()
+            store.state.plugins[scope] = [saved]
+            const destination = scope === 'global' ? 'workspace' : 'global'
+            const moved = { ...saved, name: 'Changed', workspaceId: scope === 'global' ? 'workspace-id' : null }
+
+            store.commit('updatePlugin', moved)
+
+            await vi.waitFor(() => expect(store.state.plugins[destination]).toHaveLength(1))
+            expect(store.state.plugins[scope]).toEqual([])
+            expect(store.state.plugins[destination][0]).toMatchObject({ ...moved, updatedAt: expect.any(Number) })
+            expect(vi.mocked(createPlugin).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(deletePlugin).mock.invocationCallOrder[0])
+            expect(emitter.emit).not.toHaveBeenCalledWith('error', expect.anything())
+        })
+    }
 })
 
 describe('getEnvironmentForRequest', () => {
@@ -1070,4 +1221,110 @@ test('a history load finishing after a workspace switch saves only to the call w
         delete store.state.responses[collectionId]
         delete store.state.requestResponses[collectionId]
     }
+})
+
+describe('writes the storage refuses, such as to a file holding merge conflict markers', () => {
+    const folder = (id: string, sortOrder: number) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id', sortOrder, headers: [], authentication: { type: 'No Auth' } }) as CollectionItem
+    const refused = { error: 'Error updating sortOrder for Conflicted/_.json: Unexpected token' }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.spyOn(emitter, 'emit')
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace' } as Workspace
+        store.state.plugins.workspace = []
+    })
+
+    afterEach(() => vi.restoreAllMocks())
+
+    test('a sibling\'s sort order on creating an item is reported', async() => {
+        store.state.collection = [folder('Conflicted', 0)]
+        store.state.collectionTree = [folder('Conflicted', 0)]
+        vi.mocked(createCollection).mockResolvedValueOnce({ error: null } as never)
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId) => collectionId === 'Conflicted' ? refused : { error: null })
+
+        await store.dispatch('createCollectionItem', { type: 'request_group', name: 'New', parentId: null })
+
+        await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', refused.error))
+    })
+
+    test('a sibling\'s sort order on duplicating an item is reported, and the duplicate still gets its scripts', async() => {
+        store.state.collection = [folder('Conflicted', 0), folder('Source', 1)]
+        store.state.collectionTree = [folder('Conflicted', 0), folder('Source', 1)]
+        store.state.plugins.workspace = [{ _id: 'script', type: 'script', name: null, code: { pre_request: '', post_request: '' }, workspaceId: null, collectionId: 'Source', enabled: true, createdAt: 1, updatedAt: 1 }]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId) => collectionId === 'Conflicted' ? refused : { error: null })
+
+        await store.dispatch('duplicateCollectionItem', folder('Source', 1))
+
+        await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', refused.error))
+        expect(createPlugins).toHaveBeenCalledOnce()
+    })
+
+    test('a failed copy of the duplicate\'s scripts is reported and the duplicate is still added', async() => {
+        store.state.collection = [folder('Source', 0)]
+        store.state.collectionTree = [folder('Source', 0)]
+        store.state.plugins.workspace = [{ _id: 'script', type: 'script', name: null, code: { pre_request: '', post_request: '' }, workspaceId: null, collectionId: 'Source', enabled: true, createdAt: 1, updatedAt: 1 }]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        vi.mocked(createPlugins).mockRejectedValueOnce(new Error('Cannot write plugins'))
+
+        await expect(store.dispatch('duplicateCollectionItem', folder('Source', 0))).resolves.toEqual({ error: null, results: [] })
+
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot write plugins')
+        expect(emitter.emit).toHaveBeenCalledWith('request_group', 'added')
+        expect(store.state.plugins.workspace.map(plugin => plugin._id)).toEqual(['script'])
+    })
+
+    test('a sibling\'s sort order on moving an item is reported', async() => {
+        store.state.collection = [folder('Conflicted', 0), folder('Moved', 1)]
+        store.state.collectionTree = [folder('Conflicted', 0), folder('Moved', 1)]
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId, fields) => collectionId === 'Conflicted' && 'sortOrder' in fields ? refused : { error: null })
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({ collection: store.state.collection } as never)
+
+        await store.dispatch('reorderCollectionItem', {
+            from: { id: 'Moved', parentId: null },
+            to: { id: 'Conflicted', parentId: null, type: 'request_group', cursorPosition: 'top' },
+        })
+
+        expect(emitter.emit).toHaveBeenCalledWith('error', refused.error)
+    })
+
+    test('a failed copy of imported scripts is reported and the import still shows its items', async() => {
+        store.state.collection = []
+        store.state.collectionTree = []
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+        vi.mocked(createPlugins).mockRejectedValueOnce(new Error('Cannot write plugins'))
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [folder('Imported', 0)] } as never)
+
+        await store.dispatch('setCollectionTree', {
+            collectionTree: [folder('Imported', 0)],
+            plugins: [{ _id: 'script', type: 'script', name: null, code: { pre_request: '', post_request: '' }, workspaceId: null, collectionId: 'Imported', enabled: true, createdAt: 1, updatedAt: 1 }],
+        })
+
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'Cannot write plugins')
+        expect(store.state.collection.map(item => item._id)).toEqual(['Imported'])
+        expect(store.state.plugins.workspace).toEqual([])
+    })
+
+    test('a folder\'s selected environment is reported', async() => {
+        vi.mocked(updateCollection).mockResolvedValueOnce(refused)
+
+        store.commit('updateCollectionItemCurrentEnvironment', { collectionId: 'Conflicted', currentEnvironment: 'Production' })
+
+        await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', refused.error))
+    })
+
+    test('a folder\'s headers are reported and its auth is not written after them', async() => {
+        store.state.collection = [folder('Conflicted', 0)]
+        vi.mocked(updateCollection).mockResolvedValueOnce(refused)
+
+        const result = await store.dispatch('updateCollectionItem', {
+            collectionId: 'Conflicted', name: 'Conflicted', parentId: null,
+            headers: [{ name: 'X-Key', value: '1' }], authentication: { type: 'bearer', token: 't' },
+        })
+
+        expect(result).toEqual(refused)
+        expect(emitter.emit).toHaveBeenCalledWith('error', refused.error)
+        expect(updateCollection).toHaveBeenCalledOnce()
+    })
 })
