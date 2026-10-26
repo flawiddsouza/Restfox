@@ -771,17 +771,17 @@ export default {
                 if(newResponseName === null) {
                     return
                 }
-                this.$store.commit('renameCurrentlyActiveResponse', newResponseName)
+                this.$store.commit('renameCurrentlyActiveResponse', { name: newResponseName, collectionItem: this.activeTab })
                 return
             }
 
             if(clickedContextMenuitem === 'Delete Current Response') {
-                this.$store.commit('deleteCurrentlyActiveResponse')
+                this.$store.commit('deleteCurrentlyActiveResponse', this.activeTab)
                 return
             }
 
             if(clickedContextMenuitem === 'Clear History') {
-                this.$store.commit('clearResponseHistory')
+                this.$store.commit('clearResponseHistory', this.activeTab)
                 return
             }
 

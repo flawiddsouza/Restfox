@@ -83,11 +83,13 @@ function mountPanel(state: Record<string, any>, keepAliveShown?: { value: boolea
             ? h(KeepAlive, null, [keepAliveShown.value ? h(ResponsePanel, { activeTab, key: 'panel' }) : h('div', { key: 'other' }, 'another tab')])
             : h(ResponsePanel, { activeTab }),
     })
-    app.config.globalProperties.$store = { state, commit: vi.fn() }
+    const commit = vi.fn()
+    app.config.globalProperties.$store = { state, commit }
     app.config.globalProperties.$toast = { success: vi.fn(), error: vi.fn() }
     app.mount(element)
     return {
         element,
+        commit,
         scroller: () => element.querySelector('.response-event-list-scroller') as HTMLElement,
         pathInput: () => element.querySelector('.response-event-list-path input') as HTMLInputElement,
         detailTitle: () => element.querySelector('.response-event-list-detail .response-event-list-pane-header span')?.textContent ?? null,
@@ -494,6 +496,34 @@ test('a finished response whose content type is in upper case shows as text, as 
     await settle()
 
     expect(panel.element.textContent).not.toContain('Unknown Media Type')
+
+    panel.unmount()
+})
+
+test('the history menu acts on its own request, also in a window of its own while another request is active in the main one', async() => {
+    vi.stubGlobal('createPrompt', vi.fn().mockResolvedValue('Renamed'))
+    const state = storeState({
+        activeTab: { _id: 'tab2', _type: 'request', name: 'Other', method: 'GET', url: 'http://127.0.0.1/other' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: finishedJson() },
+    })
+    const panel = mountPanel(state)
+    await settle()
+    const ownItem = expect.objectContaining({ _id: 'tab1' })
+
+    for(const action of ['Rename Current Response', 'Delete Current Response', 'Clear History']) {
+        panel.element.querySelector('.custom-dropdown')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
+        await settle()
+        const item = [...panel.element.querySelectorAll('.context-menu-item')].find(element => element.textContent!.trim() === action) as HTMLElement
+        item.click()
+        await settle()
+    }
+
+    expect(panel.commit.mock.calls).toEqual([
+        ['renameCurrentlyActiveResponse', { name: 'Renamed', collectionItem: ownItem }],
+        ['deleteCurrentlyActiveResponse', ownItem],
+        ['clearResponseHistory', ownItem],
+    ])
 
     panel.unmount()
 })
