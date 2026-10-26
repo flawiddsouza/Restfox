@@ -22,6 +22,7 @@ vi.mock('@flawiddsouza/dexie-export-import', () => ({}))
 const electronIPC = {
     getResponsesByCollectionId: vi.fn(),
     createResponse: vi.fn(),
+    getWorkspaceAtLocation: vi.fn(),
 }
 
 async function importDb() {
@@ -33,6 +34,40 @@ async function importDb() {
 
 beforeEach(() => {
     vi.clearAllMocks()
+})
+
+test('an inactive file workspace read includes its current environments', async() => {
+    const { getFileWorkspace } = await importDb()
+    const workspace = { version: 1, name: 'A', environment: { token: 'saved' }, environments: [{ name: 'Default', environment: { token: 'saved' } }] }
+    electronIPC.getWorkspaceAtLocation.mockResolvedValue(workspace)
+    expect(await getFileWorkspace('/workspaces/A')).toEqual(workspace)
+    expect(electronIPC.getWorkspaceAtLocation).toHaveBeenCalledWith('/workspaces/A', true)
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+})
+
+test('an inactive file workspace read forwards environments through web-standalone', async() => {
+    vi.resetModules()
+    vi.stubEnv('MODE', 'web-standalone')
+    const workspace = { version: 1, name: 'A', environment: { token: 'saved' } }
+    const fetch = vi.fn(async() => ({ json: async() => ({ result: workspace }) }))
+    vi.stubGlobal('fetch', fetch)
+    const { getFileWorkspace } = await import('./db')
+    expect(await getFileWorkspace('/workspaces/A')).toEqual(workspace)
+    expect(fetch).toHaveBeenCalledWith('/api/getWorkspaceAtLocation', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: '/workspaces/A', getEnvironments: true }),
+    })
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+})
+
+test('a file workspace read reports an unavailable file transport', async() => {
+    vi.resetModules()
+    vi.stubEnv('MODE', 'development')
+    const { getFileWorkspace } = await import('./db')
+    await expect(getFileWorkspace('/workspaces/A')).rejects.toThrow('File workspaces are not available')
+    vi.unstubAllEnvs()
 })
 
 test('history of a kind only a newer version knows, with a body but no HTTP request or one without its parts, is read and saved as it is', async() => {

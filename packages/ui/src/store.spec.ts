@@ -1,9 +1,12 @@
+// @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('./db', () => ({
     getResponsesByCollectionId: vi.fn(),
     getCollectionForWorkspace: vi.fn(),
     getAllWorkspaces: vi.fn(),
+    getFileWorkspace: vi.fn(),
+    getCollectionById: vi.fn(),
     putWorkspace: vi.fn(),
     updateWorkspace: vi.fn(),
     deleteWorkspace: vi.fn(),
@@ -43,8 +46,8 @@ const grpcTransport = vi.hoisted(() => ({
 
 vi.mock('./utils/grpc-transport', () => grpcTransport)
 
-import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getCollectionForWorkspace, getResponsesByCollectionId, getWorkspacePlugins, updateCollection, updatePlugin, updateResponse } from './db'
-import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, Workspace } from './global'
+import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getAllWorkspaces, getCollectionById, getCollectionForWorkspace, getFileWorkspace, getResponsesByCollectionId, getWorkspacePlugins, updateCollection, updatePlugin, updateResponse, updateWorkspace } from './db'
+import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, SetEnvironmentVariableFunction, Workspace } from './global'
 import { store } from './store'
 import { emitter } from './event-bus'
 import { INHERITED_AUTHENTICATION_TYPE, handleRequest } from './helpers'
@@ -873,6 +876,502 @@ describe('sendRequest while a response arrives', () => {
         second.finish(responseOf('response-2', []))
         await Promise.all([firstSent, secondSent])
         expect(store.state.requestResponses[tab._id]._id).toBe('response-2')
+    })
+})
+
+describe('script environment writes belong to the request workspace', () => {
+    function held<T>() {
+        let release!: (value: T) => void
+        const promise = new Promise<T>(resolve => release = resolve)
+        return { promise, release }
+    }
+
+    const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+    const workspace = (_id: string, _type?: string): Workspace => ({
+        _id, _type, name: _id, location: `/workspaces/${_id}`, dotEnv: {}, createdAt: 1, updatedAt: 1,
+        environment: { kept: _id },
+        environments: [{ name: 'Default', environment: { kept: _id } }],
+    })
+    const item = (_id: string, parentId: string | null = 'Auth'): CollectionItem => ({
+        _id, parentId, _type: 'request', name: _id, workspaceId: 'A', method: 'GET', url: 'http://127.0.0.1/slow',
+    })
+    const folder = (): CollectionItem => ({
+        ...item('Auth', null), _type: 'request_group', environment: { folderKept: 'A' },
+        environments: [{ name: 'Default', environment: { folderKept: 'A' } }],
+    })
+    let storedWorkspaces: Workspace[]
+    let storedItems: Record<string, CollectionItem>
+    let request: CollectionItem
+
+    function activate(id: string) {
+        store.state.activeWorkspace = store.state.workspaces.find(workspace => workspace._id === id)!
+        const requestForWorkspace = { ...copy(request), workspaceId: id }
+        store.commit('setCollection', [{ ...folder(), workspaceId: id }, requestForWorkspace])
+        store.state.tabs = []
+        store.state.detachedTabs = []
+    }
+
+    function controlledScript(script: (set: SetEnvironmentVariableFunction, environment: any) => void | Promise<void>) {
+        const response = held<void>()
+        const started = held<void>()
+        vi.mocked(handleRequest).mockImplementationOnce(async(_request, environment, _headers, _auth, set) => {
+            started.release()
+            await response.promise
+            await script(set, environment)
+            return { status: null, statusText: '', error: 'No response history needed' }
+        })
+        return { started: started.promise, finish: () => response.release() }
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.spyOn(console, 'log').mockImplementation(() => undefined)
+        vi.mocked(handleRequest).mockReset()
+        request = item('Auth/Login.json')
+        storedWorkspaces = [workspace('A'), workspace('B')]
+        storedItems = { [request._id]: copy(request), Auth: folder() }
+        store.state.workspaces = copy(storedWorkspaces)
+        store.state.plugins.global = []
+        store.state.plugins.workspace = []
+        vi.mocked(getAllWorkspaces).mockImplementation(async() => copy(storedWorkspaces))
+        vi.mocked(getFileWorkspace).mockImplementation(async location => ({ version: 1, ...copy(storedWorkspaces.find(workspace => workspace.location === location)!) }))
+        vi.mocked(getCollectionById).mockImplementation(async(_workspaceId, id) => storedItems[id] && copy(storedItems[id]))
+        vi.mocked(updateWorkspace).mockImplementation(async(id, fields) => {
+            Object.assign(storedWorkspaces.find(workspace => workspace._id === id)!, copy(fields))
+        })
+        vi.mocked(updateCollection).mockImplementation(async(id, collectionId, fields) => {
+            if(id === 'A') {
+                Object.assign(storedItems[collectionId], copy(fields))
+            }
+            return { error: null, idMap: null }
+        })
+        activate('A')
+    })
+
+    afterEach(() => {
+        vi.mocked(getAllWorkspaces).mockReset()
+        vi.mocked(getFileWorkspace).mockReset()
+        vi.mocked(getCollectionById).mockReset()
+        vi.mocked(updateWorkspace).mockReset()
+        vi.mocked(updateCollection).mockReset()
+        vi.restoreAllMocks()
+    })
+
+    for(const type of ['in-app', 'file']) {
+        test(`a held response writes only to its ${type} owner after switching workspaces`, async() => {
+            storedWorkspaces[0]._type = type === 'file' ? 'file' : undefined
+            store.state.workspaces[0]._type = storedWorkspaces[0]._type
+            // Storage has changed since this workspace was last opened.
+            storedWorkspaces[0].environment.diskEdit = 'keep'
+            const send = controlledScript(async(set, environment) => {
+                const saved = set('token', 'from-A')
+                expect(environment.token).toBe('from-A')
+                await saved
+                await set('ftoken', 'from-A', 'folder', request._id)
+                expect(environment.ftoken).toBe('from-A')
+            })
+            const sent = store.dispatch('sendRequest', request)
+            await send.started
+            activate('B')
+            const b = copy(store.state.activeWorkspace)
+            send.finish()
+            await sent
+
+            expect(updateWorkspace).toHaveBeenCalledWith('A', { environment: { kept: 'A', diskEdit: 'keep', token: 'from-A' } })
+            expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environment: { folderKept: 'A', ftoken: 'from-A' } })
+            expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environments: [{ name: 'Default', environment: { folderKept: 'A', ftoken: 'from-A' } }] })
+            expect(storedWorkspaces[0].environment).toEqual({ kept: 'A', diskEdit: 'keep', token: 'from-A' })
+            expect(store.state.workspaces[0].environment).toEqual(storedWorkspaces[0].environment)
+            expect(store.state.workspaces[0].environments).toEqual(storedWorkspaces[0].environments)
+            expect(store.state.activeWorkspace).toEqual(b)
+            expect(storedWorkspaces[1]).toEqual(b)
+            expect(store.state.collection[0].environment).toEqual({ folderKept: 'A' })
+            expect(getCollectionById).toHaveBeenCalledWith('A', request._id)
+            if(type === 'file') {
+                expect(getFileWorkspace).toHaveBeenCalledWith('/workspaces/A')
+                expect(getAllWorkspaces).not.toHaveBeenCalled()
+            } else {
+                expect(getAllWorkspaces).toHaveBeenCalledOnce()
+                expect(getFileWorkspace).not.toHaveBeenCalled()
+            }
+            activate('A')
+            expect(store.state.activeWorkspace!.environment.token).toBe('from-A')
+        })
+    }
+
+    test('an active owner keeps the same mutations, values and refresh using the live script parent', async() => {
+        const mutations: unknown[] = []
+        const actions: string[] = []
+        const stopMutations = store.subscribe(({ type, payload }) => {
+            if(type.startsWith('update')) {
+                mutations.push([type, copy(payload)])
+            }
+        })
+        const stopActions = store.subscribeAction(({ type }) => actions.push(type))
+        const pluginItem = item('plugin-item', 'ScriptParent')
+        storedItems.ScriptParent = { ...folder(), _id: 'ScriptParent' }
+        store.commit('setCollection', [folder(), storedItems.ScriptParent, request, pluginItem])
+        const send = controlledScript(async set => {
+            await set('token', 'from-A')
+            await set('ftoken', 'from-A', 'folder', pluginItem._id)
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await sent
+        stopMutations()
+        stopActions()
+        expect(mutations).toEqual([
+            ['updateWorkspaceEnvironment', { workspaceId: 'A', environment: { kept: 'A', token: 'from-A' } }],
+            ['updateWorkspaceEnvironments', { workspaceId: 'A', environments: [{ name: 'Default', environment: { kept: 'A', token: 'from-A' } }] }],
+            ['updateCollectionItemEnvironment', { collectionId: 'ScriptParent', environment: { folderKept: 'A', ftoken: 'from-A' } }],
+            ['updateCollectionItemEnvironments', { collectionId: 'ScriptParent', environments: [{ name: 'Default', environment: { folderKept: 'A', ftoken: 'from-A' } }] }],
+        ])
+        expect(actions).toContain('reloadTabEnvironmentResolved')
+        expect(getAllWorkspaces).not.toHaveBeenCalled()
+        expect(getCollectionById).not.toHaveBeenCalled()
+    })
+
+    test('a timer dispatches an A request while B is already active', async() => {
+        activate('B')
+        const send = controlledScript(async set => {
+            await set('token', 'from-A')
+            await set('ftoken', 'from-A', 'folder')
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await sent
+        expect(storedWorkspaces[0].environment.token).toBe('from-A')
+        expect(storedItems.Auth.environment).toMatchObject({ ftoken: 'from-A' })
+        expect(store.state.activeWorkspace!.environment).toEqual({ kept: 'B' })
+    })
+
+    for(const scope of ['workspace', 'folder'] as const) {
+        for(const order of ['first then second', 'second then first']) {
+            test(`two scripts finishing ${order} keep both inactive ${scope} values`, async() => {
+                activate('B')
+                const read = held<any>()
+                const getEnvironment = scope === 'workspace' ? getAllWorkspaces : getCollectionById
+                vi.mocked(getEnvironment).mockReturnValueOnce(read.promise)
+                const first = controlledScript(async set => {
+                    await set('first', 'one', scope)
+                })
+                const second = controlledScript(async set => {
+                    await set('second', 'two', scope)
+                })
+                const firstSent = store.dispatch('sendRequest', request)
+                await first.started
+                const secondSent = store.dispatch('sendRequest', request)
+                await second.started
+                const [earlier, later] = order === 'first then second' ? [first, second] : [second, first]
+                earlier.finish()
+                await vi.waitFor(() => expect(getEnvironment).toHaveBeenCalledOnce())
+                later.finish()
+                await Promise.resolve()
+                expect(updateWorkspace).not.toHaveBeenCalled()
+                expect(updateCollection).not.toHaveBeenCalled()
+                read.release(scope === 'workspace' ? copy(storedWorkspaces) : copy(request))
+                await Promise.all([firstSent, secondSent])
+                const environment = scope === 'workspace' ? storedWorkspaces[0].environment : storedItems.Auth.environment
+                expect(environment).toMatchObject({ first: 'one', second: 'two' })
+                if(scope === 'workspace') {
+                    expect(store.state.workspaces[0].environment).toEqual(storedWorkspaces[0].environment)
+                }
+            })
+        }
+    }
+
+    for(const stage of ['workspace read', 'file workspace read', 'item read', 'folder read', 'workspace environment save', 'workspace environments save', 'folder environment save', 'folder environments save']) {
+        for(const storageFinishesFirst of [false, true]) {
+            test(`returning to the owner during ${stage} preserves a live edit, storage finishes ${storageFinishesFirst ? 'first' : 'last'}`, async() => {
+                activate('B')
+                const pause = held<any>()
+                const folderScope = stage.startsWith('item') || stage.startsWith('folder')
+                let reached = false
+                if(stage === 'file workspace read') {
+                    store.state.workspaces[0]._type = 'file'
+                    vi.mocked(getFileWorkspace).mockImplementationOnce(() => {
+                        reached = true
+                        return pause.promise
+                    })
+                } else if(stage === 'workspace read') {
+                    vi.mocked(getAllWorkspaces).mockImplementationOnce(() => {
+                        reached = true
+                        return pause.promise
+                    })
+                } else if(stage.endsWith('read')) {
+                    const original = vi.mocked(getCollectionById).getMockImplementation()!
+                    vi.mocked(getCollectionById).mockImplementation(async(id, collectionId) => {
+                        if(collectionId === (stage === 'item read' ? request._id : 'Auth')) {
+                            reached = true
+                            return pause.promise
+                        }
+                        return original(id, collectionId)
+                    })
+                } else if(folderScope) {
+                    const original = vi.mocked(updateCollection).getMockImplementation()!
+                    vi.mocked(updateCollection).mockImplementation(async(id, collectionId, fields) => {
+                        if((stage === 'folder environment save' ? fields.environment : fields.environments) && !reached) {
+                            reached = true
+                            await pause.promise
+                        }
+                        return original(id, collectionId, fields)
+                    })
+                } else {
+                    const original = vi.mocked(updateWorkspace).getMockImplementation()!
+                    vi.mocked(updateWorkspace).mockImplementation(async(id, fields) => {
+                        if((stage === 'workspace environment save' ? fields.environment : fields.environments) && !reached) {
+                            reached = true
+                            await pause.promise
+                        }
+                        return original(id, fields)
+                    })
+                }
+                const send = controlledScript(async set => {
+                    await set('token', 'from-A', folderScope ? 'folder' : 'workspace')
+                })
+                const sent = store.dispatch('sendRequest', request)
+                await send.started
+                send.finish()
+                await vi.waitFor(() => expect(reached).toBe(true))
+                const openOwnerAndEdit = () => {
+                    activate('A')
+                    if(storageFinishesFirst) {
+                        store.commit('setCollection', [copy(storedItems.Auth), copy(request)])
+                    }
+                    const live = folderScope ? store.state.collection[0] : store.state.activeWorkspace!
+                    live.environment.edit = 'keep'
+                    if(storageFinishesFirst) {
+                        live.environments![0].environment.edit = 'keep'
+                    }
+                    return live
+                }
+                const liveBeforeSave = storageFinishesFirst ? null : openOwnerAndEdit()
+                const result = stage === 'file workspace read' ? { version: 1, ...copy(storedWorkspaces[0]) }
+                    : stage === 'workspace read' ? copy(storedWorkspaces)
+                        : stage === 'item read' ? copy(request) : stage === 'folder read' ? folder() : undefined
+                pause.release(result)
+                await sent
+                const live = liveBeforeSave ?? openOwnerAndEdit()
+                expect(live.environment).toMatchObject({ edit: 'keep', token: 'from-A' })
+                expect(live.environments![0].environment).toMatchObject({ edit: 'keep', token: 'from-A' })
+                const updates = folderScope ? vi.mocked(updateCollection).mock.calls : vi.mocked(updateWorkspace).mock.calls
+                expect(updates).toHaveLength(!storageFinishesFirst && stage.endsWith('environment save') ? 3 : 2)
+                if(stage === 'item read' && !storageFinishesFirst) {
+                    expect(getCollectionById).toHaveBeenCalledOnce()
+                }
+            })
+        }
+    }
+
+    test('a deleted owner is skipped with a visible error', async() => {
+        const send = controlledScript(async set => {
+            await set('token', 'from-A')
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        activate('B')
+        store.state.workspaces = store.state.workspaces.filter(workspace => workspace._id !== 'A')
+        send.finish()
+        await sent
+        expect(updateWorkspace).not.toHaveBeenCalled()
+        expect(updateCollection).not.toHaveBeenCalled()
+        expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not saved.*workspace no longer exists/i))
+    })
+
+    for(const missing of ['item', 'folder', 'parent', 'folder type']) {
+        test(`a missing ${missing} falls back to the owner workspace`, async() => {
+            activate('B')
+            if(missing === 'item') {
+                delete storedItems[request._id]
+            } else if(missing === 'folder') {
+                delete storedItems.Auth
+            } else if(missing === 'parent') {
+                storedItems[request._id].parentId = null
+            } else {
+                storedItems.Auth._type = 'request'
+            }
+            const send = controlledScript(async set => {
+                await set('token', 'from-A', 'folder')
+            })
+            const sent = store.dispatch('sendRequest', request)
+            await send.started
+            send.finish()
+            await sent
+            expect(storedWorkspaces[0].environment.token).toBe('from-A')
+            expect(updateCollection).not.toHaveBeenCalled()
+            expect(store.state.activeWorkspace!.environment).toEqual({ kept: 'B' })
+        })
+    }
+
+    test('a storage failure is logged and the next queued write still saves', async() => {
+        activate('B')
+        vi.mocked(getAllWorkspaces).mockRejectedValueOnce(new Error('Cannot read environment'))
+        const send = controlledScript(async(set, environment) => {
+            const failed = set('failed', 'one')
+            const saved = set('saved', 'two')
+            expect(environment).toMatchObject({ failed: 'one', saved: 'two' })
+            await failed
+            await saved
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await sent
+        expect(console.error).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cannot read environment' }))
+        expect(storedWorkspaces[0].environment).toEqual({ kept: 'A', saved: 'two' })
+    })
+
+    test('a queued write uses live state if the owner is opened before it starts', async() => {
+        activate('B')
+        const read = held<Workspace[]>()
+        vi.mocked(getAllWorkspaces).mockReturnValueOnce(read.promise)
+        const send = controlledScript(async set => {
+            const first = set('first', 'one')
+            const second = set('second', 'two')
+            await first
+            await second
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await vi.waitFor(() => expect(getAllWorkspaces).toHaveBeenCalledOnce())
+        activate('A')
+        store.state.activeWorkspace!.environment.edit = 'keep'
+        read.release(copy(storedWorkspaces))
+        await sent
+        expect(getAllWorkspaces).toHaveBeenCalledOnce()
+        expect(store.state.activeWorkspace!.environment).toEqual({ kept: 'A', edit: 'keep', first: 'one', second: 'two' })
+    })
+
+    test('an owner missing from storage is skipped with a visible error', async() => {
+        activate('B')
+        storedWorkspaces = storedWorkspaces.filter(workspace => workspace._id !== 'A')
+        const send = controlledScript(async set => {
+            await set('token', 'from-A')
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await sent
+        expect(updateWorkspace).not.toHaveBeenCalled()
+        expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not saved.*workspace no longer exists/i))
+    })
+
+    test('closing the owner during a save leaves the remaining workspace cache untouched', async() => {
+        activate('B')
+        const saved = held<void>()
+        const update = vi.mocked(updateWorkspace).getMockImplementation()!
+        vi.mocked(updateWorkspace).mockImplementation(async(id, fields) => {
+            await update(id, fields)
+            if(fields.environments) {
+                await saved.promise
+            }
+        })
+        const send = controlledScript(async set => {
+            await set('token', 'from-A')
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await vi.waitFor(() => expect(updateWorkspace).toHaveBeenCalledTimes(2))
+        store.state.workspaces = store.state.workspaces.filter(workspace => workspace._id !== 'A')
+        saved.release()
+        await sent
+        expect(store.state.workspaces).toEqual([workspace('B')])
+        expect(console.error).not.toHaveBeenCalled()
+    })
+
+    test('finishing one write does not remove a newer pending write from the queue', async() => {
+        activate('B')
+        const firstRead = held<Workspace[]>()
+        const secondRead = held<Workspace[]>()
+        const thirdQueued = held<void>()
+        vi.mocked(getAllWorkspaces).mockReturnValueOnce(firstRead.promise).mockReturnValueOnce(secondRead.promise)
+        const send = controlledScript(async set => {
+            const first = set('first', 'one')
+            const second = set('second', 'two')
+            await first
+            const third = set('third', 'three')
+            thirdQueued.release()
+            await second
+            await third
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await vi.waitFor(() => expect(getAllWorkspaces).toHaveBeenCalledOnce())
+        firstRead.release(copy(storedWorkspaces))
+        await thirdQueued.promise
+        await Promise.resolve()
+        expect(getAllWorkspaces).toHaveBeenCalledTimes(2)
+        secondRead.release(copy(storedWorkspaces))
+        await sent
+        expect(storedWorkspaces[0].environment).toEqual({ kept: 'A', first: 'one', second: 'two', third: 'three' })
+    })
+
+    test('an inactive script uses its stored current parent rather than the request or the other workspace tree', async() => {
+        activate('B')
+        storedItems['plugin-item'] = item('plugin-item', 'MovedParent')
+        storedItems.MovedParent = { ...folder(), _id: 'MovedParent' }
+        const send = controlledScript(async set => {
+            await set('token', 'from-A', 'folder', 'plugin-item')
+        })
+        const sent = store.dispatch('sendRequest', request)
+        await send.started
+        send.finish()
+        await sent
+        expect(storedItems.MovedParent.environment).toMatchObject({ token: 'from-A' })
+        expect(storedItems.Auth.environment).toEqual({ folderKept: 'A' })
+        expect(updateWorkspace).not.toHaveBeenCalled()
+    })
+
+    for(const scope of ['workspace', 'folder'] as const) {
+        for(const shape of ['missing', 'empty', 'legacy', 'named']) {
+            test(`${scope} writes preserve the ${shape} saved shape`, async() => {
+                activate('B')
+                const target = scope === 'workspace' ? storedWorkspaces[0] : storedItems.Auth
+                delete target.environments
+                if(shape === 'missing') {
+                    delete target.environment
+                } else if(shape === 'empty') {
+                    target.environment = {}
+                } else {
+                    target.environment = { legacy: 'keep' }
+                }
+                if(shape === 'named') {
+                    target.currentEnvironment = 'Production'
+                    target.environments = [{ name: 'Default', environment: { other: 'keep' } }, { name: 'Production', environment: { legacy: 'keep' } }]
+                }
+                const send = controlledScript(async set => {
+                    await set('nested.token', 'from-A', scope)
+                })
+                const sent = store.dispatch('sendRequest', request)
+                await send.started
+                send.finish()
+                await sent
+                expect(target.environment).toEqual({ ...(['missing', 'empty'].includes(shape) ? {} : { legacy: 'keep' }), nested: { token: 'from-A' } })
+                if(shape === 'named') {
+                    expect(target.environments![0]).toEqual({ name: 'Default', environment: { other: 'keep' } })
+                    expect(target.environments![1]).toEqual({ name: 'Production', environment: target.environment })
+                } else if(scope === 'folder') {
+                    expect(target.environments).toBeUndefined()
+                    expect(updateCollection).toHaveBeenCalledOnce()
+                } else {
+                    expect(target.environments).toEqual([{ name: 'Default', color: 'var(--text-color)', environment: target.environment }])
+                }
+            })
+        }
+    }
+
+    test('folder environment mutations accept an explicit owner while another workspace is active', async() => {
+        activate('B')
+        store.commit('updateCollectionItemEnvironment', { workspaceId: 'A', collectionId: 'Auth', environment: { token: 'A' } })
+        store.commit('updateCollectionItemEnvironments', { workspaceId: 'A', collectionId: 'Auth', environments: [{ name: 'Default', environment: { token: 'A' } }] })
+        expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environment: { token: 'A' } })
+        expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environments: [{ name: 'Default', environment: { token: 'A' } }] })
     })
 })
 

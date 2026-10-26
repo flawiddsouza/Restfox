@@ -151,6 +151,13 @@ export async function getAllWorkspaces() {
     return db.workspaces.toCollection().reverse().sortBy('updatedAt')
 }
 
+export async function getFileWorkspace(location: string): Promise<FileWorkspace> {
+    if(!fileIPC) {
+        throw new Error('File workspaces are not available')
+    }
+    return fileIPC.getWorkspaceAtLocation(location, true)
+}
+
 export async function putWorkspace(workspace: Workspace) {
     await db.workspaces.put(workspace)
 }

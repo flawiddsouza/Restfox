@@ -15,8 +15,7 @@ import {
     isFirstIdIndirectOrDirectParentOfSecondIdInTree,
     generateNewIdsForTree,
     substituteEnvironmentVariables,
-    setEnvironmentVariable,
-    setParentEnvironmentVariable,
+    setRequestEnvironmentVariable,
     setObjectPathValue,
     getAllHttpRequestsInFolder,
     getParentPath,
@@ -556,13 +555,13 @@ export const store = createStore<State>({
             state.activeSidebarItemForContextMenu = null
             state.sidebarContextMenuElement = null
         },
-        async updateCollectionItemEnvironment(state, { collectionId, environment }) {
+        async updateCollectionItemEnvironment(state, { collectionId, environment, workspaceId = state.activeWorkspace?._id }) {
             if(environment) {
-                if(state.activeWorkspace === null) {
+                if(!workspaceId) {
                     throw new Error('activeWorkspace is null')
                 }
 
-                await updateCollection(state.activeWorkspace._id, collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
+                await updateCollection(workspaceId, collectionId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
         async updateWorkspaceEnvironment(_state, { workspaceId, environment }) {
@@ -570,13 +569,13 @@ export const store = createStore<State>({
                 await updateWorkspace(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
-        async updateCollectionItemEnvironments(state, { collectionId, environments }) {
+        async updateCollectionItemEnvironments(state, { collectionId, environments, workspaceId = state.activeWorkspace?._id }) {
             if(environments) {
-                if(state.activeWorkspace === null) {
+                if(!workspaceId) {
                     throw new Error('activeWorkspace is null')
                 }
 
-                await updateCollection(state.activeWorkspace._id, collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
+                await updateCollection(workspaceId, collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
             }
         },
         async updateWorkspaceEnvironments(_state, { workspaceId, environments }) {
@@ -1387,6 +1386,7 @@ export const store = createStore<State>({
         // may overlap and each one is saved
         async sendRequest(context, payload: CollectionItem | { collectionItem: CollectionItem, cancelEarlierSends: boolean }) {
             const { collectionItem: activeTab, cancelEarlierSends } = 'collectionItem' in payload ? payload : { collectionItem: payload, cancelEarlierSends: false }
+            const workspaceId = activeTab.workspaceId
 
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
@@ -1420,20 +1420,8 @@ export const store = createStore<State>({
             } = await context.dispatch('getEnvironmentForRequest', { collectionItem: activeTab })
 
             const setEnvironmentVariableWrapper = (objectPath: string, value: string, scope: 'workspace' | 'folder' = 'workspace', pluginCollectionId?: string | null) => {
-                if (scope === 'folder') {
-                    let contextItem = activeTab
-                    if (pluginCollectionId) {
-                        const pluginContextItem = findItemInTreeById(context.state.collectionTree, pluginCollectionId)
-                        if (pluginContextItem) {
-                            contextItem = pluginContextItem
-                        }
-                    }
-                    setParentEnvironmentVariable(context, objectPath, value, contextItem)
-                    setObjectPathValue(environment, objectPath, value)
-                } else {
-                    setEnvironmentVariable(context, objectPath, value)
-                    setObjectPathValue(environment, objectPath, value)
-                }
+                setObjectPathValue(environment, objectPath, value)
+                return setRequestEnvironmentVariable(context, workspaceId, activeTab, objectPath, value, scope, pluginCollectionId)
             }
 
             const globalPlugins: Plugin[] = []

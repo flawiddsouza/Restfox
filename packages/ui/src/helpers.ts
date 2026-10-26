@@ -37,7 +37,7 @@ import { handleResponseTag } from '@/utils/tag'
 import { MASKED_PREVIEW, getPromptPreviewValue, handlePromptTag } from '@/utils/prompt-tag'
 import { handleTags } from '@/parsers/tag'
 import type { ParsedResult } from '@/parsers/tag'
-import { getSettingsFile, putSettingsFile, deleteSettingsFile } from '@/db'
+import { getSettingsFile, putSettingsFile, deleteSettingsFile, getAllWorkspaces, getFileWorkspace, getCollectionById, updateWorkspace, updateCollection } from '@/db'
 import { ResponseBodyCollector, getStreamView, isSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
 import { isGrpcTarget, parseGrpcTarget } from '@/utils/grpc'
@@ -2528,7 +2528,7 @@ export function generateId() {
     return nanoid()
 }
 
-export function setEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string) {
+export function setEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string, save = true) {
     try {
         if(store.state.activeWorkspace === null) {
             throw new Error('activeWorkspace is null')
@@ -2544,23 +2544,27 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
         ]
         setObjectPathValue(environmentToModify, objectPath, value)
         store.state.activeWorkspace.environment = environmentToModify
-        store.commit('updateWorkspaceEnvironment',  {
-            workspaceId: store.state.activeWorkspace._id,
-            environment: environmentToModify
-        })
+        if(save) {
+            store.commit('updateWorkspaceEnvironment',  {
+                workspaceId: store.state.activeWorkspace._id,
+                environment: environmentToModify
+            })
+        }
         const currentEnvironment = environmentsToModify.find(environmentItem => environmentItem.name === (store.state.activeWorkspace!.currentEnvironment ?? 'Default'))
         currentEnvironment.environment = environmentToModify
-        store.commit('updateWorkspaceEnvironments',  {
-            workspaceId: store.state.activeWorkspace._id,
-            environments: environmentsToModify
-        })
+        if(save) {
+            store.commit('updateWorkspaceEnvironments',  {
+                workspaceId: store.state.activeWorkspace._id,
+                environments: environmentsToModify
+            })
+        }
     } catch(e) {
         console.error('Failed to set environment variable:')
         console.error(e)
     }
 }
 
-export function setParentEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string, currentCollectionItem: CollectionItem) {
+export function setParentEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string, currentCollectionItem: CollectionItem, save = true) {
     try {
         if(store.state.activeWorkspace === null) {
             throw new Error('activeWorkspace is null')
@@ -2574,7 +2578,7 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
             targetFolderId = currentCollectionItem.parentId
         } else {
             // If there's no parent, fall back to global environment
-            setEnvironmentVariable(store, objectPath, value)
+            setEnvironmentVariable(store, objectPath, value, save)
             return
         }
 
@@ -2582,7 +2586,7 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
 
         if(!targetFolder || targetFolder._type !== 'request_group') {
             // If folder not found, fall back to global environment
-            setEnvironmentVariable(store, objectPath, value)
+            setEnvironmentVariable(store, objectPath, value, save)
             return
         }
 
@@ -2590,20 +2594,24 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
         setObjectPathValue(folderEnvironment, objectPath, value)
         targetFolder.environment = folderEnvironment
 
-        store.commit('updateCollectionItemEnvironment', {
-            collectionId: targetFolderId,
-            environment: folderEnvironment
-        })
+        if(save) {
+            store.commit('updateCollectionItemEnvironment', {
+                collectionId: targetFolderId,
+                environment: folderEnvironment
+            })
+        }
 
         if(targetFolder.environments) {
             const currentEnvironmentName = targetFolder.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
             const currentEnvironment = targetFolder.environments.find((env: any) => env.name === currentEnvironmentName) as any
             if(currentEnvironment) {
                 currentEnvironment.environment = folderEnvironment
-                store.commit('updateCollectionItemEnvironments', {
-                    collectionId: targetFolderId,
-                    environments: targetFolder.environments
-                })
+                if(save) {
+                    store.commit('updateCollectionItemEnvironments', {
+                        collectionId: targetFolderId,
+                        environments: targetFolder.environments
+                    })
+                }
             }
         }
 
@@ -2613,8 +2621,116 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
         console.error('Failed to set folder environment variable:')
         console.error(e)
         // Fall back to global environment on error
-        setEnvironmentVariable(store, objectPath, value)
+        setEnvironmentVariable(store, objectPath, value, save)
     }
+}
+
+const workspaceEnvironmentWrites = new Map<string, Promise<void>>()
+
+export function setRequestEnvironmentVariable(
+    store: ActionContext<State, State>, workspaceId: string, request: CollectionItem,
+    objectPath: string, value: string, scope: 'workspace' | 'folder', pluginCollectionId?: string | null
+) {
+    const itemId = pluginCollectionId ?? request._id
+    const applyToActiveWorkspace = (save = true) => {
+        if(store.state.activeWorkspace?._id !== workspaceId) {
+            return false
+        }
+        if(scope === 'folder') {
+            const item = findItemInTreeById(store.state.collectionTree, itemId) ?? request
+            setParentEnvironmentVariable(store, objectPath, value, item, save)
+        } else {
+            setEnvironmentVariable(store, objectPath, value, save)
+        }
+        return true
+    }
+
+    if(applyToActiveWorkspace()) {
+        return
+    }
+
+    // A read and its saves finish before another script reads this workspace's environments.
+    const write = (workspaceEnvironmentWrites.get(workspaceId) ?? Promise.resolve()).then(async() => {
+        if(applyToActiveWorkspace()) {
+            return
+        }
+        const workspace = store.state.workspaces.find(item => item._id === workspaceId)
+        if(!workspace) {
+            console.error('Environment value was not saved because its workspace no longer exists')
+            return
+        }
+
+        if(scope === 'folder') {
+            const item = await getCollectionById(workspaceId, itemId)
+            if(applyToActiveWorkspace()) {
+                return
+            }
+            if(item?.parentId) {
+                const folder = await getCollectionById(workspaceId, item.parentId)
+                if(applyToActiveWorkspace()) {
+                    return
+                }
+                if(folder?._type === 'request_group') {
+                    const environment = folder.environment ?? {}
+                    setObjectPathValue(environment, objectPath, value)
+                    const currentEnvironment = folder.environments?.find((environment: any) => environment.name === (folder.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name)) as any
+                    if(currentEnvironment) {
+                        currentEnvironment.environment = environment
+                    }
+                    await updateCollection(workspaceId, folder._id, { environment })
+                    if(currentEnvironment) {
+                        if(applyToActiveWorkspace()) {
+                            return
+                        }
+                        await updateCollection(workspaceId, folder._id, { environments: folder.environments })
+                    }
+                    applyToActiveWorkspace(false)
+                    return
+                }
+            }
+        }
+
+        const workspaceSaved = workspace._type === 'file'
+            ? await getFileWorkspace(workspace.location!)
+            : (await getAllWorkspaces()).find(item => item._id === workspaceId)
+        if(applyToActiveWorkspace()) {
+            return
+        }
+        if(!workspaceSaved) {
+            console.error('Environment value was not saved because its workspace no longer exists')
+            return
+        }
+        const environment = workspaceSaved.environment ?? {}
+        const environments = workspaceSaved.environments ?? [{
+            name: constants.DEFAULT_ENVIRONMENT.name, environment: {}, color: constants.DEFAULT_ENVIRONMENT.color
+        }]
+        setObjectPathValue(environment, objectPath, value)
+        const currentEnvironment = environments.find((environment: any) => environment.name === (workspaceSaved.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name))
+        currentEnvironment.environment = environment
+
+        // File workspaces handle these fields separately, just like the active workspace's mutations.
+        await updateWorkspace(workspaceId, { environment })
+        if(applyToActiveWorkspace()) {
+            return
+        }
+        await updateWorkspace(workspaceId, { environments })
+        if(!applyToActiveWorkspace(false)) {
+            const workspaceCurrent = store.state.workspaces.find(item => item._id === workspaceId)
+            if(workspaceCurrent) {
+                workspaceCurrent.environment = environment
+                workspaceCurrent.environments = environments
+            }
+        }
+    }).catch(error => {
+        console.error('Failed to set environment variable:')
+        console.error(error)
+    }).finally(() => {
+        if(workspaceEnvironmentWrites.get(workspaceId) === write) {
+            workspaceEnvironmentWrites.delete(workspaceId)
+        }
+    })
+    workspaceEnvironmentWrites.set(workspaceId, write)
+    return write
 }
 
 export function getParentPath(collection: CollectionItem[], itemId: string): string {
