@@ -43,7 +43,7 @@ const grpcTransport = vi.hoisted(() => ({
 
 vi.mock('./utils/grpc-transport', () => grpcTransport)
 
-import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getCollectionForWorkspace, getResponsesByCollectionId, updateCollection, updatePlugin, updateResponse } from './db'
+import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getCollectionForWorkspace, getResponsesByCollectionId, getWorkspacePlugins, updateCollection, updatePlugin, updateResponse } from './db'
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, Workspace } from './global'
 import { store } from './store'
 import { emitter } from './event-bus'
@@ -1326,5 +1326,38 @@ describe('writes the storage refuses, such as to a file holding merge conflict m
         expect(result).toEqual(refused)
         expect(emitter.emit).toHaveBeenCalledWith('error', refused.error)
         expect(updateCollection).toHaveBeenCalledOnce()
+    })
+})
+
+describe('duplicateWorkspace', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    test('copies each script once, and an imported request script belongs to the new request and the new workspace', async() => {
+        const script = (id: string, workspaceId: string | null, collectionId: string | null) => ({
+            _id: id, type: 'script', name: null, code: { pre_request: id, post_request: '' }, workspaceId, collectionId, enabled: true, createdAt: 1, updatedAt: 1,
+        }) as Plugin
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({
+            collection: [{ _id: 'request', _type: 'request', name: 'Login', parentId: null, workspaceId: 'source' }],
+        } as never)
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+        vi.mocked(getWorkspacePlugins).mockResolvedValueOnce([
+            script('workspace', 'source', null),
+            script('typed in the editor', null, 'request'),
+            // an import gives a request's script the workspace's id too
+            script('imported', 'source', 'request'),
+        ])
+
+        await store.dispatch('duplicateWorkspace', {
+            sourceWorkspace: { _id: 'source', _type: 'local', name: 'Source' }, name: 'Copy', type: 'local', location: '', includeResponseHistory: false,
+        })
+
+        const [copies, newWorkspaceId] = vi.mocked(createPlugins).mock.calls[0]
+        const newRequestId = vi.mocked(createCollections).mock.calls[0][1][0]._id
+        expect(newRequestId).not.toBe('request')
+        expect(copies.map(plugin => [(plugin.code as { pre_request: string }).pre_request, plugin.workspaceId, plugin.collectionId])).toEqual([
+            ['workspace', newWorkspaceId, null],
+            ['typed in the editor', null, newRequestId],
+            ['imported', newWorkspaceId, newRequestId],
+        ])
     })
 })

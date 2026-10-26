@@ -1758,7 +1758,9 @@ export const store = createStore<State>({
             const newPlugins: Plugin[] = []
 
             plugins.forEach(plugin => {
-                if(plugin.workspaceId) {
+                // a request's or folder's script that an import gave the workspace's id as well is copied once below,
+                // for the new item, so the source item does not get a second copy and the new one belongs to the new workspace
+                if(plugin.workspaceId && !plugin.collectionId) {
                     const newPlugin = JSON.parse(JSON.stringify(plugin))
                     newPlugin._id = nanoid()
                     newPlugin.workspaceId = newWorkspaceId
@@ -1775,6 +1777,9 @@ export const store = createStore<State>({
                     }
                     newPlugin._id = nanoid()
                     newPlugin.collectionId = newCollectionId
+                    if(newPlugin.workspaceId) {
+                        newPlugin.workspaceId = newWorkspaceId
+                    }
                     newPlugin.createdAt = new Date().getTime()
                     newPlugin.updatedAt = new Date().getTime()
                     newPlugins.push(newPlugin)

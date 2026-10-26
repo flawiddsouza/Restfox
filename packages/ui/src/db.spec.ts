@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, expect, test, vi } from 'vitest'
+import type { Plugin } from './global'
 
 // every workspace is a file workspace, whose history goes through window.electronIPC
 vi.mock('dexie', () => {
@@ -84,4 +85,29 @@ test('history without a body still has the files of its HTTP request read and sa
         ['a.txt', 'text/plain', 'file a'],
         ['b.txt', 'text/plain', 'file b'],
     ])
+})
+
+test('plugins a duplicate made in 0.41.0 left are skipped, so each item runs its plugin once and a duplicate keeps its own', async() => {
+    const { withoutDuplicateLeftovers } = await importDb()
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const plugin = (_id: string, workspaceId: string | null, collectionId: string, createdAt: number, name: string | null = null): Plugin => ({
+        _id, type: 'script', name, code: { pre_request: '', post_request: '' }, workspaceId, collectionId, enabled: true, createdAt, updatedAt: createdAt,
+    })
+    const ids = (plugins: { _id: string }[]) => plugins.map(item => item._id)
+
+    // A's request, imported, then A duplicated as B: the source keeps its own and gets a copy tagged with B
+    expect(ids(withoutDuplicateLeftovers([plugin('own', 'A', 'request-a', 1), plugin('left by B', 'B', 'request-a', 2)], 'A'))).toEqual(['own'])
+    // B's copy of that request has its own plugin tagged with A, alone on its item
+    expect(ids(withoutDuplicateLeftovers([plugin('B own', 'A', 'request-b', 2)], 'B'))).toEqual(['B own'])
+    // B duplicated as C: B's item gets a newer copy tagged with C beside its own, also mistagged
+    expect(ids(withoutDuplicateLeftovers([plugin('left by C', 'C', 'request-b', 3), plugin('B own', 'A', 'request-b', 2)], 'B'))).toEqual(['B own'])
+
+    // rightly tagged plugins and ones of another kind or name stay, however many an item has
+    expect(ids(withoutDuplicateLeftovers([
+        plugin('typed in the editor', null, 'request-a', 1),
+        plugin('imported', 'A', 'request-a', 2),
+        plugin('named', 'B', 'request-a', 3, 'Sign'),
+        // a plugin added in the Plugins modal, which has no type
+        { ...plugin('other kind', 'B', 'request-a', 4), type: undefined, code: '' },
+    ], 'A'))).toEqual(['typed in the editor', 'imported', 'named', 'other kind'])
 })

@@ -526,6 +526,31 @@ export async function getGlobalPlugins() {
     return allPlugins.filter(plugin => plugin.workspaceId == null && plugin.collectionId == null)
 }
 
+// Duplicating a workspace in 0.41.0 gave each request or folder plugin an import had tagged with the workspace two
+// copies, both mistagged: one on the source item, tagged with the duplicate, and the duplicate's own, tagged with the
+// source. A mistagged plugin is skipped when its item has the same plugin tagged rightly, or an older mistagged one,
+// which a duplicate of a duplicate leaves, so each item runs it once and a duplicate's own copy, alone on its item, stays
+export function withoutDuplicateLeftovers(plugins: Plugin[], workspaceId: string) {
+    const isMistagged = (plugin: Plugin) => !!plugin.workspaceId && plugin.workspaceId !== workspaceId
+    const isOlder = (other: Plugin, plugin: Plugin) => other.createdAt < plugin.createdAt || (other.createdAt === plugin.createdAt && other._id < plugin._id)
+    return plugins.filter(plugin => {
+        if(!isMistagged(plugin)) {
+            return true
+        }
+        const isLeftover = plugins.some(other =>
+            other !== plugin
+            && other.collectionId === plugin.collectionId
+            && other.type === plugin.type
+            && other.name === plugin.name
+            && (!isMistagged(other) || isOlder(other, plugin))
+        )
+        if(isLeftover) {
+            console.log(`Skipped plugin ${plugin._id}, a copy a workspace duplicate left on item ${plugin.collectionId}`)
+        }
+        return !isLeftover
+    })
+}
+
 export async function getWorkspacePlugins(workspaceId: string) {
     if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
@@ -541,7 +566,7 @@ export async function getWorkspacePlugins(workspaceId: string) {
 
     return [
         ...workspacePlugins.filter(plugin => plugin.collectionId === null),
-        ...collectionItemPlugins
+        ...withoutDuplicateLeftovers(collectionItemPlugins, workspaceId)
     ]
 }
 
@@ -604,7 +629,9 @@ export async function deletePluginsByWorkspace(workspaceId: string) {
         }
     }
 
-    await db.plugins.where({ workspaceId }).delete()
+    // an item's plugins go with the item. One tagged with this workspace but on another workspace's item, as a duplicate
+    // made in 0.41.0 left, belongs to that item
+    await db.plugins.where({ workspaceId }).filter(plugin => plugin.collectionId == null).delete()
 }
 
 export async function deletePluginsByCollectionIds(workspaceId: string, collectionIds: string[]) {
