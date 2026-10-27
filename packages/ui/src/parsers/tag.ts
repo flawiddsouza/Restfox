@@ -1,4 +1,5 @@
 import { Base64 } from 'js-base64'
+import type { ResolutionMode, ResponseTagCache } from '@/global'
 
 export type ParsedResult = {
     functionName: string
@@ -87,12 +88,14 @@ export function toFunctionString(parsedResult: ParsedResult): string {
 export async function handleTags(
     handleResponseTag: (...args: any) => Promise<string | undefined>,
     string: string,
-    tagTrigger: boolean,
-    cacheId: string | undefined,
+    mode: ResolutionMode,
+    responseTags: ResponseTagCache | undefined,
     noError: boolean,
     handlePromptTag?: (...args: any) => Promise<string | undefined>,
     resolvePromptTags = true,
-    resolveOtherTags = true
+    resolveOtherTags = true,
+    resolveResponseTags = true,
+    responseTagErrors?: 'placeholder'
 ) {
     const matches = [...string.matchAll(tagRegex)]
     const replacements: { start: number, end: number, replacement: string }[] = []
@@ -124,11 +127,23 @@ export async function handleTags(
         }
 
         if (parsedTag.functionName === 'response') {
-            replacement = await handleResponseTag(parsedTag, tagTrigger, cacheId)
+            if(!resolveResponseTags) {
+                continue
+            }
+            try {
+                replacement = await handleResponseTag(parsedTag, mode, responseTags)
+            } catch(error: any) {
+                if(mode === 'send' || responseTagErrors !== 'placeholder') {
+                    throw error
+                }
+                if(error?.cause !== 'display-error') {
+                    console.error(error)
+                }
+            }
         }
 
         if (parsedTag.functionName === 'prompt' && handlePromptTag) {
-            replacement = await handlePromptTag(parsedTag, tagTrigger, cacheId)
+            replacement = await handlePromptTag(parsedTag, mode, responseTags)
         }
 
         if (replacement === undefined) {

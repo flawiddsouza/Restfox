@@ -87,6 +87,7 @@
 </template>
 
 <script>
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import Modal from '@/components/Modal.vue'
 import CodeMirrorEditor from '@/components/CodeMirrorEditor.vue'
 import EditTagModal from '@/components/modals/EditTagModal.vue'
@@ -196,6 +197,7 @@ export default {
             }
         },
         showModal() {
+            this.envLoad = null
             if(this.showModal) {
                 this.parseError = ''
                 if(this.collectionItem) {
@@ -543,14 +545,19 @@ export default {
             link.click()
         },
         async loadEnvVariables() {
-            if(this.collectionItem) {
-                const request = JSON.parse(JSON.stringify(this.collectionItem))
-                const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
-                this.envVariables = environment
-            } else if(this.workspace) {
-                this.envVariables = {}
-
-                if(this.workspace._type === 'file') {
+            if(!this.showModal) {
+                return
+            }
+            const load = {}
+            this.envLoad = load
+            const isCurrent = () => this.envLoad === load
+            try {
+                let envVariables = {}
+                if(this.collectionItem) {
+                    const request = JSON.parse(JSON.stringify(this.collectionItem))
+                    const { environment } = await resolveEnvironmentForRequest(this.$store, request, 'display', { noError: true, responseTagErrors: 'placeholder' })
+                    envVariables = environment
+                } else if(this.workspace?._type === 'file') {
                     Object.keys(this.workspace.dotEnv).forEach(dotEnvKey => {
                         // this varName array join trick is needed as vite build changes all strings that match process.env to {}
                         const varName = [
@@ -558,8 +565,16 @@ export default {
                             'env',
                             dotEnvKey
                         ].join('.')
-                        this.envVariables[varName] = this.workspace.dotEnv[dotEnvKey]
+                        envVariables[varName] = this.workspace.dotEnv[dotEnvKey]
                     })
+                }
+                if(isCurrent()) {
+                    this.envVariables = envVariables
+                }
+            } catch(error) {
+                if(isCurrent()) {
+                    this.envVariables = {}
+                    console.error(error)
                 }
             }
         },

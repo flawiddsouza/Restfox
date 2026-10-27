@@ -1,3 +1,5 @@
+import { resolveEnvironmentForRequest, type RequestEnvironment } from '@/utils/environment'
+import type { ResolutionMode, ResolutionOptions } from '@/global'
 import { markRaw, toRaw } from 'vue'
 import { ActionContext, createStore } from 'vuex'
 import { nanoid } from 'nanoid'
@@ -189,7 +191,7 @@ function getAllParents(collection: CollectionItem[], parentArray: CollectionItem
     }
 }
 
-async function getEnvironmentForRequest(requestWorkspace: Workspace, requestParentArray: CollectionItem[]) {
+async function getEnvironmentForRequest(requestWorkspace: Workspace, requestParentArray: CollectionItem[], mode: ResolutionMode, options: ResolutionOptions) {
     let environment = requestWorkspace.environment ? JSON.parse(JSON.stringify(requestWorkspace.environment)) : {}
 
     if(requestWorkspace._type === 'file') {
@@ -204,7 +206,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
             environment[varName] = dotEnv[key]
         })
         // substitute process.env variables in workspace environment
-        environment = JSON.parse(await substituteEnvironmentVariables(environment, JSON.stringify(environment), { resolvePromptTags: false }))
+        environment = JSON.parse(await substituteEnvironmentVariables(environment, JSON.stringify(environment), mode, { ...options, resolvePromptTags: false, workspaceId: requestWorkspace._id }))
     }
 
     const headers: Record<string, string[]> = {}
@@ -214,7 +216,7 @@ async function getEnvironmentForRequest(requestWorkspace: Workspace, requestPare
         if(parent.environment) {
             let tempEnvironment = JSON.stringify(parent.environment)
             // a prompt tag is left for the send, this runs for every open tab on each tab switch
-            tempEnvironment = await substituteEnvironmentVariables(environment, tempEnvironment, { resolvePromptTags: false })
+            tempEnvironment = await substituteEnvironmentVariables(environment, tempEnvironment, mode, { ...options, resolvePromptTags: false, workspaceId: requestWorkspace._id })
             tempEnvironment = JSON.parse(tempEnvironment)
             Object.assign(environment, tempEnvironment)
         }
@@ -414,6 +416,7 @@ export const store = createStore<State>({
             openContextMenuElement: null,
             sockets: {},
             tabEnvironmentResolved: {},
+            tabEnvironmentResolvedRefresh: 0,
             idMap: null,
             skipPersistingActiveTab: false,
             consoleLogs: [],
@@ -1330,7 +1333,7 @@ export const store = createStore<State>({
                 return false
             }
         },
-        async getEnvironmentForRequest(context, { collectionItem, includeSelf = false }): Promise<{
+        async getEnvironmentForRequest(context, { collectionItem, includeSelf = false, mode, ...options }): Promise<{
             environment: any,
             parentHeaders: Record<string, string[]>,
             parentAuthentication?: RequestAuthentication,
@@ -1348,7 +1351,7 @@ export const store = createStore<State>({
                 requestParentArray.push(collectionItem)
             }
 
-            const { environment, parentHeaders, parentAuthentication } = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray)
+            const { environment, parentHeaders, parentAuthentication } = await getEnvironmentForRequest(context.state.activeWorkspace, requestParentArray, mode === 'send' ? 'send' : 'display', options)
 
             return { environment, parentHeaders, parentAuthentication, requestParentArray }
         },
@@ -1412,12 +1415,31 @@ export const store = createStore<State>({
             delete context.state.requestResponseStreams[tabId]
             context.state.requestResponseStatus[tabId] = 'loading'
 
-            const { environment, parentHeaders, parentAuthentication, requestParentArray }: {
-                environment: any,
-                parentHeaders: Record<string, string[]>,
-                parentAuthentication: RequestAuthentication | undefined,
-                requestParentArray: CollectionItem[]
-            } = await context.dispatch('getEnvironmentForRequest', { collectionItem: activeTab })
+            let environmentResolved: RequestEnvironment
+            try {
+                environmentResolved = await resolveEnvironmentForRequest(context, activeTab, 'send')
+            } catch(error: any) {
+                console.error(error)
+                tabSends.delete(abortController)
+                if(tabSends.size === 0) {
+                    runningSends.delete(tabId)
+                }
+                const response = {
+                    status: null,
+                    statusText: 'Error',
+                    error: error?.cause === 'display-error' ? `Error: ${error.message}` : 'Error: Request failed',
+                }
+                if(isNewestSend()) {
+                    if(context.state.activeWorkspace?._id === workspaceId) {
+                        context.state.requestResponses[tabId] = response
+                    }
+                    if(context.state.requestResponseStatus[tabId] === 'loading') {
+                        context.state.requestResponseStatus[tabId] = 'loaded'
+                    }
+                }
+                return response
+            }
+            const { environment, parentHeaders, parentAuthentication, requestParentArray } = environmentResolved
 
             const setEnvironmentVariableWrapper = (objectPath: string, value: string, scope: 'workspace' | 'folder' = 'workspace', pluginCollectionId?: string | null) => {
                 setObjectPathValue(environment, objectPath, value)
@@ -1897,12 +1919,21 @@ export const store = createStore<State>({
         async reloadTabEnvironmentResolved(context) {
             console.log('reloadTabEnvironmentResolved')
 
+            const refresh = ++context.state.tabEnvironmentResolvedRefresh
             const tabs = [...context.state.tabs, ...context.state.detachedTabs]
-            // we use forEach instead of for of to run the await in parallel
-            tabs.forEach(async tab => {
-                const { environment } = await context.dispatch('getEnvironmentForRequest', { collectionItem: tab })
-                context.state.tabEnvironmentResolved[tab._id] = environment
-            })
+            await Promise.allSettled(tabs.map(async tab => {
+                try {
+                    const { environment } = await resolveEnvironmentForRequest(context, tab, 'display', { noError: true, responseTagErrors: 'placeholder' })
+                    if(context.state.tabEnvironmentResolvedRefresh === refresh) {
+                        context.state.tabEnvironmentResolved[tab._id] = environment
+                    }
+                } catch(error) {
+                    if(context.state.tabEnvironmentResolvedRefresh === refresh) {
+                        context.state.tabEnvironmentResolved[tab._id] = {}
+                        console.error(error)
+                    }
+                }
+            }))
         },
         async refreshWorkspaceCollection(context) {
             console.log('refreshWorkspaceCollection')
@@ -2154,6 +2185,7 @@ export const store = createStore<State>({
         },
         async executeCollectionRunnerNext(context) {
             const runner = context.state.collectionRunner
+            const isCurrentRun = () => context.state.collectionRunner === runner && runner.isRunning && !runner.abortController?.signal.aborted
 
             if (!runner.isRunning) {
                 return
@@ -2192,6 +2224,9 @@ export const store = createStore<State>({
             const startTime = Date.now()
             // the response of this send, not the one the tab shows, which another send on it can replace
             const response = await context.dispatch('sendRequest', currentRequest)
+            if(!isCurrentRun()) {
+                return
+            }
             const timeTaken = Date.now() - startTime
 
             // Check for failure: either response error OR any failed tests
@@ -2230,6 +2265,9 @@ export const store = createStore<State>({
                                 resolve()
                             }, { once: true })
                         })
+                        if(!isCurrentRun()) {
+                            return
+                        }
                     }
                     context.commit('advanceCollectionRunnerProgress', {
                         requestIndex: runner.currentRequestIndex + 1,
@@ -2260,6 +2298,9 @@ export const store = createStore<State>({
                             resolve()
                         }, { once: true })
                     })
+                    if(!isCurrentRun()) {
+                        return
+                    }
                 }
 
                 context.commit('advanceCollectionRunnerProgress', {

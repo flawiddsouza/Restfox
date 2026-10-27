@@ -255,6 +255,7 @@
 </template>
 
 <script setup lang="ts">
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import { nextTick, onBeforeMount, reactive, computed, inject, ref, toRaw } from 'vue'
 import { useMobile } from '@/composables/useMobile'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
@@ -303,7 +304,7 @@ const clientUrlsEnvSubstituted: { [key: string]: string } = reactive({})
 
 // the client type and url of each connection attempt still waiting for its first answer. Connect shows until a socket
 // is connected, so a second click for the same attempt, such as a double click, is ignored instead of opening a second socket
-const pendingConnections: { [key: string]: string } = {}
+const pendingConnections: { [key: string]: { target: string } } = {}
 
 // Computed
 const store = useStore()
@@ -371,22 +372,27 @@ async function connect(client: Client) {
     const socketKey = activeTab.value._id + '-' + client.id
     const connectionTarget = `${client.type ?? 'WebSocket'} ${client.url}`
 
-    if (pendingConnections[socketKey] === connectionTarget) {
+    if (pendingConnections[socketKey]?.target === connectionTarget) {
         return
     }
 
-    pendingConnections[socketKey] = connectionTarget
-
-    const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
+    const attempt = { target: connectionTarget }
+    pendingConnections[socketKey] = attempt
+    const settleConnectionAttempt = () => {
+        if(pendingConnections[socketKey] === attempt) {
+            delete pendingConnections[socketKey]
+        }
+    }
 
     let clientUrlWithEnvironmentVariablesSubtituted: string
     // what the messages show, which are saved: a value typed into a masked prompt shows as ******
     let clientUrlToShow: string
 
     try {
-        ({ textResolved: clientUrlWithEnvironmentVariablesSubtituted, textResolvedMasked: clientUrlToShow } = await substituteEnvironmentVariablesForSend(environment, client.url, activeWorkspace.value._id))
+        const { environment } = await resolveEnvironmentForRequest(store, activeTab.value, 'send')
+        ;({ textResolved: clientUrlWithEnvironmentVariablesSubtituted, textResolvedMasked: clientUrlToShow } = await substituteEnvironmentVariablesForSend(environment, client.url, activeWorkspace.value._id))
     } catch (error: any) {
-        delete pendingConnections[socketKey]
+        settleConnectionAttempt()
         $toast.error(error.message)
         return
     }
@@ -400,7 +406,7 @@ async function connect(client: Client) {
         try {
             caCertificatesId = await registerCACertificates(flags.value.caCertificates.certificates, true)
         } catch (error: any) {
-            delete pendingConnections[socketKey]
+            settleConnectionAttempt()
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
@@ -420,7 +426,7 @@ async function connect(client: Client) {
         try {
             proxySettingsId = await registerProxySettings(flags.value.proxy)
         } catch (error) {
-            delete pendingConnections[socketKey]
+            settleConnectionAttempt()
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
@@ -432,6 +438,9 @@ async function connect(client: Client) {
         }
     }
 
+    if(pendingConnections[socketKey] !== attempt) {
+        return
+    }
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlToShow
 
     // a socket Connect is still showing for has failed or is still trying, such as a Socket.IO v2 client that
@@ -483,7 +492,7 @@ async function connect(client: Client) {
         }
     } catch(e) {
         console.log(e)
-        delete pendingConnections[socketKey]
+        settleConnectionAttempt()
         $toast.error(`Invalid WebSocket URL: ${clientUrlToShow}`)
         return
     }
@@ -502,13 +511,6 @@ async function connect(client: Client) {
     const isReplaced = () => {
         const currentSocket = sockets[socketKey]
         return currentSocket !== null && currentSocket !== undefined && toRaw(currentSocket) !== toRaw(socket)
-    }
-
-    // the attempt got its first answer, a Connect for the same client and url starts a new attempt from here on
-    function settleConnectionAttempt() {
-        if (pendingConnections[socketKey] === connectionTarget) {
-            delete pendingConnections[socketKey]
-        }
     }
 
     // says a connection failed, and why when the client knows, once per run of failed attempts
@@ -568,7 +570,7 @@ async function connect(client: Client) {
                 return
             }
 
-            disconnect(client)
+            disconnect(client, attempt)
 
             addClientMessage(client, {
                 timestamp: new Date().getTime(),
@@ -629,7 +631,7 @@ async function connect(client: Client) {
                 return
             }
 
-            disconnect(client)
+            disconnect(client, attempt)
         })
     }
 }
@@ -680,13 +682,12 @@ async function sendMessage(client: Client) {
         return
     }
 
-    const { environment } = await store.dispatch('getEnvironmentForRequest', { collectionItem: activeTab.value })
-
     let messageToSend: string
     let messageToSendMasked: string
 
     try {
-        ({ textResolved: messageToSend, textResolvedMasked: messageToSendMasked } = await substituteEnvironmentVariablesForSend(environment, client.message, activeWorkspace.value._id))
+        const { environment } = await resolveEnvironmentForRequest(store, activeTab.value, 'send')
+        ;({ textResolved: messageToSend, textResolvedMasked: messageToSendMasked } = await substituteEnvironmentVariablesForSend(environment, client.message, activeWorkspace.value._id))
     } catch (error: any) {
         $toast.error(error.message)
         return
@@ -720,7 +721,7 @@ function clearMessages(client: Client) {
     client.messages = []
 }
 
-function disconnect(client: Client) {
+function disconnect(client: Client, attempt?: { target: string }) {
     const socket = sockets[activeTab.value._id + '-' + client.id]
 
     if(socket === undefined || socket === null || disconnectTriggered[client.id]) {
@@ -728,7 +729,10 @@ function disconnect(client: Client) {
     }
 
     disconnectTriggered[client.id] = true
-    delete pendingConnections[activeTab.value._id + '-' + client.id]
+    const socketKey = activeTab.value._id + '-' + client.id
+    if(attempt === undefined || pendingConnections[socketKey] === attempt) {
+        delete pendingConnections[socketKey]
+    }
 
     if(socket instanceof WebSocket) {
         socket.close()

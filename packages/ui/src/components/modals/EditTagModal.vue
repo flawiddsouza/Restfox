@@ -63,7 +63,7 @@
             <div style="margin-top: 1rem">
                 <div style="font-weight: 500; margin-bottom: var(--label-margin-bottom); display: flex; align-items: flex-end; justify-content: space-between;">
                     Live Preview
-                    <button type="button" class="button" @click="generatePreview(true)">Refresh</button>
+                    <button type="button" class="button" @click="generatePreview('send')">Refresh</button>
                 </div>
                 <textarea class="full-width-input" :value="preview" readonly></textarea>
             </div>
@@ -399,14 +399,13 @@ function fillDefaultValues() {
     }
 }
 
-async function generatePreview(tagTrigger = false) {
-    if (tagTrigger === true) {
+async function generatePreview(mode: 'display' | 'send' = 'display') {
+    if (mode === 'send') {
         preview.value = 'Loading...'
     }
 
     try {
-        preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, {
-            tagTrigger,
+        preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, mode, {
             noError: true,
             workspaceId: store.state.activeWorkspace._id,
         })

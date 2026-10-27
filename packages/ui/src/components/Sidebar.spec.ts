@@ -53,6 +53,7 @@ function mountSidebar() {
     const app = createApp(Sidebar)
     app.config.globalProperties.$store = store
     app.config.globalProperties.$toast = toast
+    app.config.errorHandler = vi.fn()
     app.provide('store', store)
     app.mount(element)
     mountedApps.push(app)
@@ -107,6 +108,19 @@ test('Copy as grpcurl copies the call\'s command, and with no method chosen says
     await vi.waitFor(() => expect(sidebar.toast.error).toHaveBeenCalled())
 
     expect(sidebar.toast.error).toHaveBeenCalledWith('Cannot copy as grpcurl: Choose a method first')
+    expect(sidebar.toast.success).not.toHaveBeenCalled()
+    expect(writeText).not.toHaveBeenCalled()
+})
+
+test('Copy as Curl shows an environment error and copies nothing', async() => {
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const sidebar = mountSidebar()
+    sidebar.store.dispatch.mockRejectedValueOnce(new Error('Could not resolve tag'))
+    await sidebar.openMenu({ _id: 'r1', _type: 'request', name: 'Request', method: 'GET', parentId: null, workspaceId: 'w1' })
+
+    sidebar.clickOption('Copy as Curl')
+    await vi.waitFor(() => expect(sidebar.toast.error).toHaveBeenCalledWith('Failed to copy to clipboard : Could not resolve tag'))
     expect(sidebar.toast.success).not.toHaveBeenCalled()
     expect(writeText).not.toHaveBeenCalled()
 })

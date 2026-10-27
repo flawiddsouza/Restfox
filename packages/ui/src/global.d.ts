@@ -343,7 +343,20 @@ export interface CollectionRunnerState {
     currentRequestId: string | null
 }
 
+export type ResolutionMode = 'display' | 'send'
+
+export interface ResolutionOptions {
+    noError?: boolean
+    responseTagErrors?: 'placeholder'
+    resolvePromptTags?: boolean
+    resolveResponseTags?: boolean
+    workspaceId?: string
+}
+
+export type ResponseTagCache = Map<string, Promise<RequestFinalResponse | GrpcFinalResponse | undefined>>
+
 export interface State {
+    tabEnvironmentResolvedRefresh: number
     consoleLogs: string[]
     collection: CollectionItem[]
     collectionTree: CollectionItem[]

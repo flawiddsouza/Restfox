@@ -12,9 +12,12 @@ const transport = vi.hoisted(() => ({
 }))
 
 vi.mock('@/utils/grpc-transport', () => transport)
+vi.mock('@/db', async(importOriginal) => ({ ...await importOriginal<typeof import('@/db')>(), getResponsesByCollectionId: vi.fn(async() => []) }))
 
 import GrpcRequestPanel from './GrpcRequestPanel.vue'
 import { getGrpcItemKey, grpcCalls, resetGrpcCalls } from '@/utils/grpc-calls'
+import { getResponsesByCollectionId } from '@/db'
+import { store as tagStore } from '@/store'
 
 // what grpc-calls keeps an item's call by
 const itemKey = (id: string) => getGrpcItemKey({ workspaceId: 'w1', _id: id })
@@ -41,6 +44,7 @@ beforeEach(() => {
     transport.loadGrpcSchema.mockResolvedValue(schema)
     transport.startGrpcCall.mockReset()
     transport.startGrpcCall.mockReturnValue({ send: vi.fn(), end: vi.fn(), cancel: vi.fn() })
+    vi.mocked(getResponsesByCollectionId).mockReset().mockResolvedValue([])
     const storage = new Map<string, string>()
     vi.stubGlobal('localStorage', {
         getItem: (key: string) => storage.get(key) ?? null,
@@ -77,7 +81,7 @@ function grpcItem(fields: Partial<CollectionItem> = {}): CollectionItem {
     }
 }
 
-async function mountPanel(fields: Partial<CollectionItem> = {}, siblings: CollectionItem[] = [], ownerDocument = document) {
+async function mountPanel(fields: Partial<CollectionItem> = {}, siblings: CollectionItem[] = [], ownerDocument = document, environmentError: Error | null = null, resolveEnvironment?: (payload: any) => Promise<any>) {
     const state = reactive({
         activeTab: null as CollectionItem | null,
         activeWorkspace: { _id: fields.workspaceId ?? 'w1', location: null },
@@ -94,6 +98,12 @@ async function mountPanel(fields: Partial<CollectionItem> = {}, siblings: Collec
     state.collection.push(item, ...siblings)
     const dispatch = vi.fn(async(action: string, payload: any) => {
         if(action === 'getEnvironmentForRequest') {
+            if(resolveEnvironment) {
+                return resolveEnvironment(payload)
+            }
+            if(environmentError) {
+                throw environmentError
+            }
             return { environment: {}, parentHeaders: {}, parentAuthentication: undefined, requestParentArray: [] }
         }
         if(action === 'updateCollectionItemName') {
@@ -137,6 +147,227 @@ async function mountPanel(fields: Partial<CollectionItem> = {}, siblings: Collec
             element.remove()
         },
     }
+}
+
+test('a pre-key environment failure is visible and settled, and a failed reload keeps earlier methods', async() => {
+    vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const panel = await mountPanel({}, [], document, new Error('environment broken'))
+    ;(panel.element.querySelector('[data-testid="grpc-request-panel-tab-Proto"]') as HTMLElement).click()
+    await nextTick()
+    const status = () => panel.element.querySelector('.grpc-request-panel-proto-status')!
+    expect(status().textContent).toContain('environment broken')
+    const reload = () => [...status().querySelectorAll('button')].find(button => button.textContent === 'Reload') as HTMLButtonElement
+    expect(reload().disabled).toBe(false)
+    expect(transport.loadGrpcSchema).not.toHaveBeenCalled()
+    panel.dispatch.mockImplementation(async(action: string) => {
+        if(action === 'getEnvironmentForRequest') {
+            return { environment: {}, parentHeaders: {}, parentAuthentication: undefined, requestParentArray: [] }
+        }
+        throw new Error(`unexpected action ${action}`)
+    })
+    reload().click()
+    await vi.waitFor(() => expect(status().textContent).toContain('1 service, 3 methods'))
+    vi.mocked(Date.now).mockReturnValue(2000)
+    panel.dispatch.mockRejectedValueOnce(new Error('reload preparation failed'))
+    reload().click()
+    await vi.waitFor(() => expect(status().textContent).toContain('reload preparation failed'))
+    expect(status().textContent).toContain('Last loaded')
+    expect(reload().disabled).toBe(false)
+    panel.unmount()
+})
+
+test('a newer successful load of a shared schema replaces an earlier preparation error in Proto', async() => {
+    vi.spyOn(Date, 'now').mockReturnValue(1000)
+    window.createPrompt = vi.fn(async() => null)
+    const first = await mountPanel({ headers: [{ name: 'authorization', value: `{% prompt(title='Token') %}` }] })
+    let second: Awaited<ReturnType<typeof mountPanel>> | undefined
+    try {
+        (first.element.querySelector('[data-testid="grpc-request-panel-tab-Proto"]') as HTMLElement).click()
+        await nextTick()
+        const status = () => first.element.querySelector('.grpc-request-panel-proto-status')!
+        const reload = [...status().querySelectorAll('button')].find(button => button.textContent === 'Reload') as HTMLButtonElement
+        reload.click()
+        await vi.waitFor(() => expect(status().textContent).toContain('Prompt "Token" was cancelled'))
+        vi.mocked(Date.now).mockReturnValue(2000)
+        second = await mountPanel({ _id: 'other' })
+        expect(transport.loadGrpcSchema).toHaveBeenCalledOnce()
+        expect(status().textContent).toContain('1 service, 3 methods')
+        expect(status().textContent).not.toContain('Could not load methods')
+        vi.mocked(Date.now).mockReturnValue(3000)
+        transport.loadGrpcSchema.mockRejectedValueOnce(new Error('newer server load failed'))
+        ;(second.element.querySelector('[data-testid="grpc-request-panel-tab-Proto"]') as HTMLElement).click()
+        await nextTick()
+        const secondStatus = second.element.querySelector('.grpc-request-panel-proto-status')!
+        ;([...secondStatus.querySelectorAll('button')].find(button => button.textContent === 'Reload') as HTMLButtonElement).click()
+        await vi.waitFor(() => expect(status().textContent).toContain('newer server load failed'))
+        expect(status().textContent).not.toContain('Prompt "Token" was cancelled')
+    } finally {
+        first.unmount()
+        second?.unmount()
+    }
+})
+
+for(const preparationFailure of ['folder response tag', 'cancelled Reload prompt']) {
+    test(`Send replaces the ${preparationFailure} error with loaded methods in Proto`, async() => {
+        const login = grpcItem({ _id: 'login', _type: 'request', grpc: undefined })
+        const folder = grpcItem({ _id: 'folder', _type: 'request_group', environment: { TOKEN: `{% response(request='login', attribute='body', path='$.token', behavior='always') %}` } })
+        const previousCollection = tagStore.state.collection
+        const previousWorkspace = tagStore.state.activeWorkspace
+        tagStore.state.activeWorkspace = { _id: 'w1', _type: 'local', environment: {} } as any
+        tagStore.state.collection = [login, folder]
+        const dispatch = tagStore.dispatch.bind(tagStore)
+        const sendLogin = vi.spyOn(tagStore, 'dispatch').mockImplementation((action: any, payload?: any) => action === 'sendRequest'
+            ? Promise.resolve({ status: 200, headers: [['content-type', 'application/json']], buffer: new TextEncoder().encode('{"token":"fresh"}').buffer })
+            : dispatch(action, payload))
+        window.createPrompt = vi.fn(async() => null)
+        const panel = await mountPanel({
+            parentId: preparationFailure === 'folder response tag' ? folder._id : null,
+            headers: [{ name: 'authorization', value: preparationFailure === 'folder response tag' ? '{{TOKEN}}' : `{% prompt(title='Token') %}` }],
+            grpc: { service: 'demo.v1.Demo', method: 'SayHello' },
+        }, [], document, null, payload => tagStore.dispatch('getEnvironmentForRequest', payload))
+        try {
+            (panel.element.querySelector('[data-testid="grpc-request-panel-tab-Proto"]') as HTMLElement).click()
+            await nextTick()
+            const status = () => panel.element.querySelector('.grpc-request-panel-proto-status')!
+            if(preparationFailure === 'cancelled Reload prompt') {
+                const reload = [...status().querySelectorAll('button')].find(button => button.textContent === 'Reload') as HTMLButtonElement
+                reload.click()
+            }
+            await vi.waitFor(() => expect(status().textContent).toContain('Could not load methods'))
+            expect(transport.loadGrpcSchema).not.toHaveBeenCalled()
+            vi.mocked(window.createPrompt).mockResolvedValue('answered')
+            panel.action().click()
+            await vi.waitFor(() => expect(transport.startGrpcCall).toHaveBeenCalledOnce())
+            transport.startGrpcCall.mock.calls[0][1]({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+            await vi.waitFor(() => expect(status().textContent).toContain('1 service, 3 methods'))
+            expect(status().textContent).not.toContain('Could not load methods')
+            expect(status().textContent).not.toContain('Last loaded')
+            if(preparationFailure === 'folder response tag') {
+                expect(sendLogin.mock.calls.filter(([action]: any[]) => action === 'sendRequest')).toHaveLength(1)
+            }
+        } finally {
+            panel.unmount()
+            tagStore.state.collection = previousCollection
+            tagStore.state.activeWorkspace = previousWorkspace
+        }
+    })
+}
+
+for(const preparationFailure of ['folder response tag', 'cancelled Reload prompt']) {
+    for(const connectionFailure of [false, true]) {
+        test(`Send's failed methods load replaces the ${preparationFailure} error in Proto, connection failure: ${connectionFailure}`, async() => {
+            vi.spyOn(Date, 'now').mockReturnValue(1000)
+            const login = grpcItem({ _id: 'login', _type: 'request', grpc: undefined })
+            const folder = grpcItem({ _id: 'folder', _type: 'request_group', environment: { TOKEN: `{% response(request='login', attribute='body', path='$.token', behavior='always') %}` } })
+            const previousCollection = tagStore.state.collection
+            const previousWorkspace = tagStore.state.activeWorkspace
+            tagStore.state.activeWorkspace = { _id: 'w1', _type: 'local', environment: {} } as any
+            tagStore.state.collection = [login, folder]
+            const dispatch = tagStore.dispatch.bind(tagStore)
+            const sendLogin = vi.spyOn(tagStore, 'dispatch').mockImplementation((action: any, payload?: any) => action === 'sendRequest'
+                ? Promise.resolve({ status: 200, headers: [['content-type', 'application/json']], buffer: new TextEncoder().encode('{"token":"fresh"}').buffer })
+                : dispatch(action, payload))
+            window.createPrompt = vi.fn(async() => null)
+            const panel = await mountPanel({
+                parentId: preparationFailure === 'folder response tag' ? folder._id : null,
+                headers: [{ name: 'authorization', value: preparationFailure === 'folder response tag' ? '{{TOKEN}}' : `{% prompt(title='Token') %}` }],
+                grpc: { service: 'demo.v1.Demo', method: 'SayHello' },
+            }, [], document, null, payload => tagStore.dispatch('getEnvironmentForRequest', payload))
+            try {
+                (panel.element.querySelector('[data-testid="grpc-request-panel-tab-Proto"]') as HTMLElement).click()
+                await nextTick()
+                const status = () => panel.element.querySelector('.grpc-request-panel-proto-status')!
+                if(preparationFailure === 'cancelled Reload prompt') {
+                    const reload = [...status().querySelectorAll('button')].find(button => button.textContent === 'Reload') as HTMLButtonElement
+                    reload.click()
+                }
+                const previousError = preparationFailure === 'folder response tag' ? 'Could not resolve tag' : 'Prompt "Token" was cancelled'
+                await vi.waitFor(() => expect(status().textContent).toContain(previousError))
+                expect(transport.loadGrpcSchema).not.toHaveBeenCalled()
+                vi.mocked(Date.now).mockReturnValue(2000)
+                vi.mocked(window.createPrompt).mockResolvedValue('answered')
+                const serverError = connectionFailure ? 'localhost:50051 refused the connection' : 'The server does not offer server reflection'
+                transport.loadGrpcSchema.mockRejectedValueOnce(Object.assign(new Error(serverError), connectionFailure
+                    ? { code: 'CONNECTION_FAILED', grpcStatus: { code: 14, name: 'UNAVAILABLE' } }
+                    : { code: 'REFLECTION_UNIMPLEMENTED' }))
+                panel.action().click()
+                await vi.waitFor(() => expect(grpcCalls[itemKey(panel.item._id)]?.phase).toBe('ended'))
+                expect(transport.loadGrpcSchema).toHaveBeenCalledOnce()
+                expect(transport.startGrpcCall).not.toHaveBeenCalled()
+                expect(status().textContent).toContain(serverError)
+                expect(status().textContent).not.toContain(previousError)
+                expect((status().querySelector('button') as HTMLButtonElement).disabled).toBe(false)
+                if(preparationFailure === 'folder response tag') {
+                    expect(sendLogin.mock.calls.filter(([action]: any[]) => action === 'sendRequest')).toHaveLength(1)
+                }
+            } finally {
+                panel.unmount()
+                tagStore.state.collection = previousCollection
+                tagStore.state.activeWorkspace = previousWorkspace
+            }
+        })
+    }
+}
+
+for(const firstEndsFirst of [true, false]) {
+    test(`a failed gRPC target preview cannot replace a newer environment at the same URL, first ends first: ${firstEndsFirst}`, async() => {
+        const previousCollection = tagStore.state.collection
+        const previousWorkspace = tagStore.state.activeWorkspace
+        tagStore.state.activeWorkspace = { _id: 'w1' } as any
+        tagStore.state.collection = [grpcItem({ _id: 'g', grpc: { service: 'Demo', method: 'Stream' } })]
+        const panel = await mountPanel({ url: '{{TARGET}}' })
+        let finishFirst!: (responses: any) => void
+        vi.mocked(getResponsesByCollectionId).mockImplementationOnce(() => new Promise(resolve => {
+            finishFirst = resolve
+        }))
+        try {
+            panel.state.tabEnvironmentResolved[panel.item._id] = { TARGET: `{% response(request='g', attribute='body', path='$.token', behavior='never') %}` }
+            await vi.waitFor(() => expect(getResponsesByCollectionId).toHaveBeenCalledOnce())
+            if(firstEndsFirst) {
+                finishFirst([{ grpc: { service: 'Demo', method: 'Stream', kind: 'serverStream', ended: 'completed' } }])
+                await vi.waitFor(() => expect(panel.targetTag()?.getAttribute('title')).toContain('has no spaces'))
+            }
+            panel.state.tabEnvironmentResolved[panel.item._id] = { TARGET: 'grpcs://new.test:443' }
+            await vi.waitFor(() => expect(panel.targetTag()?.getAttribute('title')).toContain('new.test:443'))
+            if(!firstEndsFirst) {
+                finishFirst([{ grpc: { service: 'Demo', method: 'Stream', kind: 'serverStream', ended: 'completed' } }])
+                for(let index = 0; index < 30; index++) {
+                    await Promise.resolve()
+                }
+                await nextTick()
+            }
+            expect(panel.targetTag()?.getAttribute('title')).toContain('new.test:443')
+        } finally {
+            panel.unmount()
+            tagStore.state.collection = previousCollection
+            tagStore.state.activeWorkspace = previousWorkspace
+        }
+    })
+}
+
+for(const [url, reason] of [
+    ['', 'Enter the server address to load its methods.'],
+    ['ftp://localhost:50051', 'A gRPC server address starts with grpc://, grpcs://, http://, https:// or no scheme, not ftp://'],
+    ['{{ADDRESS}}', 'The variable ADDRESS has no value in the environment'],
+]) {
+    test(`an unusable address ${JSON.stringify(url)} keeps the method and Proto guidance without Reload`, async() => {
+        const panel = await mountPanel({ url })
+        try {
+            (panel.element.querySelector('[data-testid="grpc-request-panel-tab-Proto"]') as HTMLButtonElement).click()
+            await nextTick()
+            const status = panel.element.querySelector('.grpc-request-panel-proto-status')!
+            expect(status.textContent?.trim()).toBe(reason)
+            expect(status.querySelector('button')).toBeNull()
+            ;(panel.element.querySelector('.grpc-method-picker-button') as HTMLButtonElement).click()
+            await nextTick()
+            const picker = panel.element.querySelector('.grpc-method-picker-dropdown')!
+            await vi.waitFor(() => expect(picker.textContent?.trim()).toBe(reason))
+            expect(picker.querySelector('button')).toBeNull()
+            expect(transport.loadGrpcSchema).not.toHaveBeenCalled()
+        } finally {
+            panel.unmount()
+        }
+    })
 }
 
 test('Send waits for a method, and the button says what it will do for the chosen one', async() => {

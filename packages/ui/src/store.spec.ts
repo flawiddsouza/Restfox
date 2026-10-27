@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('./db', () => ({
+    fileIPC: vi.fn(),
     getResponsesByCollectionId: vi.fn(),
     getCollectionForWorkspace: vi.fn(),
     getAllWorkspaces: vi.fn(),
@@ -50,7 +51,8 @@ import { createCollection, createCollections, createPlugin, createPlugins, creat
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, SetEnvironmentVariableFunction, Workspace } from './global'
 import { store } from './store'
 import { emitter } from './event-bus'
-import { INHERITED_AUTHENTICATION_TYPE, handleRequest } from './helpers'
+import { INHERITED_AUTHENTICATION_TYPE, SendResolver, handleRequest } from './helpers'
+import * as grpcState from './utils/grpc-calls'
 import { type GrpcLiveCall, getGrpcItemKey, grpcCalls, resetGrpcCalls, startGrpcCallForItem } from './utils/grpc-calls'
 
 function scriptPlugin(id: string, code: { pre_request: string, post_request: string }): Plugin {
@@ -1859,4 +1861,742 @@ describe('duplicateWorkspace', () => {
             ['imported', newWorkspaceId, newRequestId],
         ])
     })
+})
+
+function resolutionGate<T>() {
+    let resolve!: (value: T) => void
+    let reject!: (error: Error) => void
+    const promise = new Promise<T>((done, fail) => {
+        resolve = done; reject = fail
+    })
+    return { promise, resolve, reject }
+}
+
+describe('response tag resolution boundaries', () => {
+    const tag = `{% response(request='login', attribute='body', path='$.token', behavior='always') %}`
+    const login = { _id: 'login', _type: 'request', name: 'Login', workspaceId: 'w', parentId: null, url: 'https://example.test/login', method: 'GET' } as CollectionItem
+    const folder = { _id: 'folder', _type: 'request_group', name: 'Folder', workspaceId: 'w', parentId: null, environment: { TOKEN: tag } } as CollectionItem
+    const request = { ...login, _id: 'request', parentId: 'folder' }
+    const reply = (token: string) => ({ _id: token, collectionId: 'login', status: 200, statusText: 'OK', headers: [['content-type', 'application/json']], buffer: new TextEncoder().encode(JSON.stringify({ token })).buffer, createdAt: Date.now() })
+    beforeEach(() => {
+        vi.clearAllMocks()
+        resetGrpcCalls()
+        vi.stubGlobal('localStorage', { getItem: () => null })
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        store.state.activeWorkspace = { _id: 'w', name: 'W', _type: 'file', dotEnv: {} } as Workspace
+        folder.environment = { TOKEN: tag }
+        folder.headers = []
+        store.state.collection = [login, folder, request]
+        store.state.responses = {}
+        store.state.requestResponses = {}
+        store.state.requestResponseStatus = {}
+        store.state.requestAbortController = {}
+        store.state.plugins.global = []
+        store.state.plugins.workspace = []
+        store.state.tabEnvironmentResolved = {}
+        store.state.tabs = [request]
+        store.state.detachedTabs = []
+        vi.mocked(getResponsesByCollectionId).mockReset().mockResolvedValue([])
+        vi.mocked(handleRequest).mockReset().mockImplementation(async item => ({ ...reply('fresh'), collectionId: item._id } as any))
+    })
+    afterEach(() => {
+        resetGrpcCalls(); vi.restoreAllMocks(); vi.unstubAllGlobals()
+    })
+
+    test('display environments use saved history, while send environments trigger dependencies', async() => {
+        const display = await store.dispatch('getEnvironmentForRequest', { collectionItem: request, mode: 'display', noError: true, responseTagErrors: 'placeholder' })
+        expect(display.environment.TOKEN).toBe('<no value found>')
+        expect(handleRequest).not.toHaveBeenCalled()
+        const sending = await store.dispatch('getEnvironmentForRequest', { collectionItem: request, mode: 'send' })
+        expect(sending.environment.TOKEN).toBe('fresh')
+        expect(handleRequest).toHaveBeenCalledOnce()
+    })
+
+    test('failed preparation returns an ordinary error, clears cancellation membership and allows retry', async() => {
+        vi.mocked(getResponsesByCollectionId).mockRejectedValueOnce(new Error('history unavailable'))
+        const response = await store.dispatch('sendRequest', request).catch(error => ({ rejected: error }))
+        expect(response).toMatchObject({ status: null, statusText: 'Error', error: 'Error: Request failed' })
+        expect(store.state.requestResponses.request).toEqual(response)
+        expect(store.state.requestResponseStatus.request).toBe('loaded')
+        const failedController = store.state.requestAbortController.request
+        await store.dispatch('sendRequest', { collectionItem: request, cancelEarlierSends: true })
+        expect(failedController.signal.aborted).toBe(false)
+        expect(handleRequest).toHaveBeenCalled()
+    })
+
+    // The runner starts its step in the background. Wait for that exact action to finish.
+    function runnerStep() {
+        const finished = resolutionGate<void>()
+        let step: any
+        const unsubscribe = store.subscribeAction({
+            before(action) {
+                if(action.type === 'executeCollectionRunnerNext' && !step) {
+                    step = action
+                }
+            },
+            after(action) {
+                if(action === step) {
+                    finished.resolve(undefined)
+                }
+            },
+        })
+        return { finished: finished.promise, unsubscribe }
+    }
+
+    const run = (item: CollectionItem, continueOnError: boolean, delayMs = 0) => store.dispatch('startCollectionRunner', {
+        source: { ...folder, children: [item] }, selectedRequests: [item], iterations: 1, delayMs, continueOnError,
+    })
+
+    for(const olderEndsFirst of [true, false]) {
+        for(const continueOnError of [true, false]) {
+            test(`an old runner's failed Login cannot change a replacement run, older ends first: ${olderEndsFirst}, continue on error: ${continueOnError}`, async() => {
+                store.commit('resetCollectionRunner')
+                const oldStep = runnerStep()
+                const loginStarted = resolutionGate<void>()
+                const loginResult = resolutionGate<any>()
+                const newerStarted = resolutionGate<void>()
+                const newerResult = resolutionGate<any>()
+                vi.mocked(handleRequest).mockImplementationOnce(() => {
+                    loginStarted.resolve(undefined)
+                    return loginResult.promise
+                }).mockImplementationOnce(() => {
+                    newerStarted.resolve(undefined)
+                    return newerResult.promise
+                })
+                try {
+                    await run(request, continueOnError)
+                    await loginStarted.promise
+                    await store.dispatch('cancelCollectionRunner')
+                    store.commit('resetCollectionRunner')
+                    const newer = { ...login, _id: 'newer' }
+                    store.state.collection.push(newer)
+                    await run(newer, false)
+                    await newerStarted.promise
+                    const newerRunner = store.state.collectionRunner
+                    if(olderEndsFirst) {
+                        loginResult.resolve({ status: null, error: 'Login failed' })
+                        await oldStep.finished
+                        expect(store.state.collectionRunner).toBe(newerRunner)
+                        expect(newerRunner.isRunning).toBe(true)
+                        expect(newerRunner.currentRequestId).toBe('newer')
+                        expect(newerRunner.results[0]).toMatchObject({ requestId: 'newer', status: 'running' })
+                        expect(newerRunner.results[0].error).toBeUndefined()
+                    }
+                    newerResult.resolve({ ...reply('new response'), collectionId: 'newer' })
+                    await vi.waitFor(() => expect(newerRunner.isRunning).toBe(false))
+                    if(!olderEndsFirst) {
+                        loginResult.resolve({ status: null, error: 'Login failed' })
+                        await oldStep.finished
+                    }
+                    expect(newerRunner.results[0]).toMatchObject({ requestId: 'newer', status: 'success' })
+                    expect(newerRunner.results[0].error).toBeUndefined()
+                    expect(handleRequest).toHaveBeenCalledTimes(2)
+                } finally {
+                    oldStep.unsubscribe()
+                    await store.dispatch('cancelCollectionRunner')
+                    store.commit('resetCollectionRunner')
+                }
+            })
+        }
+    }
+
+    test('a cancelled runner keeps its cancelled row when its pending Login fails', async() => {
+        store.commit('resetCollectionRunner')
+        const step = runnerStep()
+        const started = resolutionGate<void>()
+        const loginResult = resolutionGate<any>()
+        vi.mocked(handleRequest).mockImplementationOnce(() => {
+            started.resolve(undefined)
+            return loginResult.promise
+        })
+        try {
+            await run(request, true)
+            await started.promise
+            await store.dispatch('cancelCollectionRunner')
+            loginResult.resolve({ status: null, error: 'Login failed' })
+            await step.finished
+            expect(store.state.collectionRunner.isRunning).toBe(false)
+            expect(store.state.collectionRunner.currentRequestIndex).toBe(0)
+            expect(store.state.collectionRunner.results[0]).toMatchObject({ status: 'error', error: 'Cancelled' })
+            expect(handleRequest).toHaveBeenCalledOnce()
+        } finally {
+            step.unsubscribe()
+            store.commit('resetCollectionRunner')
+        }
+    })
+
+    for(const failed of [true, false]) {
+        test(`a runner cancelled during its delay cannot advance a replacement run, failed: ${failed}`, async() => {
+            store.commit('resetCollectionRunner')
+            const step = runnerStep()
+            const newerStarted = resolutionGate<void>()
+            const newerResult = resolutionGate<any>()
+            vi.mocked(handleRequest).mockResolvedValueOnce(failed ? { status: null, error: 'Failed' } as any : reply('old') as any)
+                .mockImplementationOnce(() => {
+                    newerStarted.resolve(undefined)
+                    return newerResult.promise
+                })
+            try {
+                await run(login, true, 60000)
+                await vi.waitFor(() => expect(store.state.collectionRunner.results[0].status).toBe(failed ? 'error' : 'success'))
+                // Cancel releases the delay, then close and start again before its continuation runs.
+                store.dispatch('cancelCollectionRunner')
+                store.commit('resetCollectionRunner')
+                const newer = { ...login, _id: 'newer' }
+                store.state.collection.push(newer)
+                const starting = run(newer, false)
+                await step.finished
+                await starting
+                await newerStarted.promise
+                expect(store.state.collectionRunner.currentRequestIndex).toBe(0)
+                expect(store.state.collectionRunner.currentRequestId).toBe('newer')
+                expect(store.state.collectionRunner.isRunning).toBe(true)
+                newerResult.resolve({ ...reply('new'), collectionId: 'newer' })
+                await vi.waitFor(() => expect(store.state.collectionRunner.isRunning).toBe(false))
+                expect(store.state.collectionRunner.results[0].status).toBe('success')
+                expect(handleRequest).toHaveBeenCalledTimes(2)
+            } finally {
+                step.unsubscribe()
+                await store.dispatch('cancelCollectionRunner')
+                store.commit('resetCollectionRunner')
+            }
+        })
+    }
+
+    test('an older preparation failure cannot replace a newer Send or another workspace display', async() => {
+        for(const replacement of ['send', 'workspace']) {
+            const history = resolutionGate<any[]>()
+            vi.mocked(getResponsesByCollectionId).mockReturnValueOnce(history.promise)
+            const sending = store.dispatch('sendRequest', request).catch(error => ({ rejected: error }))
+            await vi.waitFor(() => expect(getResponsesByCollectionId).toHaveBeenCalled())
+            const marker = { status: null, statusText: 'Other', error: 'other result' }
+            if(replacement === 'workspace') {
+                store.state.activeWorkspace = { _id: 'other' } as Workspace
+            } else {
+                store.state.requestAbortController.request = new AbortController()
+            }
+            store.state.requestResponses.request = marker
+            store.state.requestResponseStatus.request = 'pending'
+            history.reject(new Error('old failure'))
+            expect(await sending).toMatchObject({ error: 'Error: Request failed' })
+            expect(store.state.requestResponses.request).toEqual(marker)
+            expect(store.state.requestResponseStatus.request).toBe('pending')
+            store.state.activeWorkspace = { _id: 'w', name: 'W', _type: 'file', dotEnv: {} } as Workspace
+            vi.mocked(getResponsesByCollectionId).mockClear()
+        }
+    })
+
+    test('a failed Login settles the newest Send after leaving its workspace', async() => {
+        for(const failWhileAway of [true, false]) {
+            const workspace = store.state.activeWorkspace!
+            const collection = [...store.state.collection]
+            const loginStarted = resolutionGate<void>()
+            const loginResult = resolutionGate<any>()
+            vi.mocked(handleRequest).mockImplementationOnce(() => {
+                loginStarted.resolve(undefined)
+                return loginResult.promise
+            })
+            const marker = reply('previous')
+            store.state.requestResponses.request = marker
+            const sending = store.dispatch('sendRequest', request)
+            await loginStarted.promise
+            expect(store.state.requestResponseStatus.request).toBe('loading')
+            store.commit('setActiveWorkspace', { _id: 'other', _type: 'file', name: 'Other', dotEnv: {} })
+            store.commit('setCollection', [])
+            expect(store.state.requestResponseStatus.request).toBe('loading')
+            expect(store.state.requestResponses.request).toEqual(marker)
+            if(!failWhileAway) {
+                store.commit('setActiveWorkspace', workspace)
+                store.commit('setCollection', collection)
+            }
+            loginResult.resolve({ status: null, statusText: 'Error', error: 'Login failed' })
+            const result = await sending
+            expect(result.error).toBe('Error: The request this tag sent did not complete with a whole response')
+            expect(store.state.requestResponseStatus.request).toBe('loaded')
+            expect(store.state.requestResponses.request).toEqual(failWhileAway ? marker : result)
+            store.commit('setActiveWorkspace', workspace)
+            store.commit('setCollection', collection)
+            expect(store.state.requestResponseStatus.request).toBe('loaded')
+        }
+    })
+
+    for(const olderEndsFirst of [true, false]) {
+        test(`a failed Login leaves another file workspace's same-id newer Send alone, older ends first: ${olderEndsFirst}`, async() => {
+            const loginStarted = resolutionGate<void>()
+            const loginResult = resolutionGate<any>()
+            const newerStarted = resolutionGate<void>()
+            const newerResult = resolutionGate<any>()
+            vi.mocked(handleRequest).mockImplementationOnce(() => {
+                loginStarted.resolve(undefined)
+                return loginResult.promise
+            }).mockImplementationOnce(() => {
+                newerStarted.resolve(undefined)
+                return newerResult.promise
+            })
+            const older = store.dispatch('sendRequest', request)
+            await loginStarted.promise
+            const otherRequest = { ...request, workspaceId: 'other', parentId: null }
+            store.commit('setActiveWorkspace', { _id: 'other', _type: 'file', name: 'Other', dotEnv: {} })
+            store.commit('setCollection', [otherRequest])
+            const marker = reply('other-previous')
+            store.state.requestResponses.request = marker
+            const newer = store.dispatch('sendRequest', otherRequest)
+            await newerStarted.promise
+            const newerController = store.state.requestAbortController.request
+            if(olderEndsFirst) {
+                loginResult.resolve({ status: null, statusText: 'Error', error: 'Login failed' })
+                await older
+                expect(store.state.requestResponseStatus.request).toBe('loading')
+                expect(store.state.requestResponses.request).toEqual(marker)
+            }
+            const response = { ...reply('other-new'), collectionId: 'request' }
+            newerResult.resolve(response)
+            await newer
+            if(!olderEndsFirst) {
+                loginResult.resolve({ status: null, statusText: 'Error', error: 'Login failed' })
+                await older
+            }
+            expect(store.state.requestAbortController.request).toBe(newerController)
+            expect(store.state.requestResponseStatus.request).toBe('loaded')
+            expect(store.state.requestResponses.request).toEqual(response)
+        })
+    }
+
+    for(const failed of [true, false]) {
+        for(const firstEndsFirst of [true, false]) {
+            test(`environment refresh publishes tabs independently and ignores stale success/error, first ends first: ${firstEndsFirst}, failure: ${failed}`, async() => {
+                const first = resolutionGate<any[]>()
+                const second = resolutionGate<any[]>()
+                const fast = { ...login, _id: 'fast' }
+                store.state.tabs = [request, fast]
+                vi.mocked(getResponsesByCollectionId).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+                const oldRefresh = store.dispatch('reloadTabEnvironmentResolved')
+                await vi.waitFor(() => expect(getResponsesByCollectionId).toHaveBeenCalledTimes(1))
+                await vi.waitFor(() => expect(store.state.tabEnvironmentResolved.fast).toEqual({}))
+                const newRefresh = store.dispatch('reloadTabEnvironmentResolved')
+                await vi.waitFor(() => expect(getResponsesByCollectionId).toHaveBeenCalledTimes(2))
+                const finishFirst = () => failed ? first.reject(new Error('old failure')) : first.resolve([reply('old')] as any)
+                if(firstEndsFirst) {
+                    finishFirst()
+                    await oldRefresh
+                    expect(store.state.tabEnvironmentResolved.request).toBeUndefined()
+                }
+                second.resolve([reply('new')] as any)
+                await newRefresh
+                if(!firstEndsFirst) {
+                    finishFirst()
+                }
+                await oldRefresh
+                expect(store.state.tabEnvironmentResolved.request.TOKEN).toBe('new')
+                expect(console.error).toHaveBeenCalledTimes(failed ? 1 : 0)
+                if(failed) {
+                    expect(console.error).toHaveBeenCalledWith(expect.objectContaining({ message: 'old failure' }))
+                }
+            })
+        }
+
+    }
+
+    test('a stale unexpected refresh failure cannot clear current values or report', async() => {
+        const previous = resolutionGate<any[]>()
+        store.state.activeWorkspace!.environment = { DELAY: `{% response(request='login', attribute='body', path='$.token', behavior='never') %}` }
+        store.state.collection[1].environment = { TOKEN: '{% invalid-function() %}' }
+        vi.mocked(getResponsesByCollectionId).mockReturnValueOnce(previous.promise)
+        const oldRefresh = store.dispatch('reloadTabEnvironmentResolved')
+        await vi.waitFor(() => expect(getResponsesByCollectionId).toHaveBeenCalledOnce())
+        store.state.tabs = []
+        await store.dispatch('reloadTabEnvironmentResolved')
+        store.state.tabEnvironmentResolved.request = { CURRENT: true }
+        previous.resolve([])
+        await oldRefresh
+        expect(store.state.tabEnvironmentResolved.request).toEqual({ CURRENT: true })
+        expect(console.error).not.toHaveBeenCalled()
+    })
+
+    test('a current unexpected refresh error clears stale values, logs and settles', async() => {
+        store.state.tabEnvironmentResolved.request = { STALE: true }
+        store.state.collection[1].environment = { TOKEN: '{% invalid-function() %}' }
+        await store.dispatch('reloadTabEnvironmentResolved')
+        expect(store.state.tabEnvironmentResolved.request).toEqual({})
+        expect(console.error).toHaveBeenCalled()
+        store.state.collection[1].environment = { TOKEN: tag }
+    })
+
+    test('automatic schema preparation defers unused tags, and fails visibly for a used value', async() => {
+        const grpc = { ...request, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [] } as CollectionItem
+        store.state.collection.push(grpc)
+        grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [] })
+        await grpcState.loadGrpcSchemaForItem(store, grpc, { automatic: true, mode: 'display' } as any)
+        expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+        expect(handleRequest).not.toHaveBeenCalled()
+        grpc.headers = [{ name: 'authorization', value: '{{TOKEN}}' }]
+        const result = await grpcState.loadGrpcSchemaForItem(store, grpc, { automatic: true, force: true, mode: 'display' } as any)
+        expect(result).toMatchObject({ error: expect.stringContaining('Could not resolve tag') })
+        expect(handleRequest).not.toHaveBeenCalled()
+        expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+    })
+
+    test('a failed dependency schema preparation stops the tag with its original cause', async() => {
+        const grpc = { ...request, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: '{{TOKEN}}' }] } as CollectionItem
+        store.state.collection.push(grpc)
+        vi.mocked(handleRequest).mockResolvedValue({ status: null, statusText: 'Error', error: 'Error: Request failed' } as any)
+        await expect(new SendResolver('w', 'send').resolve({}, `{% response(request='g', attribute='body', path='$.token', behavior='always') %}`, 'unsaved')).rejects.toThrow('The request this tag sent did not complete with a whole response')
+        expect(grpcTransport.loadGrpcSchema).not.toHaveBeenCalled()
+        expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+    })
+
+    for(const usedIn of ['address', 'direct metadata', 'inherited metadata']) {
+        test(`automatic schema used absence fails in ${usedIn} without sending or placeholder traffic`, async() => {
+            const grpc = { ...request, _id: 'g', _type: 'grpc', url: usedIn === 'address' ? '{{TOKEN}}:50051' : 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: usedIn === 'direct metadata' ? [{ name: 'authorization', value: tag }] : [] } as CollectionItem
+            if(usedIn === 'inherited metadata') {
+                folder.headers = [{ name: 'authorization', value: '{{TOKEN}}' }]
+            }
+            store.state.collection.push(grpc)
+            const result = await grpcState.loadGrpcSchemaForItem(store, grpc, { automatic: true, mode: 'display' })
+            expect(result).toMatchObject({ error: expect.stringContaining('Could not resolve tag') })
+            expect(handleRequest).not.toHaveBeenCalled()
+            expect(grpcTransport.loadGrpcSchema).not.toHaveBeenCalled()
+            folder.headers = []
+        })
+    }
+
+    test('a schema load without an explicit send mode cannot send Login', async() => {
+        const grpc = { ...request, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: '{{TOKEN}}' }] } as CollectionItem
+        store.state.collection.push(grpc)
+        const result = await grpcState.loadGrpcSchemaForItem(store, grpc, { force: true } as any)
+        expect(handleRequest).not.toHaveBeenCalled()
+        expect(grpcTransport.loadGrpcSchema).not.toHaveBeenCalled()
+        expect(result).toMatchObject({ error: expect.stringContaining('Could not resolve tag') })
+    })
+
+    test('X to cold G to Login uses send permission after G was opened and failed in display mode', async() => {
+        const grpc = { ...request, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: '{{TOKEN}}' }], body: { mimeType: 'application/json', text: '{}' } } as CollectionItem
+        store.state.collection.push(grpc)
+        grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [{ name: 'Demo', methods: [{ name: 'Call', path: '/Demo/Call', requestStream: false, responseStream: false, inputType: 'A', outputType: 'B', example: '{}' }] }] })
+        await grpcState.loadGrpcSchemaForItem(store, grpc, { automatic: true, mode: 'display' } as any)
+        expect(grpcTransport.loadGrpcSchema).not.toHaveBeenCalled()
+        vi.mocked(handleRequest).mockClear()
+        grpcTransport.startGrpcCall.mockImplementation(async(_spec, event) => {
+            event({ type: 'received', json: '{"token":"g-token"}', time: 1 })
+            event({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+            return { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+        })
+        const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='always') %}` } }
+        const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+        store.state.collection.push(sourceFolder, source)
+        await store.dispatch('sendRequest', source)
+        expect(vi.mocked(handleRequest).mock.calls.find(([item]) => item._id === 'x')?.[1]).toMatchObject({ G_TOKEN: 'g-token' })
+        expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'fresh']]) }), expect.any(AbortSignal))
+        expect(grpcTransport.startGrpcCall).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'fresh']]) }), expect.any(Function))
+        expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(1)
+    })
+
+    test('X to cold G sends the Login in G\'s address once when a newer methods load of G takes over', async() => {
+        const grpc = { ...login, _id: 'g', _type: 'grpc', url: `localhost:${tag}`, grpc: { service: 'Demo', method: 'Call' }, headers: [], body: { mimeType: 'application/json', text: '{}' } } as CollectionItem
+        store.state.collection.push(grpc)
+        grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [{ name: 'Demo', methods: [{ name: 'Call', path: '/Demo/Call', requestStream: false, responseStream: false, inputType: 'A', outputType: 'B', example: '{}' }] }] })
+        grpcTransport.startGrpcCall.mockImplementation(async(_spec, event) => {
+            event({ type: 'received', json: '{"token":"g-token"}', time: 1 })
+            event({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+            return { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+        })
+        const firstLogin = resolutionGate<any>()
+        vi.mocked(handleRequest).mockImplementation(async item => {
+            if(item._id === 'login' && vi.mocked(handleRequest).mock.calls.filter(([called]) => called._id === 'login').length === 1) {
+                return firstLogin.promise
+            }
+            return { ...reply('50051'), collectionId: item._id } as any
+        })
+        const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='always') %}` } }
+        const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+        store.state.collection.push(sourceFolder, source)
+        const sending = store.dispatch('sendRequest', source)
+        await vi.waitFor(() => expect(vi.mocked(handleRequest).mock.calls.some(([item]) => item._id === 'login')).toBe(true))
+        // G's tab opens meanwhile and starts its own methods load, which takes over
+        await grpcState.loadGrpcSchemaForItem(store, grpc, { automatic: true, mode: 'display' })
+        firstLogin.resolve({ ...reply('50051'), collectionId: 'login' })
+        await sending
+        expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(1)
+        expect(vi.mocked(handleRequest).mock.calls.find(([item]) => item._id === 'x')?.[1]).toMatchObject({ G_TOKEN: 'g-token' })
+    })
+
+    for(const behavior of ['no-history', 'when-expired']) {
+        test(`X to cold G with ${behavior} reads saved history after a display kind check transport failure`, async() => {
+            const grpc = { ...login, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: tag }], body: { mimeType: 'application/json', text: '{}' } } as CollectionItem
+            const saved = { _id: 'saved', collectionId: 'g', createdAt: Date.now(), grpc: { service: 'Demo', method: 'PreviousCall', kind: 'unary', ended: 'completed', status: { code: 0 }, events: [{ type: 'received', json: '{"token":"saved-g-token"}' }] } }
+            const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='${behavior}', maxAge=3600) %}` } }
+            const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+            store.state.collection.push(grpc, sourceFolder, source)
+            let savedResponses = [saved]
+            vi.mocked(getResponsesByCollectionId).mockImplementation(async(_workspaceId, itemId) => (itemId === 'g' ? savedResponses : itemId === 'login' ? [reply('saved-login')] : []) as any)
+            grpcTransport.loadGrpcSchema.mockReset().mockRejectedValue(new Error('Offline schema transport'))
+            grpcTransport.startGrpcCall.mockReset().mockImplementation(async(_spec, event) => {
+                event({ type: 'received', json: '{"token":"fresh-g-token"}', time: 1 })
+                event({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+                return { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+            })
+
+            await store.dispatch('sendRequest', source)
+            expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+            expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+            expect(vi.mocked(handleRequest).mock.calls.map(([item]) => item._id)).toEqual(['x'])
+            expect(vi.mocked(handleRequest).mock.calls[0][1]).toMatchObject({ G_TOKEN: 'saved-g-token' })
+
+            // If history changes during the failed display load, the call prepares its own send.
+            resetGrpcCalls()
+            vi.mocked(handleRequest).mockClear()
+            const schemaStarted = resolutionGate<void>()
+            const schemaResult = resolutionGate<any>()
+            grpcTransport.loadGrpcSchema.mockReset().mockImplementationOnce(() => {
+                schemaStarted.resolve(undefined)
+                return schemaResult.promise
+            }).mockResolvedValueOnce({ source: 'reflection', services: [{ name: 'Demo', methods: [{ name: 'Call', path: '/Demo/Call', requestStream: false, responseStream: false, inputType: 'A', outputType: 'B', example: '{}' }] }] })
+            const sending = store.dispatch('sendRequest', source)
+            await schemaStarted.promise
+            if(behavior === 'no-history') {
+                savedResponses = []
+            } else {
+                saved.createdAt -= 7200000
+            }
+            schemaResult.reject(new Error('Offline schema transport'))
+            await sending
+            expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledTimes(2)
+            expect(grpcTransport.startGrpcCall).toHaveBeenCalledOnce()
+            expect(vi.mocked(handleRequest).mock.calls.map(([item]) => item._id)).toEqual(['login', 'x'])
+            expect(vi.mocked(handleRequest).mock.calls[1][1]).toMatchObject({ G_TOKEN: 'fresh-g-token' })
+            expect(grpcTransport.startGrpcCall).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'fresh']]) }), expect.any(Function))
+        })
+
+        for(const streaming of [false, true]) {
+            test(`X to cold G with ${behavior} reads another method's history without sending Login and checks the ${streaming ? 'streaming' : 'unary'} current method`, async() => {
+                const grpc = { ...login, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: tag }], body: { mimeType: 'application/json', text: '{}' } } as CollectionItem
+                const saved = { _id: 'saved', collectionId: 'g', createdAt: Date.now(), grpc: { service: 'Demo', method: 'PreviousCall', kind: 'unary', ended: 'completed', status: { code: 0 }, events: [{ type: 'received', json: '{"token":"saved-g-token"}' }] } }
+                const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='${behavior}', maxAge=3600) %}` } }
+                const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+                store.state.collection.push(grpc, sourceFolder, source)
+                let savedResponses = [saved]
+                vi.mocked(getResponsesByCollectionId).mockImplementation(async(_workspaceId, itemId) => (itemId === 'g' ? savedResponses : itemId === 'login' ? [reply('saved-login')] : []) as any)
+                const schema = { source: 'reflection', services: [{ name: 'Demo', methods: [{ name: 'Call', path: '/Demo/Call', requestStream: false, responseStream: streaming, inputType: 'A', outputType: 'B', example: '{}' }] }] }
+                grpcTransport.loadGrpcSchema.mockReset().mockResolvedValue(schema)
+                grpcTransport.startGrpcCall.mockReset().mockImplementation(async(_spec, event) => {
+                    event({ type: 'received', json: '{"token":"g-token"}', time: 1 })
+                    event({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+                    return { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+                })
+
+                const result = await store.dispatch('sendRequest', source)
+                expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(0)
+                expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+                expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'saved-login']]) }), expect.any(AbortSignal))
+                expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+                if(streaming) {
+                    expect(result.error).toContain('A response tag can read only a unary gRPC call')
+                    expect(handleRequest).not.toHaveBeenCalled()
+                } else {
+                    expect(vi.mocked(handleRequest).mock.calls.find(([item]) => item._id === 'x')?.[1]).toMatchObject({ G_TOKEN: 'saved-g-token' })
+
+                    resetGrpcCalls()
+                    vi.mocked(handleRequest).mockClear()
+                    grpcTransport.loadGrpcSchema.mockClear()
+                    saved.createdAt -= 7200000
+                    const sendBehavior = behavior === 'no-history' ? 'always' : 'when-expired'
+                    sourceFolder.environment.G_TOKEN = `{% response(request='g', attribute='body', path='$.token', behavior='${sendBehavior}', maxAge=3600) %}`
+                    await store.dispatch('sendRequest', source)
+                    expect(vi.mocked(handleRequest).mock.calls.find(([item]) => item._id === 'x')?.[1]).toMatchObject({ G_TOKEN: 'g-token' })
+                    expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(1)
+                    expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+                    expect(grpcTransport.startGrpcCall).toHaveBeenCalledOnce()
+                    expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'fresh']]) }), expect.any(AbortSignal))
+                    expect(grpcTransport.startGrpcCall).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'fresh']]) }), expect.any(Function))
+
+                    for(const initiallySends of [false, true]) {
+                        resetGrpcCalls()
+                        vi.mocked(handleRequest).mockClear()
+                        grpcTransport.loadGrpcSchema.mockClear()
+                        grpcTransport.startGrpcCall.mockClear()
+                        sourceFolder.environment.G_TOKEN = `{% response(request='g', attribute='body', path='$.token', behavior='${behavior}', maxAge=3600) %}`
+                        const setHistory = (needsSend: boolean) => {
+                            saved.createdAt = Date.now() - (needsSend ? 7200000 : 0)
+                            savedResponses = needsSend && behavior === 'no-history' ? [] : [saved]
+                        }
+                        setHistory(initiallySends)
+                        const schemaStarted = resolutionGate<void>()
+                        const schemaLoad = resolutionGate<typeof schema>()
+                        grpcTransport.loadGrpcSchema.mockImplementationOnce(() => {
+                            schemaStarted.resolve(undefined)
+                            return schemaLoad.promise
+                        })
+                        const sending = store.dispatch('sendRequest', source)
+                        await schemaStarted.promise
+                        try {
+                            expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(initiallySends ? 1 : 0)
+                            expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+                            setHistory(!initiallySends)
+                        } finally {
+                            schemaLoad.resolve(schema)
+                            await sending
+                        }
+                        expect(vi.mocked(handleRequest).mock.calls.find(([item]) => item._id === 'x')?.[1]).toMatchObject({ G_TOKEN: initiallySends ? 'saved-g-token' : 'g-token' })
+                        expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(1)
+                        expect(grpcTransport.startGrpcCall).toHaveBeenCalledTimes(initiallySends ? 0 : 1)
+                        if(!initiallySends) {
+                            expect(grpcTransport.startGrpcCall).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'fresh']]) }), expect.any(Function))
+                        }
+                    }
+                }
+            })
+        }
+    }
+
+    for(const reuse of ['loaded', 'loading']) {
+        test(`X to G reuses a ${reuse} schema and resolves G's address dependency once`, async() => {
+            const schema = { source: 'reflection', services: [{ name: 'Demo', methods: [{ name: 'Call', path: '/Demo/Call', requestStream: false, responseStream: false, inputType: 'A', outputType: 'B', example: '{}' }] }] }
+            const schemaLoad = resolutionGate<any>()
+            grpcTransport.loadGrpcSchema.mockReset().mockReturnValueOnce(schemaLoad.promise)
+            const other = { ...login, _id: 'h', _type: 'grpc', url: 'localhost:50051' } as CollectionItem
+            const loading = grpcState.loadGrpcSchemaForItem(store, other, { automatic: true, mode: 'display' })
+            await vi.waitFor(() => expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce())
+            if(reuse === 'loaded') {
+                schemaLoad.resolve(schema)
+                await loading
+            }
+            const grpc = { ...login, _id: 'g', _type: 'grpc', url: tag, grpc: { service: 'Demo', method: 'Call' }, headers: [], body: { mimeType: 'application/json', text: '{}' } } as CollectionItem
+            const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='always') %}` } }
+            const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+            store.state.collection.push(other, grpc, sourceFolder, source)
+            vi.mocked(handleRequest).mockImplementation(async item => ({ ...reply('localhost:50051'), collectionId: item._id } as any))
+            grpcTransport.startGrpcCall.mockImplementation(async(_spec, event) => {
+                event({ type: 'received', json: '{"token":"g-token"}', time: 1 })
+                event({ type: 'status', code: 0, name: 'OK', details: '', trailers: [], time: 2 })
+                return { send: vi.fn(), end: vi.fn(), cancel: vi.fn() }
+            })
+            const sending = store.dispatch('sendRequest', source)
+            await vi.waitFor(() => expect(grpcState.grpcItemSchemaKeys[getGrpcItemKey(grpc)]).toBe(grpcState.grpcItemSchemaKeys[getGrpcItemKey(other)]))
+            schemaLoad.resolve(schema)
+            const preparedOther = await loading
+            await sending
+            expect(vi.mocked(handleRequest).mock.calls.find(([item]) => item._id === 'x')?.[1]).toMatchObject({ G_TOKEN: 'g-token' })
+            expect(vi.mocked(handleRequest).mock.calls.filter(([item]) => item._id === 'login')).toHaveLength(1)
+            expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+            expect(preparedOther?.requestPreparation?.stopAbortController.signal.aborted).toBe(false)
+        })
+    }
+
+    for(const hasErrorWithoutValues of [true, false]) {
+        test(`a dependent gRPC call never saves a shared schema load's masked metadata name, engine copy: ${hasErrorWithoutValues}`, async() => {
+            const schemaStarted = resolutionGate<void>()
+            const schemaLoad = resolutionGate<any>()
+            window.createPrompt = vi.fn(async() => 'private name')
+            const other = { ...login, _id: 'h', _type: 'grpc', url: 'localhost:50051', headers: [{ name: `{% prompt(title='Metadata name', mask=1) %}`, value: 'value' }] } as CollectionItem
+            const grpc = { ...login, _id: 'g', _type: 'grpc', url: other.url, grpc: { service: 'Demo', method: 'Call' } } as CollectionItem
+            const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='always') %}` } }
+            const source = { ...grpc, _id: 'x', parentId: sourceFolder._id }
+            store.state.collection.push(other, grpc, sourceFolder, source)
+            grpcTransport.loadGrpcSchema.mockReset().mockImplementationOnce(() => {
+                schemaStarted.resolve(undefined)
+                return schemaLoad.promise
+            })
+            try {
+                const loading = grpcState.loadGrpcSchemaForItem(store, other, { force: true, mode: 'send' })
+                await schemaStarted.promise
+                expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['private name', 'value']]) }), expect.any(AbortSignal))
+                const sending = startGrpcCallForItem(store, source, { waitForEnd: true })
+                await vi.waitFor(() => expect(grpcState.grpcItemSchemaKeys[getGrpcItemKey(grpc)]).toBe(grpcState.grpcItemSchemaKeys[getGrpcItemKey(other)]))
+                const error = Object.assign(new Error('Metadata private name: a name has only letters, digits, -, _ and .'), hasErrorWithoutValues ? { messageWithoutValues: 'Metadata ******: a name has only letters, digits, -, _ and .' } : {})
+                schemaLoad.reject(error)
+                await loading
+                await sending
+                const saved = vi.mocked(createResponse).mock.calls.find(([, response]) => response.collectionId === 'x')?.[1] as any
+                expect(saved.grpc.error).toBe(hasErrorWithoutValues ? 'Metadata ******: a name has only letters, digits, -, _ and .' : 'Could not load the methods of the request this tag reads')
+                expect(JSON.stringify(saved)).not.toContain('private name')
+                expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+                expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+                expect(window.createPrompt).toHaveBeenCalledOnce()
+            } finally {
+                delete (window as any).createPrompt
+            }
+        })
+    }
+
+    test('an HTTP dependency preparation failure keeps its cause in Logs only', async() => {
+        const missing = `{% response(request='missing', attribute='body', path='$.token', behavior='never') %}`
+        const loginFolder = { ...folder, _id: 'login-folder', environment: { MISSING: missing } }
+        store.state.collection[0] = { ...login, parentId: loginFolder._id }
+        store.state.collection.push(loginFolder)
+        const result = await store.dispatch('sendRequest', request)
+        expect(result.error).toBe('Error: The request this tag sent did not complete with a whole response')
+        expect(console.error).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('request=\'missing\'') }))
+        expect(handleRequest).not.toHaveBeenCalled()
+    })
+
+    test('a gRPC environment failure does not save its HTTP dependency masked script value', async() => {
+        const originalHelpers = await vi.importActual<typeof import('./helpers')>('./helpers')
+        vi.mocked(handleRequest).mockImplementation(originalHelpers.handleRequest)
+        window.createPrompt = vi.fn(async() => 'private-header-value')
+        try {
+            const http = { ...login, _id: 'h', headers: [{ name: 'X-Secret', value: `{% prompt(title='Dependency secret', mask=1) %}` }] }
+            const sourceFolder = { ...folder, _id: 'source-folder', environment: { H_TOKEN: `{% response(request='h', attribute='body', path='$.token', behavior='always') %}` } }
+            const source = { ...login, _id: 'x', _type: 'grpc', parentId: sourceFolder._id, url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' } } as CollectionItem
+            store.state.collection.push(http, sourceFolder, source)
+            store.state.plugins.workspace = [{ ...scriptPlugin('throw-header', { pre_request: `throw new Error(rf.request.getHeader('X-Secret'))`, post_request: '' }), collectionId: 'h' }]
+            await startGrpcCallForItem(store, source, { waitForEnd: true })
+            expect(window.createPrompt).toHaveBeenCalledOnce()
+            expect(store.state.requestResponses.h.error).toContain('private-header-value')
+            const saved = vi.mocked(createResponse).mock.calls.find(([, response]) => response.collectionId === 'x')?.[1] as any
+            expect(saved.grpc.error).toBe('The request this tag sent did not complete with a whole response')
+            expect(JSON.stringify(saved)).not.toContain('private-header-value')
+            expect(console.error).toHaveBeenCalled()
+            expect(grpcTransport.loadGrpcSchema).not.toHaveBeenCalled()
+            expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+        } finally {
+            delete (window as any).createPrompt
+        }
+    })
+
+    for(const schemaKind of ['unary', 'streaming', 'offline']) {
+        test(`X to cold G with never reads another method's whole history only once the schema shows a unary method, schema: ${schemaKind}`, async() => {
+            const grpc = { ...login, _id: 'g', _type: 'grpc', url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: tag }], body: { mimeType: 'application/json', text: '{}' } } as CollectionItem
+            const saved = { _id: 'saved', collectionId: 'g', createdAt: Date.now(), grpc: { service: 'Demo', method: 'PreviousCall', kind: 'unary', ended: 'completed', status: { code: 0 }, events: [{ type: 'received', json: '{"token":"saved-g-token"}' }] } }
+            const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='never') %}` } }
+            const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+            store.state.collection.push(grpc, sourceFolder, source)
+            vi.mocked(getResponsesByCollectionId).mockImplementation(async(_workspaceId, itemId) => (itemId === 'g' ? [saved] : itemId === 'login' ? [reply('saved-login')] : []) as any)
+            grpcTransport.loadGrpcSchema.mockReset()
+            if(schemaKind === 'offline') {
+                grpcTransport.loadGrpcSchema.mockRejectedValue(new Error('Offline schema transport'))
+            } else {
+                grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [{ name: 'Demo', methods: [{ name: 'Call', path: '/Demo/Call', requestStream: false, responseStream: schemaKind === 'streaming', inputType: 'A', outputType: 'B', example: '{}' }] }] })
+            }
+
+            const result = await store.dispatch('sendRequest', source)
+            expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledOnce()
+            expect(grpcTransport.loadGrpcSchema).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.arrayContaining([['authorization', 'saved-login']]) }), expect.any(AbortSignal))
+            expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+            // with the method's kind unknown, never cannot tell a unary call's reply from a stream's, as before
+            if(schemaKind !== 'unary') {
+                expect(result.error).toContain('A response tag can read only a unary gRPC call')
+                expect(handleRequest).not.toHaveBeenCalled()
+            } else {
+                expect(vi.mocked(handleRequest).mock.calls.map(([item]) => item._id)).toEqual(['x'])
+                expect(vi.mocked(handleRequest).mock.calls[0][1]).toMatchObject({ G_TOKEN: 'saved-g-token' })
+            }
+        })
+    }
+
+    for(const dependencyIn of ['metadata', 'folder environment']) {
+        test(`X to cold G with never does not send Login in G's ${dependencyIn} or load its schema`, async() => {
+            vi.mocked(getResponsesByCollectionId).mockImplementation(async(_workspaceId, collectionId) => collectionId === login._id ? [reply('saved-login-token')] as any : [])
+            const grpc = { ...login, _id: 'g', _type: 'grpc', parentId: dependencyIn === 'folder environment' ? folder._id : null, url: 'localhost:50051', grpc: { service: 'Demo', method: 'Call' }, headers: [{ name: 'authorization', value: dependencyIn === 'metadata' ? tag : '{{TOKEN}}' }] } as CollectionItem
+            const sourceFolder = { ...folder, _id: 'source-folder', environment: { G_TOKEN: `{% response(request='g', attribute='body', path='$.token', behavior='never') %}` } }
+            const source = { ...login, _id: 'x', parentId: sourceFolder._id }
+            store.state.collection.push(grpc, sourceFolder, source)
+            grpcTransport.loadGrpcSchema.mockResolvedValue({ source: 'reflection', services: [] })
+            const result = await store.dispatch('sendRequest', source)
+            expect(handleRequest).not.toHaveBeenCalled()
+            expect(grpcTransport.loadGrpcSchema).not.toHaveBeenCalled()
+            expect(grpcTransport.startGrpcCall).not.toHaveBeenCalled()
+            expect(result.error).toContain('Could not resolve tag')
+            expect(result.error).toContain('request=\'g\'')
+        })
+    }
 })

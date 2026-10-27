@@ -231,6 +231,7 @@ import {
     getGrpcSchemaKey,
     grpcCalls,
     grpcItemSchemaKeys,
+    grpcItemSchemaPreparations,
     grpcSchemas,
     isGrpcCallAcceptingMessages,
     isGrpcCallRunning,
@@ -297,6 +298,7 @@ const addressBarFit = ref<AddressBarFit>('full')
 const protoMode = ref<'reflection' | 'proto'>('reflection')
 const editDescription = ref(false)
 const targetPreview = ref<GrpcTarget | { error: string } | null>(null)
+let targetPreviewLoad = 0
 const schemaLoadingShown = ref(false)
 const editTagModalShow = ref(false)
 const editTagParsedFunc = ref<any>(null)
@@ -357,8 +359,22 @@ const streamButtonsDisabledReason = computed<string | null>(() => {
 })
 
 const schemaEntry = computed<GrpcSchemaEntry | null>(() => {
-    const key = grpcItemSchemaKeys[getGrpcItemKey(props.activeTab)]
-    return key ? grpcSchemas[key] ?? null : null
+    const itemKey = getGrpcItemKey(props.activeTab)
+    const key = grpcItemSchemaKeys[itemKey]
+    const entry = key ? grpcSchemas[key] ?? null : null
+    const preparation = grpcItemSchemaPreparations[itemKey]
+    const preparationFailed = preparation?.error != null && preparation.failedAt !== null
+        && (entry?.loadedAt == null || preparation.failedAt > entry.loadedAt)
+        && (entry?.failedAt == null || preparation.failedAt > entry.failedAt)
+    if(!preparation || (!preparation.loading && !preparationFailed)) {
+        return entry
+    }
+    return {
+        schema: null, loadedAt: null, error: null, errorCode: null, failedAt: null,
+        ...entry,
+        loading: entry?.loading ?? preparation.loading,
+        ...(preparationFailed ? { error: preparation.error, failedAt: preparation.failedAt } : {}),
+    }
 })
 
 const schemaMethod = computed<GrpcSchemaMethod | null>(() => {
@@ -563,6 +579,7 @@ function updateAddressBarFit() {
 }
 
 async function updateTargetPreview() {
+    const load = ++targetPreviewLoad
     const url = props.activeTab.url ?? ''
     if(url.trim() === '') {
         targetPreview.value = null
@@ -570,7 +587,7 @@ async function updateTargetPreview() {
     }
     const newTargetPreview = await previewGrpcTarget(props.activeTab, collectionItemEnvironmentResolved.value)
     // a newer address answers for itself
-    if((props.activeTab.url ?? '') === url) {
+    if(targetPreviewLoad === load && (props.activeTab.url ?? '') === url) {
         targetPreview.value = newTargetPreview
     }
 }
@@ -586,7 +603,7 @@ function loadSchema(force: boolean, automatic = false) {
     if(!available.value) {
         return
     }
-    loadGrpcSchemaForItem(store, props.activeTab, { force, automatic })
+    loadGrpcSchemaForItem(store, props.activeTab, { force, automatic, mode: automatic ? 'display' : 'send' })
 }
 
 function listenForKeys() {

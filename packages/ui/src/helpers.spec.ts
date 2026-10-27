@@ -40,6 +40,8 @@ import {
     humanFriendlyRunningTime,
     humanFriendlyTime,
 } from './helpers'
+import { store as requestStore } from './store'
+import { getResponsesByCollectionId } from './db'
 import { forgetPromptValues } from './utils/prompt-tag'
 import { markSendReplaced } from './utils/response-stream'
 import type { CollectionItem, HandleRequestState, RequestAuthentication, RequestFinalResponse } from './global'
@@ -49,6 +51,7 @@ import path from 'node:path'
 // edge-runtime has no IndexedDB, Settings > CA Certificates is kept in memory here
 vi.mock('@/db', async(importOriginal) => ({
     ...await importOriginal<typeof import('@/db')>(),
+    getResponsesByCollectionId: vi.fn(async() => []),
     getSettingsFile: vi.fn(async() => null),
     putSettingsFile: vi.fn(async() => undefined),
     deleteSettingsFile: vi.fn(async() => undefined),
@@ -196,7 +199,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
             "messyKey": "${env[extremelyMessyKey]}",
         }`
-        assert.equal(await substituteEnvironmentVariables(env, input), expectedOutput)
+        assert.equal(await substituteEnvironmentVariables(env, input, 'display'), expectedOutput)
 
     })
 
@@ -295,8 +298,8 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "str": {{ s t r }},
         }`
 
-        assert.equal(await substituteEnvironmentVariables(env, input), input)
-        assert.equal(await substituteEnvironmentVariables(env, extraForRegExSpecific), extraForRegExSpecific)
+        assert.equal(await substituteEnvironmentVariables(env, input, 'display'), input)
+        assert.equal(await substituteEnvironmentVariables(env, extraForRegExSpecific, 'display'), extraForRegExSpecific)
 
     })
 
@@ -341,7 +344,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
 
             "messyKey": "${env[extremelyMessyKey]}",
         }`
-        assert.equal(await substituteEnvironmentVariables(env, input), expectedOutput)
+        assert.equal(await substituteEnvironmentVariables(env, input, 'display'), expectedOutput)
     })
 
     test('Insomnia support will not be used if "_" is present as a key in "environment"', async() => {
@@ -369,7 +372,7 @@ describe(`Function: ${substituteEnvironmentVariables.name}`, () => {
             "_.someKey": {{ _.someKey  }},
             "_.someKey": {{  _.someKey  }},
         }`
-        assert.equal(await substituteEnvironmentVariables(env, input), expectedOutput)
+        assert.equal(await substituteEnvironmentVariables(env, input, 'display'), expectedOutput)
     })
 })
 
@@ -1930,7 +1933,7 @@ describe(`Function: ${createRequestData.name}`, () => {
     const prepare = (url: string, parameters: CollectionItem['parameters'], environment: Record<string, string> = {}) => {
         const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'Request', method: 'GET', url, parameters } as CollectionItem
         const state: HandleRequestState = { currentPlugin: null, testResults: [] }
-        return createRequestData(state, request, environment, {}, undefined, null, [], null)
+        return createRequestData(state, request, environment, {}, undefined, null, [], null, new SendResolver((request).workspaceId, 'send'))
     }
 
     test('sends the url as typed when the request has no Query table', async() => {
@@ -2020,7 +2023,7 @@ describe('Authentication inheritance', () => {
     const prepare = (authentication: CollectionItem['authentication'], { parentAuthentication }: { parentAuthentication: CollectionItem['authentication'] } = { parentAuthentication: folderAuthentication }) => {
         const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: 'f', name: 'Request', method: 'GET', url: 'https://example.test/', authentication } as CollectionItem
         const state: HandleRequestState = { currentPlugin: null, testResults: [] }
-        return createRequestData(state, request, {}, {}, parentAuthentication, null, [], null)
+        return createRequestData(state, request, {}, {}, parentAuthentication, null, [], null, new SendResolver((request).workspaceId, 'send'))
     }
 
     test('a request set to No Auth under a bearer folder sends no Authorization header', async() => {
@@ -2080,7 +2083,7 @@ describe('Header name casing', () => {
     const request = (fields: Partial<CollectionItem>) => ({ _id: 'r', _type: 'request', workspaceId: 'w', parentId: 'f', name: 'Request', method: 'GET', url: 'https://example.test/', ...fields }) as CollectionItem
     const prepare = (fields: Partial<CollectionItem>, { environment = {}, parentHeaders = {}, parentAuthentication }: { environment?: Record<string, unknown>, parentHeaders?: Record<string, string[]>, parentAuthentication?: CollectionItem['authentication'] } = {}) => {
         const state: HandleRequestState = { currentPlugin: null, testResults: [] }
-        return createRequestData(state, request(fields), environment, parentHeaders, parentAuthentication, null, [], null)
+        return createRequestData(state, request(fields), environment, parentHeaders, parentAuthentication, null, [], null, new SendResolver((request(fields)).workspaceId, 'send'))
     }
 
     test('a header name is sent as typed', async() => {
@@ -2175,6 +2178,39 @@ describe(`Function: ${fetchGraphQLSchema.name}`, () => {
         const { sent, result } = await fetchSchema({ headers: [{ name: 'content-type', value: 'application/json; charset=utf-8' }] })
         await result
         expect(Object.entries(sent.headers!).filter(([name]) => name.toLowerCase() === 'content-type')).toEqual([['content-type', 'application/json; charset=utf-8']])
+    })
+
+    test('an aborted schema fetch asks no further prompt after a request field waits', async() => {
+        forgetPromptValues()
+        let answerFirst!: (value: string) => void
+        let promptOpened!: () => void
+        const opened = new Promise<void>(resolve => {
+            promptOpened = resolve
+        })
+        window.createPrompt = vi.fn((title: string) => {
+            if(title === 'First header') {
+                return new Promise<string>(resolve => {
+                    answerFirst = resolve
+                    promptOpened()
+                })
+            }
+            return Promise.resolve('later')
+        })
+        vi.stubGlobal('fetch', vi.fn(async() => new Response(JSON.stringify({ data: { __schema: { types } } }))))
+        const controller = new AbortController()
+        const result = fetchGraphQLSchema(request({ headers: [
+            { name: 'X-First', value: `{% prompt(title='First header') %}` },
+            { name: 'X-Later', value: `{% prompt(title='Later header') %}` },
+        ] }), {}, {}, undefined, controller.signal, flags).catch(error => error)
+        await opened
+        controller.abort()
+        answerFirst('first')
+        const error = await result
+        expect(window.createPrompt).toHaveBeenCalledOnce()
+        expect(error).toMatchObject({ message: 'The send was stopped' })
+        expect(fetch).not.toHaveBeenCalled()
+        delete (window as any).createPrompt
+        forgetPromptValues()
     })
 
     test('fails with the server\'s GraphQL errors', async() => {
@@ -2729,7 +2765,7 @@ describe('Prompt tag', () => {
     const request = (fields: Partial<CollectionItem>) => ({ _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'Request', method: 'GET', url: 'https://example.test/', ...fields }) as CollectionItem
     const prepare = (fields: Partial<CollectionItem>) => {
         const state: HandleRequestState = { currentPlugin: null, testResults: [] }
-        return createRequestData(state, request(fields), {}, {}, undefined, null, [], null)
+        return createRequestData(state, request(fields), {}, {}, undefined, null, [], null, new SendResolver((request(fields)).workspaceId, 'send'))
     }
     const send = async(fields: Partial<CollectionItem>, environment: Record<string, unknown> = {}, plugins: unknown[] = []) => {
         const sent: { url?: string, headers?: Record<string, string> } = {}
@@ -2772,8 +2808,8 @@ describe('Prompt tag', () => {
     test('Ask once keeps the value for later sends, shared by the same prompt in another request, such as through one environment variable', async() => {
         const environment = { PASSWORD: `{% prompt(title='Password once', ask='once') %}` }
         answers = ['secret']
-        await createRequestData({ currentPlugin: null, testResults: [] }, request({ headers: [{ name: 'X-Password', value: '{{PASSWORD}}' }] }), environment, {}, undefined, null, [], null)
-        const other = await createRequestData({ currentPlugin: null, testResults: [] }, request({ _id: 'other', url: 'https://example.test/{{PASSWORD}}' }), environment, {}, undefined, null, [], null)
+        await createRequestData({ currentPlugin: null, testResults: [] }, request({ headers: [{ name: 'X-Password', value: '{{PASSWORD}}' }] }), environment, {}, undefined, null, [], null, new SendResolver((request({ headers: [{ name: 'X-Password', value: '{{PASSWORD}}' }] })).workspaceId, 'send'))
+        const other = await createRequestData({ currentPlugin: null, testResults: [] }, request({ _id: 'other', url: 'https://example.test/{{PASSWORD}}' }), environment, {}, undefined, null, [], null, new SendResolver((request({ _id: 'other', url: 'https://example.test/{{PASSWORD}}' })).workspaceId, 'send'))
         expect(other.url.pathname).toBe('/secret')
         expect(createPrompt).toHaveBeenCalledTimes(1)
     })
@@ -2786,8 +2822,8 @@ describe('Prompt tag', () => {
         const staging = await prepare({ workspaceId: 'staging', headers: [{ name: 'X-Password', value: once }, { name: 'X-User', value: prefill }] })
         expect([staging.headers['X-Password'], staging.headers['X-User']]).toEqual(['staging-pass', 'staging-user'])
         expect(createPrompt.mock.calls.map(call => [call[0], call[1]])).toEqual([['Workspace password', 'd'], ['Workspace user', ''], ['Workspace password', 'd'], ['Workspace user', '']])
-        expect(await substituteEnvironmentVariables({}, once, { workspaceId: 'w' })).toBe('prod-pass')
-        expect(await substituteEnvironmentVariables({}, once, { workspaceId: 'other' })).toBe('d')
+        expect(await substituteEnvironmentVariables({}, once, 'display', { workspaceId: 'w' })).toBe('prod-pass')
+        expect(await substituteEnvironmentVariables({}, once, 'display', { workspaceId: 'other' })).toBe('d')
     })
 
     test('Ask once does not share with a prompt that has another title', async() => {
@@ -2806,15 +2842,15 @@ describe('Prompt tag', () => {
     })
 
     test('previews never open the box: they show the default, or ****** for a masked prompt', async() => {
-        const preview = (tag: string) => substituteEnvironmentVariables({}, tag, { tagTrigger: false, noError: true })
+        const preview = (tag: string) => substituteEnvironmentVariables({}, tag, 'display', { noError: true })
         expect(await preview(`{% prompt(title='Id', defaultValue='7') %}`)).toBe('7')
         expect(await preview(`{% prompt(title='Password', defaultValue='x', mask=1) %}`)).toBe('******')
         expect(createPrompt).not.toHaveBeenCalled()
     })
 
     test('only a send asks, a text resolved outside one shows the preview value even when tags are run', async() => {
-        expect(await substituteEnvironmentVariables({}, `{% prompt(title='Id', defaultValue='7') %}`)).toBe('7')
-        expect(await substituteEnvironmentVariables({}, `{% prompt(title='Password', defaultValue='x', mask=1) %}`)).toBe('******')
+        expect(await substituteEnvironmentVariables({}, `{% prompt(title='Id', defaultValue='7') %}`, 'display')).toBe('7')
+        expect(await substituteEnvironmentVariables({}, `{% prompt(title='Password', defaultValue='x', mask=1) %}`, 'display')).toBe('******')
         expect(createPrompt).not.toHaveBeenCalled()
     })
 
@@ -2905,10 +2941,10 @@ describe('Prompt tag', () => {
             return title === 'First' ? new Promise(resolve => answerFirst = resolve) : Promise.resolve(`typed in ${title}`)
         })
         const stopped = new AbortController()
-        const first = new SendResolver('w').resolve({}, `{% prompt(title='First') %}`, 'url')
-        const waiting = new SendResolver('w', true, stopped.signal).resolve({}, `{% prompt(title='Waiting') %}`, 'url')
-        const sharedByStopped = new SendResolver('w', true, stopped.signal).resolve({}, `{% prompt(title='Shared once', ask='once') %}`, 'url')
-        const sharedByRunning = new SendResolver('w').resolve({}, `{% prompt(title='Shared once', ask='once') %}`, 'url')
+        const first = new SendResolver('w', 'send').resolve({}, `{% prompt(title='First') %}`, 'url')
+        const waiting = new SendResolver('w', 'send', stopped.signal).resolve({}, `{% prompt(title='Waiting') %}`, 'url')
+        const sharedByStopped = new SendResolver('w', 'send', stopped.signal).resolve({}, `{% prompt(title='Shared once', ask='once') %}`, 'url')
+        const sharedByRunning = new SendResolver('w', 'send').resolve({}, `{% prompt(title='Shared once', ask='once') %}`, 'url')
         await new Promise(resolve => setTimeout(resolve))
 
         stopped.abort()
@@ -2924,7 +2960,7 @@ describe('Prompt tag', () => {
     test('a url left out goes from the sent headers too: HTTP/2 :path and :authority, and host', async() => {
         const response = { url: 'https://example.test/a', request: { method: 'GET', query: '?k=S3CRET', headers: {}, headersSent: [[':method', 'GET'], [':path', '/a?k=S3CRET'], [':authority', 'example.test'], [':scheme', 'https'], ['host', 'example.test'], ['x-trace', 't1']], body: null, original: {} } } as unknown as RequestFinalResponse
         answers = ['S3CRET']
-        const urlSend = new SendResolver('w')
+        const urlSend = new SendResolver('w', 'send')
         await urlSend.resolve({}, `{% prompt(title='Query', mask=1) %}`, 'url')
         const saved = urlSend.omitMaskedPromptParts(response, request({ url: 'https://example.test/a?k={{K}}' }))
         expect(saved.request.headersSent).toEqual([[':method', 'GET'], [':scheme', 'https'], ['x-trace', 't1']])
@@ -3045,18 +3081,18 @@ describe('Prompt tag', () => {
         const response = { url: 'https://example.test/a', request: { method: 'GET', query: '?q=1', headers: { authorization: 'Bearer x', 'X-Trace': 't1' }, headersSent: [['host', 'example.test'], ['authorization', 'Bearer x'], ['x-trace', 't1']], body: 'b', original: {} } } as unknown as RequestFinalResponse
         const tag = `{% prompt(title='Omitted', ask='once', mask=1) %}`
         answers = ['x']
-        const headerSend = new SendResolver('w')
+        const headerSend = new SendResolver('w', 'send')
         await headerSend.resolve({}, tag, { header: 'Authorization' })
         const saved = headerSend.omitMaskedPromptParts(response, request({ url: '{{BASE}}/a?q=1' }))
         expect(saved.request.headers).toEqual({ 'X-Trace': 't1' })
         expect(saved.request.headersSent).toEqual([['host', 'example.test'], ['x-trace', 't1']])
         expect([saved.url, saved.request.query, saved.request.body]).toEqual(['https://example.test/a', '?q=1', 'b'])
-        const allSend = new SendResolver('w')
+        const allSend = new SendResolver('w', 'send')
         await allSend.resolve({}, tag, 'url')
         await allSend.resolve({}, tag, 'body')
         const all = allSend.omitMaskedPromptParts(response, request({ url: '{{BASE}}/a?q=1' }))
         expect([all.url, all.request.query, all.request.body]).toEqual(['{{BASE}}/a?q=1', '', null])
-        const unsavedSend = new SendResolver('w')
+        const unsavedSend = new SendResolver('w', 'send')
         await unsavedSend.resolve({}, tag, 'unsaved')
         expect(unsavedSend.omitMaskedPromptParts(response, request({}))).toBe(response)
     })
@@ -3208,4 +3244,28 @@ describe('humanFriendlyRunningTime', () => {
         expect([0, 305, 1000, 4250, 12_345, 65_400].map(humanFriendlyRunningTime)).toEqual(['0 ms', '300 ms', '1000 ms', '4.2 s', '12.3 s', '1.09 m'])
         expect([305, 4250, 65_400].map(humanFriendlyTime)).toEqual(['305 ms', '4.25 s', '1.09 m'])
     })
+})
+
+test('a script preparing disabled and unnamed response-tag headers never sends their dependencies', async() => {
+    const originalWorkspace = requestStore.state.activeWorkspace
+    const originalCollection = requestStore.state.collection
+    requestStore.state.activeWorkspace = { _id: 'w' } as any
+    requestStore.state.collection = [{ _id: 'login', _type: 'request', name: 'Login', workspaceId: 'w', parentId: null }]
+    const fresh = { _id: 'fresh', collectionId: 'login', status: 200, statusText: 'OK', createdAt: Date.now(), headers: [['content-type', 'application/json']], buffer: new TextEncoder().encode('{"token":"fresh"}').buffer }
+    const dispatch = vi.spyOn(requestStore, 'dispatch').mockResolvedValue(fresh)
+    vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+    const tag = `{% response(request='login', attribute='body', path='$.token', behavior='always') %}`
+    const request: CollectionItem = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'R', method: 'GET', url: 'https://example.test', headers: [{ name: 'X-Off', value: tag, disabled: true }, { name: '', value: tag }] }
+    const script = { _id: 'script', type: 'script', name: null, workspaceId: null, collectionId: 'r', enabled: true, code: { pre_request: 'rf.request.getMethod()', post_request: '' } } as any
+    try {
+        await createRequestData({ currentPlugin: null, testResults: [] }, request, {}, {}, undefined, null, [script], null, new SendResolver('w', 'send'))
+        expect(dispatch).not.toHaveBeenCalled()
+        request.headers!.push({ name: 'X-Used', value: tag })
+        const prepared = await createRequestData({ currentPlugin: null, testResults: [] }, request, {}, {}, undefined, null, [script], null, new SendResolver('w', 'send'))
+        expect(prepared.headers['X-Used']).toBe('fresh')
+        expect(dispatch).toHaveBeenCalledOnce()
+    } finally {
+        requestStore.state.activeWorkspace = originalWorkspace
+        requestStore.state.collection = originalCollection
+    }
 })

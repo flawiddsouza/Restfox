@@ -624,6 +624,7 @@ export default {
             editTagParsedFunc: null,
             editTagUpdateFunc: null,
             urlPreview: '',
+            urlPreviewLoad: 0,
         }
     },
     computed: {
@@ -1112,25 +1113,30 @@ export default {
             this.editTagModalShow = true
         },
         async getUrlPreview() {
+            const load = ++this.urlPreviewLoad
             if (!this.activeTab) {
                 return
             }
 
-            let url = this.activeTab.url ?? ''
+            const activeTab = this.activeTab
+            const environment = this.collectionItemEnvironmentResolved
+            let url = activeTab.url ?? ''
 
-            url = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, url, { tagTrigger: false, noError: true, workspaceId: this.activeTab.workspaceId })
+            url = await substituteEnvironmentVariables(environment, url, 'display', { noError: true, responseTagErrors: 'placeholder', workspaceId: activeTab.workspaceId })
 
-            if (this.activeTab.pathParameters) {
-                for (const pathParameter of this.activeTab.pathParameters.filter(item => !item.disabled)) {
-                    const paramName = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.name, { tagTrigger: false, noError: true, workspaceId: this.activeTab.workspaceId })
-                    const paramValue = await substituteEnvironmentVariables(this.collectionItemEnvironmentResolved, pathParameter.value, { tagTrigger: false, noError: true, workspaceId: this.activeTab.workspaceId })
+            if (activeTab.pathParameters) {
+                for (const pathParameter of activeTab.pathParameters.filter(item => !item.disabled)) {
+                    const paramName = await substituteEnvironmentVariables(environment, pathParameter.name, 'display', { noError: true, responseTagErrors: 'placeholder', workspaceId: activeTab.workspaceId })
+                    const paramValue = await substituteEnvironmentVariables(environment, pathParameter.value, 'display', { noError: true, responseTagErrors: 'placeholder', workspaceId: activeTab.workspaceId })
 
                     url = url.replaceAll(`:${paramName}`, paramValue)
                         .replaceAll(`{${paramName}}`, paramValue)
                 }
             }
 
-            this.urlPreview = url !== '' && url.trim() !== '' ? url : 'No URL'
+            if(this.urlPreviewLoad === load) {
+                this.urlPreview = url !== '' && url.trim() !== '' ? url : 'No URL'
+            }
         },
         async generateTests()  {
             const generatedTestScripts = await generateTestScripts()

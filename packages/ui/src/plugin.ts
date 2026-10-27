@@ -121,7 +121,7 @@ export async function createRequestContextForPlugin(send: SendResolver, request:
     for (const header of state.headers ?? []) {
         try {
             if (header.disabled || header.name === '') {
-                const text = await substituteEnvironmentVariables(environment, header.value)
+                const text = await substituteEnvironmentVariables(environment, header.value, 'display', { workspaceId: send.workspaceId })
                 headerCache[header.name.toLowerCase()] = () => text
             } else {
                 headerCache[header.name.toLowerCase()] = await send.resolveForScript(environment, header.value)

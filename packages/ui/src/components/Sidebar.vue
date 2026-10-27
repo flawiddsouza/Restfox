@@ -48,6 +48,8 @@
 </template>
 
 <script>
+import { SendResolver } from '@/helpers'
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import { toRaw } from 'vue'
 import { useMobile } from '@/composables/useMobile'
 import SidebarItem from './SidebarItem.vue'
@@ -391,9 +393,9 @@ export default {
 
             if(clickedSidebarItem === 'Copy as Curl') {
                 const request = deepClone(this.activeSidebarItemForContextMenu)
-                const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
                 try {
-                    const curlCommand = await generateCode(request, environment, parentHeaders, parentAuthentication, 'shell', 'curl')
+                    const { environment, parentHeaders, parentAuthentication } = await resolveEnvironmentForRequest(this.$store, request, 'send')
+                    const curlCommand = await generateCode(request, environment, parentHeaders, parentAuthentication, 'shell', 'curl', new SendResolver(request.workspaceId, 'send'))
                     await navigator.clipboard.writeText(curlCommand)
                     this.$toast.success('Copied to clipboard')
                 } catch (e) {
@@ -410,11 +412,12 @@ export default {
 
             if(clickedSidebarItem === 'Copy as grpcurl') {
                 const grpcRequest = deepClone(this.activeSidebarItemForContextMenu)
+                const workspaceLocation = this.$store.state.activeWorkspace?.location ?? null
                 let grpcurlCommand
                 try {
-                    const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: grpcRequest })
+                    const { environment, parentHeaders, parentAuthentication } = await resolveEnvironmentForRequest(this.$store, grpcRequest, 'send')
                     // the command is shown, never saved
-                    const grpcRequestData = await createGrpcRequestData(grpcRequest, environment, parentHeaders, parentAuthentication, this.$store.state.activeWorkspace?.location ?? null)
+                    const grpcRequestData = await createGrpcRequestData(grpcRequest, environment, parentHeaders, parentAuthentication, workspaceLocation)
                     const target = parseGrpcTarget(grpcRequestData.url)
                     if('error' in target) {
                         throw new Error(target.error)

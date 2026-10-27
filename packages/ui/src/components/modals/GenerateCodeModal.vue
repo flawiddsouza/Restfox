@@ -29,10 +29,12 @@
 </template>
 
 <script>
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import Modal from '@/components/Modal.vue'
 import { generateCode, getAvailableTargets } from '@/utils/generate-code'
 import CodeMirrorEditor from '../CodeMirrorEditor.vue'
 import constants from '@/constants'
+import { SendResolver } from '@/helpers'
 
 export default {
     props: {
@@ -112,15 +114,32 @@ export default {
                 localStorage.removeItem(constants.LOCAL_STORAGE_KEY.GENERATE_CODE_CLIENT)
             }
         },
+        // the item's tags are resolved once each time the modal opens, so picking another language or client neither
+        // sends a response tag's request again nor asks a prompt again. After an error, the next pick resolves them again
+        resolveTags() {
+            if(this.tagsResolved?.collectionItem !== this.collectionItem) {
+                const request = JSON.parse(JSON.stringify(this.collectionItem))
+                this.tagsResolved = {
+                    collectionItem: this.collectionItem,
+                    environment: resolveEnvironmentForRequest(this.$store, request, 'send'),
+                    send: new SendResolver(request.workspaceId, 'send'),
+                }
+            }
+            return this.tagsResolved
+        },
         async generateCode() {
             if(this.selectedClient) {
+                const tagsResolved = this.resolveTags()
                 try {
                     const request = JSON.parse(JSON.stringify(this.collectionItem))
-                    const { environment, parentHeaders, parentAuthentication } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request })
-                    const code = await generateCode(request, environment, parentHeaders, parentAuthentication, this.selectedLanguage, this.selectedClient)
+                    const { environment, parentHeaders, parentAuthentication } = await tagsResolved.environment
+                    const code = await generateCode(request, environment, parentHeaders, parentAuthentication, this.selectedLanguage, this.selectedClient, tagsResolved.send)
                     this.generatedCode = code
                 } catch(e) {
                     this.generatedCode = e.message
+                    if(this.tagsResolved === tagsResolved) {
+                        this.tagsResolved = null
+                    }
                 }
             } else {
                 this.generatedCode = ''
@@ -130,6 +149,10 @@ export default {
             await navigator.clipboard.writeText(this.generatedCode)
             this.$toast.success('Copied to clipboard')
         },
+    },
+    created() {
+        // kept out of the reactive state
+        this.tagsResolved = null
     },
     async mounted() {
         const selectedLanguage = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GENERATE_CODE_LANGUAGE)

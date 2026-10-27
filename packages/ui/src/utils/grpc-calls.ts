@@ -1,3 +1,5 @@
+import { resolveEnvironmentForRequest, type RequestEnvironment } from '@/utils/environment'
+import type { ResolutionMode } from '@/global'
 import { markRaw, reactive, toRaw } from 'vue'
 import type { Store } from 'vuex'
 import { nanoid } from 'nanoid'
@@ -81,7 +83,7 @@ export interface GrpcLiveCall {
 
 // what a call needs that is not shown, kept out of the reactive state
 interface GrpcCallState {
-    onFinished: () => void
+    onFinished: (response?: GrpcFinalResponse) => void
     // the item's id now, which a rename or move in a file workspace changes while the call runs
     itemId: string
     workspaceId: string
@@ -135,6 +137,8 @@ export interface GrpcSchemaEntry {
 export const grpcSchemas = reactive<Record<string, GrpcSchemaEntry>>({})
 // the schema each item uses, by getGrpcItemKey, null while its server is not known
 export const grpcItemSchemaKeys = reactive<Record<string, string | null>>({})
+// Preparation can fail before an address supplies a schema key.
+export const grpcItemSchemaPreparations = reactive<Record<string, { loading: boolean, error: string | null, failedAt: number | null }>>({})
 // A load runs while a caller waits on it. A caller that can stop waiting, such as a Send that is cancelled, passes a
 // signal, and the load stops, closing its connection, once no caller waits on it
 interface SchemaLoad {
@@ -210,7 +214,7 @@ async function asksPrompt(item: CollectionItem, environment: any, parentHeaders:
         JSON.stringify(environment?.GLOBAL_HEADERS ?? {}),
     ]
     for(const text of allTexts) {
-        const textResolved = await substituteEnvironmentVariables(environment, text ?? '', { tagTrigger: false, noError: true, resolvePromptTags: false, workspaceId: item.workspaceId })
+        const textResolved = await substituteEnvironmentVariables(environment, text ?? '', 'display', { noError: true, resolvePromptTags: false, resolveResponseTags: false, workspaceId: item.workspaceId })
         if(PROMPT_TAG_REGEX.test(textResolved)) {
             return true
         }
@@ -220,7 +224,7 @@ async function asksPrompt(item: CollectionItem, environment: any, parentHeaders:
 
 // The server address as typed, with variables resolved as a preview, never asking a prompt
 export async function previewGrpcTarget(item: CollectionItem, environment: any) {
-    const urlResolved = await substituteEnvironmentVariables(environment ?? {}, item.url ?? '', { tagTrigger: false, noError: true, workspaceId: item.workspaceId })
+    const urlResolved = await substituteEnvironmentVariables(environment ?? {}, item.url ?? '', 'display', { noError: true, responseTagErrors: 'placeholder', workspaceId: item.workspaceId })
     return parseGrpcTarget(urlResolved)
 }
 
@@ -246,9 +250,12 @@ function describeError(error: any) {
     return 'The call failed'
 }
 
+// A cold dependency uses one resolver for its schema and call, including the call's Stop signal.
+export type GrpcRequestPreparation = RequestEnvironment & { send: SendResolver, stopAbortController: AbortController }
+
 // connectionStatus is the status of a load that could not reach the server, such as UNAVAILABLE
 // errorWithoutValues is the engine's copy of the error for history, see GrpcCallEvent
-type SchemaLoadResult = { schema: GrpcSchema | null, error: string | null, errorWithoutValues?: string, connectionStatus: GrpcStatus | null }
+type SchemaLoadResult = { schema: GrpcSchema | null, error: string | null, errorWithoutValues?: string, connectionStatus: GrpcStatus | null, requestPreparation?: GrpcRequestPreparation }
 
 // what a caller that stopped waiting gets, which it does not show
 const SCHEMA_LOAD_NOT_WAITED_ON: SchemaLoadResult = { schema: null, error: 'The methods load was stopped', connectionStatus: null }
@@ -341,104 +348,117 @@ async function runSchemaLoad(key: string, metadataItemKey: string | null, load: 
 
 // Loads the methods an item can call. An automatic load, such as on opening the item or after its address changes,
 // reuses a schema already loaded or loading and never asks a prompt. The user's Reload always loads again
-export async function loadGrpcSchemaForItem(store: Store<State>, item: CollectionItem, { automatic = false, force = false } = {}) {
+export async function loadGrpcSchemaForItem(store: Store<State>, item: CollectionItem, options: { automatic?: boolean, force?: boolean, mode: ResolutionMode }): Promise<SchemaLoadResult | undefined> {
     if(!isGrpcAvailable()) {
         return
     }
 
+    const { automatic = false, force = false } = options ?? {}
+    const mode = options?.mode === 'send' ? 'send' : 'display'
     const itemKey = getGrpcItemKey(item)
     const requestNumber = ++schemaRequestCount
     itemSchemaRequests.set(itemKey, requestNumber)
     const isLatestRequest = () => itemSchemaRequests.get(itemKey) === requestNumber
-
-    const { environment, parentHeaders, parentAuthentication } = await store.dispatch('getEnvironmentForRequest', { collectionItem: item })
-    if(!isLatestRequest()) {
-        return
-    }
-
-    const protoFiles = getGrpcProtoFiles(item)
-    const reuses = (key: string) => !force && key in grpcSchemas && (grpcSchemas[key].loading || grpcSchemas[key].schema !== null || (automatic && grpcSchemas[key].error !== null && (schemaFailedItemKeys.get(key) ?? itemKey) === itemKey))
-
-    if(protoFiles) {
-        const key = getGrpcSchemaKey(null, protoFiles)!
-        grpcItemSchemaKeys[itemKey] = key
-        if(reuses(key)) {
-            return waitForRunningSchemaLoad(key)
-        }
-        const target = await previewGrpcTarget(item, environment)
-        return runSchemaLoad(key, null, signal => loadGrpcSchema({
-            target: isGrpcTarget(target) ? target : PROTO_ONLY_TARGET,
-            metadata: [],
-            protoFiles,
-            disableSSLVerification: isSSLVerificationDisabled(store),
-            timeoutMs: getSavedRequestTimeout(),
-        }, signal))
-    }
-
-    const url = item.url ?? ''
-
-    if(automatic && await asksPrompt(item, environment, parentHeaders, parentAuthentication, [url])) {
-        // the address can be known without asking, the methods wait for the user
-        if(!PROMPT_TAG_REGEX.test(await substituteEnvironmentVariables(environment, url, { tagTrigger: false, noError: true, resolvePromptTags: false, workspaceId: item.workspaceId }))) {
-            const target = await previewGrpcTarget(item, environment)
-            if(isLatestRequest()) {
-                grpcItemSchemaKeys[itemKey] = isGrpcTarget(target) ? getGrpcSchemaKey(target, null) : null
-            }
-        } else if(isLatestRequest()) {
-            grpcItemSchemaKeys[itemKey] = null
-        }
-        return
-    }
-
-    // an automatic load sends no request a response tag names, as it asks no prompt
-    const send = new SendResolver(item.workspaceId, !automatic)
-
-    let target: GrpcTarget | { error: string }
-    let metadata: GrpcMetadata
+    grpcItemSchemaPreparations[itemKey] = { loading: true, error: null, failedAt: null }
+    const preparation = grpcItemSchemaPreparations[itemKey]
+    const isLatestPreparation = () => isLatestRequest() && grpcItemSchemaPreparations[itemKey] === preparation
     let key: string | null = null
-    // such as a response tag's request, which can take long enough for the address to change. A newer request for the
-    // same server, such as an automatic one that reused the methods, leaves this one to load them or say why it cannot
+    let send: SendResolver | undefined
+    // A newer waiter for the same address still needs the load that prepared its metadata.
     const ownsLoad = () => isLatestRequest() || (key !== null && grpcItemSchemaKeys[itemKey] === key)
+    const reuses = (schemaKey: string) => !force && schemaKey in grpcSchemas && (grpcSchemas[schemaKey].loading || grpcSchemas[schemaKey].schema !== null || (mode === 'display' && automatic && grpcSchemas[schemaKey].error !== null && (schemaFailedItemKeys.get(schemaKey) ?? itemKey) === itemKey))
+    const reusedResult = (schemaKey: string) => waitForRunningSchemaLoad(schemaKey) ?? Promise.resolve({ schema: grpcSchemas[schemaKey].schema, error: grpcSchemas[schemaKey].schema ? null : grpcSchemas[schemaKey].error, connectionStatus: null })
 
     try {
-        target = parseGrpcTarget(await send.resolve(environment, url, 'unsaved'))
+        const requestEnvironment = await resolveEnvironmentForRequest(store, item, mode, { resolveResponseTags: !automatic })
+        const { environment, parentHeaders, parentAuthentication } = requestEnvironment
         if(!isLatestRequest()) {
             return
         }
+        const protoFiles = getGrpcProtoFiles(item)
+        if(protoFiles) {
+            // the files' schema does not depend on the address, so an address that fails to resolve stays this item's error
+            const protoKey = getGrpcSchemaKey(null, protoFiles)!
+            grpcItemSchemaKeys[itemKey] = protoKey
+            if(reuses(protoKey)) {
+                return await reusedResult(protoKey)
+            }
+            const target = await previewGrpcTarget(item, environment)
+            if(!isLatestPreparation()) {
+                return
+            }
+            return await runSchemaLoad(protoKey, null, signal => loadGrpcSchema({
+                target: isGrpcTarget(target) ? target : PROTO_ONLY_TARGET,
+                metadata: [],
+                protoFiles,
+                disableSSLVerification: isSSLVerificationDisabled(store),
+                timeoutMs: getSavedRequestTimeout(),
+            }, signal))
+        }
+
+        const url = item.url ?? ''
+        if(automatic && await asksPrompt(item, environment, parentHeaders, parentAuthentication, [url])) {
+            if(!PROMPT_TAG_REGEX.test(await substituteEnvironmentVariables(environment, url, 'display', { noError: true, resolvePromptTags: false, resolveResponseTags: false, workspaceId: item.workspaceId }))) {
+                const target = await previewGrpcTarget(item, environment)
+                if(isLatestRequest()) {
+                    grpcItemSchemaKeys[itemKey] = isGrpcTarget(target) ? getGrpcSchemaKey(target, null) : null
+                }
+            } else if(isLatestRequest()) {
+                grpcItemSchemaKeys[itemKey] = null
+            }
+            return
+        }
+
+        const stopAbortController = new AbortController()
+        send = new SendResolver(item.workspaceId, mode, stopAbortController.signal)
+        // a newer load took over, a response tag waiting on this one still calls the item with what this resolved
+        const overtaken = () => ({ schema: null, error: null, connectionStatus: null, requestPreparation: { ...requestEnvironment, send: send!, stopAbortController } })
+        const target = parseGrpcTarget(await send.resolve(environment, url, 'unsaved'))
+        if(!isLatestRequest()) {
+            return overtaken()
+        }
         if(!isGrpcTarget(target)) {
             grpcItemSchemaKeys[itemKey] = null
-            return
+            return { schema: null, error: target.error, errorWithoutValues: send.tookMaskedValue ? undefined : target.error, connectionStatus: null }
         }
         key = getGrpcSchemaKey(target, null)!
         grpcItemSchemaKeys[itemKey] = key
         if(reuses(key)) {
-            return waitForRunningSchemaLoad(key)
+            const result = await reusedResult(key)
+            return { ...result, requestPreparation: { ...requestEnvironment, send, stopAbortController } }
         }
-        metadata = await resolveMetadata(store, item, environment, parentHeaders, parentAuthentication, send)
+        const metadata = await resolveMetadata(store, item, environment, parentHeaders, parentAuthentication, send)
         if(!ownsLoad()) {
-            return
+            return overtaken()
         }
+        const result = await runSchemaLoad(key, itemKey, signal => loadGrpcSchema({
+            target,
+            metadata,
+            protoFiles: null,
+            disableSSLVerification: isSSLVerificationDisabled(store),
+            timeoutMs: getSavedRequestTimeout(),
+        }, signal))
+        return { ...result, requestPreparation: { ...requestEnvironment, send, stopAbortController } }
     } catch(error) {
-        // such as a cancelled prompt, shown where the methods would be
+        const message = describeError(error)
+        if(isLatestPreparation()) {
+            Object.assign(grpcItemSchemaPreparations[itemKey], { error: message, failedAt: Date.now() })
+        }
         if(ownsLoad()) {
-            const key = grpcItemSchemaKeys[itemKey]
-            if(key) {
-                grpcSchemas[key] ??= { loading: false, schema: null, loadedAt: null, error: null, errorCode: null, failedAt: null }
-                Object.assign(grpcSchemas[key], { error: describeError(error), errorCode: null, failedAt: Date.now() })
-                schemaFailedItemKeys.set(key, itemKey)
+            const schemaKey = key
+            if(schemaKey) {
+                grpcSchemas[schemaKey] ??= { loading: false, schema: null, loadedAt: null, error: null, errorCode: null, failedAt: null }
+                Object.assign(grpcSchemas[schemaKey], { error: message, errorCode: null, failedAt: Date.now() })
+                schemaFailedItemKeys.set(schemaKey, itemKey)
             }
         }
-        return
+        // Environment preparation never asks a prompt. Later preparation errors are safe only before one was masked.
+        return { schema: null, error: message, errorWithoutValues: send?.tookMaskedValue ? undefined : message, connectionStatus: null }
+    } finally {
+        if(isLatestPreparation()) {
+            grpcItemSchemaPreparations[itemKey].loading = false
+        }
     }
-
-    const validTarget = target
-    return runSchemaLoad(key!, itemKey, signal => loadGrpcSchema({
-        target: validTarget,
-        metadata,
-        protoFiles: null,
-        disableSSLVerification: isSSLVerificationDisabled(store),
-        timeoutMs: getSavedRequestTimeout(),
-    }, signal))
 }
 
 // kind is the method's, when the methods loaded before name it
@@ -598,7 +618,7 @@ async function finishCall(store: Store<State>, call: GrpcLiveCall, controller: G
         // such as for an item its file workspace no longer has. The call stays on screen
         console.error(`The gRPC call could not be saved to history: ${describeError(error)}`)
     } finally {
-        controller.onFinished()
+        controller.onFinished(entrySaved)
     }
 }
 
@@ -687,11 +707,12 @@ function dropGrpcCall(itemKey: string) {
 
 // Sends the item's call: Send for unary and server streaming calls, Start for client and bidi streams. A call still
 // running on the item stops first and is not saved, since nothing could reach it once this one shows
-export async function startGrpcCallForItem(store: Store<State>, item: CollectionItem, { unaryOnly = false, waitForEnd = false } = {}) {
+export async function startGrpcCallForItem(store: Store<State>, item: CollectionItem, { unaryOnly = false, waitForEnd = false, requestPreparation }: { unaryOnly?: boolean, waitForEnd?: boolean, requestPreparation?: GrpcRequestPreparation } = {}) {
     if(unaryOnly && (!item.grpc?.service || !item.grpc?.method)) {
         throw new Error(GRPC_RESPONSE_TAG_UNARY_MESSAGE, { cause: 'display-error' })
     }
     const itemKey = getGrpcItemKey(item)
+    const schemaPreparation = grpcItemSchemaPreparations[itemKey]
 
     dropGrpcCall(itemKey)
 
@@ -702,8 +723,8 @@ export async function startGrpcCallForItem(store: Store<State>, item: Collection
     // the reactive copy, which the panels watch
     const liveCall = grpcCalls[itemKey]
 
-    let onFinished: () => void = () => undefined
-    const finished = new Promise<void>(resolve => {
+    let onFinished: (response?: GrpcFinalResponse) => void = () => undefined
+    const finished = new Promise<GrpcFinalResponse | undefined>(resolve => {
         onFinished = resolve
     })
     const controller: GrpcCallState = {
@@ -711,7 +732,7 @@ export async function startGrpcCallForItem(store: Store<State>, item: Collection
         itemId: item._id,
         workspaceId: item.workspaceId,
         transport: null,
-        stopAbortController: new AbortController(),
+        stopAbortController: requestPreparation?.stopAbortController ?? new AbortController(),
         cancelRequested: false,
         replaced: false,
         send: null,
@@ -741,8 +762,8 @@ export async function startGrpcCallForItem(store: Store<State>, item: Collection
     }
 
     try {
-        const { environment, parentHeaders, parentAuthentication } = await store.dispatch('getEnvironmentForRequest', { collectionItem: item })
-        const send = new SendResolver(item.workspaceId, true, controller.stopAbortController.signal)
+        const { environment, parentHeaders, parentAuthentication } = requestPreparation ?? await resolveEnvironmentForRequest(store, item, 'send')
+        const send = requestPreparation?.send ?? new SendResolver(item.workspaceId, 'send', controller.stopAbortController.signal)
         controller.send = send
         controller.environment = environment
 
@@ -783,6 +804,10 @@ export async function startGrpcCallForItem(store: Store<State>, item: Collection
             }
             schema = loaded.schema
             schemaMethod = findGrpcMethod(schema, liveCall.service, liveCall.method)
+        }
+
+        if(schema && grpcItemSchemaPreparations[itemKey] === schemaPreparation) {
+            delete grpcItemSchemaPreparations[itemKey]
         }
 
         if(!schemaMethod) {
@@ -851,7 +876,7 @@ export async function startGrpcCallForItem(store: Store<State>, item: Collection
             transport.cancel()
         }
         if(waitForEnd) {
-            await finished
+            return await finished
         }
     } catch(error: any) {
         if(unaryOnly && error?.message === GRPC_RESPONSE_TAG_UNARY_MESSAGE) {
@@ -941,6 +966,7 @@ function forgetGrpcCallsForItemKeys(itemKeys: string[]) {
     for(const itemKey of itemKeys) {
         dropGrpcCall(itemKey)
         itemSchemaRequests.delete(itemKey)
+        delete grpcItemSchemaPreparations[itemKey]
         delete grpcCalls[itemKey]
         delete grpcItemSchemaKeys[itemKey]
     }
@@ -962,14 +988,15 @@ export function moveGrpcCallsToNewItemIds(workspaceId: string, oldItemIds: strin
     // all taken out first, so an item renamed to a name another one just gave up keeps its own call
     const moved = [...oldIds].filter(oldId => newIdsByOldId.has(oldId) && newIdsByOldId.get(oldId) !== oldId).map(oldId => {
         const oldKey = keyOf(oldId)
-        const entry = { newId: newIdsByOldId.get(oldId)!, controller: controllers.get(oldKey), call: grpcCalls[oldKey], schemaKey: grpcItemSchemaKeys[oldKey] }
+        const entry = { newId: newIdsByOldId.get(oldId)!, controller: controllers.get(oldKey), call: grpcCalls[oldKey], schemaKey: grpcItemSchemaKeys[oldKey], preparation: grpcItemSchemaPreparations[oldKey] }
         controllers.delete(oldKey)
         delete grpcCalls[oldKey]
         delete grpcItemSchemaKeys[oldKey]
         itemSchemaRequests.delete(oldKey)
+        delete grpcItemSchemaPreparations[oldKey]
         return entry
     })
-    for(const { newId, controller, call, schemaKey } of moved) {
+    for(const { newId, controller, call, schemaKey, preparation } of moved) {
         const newKey = keyOf(newId)
         if(controller) {
             controller.itemId = newId
@@ -977,6 +1004,9 @@ export function moveGrpcCallsToNewItemIds(workspaceId: string, oldItemIds: strin
         }
         if(call) {
             grpcCalls[newKey] = call
+        }
+        if(preparation) {
+            grpcItemSchemaPreparations[newKey] = { ...preparation, loading: false }
         }
         if(schemaKey !== undefined) {
             grpcItemSchemaKeys[newKey] = schemaKey
@@ -987,7 +1017,7 @@ export function moveGrpcCallsToNewItemIds(workspaceId: string, oldItemIds: strin
 // for a workspace deleted or closed, whose items a file workspace keeps only on disk
 export function forgetGrpcCallsForWorkspace(workspaceId: string) {
     // ended calls too, which have no controller anymore, and the methods each item uses
-    const itemKeys = new Set([...controllers.keys(), ...Object.keys(grpcCalls), ...Object.keys(grpcItemSchemaKeys), ...itemSchemaRequests.keys()])
+    const itemKeys = new Set([...controllers.keys(), ...Object.keys(grpcCalls), ...Object.keys(grpcItemSchemaKeys), ...itemSchemaRequests.keys(), ...Object.keys(grpcItemSchemaPreparations)])
     forgetGrpcCallsForItemKeys([...itemKeys].filter(itemKey => JSON.parse(itemKey)[0] === workspaceId))
 }
 
@@ -996,6 +1026,9 @@ export function forgetGrpcCallsForWorkspace(workspaceId: string) {
 // next load tries again. Methods loaded before are kept
 export function forgetFailedGrpcSchemaLoads() {
     connectionSettingsChanges++
+    for(const preparation of Object.values(grpcItemSchemaPreparations)) {
+        Object.assign(preparation, { error: null, failedAt: null })
+    }
     for(const [key, entry] of Object.entries(grpcSchemas)) {
         if(!entry.loading && entry.error !== null) {
             Object.assign(entry, { error: null, errorCode: null, failedAt: null })
@@ -1011,6 +1044,9 @@ export function resetGrpcCalls() {
     schemaLoads.clear()
     schemaFailedItemKeys.clear()
     itemSchemaRequests.clear()
+    for(const key of Object.keys(grpcItemSchemaPreparations)) {
+        delete grpcItemSchemaPreparations[key]
+    }
     for(const key of Object.keys(grpcCalls)) {
         delete grpcCalls[key]
     }

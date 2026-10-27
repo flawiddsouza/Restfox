@@ -59,7 +59,7 @@ Scripts, a folder's included, do not run for gRPC requests, and the Collection R
 
 A response tag can read a unary gRPC request. **Body** reads the reply's JSON with JSONPath, **Raw** reads that JSON as text, and **Header** reads received metadata by name, without regard to case. The trigger behaviors work as for HTTP requests. A triggered call uses the same metadata, inherited auth, prompts and connection settings as **Send**, and the tag waits for the call to end and be saved.
 
-Tags read the latest completed call with status OK and exactly one decoded reply. They skip failed, cancelled and undecodable calls, and can read the known fields of a reply whose bytes also contain unknown fields. A stream or a request without a chosen unary method cannot be read by a response tag.
+Tags read the latest completed call with status OK and exactly one decoded reply. They skip failed, cancelled and undecodable calls, and can read the known fields of a reply whose bytes also contain unknown fields. A tag that makes its own call reads that call, and stops the send when the call does not end that way. A stream or a request without a chosen unary method cannot be read by a response tag.
 
 ## Messages
 

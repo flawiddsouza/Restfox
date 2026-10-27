@@ -17,11 +17,11 @@ export async function generateCode(
     parentHeaders: Record<string, string[]>,
     parentAuthentication: RequestAuthentication | undefined,
     target: 'shell',
-    clientId: 'curl'
+    clientId: 'curl',
+    // one send for prompt and response tags, so a prompt in the url and the body asks once and a response tag sends
+    // once. The code is shown, never saved
+    send: SendResolver
 ) {
-    // one send for prompt tags, so a prompt in the url and the body asks once. The code is shown, never saved
-    const send = new SendResolver(request.workspaceId)
-
     const state: HandleRequestState = {
         currentPlugin: null,
         testResults: []

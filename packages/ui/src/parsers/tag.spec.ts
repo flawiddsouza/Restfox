@@ -1,3 +1,4 @@
+// @vitest-environment edge-runtime
 import { test, expect } from 'vitest'
 import { tagRegex, parseFunction, toFunctionString, handleTags, ParsedResult } from './tag'
 
@@ -89,7 +90,7 @@ test('handleTags: #311', async() => {
         }
     }
 
-    expect(await handleTags(handleResponseTag, input, false, undefined, true)).toEqual(expectedOutput)
+    expect(await handleTags(handleResponseTag, input, 'display', undefined, true)).toEqual(expectedOutput)
 })
 
 test('parseFunction: a bare true or false reads as 1 or 0, as the tag editor writes a checkbox', async() => {

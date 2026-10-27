@@ -463,9 +463,11 @@
 </template>
 
 <script setup lang="ts">
+import { type Store, useStore } from 'vuex'
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import { computed, PropType, ref } from 'vue'
 import CodeMirrorSingleLine from './CodeMirrorSingleLine.vue'
-import { CollectionItem, Flags } from '@/global'
+import { CollectionItem, Flags, RequestAuthentication, State } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
 import { createOAuthTokenRequest, describeOAuthTokenError, fetchWrapper, getAuthenticationType, getMissingOAuthTokenFieldsMessage, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, parseOAuthTokenResponse, SendResolver } from '@/helpers'
@@ -473,6 +475,8 @@ import { useToast } from 'vue-toast-notification'
 import { bufferToString } from '@/utils/response'
 
 const toast = useToast()
+
+const store: Store<State> = useStore()
 
 const props = defineProps({
     collectionItem: {
@@ -691,26 +695,34 @@ function generateRandomState(): string {
 
 // the fields of one token request are one send for prompt tags: a prompt used twice asks once, cancelling stops it.
 // The fields are sent, never saved
-async function runWithPromptSend(action: (send: SendResolver) => Promise<void>) {
+async function runWithPromptSend(action: (auth: RequestAuthentication | undefined, send: SendResolver, env: any) => Promise<void>) {
+    const collectionItem = props.collectionItem
+    const auth = collectionItem?.authentication
+    const send = new SendResolver(collectionItem.workspaceId, 'send')
     try {
-        await action(new SendResolver(props.collectionItem.workspaceId))
+        const { environment } = await resolveEnvironmentForRequest(store, collectionItem, 'send', { includeSelf: collectionItem._type === 'request_group' })
+        await action(auth, send, environment)
     } catch (error: any) {
         if (error?.cause === 'display-error') {
             toast.error(error.message)
             return
         }
-        throw error
+        console.error(error)
+        toast.error(error instanceof Error ? error.message : String(error))
     }
 }
 
 async function openAuthorizationUrl() {
-    await runWithPromptSend(openAuthorizationUrlForSend)
+    const auth = props.collectionItem?.authentication
+    // PKCE is taken as it is at the click, when the item it is saved into is still the one shown
+    const usePKCE = !!auth?.usePKCE
+    if (auth && usePKCE && !auth.codeVerifier) {
+        auth.codeVerifier = generateRandomString(50)
+    }
+    await runWithPromptSend((auth, send, env) => openAuthorizationUrlForSend(auth, send, env, usePKCE))
 }
 
-async function openAuthorizationUrlForSend(send: SendResolver) {
-    const auth = props.collectionItem?.authentication
-    const env = props.collectionItemEnvironmentResolved
-
+async function openAuthorizationUrlForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any, usePKCE: boolean) {
     if (auth) {
         try {
             const clientId: string = await send.resolve(env, auth.clientId, 'unsaved')
@@ -743,9 +755,9 @@ async function openAuthorizationUrlForSend(send: SendResolver) {
             }
 
             // Handle PKCE if enabled
-            if (auth.usePKCE) {
+            if (usePKCE) {
                 if (!auth.codeVerifier) {
-                    generateCodeVerifier()
+                    auth.codeVerifier = generateRandomString(50)
                 }
                 if (auth.codeVerifier) {
                     const codeChallenge = await sha256(auth.codeVerifier)
@@ -783,10 +795,7 @@ async function requestOAuthToken() {
     await runWithPromptSend(requestOAuthTokenForSend)
 }
 
-async function requestOAuthTokenForSend(send: SendResolver) {
-    const auth = props.collectionItem?.authentication
-    const env = props.collectionItemEnvironmentResolved
-
+async function requestOAuthTokenForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any) {
     if (auth) {
         // a field that was never filled in is undefined and would otherwise be sent as the text 'undefined'
         const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
@@ -868,56 +877,51 @@ async function refreshOAuthToken() {
     await runWithPromptSend(refreshOAuthTokenForSend)
 }
 
-async function refreshOAuthTokenForSend(send: SendResolver) {
-    const auth = props.collectionItem?.authentication
-    const env = props.collectionItemEnvironmentResolved
-
+async function refreshOAuthTokenForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any) {
     if(auth) {
-        if(props.collectionItem && props.collectionItem.authentication) {
-            const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
-            const clientSecret: string = await send.resolve(env, auth.clientSecret ?? '', 'unsaved')
-            const accessTokenUrl: string = await send.resolve(env, auth.accessTokenUrl ?? '', 'unsaved')
-            const refreshToken: string | any = props.collectionItem.authentication.refreshToken
+        const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
+        const clientSecret: string = await send.resolve(env, auth.clientSecret ?? '', 'unsaved')
+        const accessTokenUrl: string = await send.resolve(env, auth.accessTokenUrl ?? '', 'unsaved')
+        const refreshToken: string | any = auth.refreshToken
 
-            const missingFieldsMessage = getMissingOAuthTokenFieldsMessage('refresh', { accessTokenUrl })
+        const missingFieldsMessage = getMissingOAuthTokenFieldsMessage('refresh', { accessTokenUrl })
 
-            if (missingFieldsMessage) {
-                toast.error(missingFieldsMessage)
+        if (missingFieldsMessage) {
+            toast.error(missingFieldsMessage)
+            return
+        }
+
+        try {
+            const abortController = new AbortController()
+
+            const { headers, body } = createOAuthTokenRequest(clientId, clientSecret, auth.clientAuthentication, {
+                grant_type: constants.GRANT_TYPES.refresh_token,
+                refresh_token: refreshToken,
+            })
+
+            const response = await fetchWrapper(accessTokenUrl, 'POST', headers, body, abortController.signal, {
+                electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
+                disableSSLVerification: props.flags.disableSSLVerification,
+                requestTimeout: getSavedRequestTimeout(),
+            })
+
+            const res = parseOAuthTokenResponse(response.buffer)
+
+            if(response.status !== 200 || !res?.access_token) {
+                couldNotFetchTokenError(response, accessTokenUrl)
                 return
             }
 
-            try {
-                const abortController = new AbortController()
-
-                const { headers, body } = createOAuthTokenRequest(clientId, clientSecret, auth.clientAuthentication, {
-                    grant_type: constants.GRANT_TYPES.refresh_token,
-                    refresh_token: refreshToken,
-                })
-
-                const response = await fetchWrapper(accessTokenUrl, 'POST', headers, body, abortController.signal, {
-                    electronSwitchToChromiumFetch: props.flags.electronSwitchToChromiumFetch,
-                    disableSSLVerification: props.flags.disableSSLVerification,
-                    requestTimeout: getSavedRequestTimeout(),
-                })
-
-                const res = parseOAuthTokenResponse(response.buffer)
-
-                if(response.status !== 200 || !res?.access_token) {
-                    couldNotFetchTokenError(response, accessTokenUrl)
-                    return
+            if(props.collectionItem && props.collectionItem.authentication) {
+                props.collectionItem.authentication.token = res.access_token
+                if('refresh_token' in res) {
+                    props.collectionItem.authentication.refreshToken = res.refresh_token
                 }
-
-                if(props.collectionItem && props.collectionItem.authentication) {
-                    props.collectionItem.authentication.token = res.access_token
-                    if('refresh_token' in res) {
-                        props.collectionItem.authentication.refreshToken = res.refresh_token
-                    }
-                }
-                toast.success('OAuth token refreshed successfully!')
-
-            } catch (error) {
-                couldNotFetchTokenError(error, accessTokenUrl)
             }
+            toast.success('OAuth token refreshed successfully!')
+
+        } catch (error) {
+            couldNotFetchTokenError(error, accessTokenUrl)
         }
     }
 }

@@ -2,12 +2,11 @@ import * as tagParser from '@/parsers/tag'
 import { store } from '@/store'
 import { getResponsesByCollectionId } from '@/db'
 import { bufferToString, filterJSONResponse, filterXmlResponse, getResponseContentType } from './response'
-import { CollectionItem, GrpcFinalResponse, RequestFinalResponse } from '@/global'
+import { CollectionItem, GrpcFinalResponse, RequestFinalResponse, ResolutionMode, ResponseTagCache } from '@/global'
 import { jsonStringify } from '@/helpers'
 import { GRPC_RESPONSE_TAG_UNARY_MESSAGE, findGrpcMethod, getGrpcCallKind } from './grpc'
-import { getGrpcItemKey, grpcItemSchemaKeys, grpcSchemas, loadGrpcSchemaForItem, startGrpcCallForItem } from './grpc-calls'
+import { type GrpcRequestPreparation, getGrpcItemKey, grpcItemSchemaKeys, grpcSchemas, loadGrpcSchemaForItem, startGrpcCallForItem } from './grpc-calls'
 
-const cache = new Map<string, any>()
 type SavedResponse = RequestFinalResponse | GrpcFinalResponse
 
 // A response cut short holds part of its body, so a tag reads the newest whole one, as when only whole ones were saved
@@ -27,119 +26,124 @@ async function getWholeResponses(request: CollectionItem, responses?: SavedRespo
 
 async function getResponseForRequest(
     collectionId: string,
-    tagTrigger: boolean,
+    mode: ResolutionMode,
     behavior: 'never' | 'no-history' | 'when-expired' | 'always',
     maxAgeInSeconds: number,
     workspaceId?: string,
 ) {
-    const findRequest = () => {
+    const findRequest = (afterWait = false) => {
         const request = store.state.collection.find(collectionItem => collectionItem._id === collectionId && (workspaceId === undefined || collectionItem.workspaceId === workspaceId))
-        if(workspaceId !== undefined && !request) {
+        if(workspaceId !== undefined && store.state.activeWorkspace?._id !== workspaceId) {
             throw new Error('The request this tag reads is in another workspace', { cause: 'display-error' })
+        }
+        if(afterWait && !request) {
+            throw new Error('The request this tag reads was deleted', { cause: 'display-error' })
         }
         return request
     }
+    mode = mode === 'send' ? 'send' : 'display'
     const request = findRequest()
+
+    const shouldSend = (responses: SavedResponse[]) => {
+        if(mode !== 'send' || behavior === 'never') {
+            return false
+        }
+        if(behavior === 'always') {
+            return true
+        }
+        if(behavior === 'no-history') {
+            return responses.length === 0
+        }
+        const latestResponse = responses[0]
+        return behavior === 'when-expired' && (!latestResponse || Date.now() - new Date(latestResponse.createdAt).getTime() > maxAgeInSeconds * 1000)
+    }
 
     if (!request || (request._type !== 'request' && request._type !== 'grpc')) {
         return undefined
     }
 
     let grpcResponses: SavedResponse[] | undefined
+    let requestPreparation: GrpcRequestPreparation | undefined
     if(request._type === 'grpc') {
         if(!request.grpc?.service || !request.grpc?.method) {
             throw new Error(GRPC_RESPONSE_TAG_UNARY_MESSAGE, { cause: 'display-error' })
         }
         grpcResponses = await getResponsesByCollectionId(request.workspaceId, request._id) as SavedResponse[]
+        const wholeResponses = await getWholeResponses(request, grpcResponses)
+        const schemaMode = shouldSend(wholeResponses) ? 'send' : 'display'
+        findRequest(true)
         const selectedSchema = () => grpcSchemas[grpcItemSchemaKeys[getGrpcItemKey(request)] ?? '']?.schema
         const selectedMethod = () => findGrpcMethod(selectedSchema(), request.grpc?.service, request.grpc?.method)
         const saved = grpcResponses.find((response): response is GrpcFinalResponse => 'grpc' in response && !!response.grpc.kind && response.grpc.service === request.grpc?.service && response.grpc.method === request.grpc?.method)
         // Reading history works offline too. A loaded schema is newer evidence of the chosen method's kind.
         let kind = selectedSchema() ? (selectedMethod() ? getGrpcCallKind(selectedMethod()!) : null) : saved?.grpc.kind
         if(kind === undefined) {
-            findRequest()
-            await loadGrpcSchemaForItem(store, request, { automatic: true })
+            if(mode !== 'send' || (behavior === 'never' && wholeResponses.length === 0)) {
+                return undefined
+            }
+            const loaded = await loadGrpcSchemaForItem(store, request, { automatic: true, mode: schemaMode })
+            findRequest(true)
+            if(schemaMode === 'send' && loaded?.error) {
+                throw new Error(loaded.errorWithoutValues ?? 'Could not load the methods of the request this tag reads', { cause: 'display-error' })
+            }
+            requestPreparation = schemaMode === 'send' ? loaded?.requestPreparation : undefined
             kind = selectedMethod() ? getGrpcCallKind(selectedMethod()!) : null
+            // A call may have saved while the schema loaded.
+            grpcResponses = await getResponsesByCollectionId(request.workspaceId, request._id) as SavedResponse[]
+            findRequest(true)
         }
-        if((kind && kind !== 'unary') || (!kind && (selectedSchema() || !tagTrigger || behavior === 'never'))) {
+        if((kind && kind !== 'unary') || (!kind && (selectedSchema() || mode !== 'send' || behavior === 'never'))) {
             throw new Error(GRPC_RESPONSE_TAG_UNARY_MESSAGE, { cause: 'display-error' })
         }
     }
 
-    const send = () => {
-        findRequest()
-        return request._type === 'grpc'
-            ? startGrpcCallForItem(store, request, { unaryOnly: true, waitForEnd: true })
-            : store.dispatch('sendRequest', request)
-    }
-
-    if (!tagTrigger) {
-        behavior = 'never'
-    }
-
-    if (behavior === 'always') {
-        // send request
-        await send()
-    }
-
-    let responses = await getWholeResponses(request, behavior === 'always' ? undefined : grpcResponses)
-    let latestResponse = responses[0]
-
-    let refetchResponses = false
-
-    if (behavior === 'no-history' && responses.length === 0) {
-        // send request
-        refetchResponses = true
-    }
-
-    if (behavior === 'when-expired') {
-        if (!latestResponse) {
-            // send request
-            refetchResponses = true
-        } else {
-            const now = new Date().getTime()
-            const responseTime = new Date(latestResponse.createdAt).getTime()
-            const age = now - responseTime
-
-            if (age > (maxAgeInSeconds * 1000)) {
-                // send request
-                refetchResponses = true
-            }
+    const send = async() => {
+        findRequest(true)
+        const result = request._type === 'grpc'
+            ? await startGrpcCallForItem(store, request, { unaryOnly: true, waitForEnd: true, ...(requestPreparation ? { requestPreparation } : {}) })
+            : await store.dispatch('sendRequest', request)
+        const response = result && ('grpc' in result || ('buffer' in result && !('error' in result)))
+            ? (await getWholeResponses(request, [result]))[0]
+            : undefined
+        if(!response) {
+            throw new Error('The request this tag sent did not complete with a whole response', { cause: 'display-error' })
         }
+        findRequest(true)
+        return response
     }
 
-    if (refetchResponses) {
-        await send()
-        responses = await getWholeResponses(request)
-        // newest first, as the database gives them
-        latestResponse = responses[0]
+    if (mode === 'send' && behavior === 'always') {
+        return send()
     }
 
-    return latestResponse
+    const responses = await getWholeResponses(request, grpcResponses)
+    findRequest(true)
+    return shouldSend(responses) ? send() : responses[0]
 }
 
-export async function handleResponseTag(parsedTag: tagParser.ParsedResult, tagTrigger: boolean, cacheId: string | undefined, workspaceId?: string) {
+export async function handleResponseTag(parsedTag: tagParser.ParsedResult, mode: ResolutionMode, responseTags: ResponseTagCache | undefined, workspaceId?: string) {
     let returnValue = undefined
 
-    const cacheKey = JSON.stringify([workspaceId, cacheId, parsedTag])
+    const cacheKey = JSON.stringify([workspaceId, parsedTag])
 
-    let response: RequestFinalResponse | GrpcFinalResponse | undefined
+    let pendingResponse = responseTags?.get(cacheKey)
 
-    if (cacheId && cache.has(cacheKey)) {
-        response = cache.get(cacheKey)
-    } else {
-        response = await getResponseForRequest(
+    if (!pendingResponse) {
+        pendingResponse = getResponseForRequest(
             parsedTag.parameters.request as string,
-            tagTrigger,
+            mode,
             parsedTag.parameters.behavior as 'never' | 'no-history' | 'when-expired' | 'always',
             parsedTag.parameters.maxAge as number,
             workspaceId,
         )
+        if (responseTags) {
+            responseTags.set(cacheKey, pendingResponse)
+            // a failure is not kept, the next resolution tries again
+            pendingResponse.catch(() => responseTags.delete(cacheKey))
+        }
     }
 
-    if (cacheId) {
-        cache.set(cacheKey, response)
-    }
+    const response = await pendingResponse
 
     if (response) {
         const grpc = 'grpc' in response ? response.grpc : null

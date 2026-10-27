@@ -77,6 +77,7 @@
 </template>
 
 <script>
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { useStore } from 'vuex'
 import { fetchGraphQLSchema } from '@/helpers'
@@ -129,7 +130,7 @@ export default {
             loading.value = true
             error.value = null
             try {
-                const { environment, parentHeaders, parentAuthentication } = await store.dispatch('getEnvironmentForRequest', { collectionItem: props.collectionItem })
+                const { environment, parentHeaders, parentAuthentication } = await resolveEnvironmentForRequest(store, props.collectionItem, 'send')
                 schema.value = await fetchGraphQLSchema(props.collectionItem, environment, parentHeaders, parentAuthentication, currentAbortController.signal, store.state.flags)
             } catch (err) {
                 if(currentAbortController.signal.aborted) {

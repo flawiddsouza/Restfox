@@ -42,6 +42,7 @@
 </template>
 
 <script>
+import { resolveEnvironmentForRequest } from '@/utils/environment'
 import RequestPanelHeaders from '@/components/RequestPanelHeaders.vue'
 import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import EditTagModal from '@/components/modals/EditTagModal.vue'
@@ -104,14 +105,21 @@ export default {
     },
     methods: {
         async loadEnvVariables() {
+            const load = {}
+            this.envLoad = load
+            const isCurrent = () => this.envLoad === load
             try {
                 if(this.collectionItem) {
                     const request = JSON.parse(JSON.stringify(this.collectionItem))
-                    const { environment } = await this.$store.dispatch('getEnvironmentForRequest', { collectionItem: request, includeSelf: true })
-                    this.envVariables = environment
+                    const { environment } = await resolveEnvironmentForRequest(this.$store, request, 'display', { includeSelf: true, noError: true, responseTagErrors: 'placeholder' })
+                    if(isCurrent()) {
+                        this.envVariables = environment
+                    }
                 }
             } catch (error) {
-                console.error('Error loading environment variables:', error)
+                if(isCurrent()) {
+                    console.error('Error loading environment variables:', error)
+                }
             }
         },
         async updateCollectionItem(collectionItem) {

@@ -1,5 +1,6 @@
 // @vitest-environment edge-runtime
 
+import { SendResolver } from '@/helpers'
 import { assert, test, describe, vi, beforeAll } from 'vitest'
 import { generateCode } from './generate-code'
 
@@ -73,7 +74,7 @@ describe(`${generateCode.name}`, () => {
             API_URL: 'http://clicks-inges-abc-xyz.ap-south-1.elb.amazonaws.com'
         }
 
-        const input = await generateCode(request, environment, {}, undefined, 'shell', 'curl')
+        const input = await generateCode(request, environment, {}, undefined, 'shell', 'curl', new SendResolver((request).workspaceId, 'send'))
         const expectedOutput = `curl --request POST \\
     --url 'http://clicks-inges-abc-xyz.ap-south-1.elb.amazonaws.com/collect?appId=demo_app2' \\
     --header 'Content-Type: application/json; charset=utf-8' \\
@@ -87,7 +88,7 @@ test('a prompt in the url and the body asks once', async() => {
     ;(window as any).createPrompt = createPrompt
     const tag = `{% prompt(title='Version') %}`
     const request = { _id: 'r', _type: 'request', workspaceId: 'w', parentId: null, name: 'r', method: 'POST', url: `https://example.test/${tag}`, body: { mimeType: 'application/json', text: `{"v":"${tag}"}` } }
-    const code = await generateCode(request as any, {}, {}, undefined, 'shell', 'curl')
+    const code = await generateCode(request as any, {}, {}, undefined, 'shell', 'curl', new SendResolver((request as any).workspaceId, 'send'))
     assert.include(code, 'https://example.test/v1')
     assert.include(code, '{"v":"v1"}')
     assert.equal(createPrompt.mock.calls.length, 1)

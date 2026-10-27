@@ -29,6 +29,9 @@ import {
     ResponseProgressHandler,
     GrpcProtoFile,
     GrpcSettings,
+    ResolutionMode,
+    ResolutionOptions,
+    ResponseTagCache,
 } from './global'
 import { ActionContext } from 'vuex'
 import { version } from '../../electron/package.json'
@@ -90,9 +93,10 @@ export function flattenTree(array: CollectionItem[]) {
 export function substituteEnvironmentVariables(
     environment: any,
     string: string,
-    options: { tagTrigger?: boolean, noError?: boolean, resolvePromptTags?: boolean, workspaceId?: string } = {}
+    mode: ResolutionMode,
+    options: ResolutionOptions = {}
 ) {
-    return substituteEnvironmentVariablesWith(environment, string, options)
+    return substituteEnvironmentVariablesWith(environment, string, mode, options)
 }
 
 // send keeps response tags' responses for one send and resolves its prompt tags. promptTagsOnly leaves variables and
@@ -100,10 +104,12 @@ export function substituteEnvironmentVariables(
 async function substituteEnvironmentVariablesWith(
     environment: any,
     string: string,
-    options: { tagTrigger?: boolean, noError?: boolean, resolvePromptTags?: boolean, promptTagsOnly?: boolean, workspaceId?: string },
-    send?: { cacheId: string, handlePromptTag: (parsedTag: ParsedResult) => Promise<string>, throwIfStopped: () => void }
+    mode: ResolutionMode,
+    options: ResolutionOptions & { promptTagsOnly?: boolean },
+    send?: { responseTags: ResponseTagCache, handlePromptTag: (parsedTag: ParsedResult) => Promise<string>, throwIfStopped: () => void }
 ) {
-    const { tagTrigger = true, noError = false, resolvePromptTags = true, promptTagsOnly = false } = options
+    mode = mode === 'send' ? 'send' : 'display'
+    const { noError = false, resolvePromptTags = true, resolveResponseTags = true, promptTagsOnly = false } = options
 
     if(promptTagsOnly) {
         environment = {}
@@ -134,15 +140,15 @@ async function substituteEnvironmentVariablesWith(
         substitutedString = substitutedString.replaceAll(`{{ ${objectPath} }}`, objectPathValue)
     })
 
-    const handlePromptTagForString = async(parsedTag: ParsedResult) => send ? send.handlePromptTag(parsedTag) : getPromptPreviewValue(parsedTag, options.workspaceId)
+    const handlePromptTagForString = async(parsedTag: ParsedResult) => mode === 'send' && send ? send.handlePromptTag(parsedTag) : getPromptPreviewValue(parsedTag, options.workspaceId)
 
     // a send that was stopped sends no request of a response tag still to come in the text
-    const handleResponseTagForString = async(parsedTag: ParsedResult, tagTrigger: boolean, cacheId: string | undefined) => {
+    const handleResponseTagForString = async(parsedTag: ParsedResult) => {
         send?.throwIfStopped()
-        return handleResponseTag(parsedTag, tagTrigger, cacheId, options.workspaceId)
+        return handleResponseTag(parsedTag, mode, send?.responseTags, options.workspaceId)
     }
 
-    substitutedString = await handleTags(handleResponseTagForString, substitutedString, tagTrigger, send?.cacheId, noError, handlePromptTagForString, resolvePromptTags, !promptTagsOnly)
+    substitutedString = await handleTags(handleResponseTagForString, substitutedString, mode, send?.responseTags, noError, handlePromptTagForString, resolvePromptTags, !promptTagsOnly, resolveResponseTags, options.responseTagErrors)
 
     return substitutedString
 }
@@ -155,14 +161,14 @@ export type SendPart = 'url' | 'body' | { header: string } | 'unsaved'
 // One send of a request, or one preparation of it such as generated code. Prompt tags ask only through it, and each
 // text it resolves names the part of the send it goes into, so a masked prompt's value never reaches a saved copy
 export class SendResolver {
-    // what Ask keeps is kept per workspace. tagTrigger false has response tags read the saved response and never send
+    // what Ask keeps is kept per workspace. Display reads saved responses and never sends
     // their request, for a resolve the user did not ask for. Once signal aborts, as when the send is cancelled, no text
     // starts resolving and no prompt or response tag in a text still resolving goes on, so neither a prompt nor a
     // response tag's request comes after the cancel
-    constructor(readonly workspaceId: string, readonly tagTrigger = true, readonly signal: AbortSignal | null = null) {}
+    constructor(readonly workspaceId: string, readonly mode: ResolutionMode, readonly signal: AbortSignal | null = null) {}
 
     // response tags keep their response for the send by it
-    readonly cacheId = nanoid()
+    private readonly responseTags: ResponseTagCache = new Map()
     // the values this send was given, so a prompt used twice in one send asks once
     private readonly promptValues = new Map<string, Promise<string>>()
     // the values masked prompts gave this send, to be hidden in text written from them, such as an error
@@ -331,8 +337,8 @@ export class SendResolver {
 
     private async substitute(environment: any, text: string, onMaskedPrompt: () => void, { hideMasked = false, promptTagsOnly = false } = {}) {
         this.throwIfStopped()
-        return substituteEnvironmentVariablesWith(environment, text, { promptTagsOnly, tagTrigger: this.tagTrigger, workspaceId: this.workspaceId }, {
-            cacheId: this.cacheId,
+        return substituteEnvironmentVariablesWith(environment, text, this.mode, { promptTagsOnly, workspaceId: this.workspaceId }, {
+            responseTags: this.responseTags,
             throwIfStopped: () => this.throwIfStopped(),
             handlePromptTag: async parsedTag => {
                 this.throwIfStopped()
@@ -379,7 +385,7 @@ export class SendResolver {
 
 // text resolved as a send of its own, and the same with masked prompt values hidden, which is what may be shown and saved
 export function substituteEnvironmentVariablesForSend(environment: any, text: string, workspaceId: string) {
-    return new SendResolver(workspaceId).resolveWithMasked(environment, text)
+    return new SendResolver(workspaceId, 'send').resolveWithMasked(environment, text)
 }
 
 export function generateBasicAuthString(username: string, password: string) {
@@ -1038,7 +1044,7 @@ export async function createRequestData(
     plugins: Plugin[],
     workspaceLocation: string | null,
     // a caller that saves the send, or resolves more of it, passes its own
-    send = new SendResolver(request.workspaceId),
+    send: SendResolver,
     // keyed by the sent name, so masked names that become identical still keep their own entries
     headersMasked?: Map<string, [string, string]>
 ): Promise<CreateRequestDataReturn> {
@@ -1324,7 +1330,7 @@ export async function handleRequest(
     }
 
     // what a masked prompt left out of the saved copy is known once the request is prepared
-    const send = new SendResolver(request.workspaceId)
+    const send = new SendResolver(request.workspaceId, 'send')
 
     try {
         const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation, send)
@@ -1520,7 +1526,7 @@ export async function fetchGraphQLSchema(
         testResults: [],
     }
 
-    const { url, headers } = await createRequestData(state, { ...request, body: undefined }, environment, parentHeaders, parentAuthentication, null, [], null)
+    const { url, headers } = await createRequestData(state, { ...request, body: undefined }, environment, parentHeaders, parentAuthentication, null, [], null, new SendResolver(request.workspaceId, 'send', abortControllerSignal))
 
     setDefaultUserAgent(headers)
 
@@ -3612,7 +3618,7 @@ export async function createGrpcRequestData(
     parentAuthentication: RequestAuthentication | undefined,
     workspaceLocation: string | null
 ) {
-    const send = new SendResolver(grpcRequest.workspaceId)
+    const send = new SendResolver(grpcRequest.workspaceId, 'send')
     return {
         url: await send.resolve(environment, grpcRequest.url ?? '', 'url'),
         metadata: await resolveGrpcMetadata(grpcRequest, environment, parentHeaders, parentAuthentication, workspaceLocation, send),
