@@ -75,7 +75,10 @@
             "applicationId": "Artelin.Restfox"
         },
         "snap": {
-            "allowNativeWayland": true
+            "allowNativeWayland": true,
+            "executableArgs": [
+                "--ozone-platform=x11"
+            ]
         },
         "files": [
             "**/*",
