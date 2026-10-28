@@ -47,3 +47,22 @@ test('double-clicking an item of a type only a newer version knows starts renami
 
     expect(element.querySelector<HTMLInputElement>('.sidebar-item input')?.value).toBe('From a newer version')
 })
+
+test('a folder\'s environment switcher shows each environment\'s color dot and its name as typed, an imported one included', () => {
+    const name = '<img src=x onerror="window.ranSidebarItem = true"> &amp;'
+    const { element } = mountItem({
+        _id: 'folder1',
+        _type: 'request_group',
+        name: 'Folder',
+        parentId: null,
+        children: [],
+        environments: [{ name: 'Default', color: '#ff0000', environment: {} }, { name, environment: {} }],
+    })
+
+    const [, defaultOption, importedOption] = [...element.querySelectorAll('.context-menu-item')]
+    expect((defaultOption.querySelector('i.fa-circle') as HTMLElement).style.color).toBe('#ff0000')
+    expect(defaultOption.textContent!.trim()).toBe('Default')
+    expect(importedOption.querySelector('img')).toBeNull()
+    expect(importedOption.querySelector('i.fa-circle')).not.toBeNull()
+    expect(importedOption.textContent!.trim()).toBe(name)
+})

@@ -13,7 +13,13 @@
                             @click.stop="handleClick(option)"
                         >
                             <i :class="option.icon" v-if="option.icon"></i>
-                            <div v-html="getOption(option)" style="display: flex;"></div>
+                            <div style="display: flex;">
+                                <div v-if="selectedOption !== undefined && !option.disabled" class="selected-indicator" :style="isSelected(option) ? 'margin-right: 0.3rem;' : 'margin-left: 1rem;'"><i v-if="isSelected(option)" class="fa fa-check"></i></div>
+                                <!-- a label shows as typed. labelHtml lays an entry out in HTML, and its builder escapes each text it puts
+                                in. A color key draws the environment dot, in the text color when it holds none -->
+                                <div v-if="option.labelHtml !== undefined" style="word-break: break-all;" v-html="option.labelHtml"></div>
+                                <div v-else style="word-break: break-all;"><template v-if="'color' in option"><i class="fa fa-circle" :style="{ color: option.color }"></i>{{ `\u00a0\u00a0${option.label}` }}</template><template v-else>{{ option.label }}</template></div>
+                            </div>
                         </button>
                     </slot>
                 </template>
@@ -153,19 +159,9 @@ export default {
             this.$emit('click', option.value)
             this.$emit('update:show', false)
         },
-        getOption(option) {
-            const tickMark = '<div class="selected-indicator" style="margin-right: 0.3rem;"><i class="fa fa-check"></i></div>'
-            const noTickMark = '<div class="selected-indicator" style="margin-left: 1rem;"></div>'
-            const displayedOption = `<div style="word-break: break-all;">${option.label}</div>`
-
-            if(this.selectedOption === undefined || option.disabled) {
-                return displayedOption
-            }
-
+        isSelected(option) {
             const { _id } = option.value || {}
-            const isSelected = (_id && _id === this.selectedOption?._id) || (option.value === this.selectedOption)
-
-            return `${isSelected ? tickMark : noTickMark}${displayedOption}`
+            return (_id && _id === this.selectedOption?._id) || (option.value === this.selectedOption)
         }
     }
 }
@@ -238,12 +234,6 @@ button.context-menu-item > i {
     border-bottom: 1px solid var(--modal-border-color);
     margin-top: 5px;
     margin-bottom: 5px;
-}
-
-.selected-indicator {
-    padding-right: 0.1rem;
-    font-size: 0.5rem;
-    color: var(--button-text-color);
 }
 
 .context-menu-header {

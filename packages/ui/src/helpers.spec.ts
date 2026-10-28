@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 
 import { assert, test, describe, expect, vi, afterEach, beforeEach } from 'vitest'
+import { Window as HappyDomWindow } from 'happy-dom'
 import {
     substituteEnvironmentVariables,
     parseContentDispositionHeaderAndGetFileName,
@@ -2260,8 +2261,17 @@ describe(`Function: ${createOAuthTokenRequest.name}`, () => {
 })
 
 describe(`Function: ${describeOAuthTokenError.name}`, () => {
+    // the browser's parser, which every build has and this runtime lacks
+    beforeEach(() => {
+        (globalThis as any).DOMParser = new HappyDomWindow().DOMParser
+    })
+
+    afterEach(() => {
+        delete (globalThis as any).DOMParser
+    })
+
     const url = 'https://auth.example.test/token'
-    const response = (status: number, body: string, statusText = '') => ({ status, statusText, buffer: new TextEncoder().encode(body).buffer })
+    const response = (status: number, body: string, statusText = '', headers?: [string, string][]) => ({ status, statusText, buffer: new TextEncoder().encode(body).buffer, headers })
 
     test('an invalid_client answer names the error and the settings to change', () => {
         const message = describeOAuthTokenError(response(401, '{"error":"invalid_client","error_description":"bad secret"}', 'Unauthorized'), url)
@@ -2276,6 +2286,27 @@ describe(`Function: ${describeOAuthTokenError.name}`, () => {
         const page = '<!doctype html><title>403</title><style>body { color: red }</style>403 Forbidden'
         expect(describeOAuthTokenError(response(403, page), url)).toBe('The token endpoint answered HTTP 403: 403 403 Forbidden. It refused the request. Check the Client ID and Client Secret, or switch Client Authentication between Basic Auth Header and Request Body.')
         expect(describeOAuthTokenError(response(404, 'Cannot POST /nope', 'Not Found'), url)).toBe('The token endpoint answered HTTP 404 Not Found: Cannot POST /nope. Check the Access Token URL.')
+    })
+
+    test('an HTML error page\'s character references are shown as the page shows them', () => {
+        const page = '<html><body><h1>Service unavailable &ndash; retry later</h1><p>Tom&#39;s &amp; Jerry&#x27;s&nbsp;shop</p></body></html>'
+        expect(describeOAuthTokenError(response(503, page), url)).toBe('The token endpoint answered HTTP 503: Service unavailable – retry later Tom\'s & Jerry\'s\u00a0shop.')
+    })
+
+    test('a plain text or JSON answer quoting a URL is shown as it came, its &copy= included', () => {
+        const quoted = 'Try https://api.test/search?q=x&region=us&copy=2 later'
+        expect(describeOAuthTokenError(response(503, quoted), url)).toBe(`The token endpoint answered HTTP 503: ${quoted}.`)
+        expect(describeOAuthTokenError(response(401, `{"message":"${quoted}"}`), url)).toBe(`The token endpoint answered HTTP 401: {"message":"${quoted}"}. It refused the request. Check the Client ID and Client Secret, or switch Client Authentication between Basic Auth Header and Request Body.`)
+    })
+
+    test('the type the server gives an answer decides whether it is read as HTML, and JSON never is', () => {
+        const page = 'Service unavailable &ndash; retry later'
+        expect(describeOAuthTokenError(response(503, page, '', [['Content-Type', 'text/html; charset=utf-8']]), url)).toBe('The token endpoint answered HTTP 503: Service unavailable – retry later.')
+        const json = '{"message":"No <token> for ?q=x&region=us&copy=2"}'
+        expect(describeOAuthTokenError(response(503, json, '', [['Content-Type', 'application/json']]), url)).toBe(`The token endpoint answered HTTP 503: ${json}.`)
+        expect(describeOAuthTokenError(response(503, json), url)).toBe(`The token endpoint answered HTTP 503: ${json}.`)
+        const text = 'Use <client_id> at ?q=x&copy=2'
+        expect(describeOAuthTokenError(response(503, text, '', [['content-type', 'text/plain']]), url)).toBe(`The token endpoint answered HTTP 503: ${text}.`)
     })
 
     test('a JSON answer without the OAuth error field is shown as its text', () => {

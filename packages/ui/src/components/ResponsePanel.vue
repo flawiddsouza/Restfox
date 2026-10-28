@@ -283,6 +283,7 @@ import {
 import { NDJSON_CONTENT_TYPES, TEXT_CONTENT_TYPE_PREFIXES, getStreamView } from '@/utils/response-stream'
 import { createEventStreamParser, createJsonLinesParser, parseEventStream, parseJsonLines } from '@/utils/event-stream'
 import { emitter } from '@/event-bus'
+import { escapeHtml } from '@/utils/escape-html'
 import ResponseFilteringHelpModal from '@/components/modals/ResponseFilteringHelpModal.vue'
 import constants from '@/constants'
 import { vTooltip } from '@/directives/vTooltip'
@@ -519,7 +520,8 @@ export default {
                 }
                 const downloadUrl = URL.createObjectURL(this.response.request.body)
                 window.responseRequestBodyObjectUrls.push(downloadUrl)
-                return `<div><a href="${downloadUrl}" download="${this.response.request.body.name}">${this.response.request.body.name}</a></div>`
+                // a file name may hold markup characters, as one read back from a shared file workspace's history can
+                return `<div><a href="${downloadUrl}" download="${escapeHtml(this.response.request.body.name)}">${escapeHtml(this.response.request.body.name)}</a></div>`
             } else {
                 if(this.response.request.original.body.mimeType === 'multipart/form-data' && this.response.request.original.body.params && this.response.request.original.body.params.length > 0) {
                     // prevent memory leak
@@ -536,11 +538,11 @@ export default {
                         const handleFile = item => {
                             const downloadUrl = URL.createObjectURL(item)
                             window.responseRequestBodyObjectUrls.push(downloadUrl)
-                            return `<div><a href="${downloadUrl}" download="${item.name}">${item.name}</div>`
+                            return `<div><a href="${downloadUrl}" download="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>`
                         }
                         return `
                             <tr>
-                                <td style="${tdStyle}">${param.name}</td>
+                                <td style="${tdStyle}">${escapeHtml(param.name)}</td>
                                 <td style="${tdStyle}">${param.type === 'text' ? param.value : param.files.map(handleFile)}</td>
                             </tr>
                         `
@@ -892,20 +894,21 @@ export default {
             return this.responses.map(item => {
                 const color = responseStatusColorMapping(item)
 
-                const requestMethod = item.request ? `<span class="request-method--${item.request.method}"> ${item.request.method} </span> ` : ''
+                // a custom method, the name and the URL come from collection data, which may have been imported
+                const requestMethod = item.request ? `<span class="request-method--${escapeHtml(item.request.method)}"> ${escapeHtml(item.request.method)} </span> ` : ''
 
-                const label = `
+                const labelHtml = `
                     <div style="display: flex; flex-wrap: wrap; align-items: center;">
-                        <div>${dateFormat(item.createdAt, true)}</div> <div class="tag ${color}" style="padding: 2px 3px; margin-left: 0.5rem;">${item.status} ${this.getStatusText(item.status)}</div> <div class="tag" style="padding: 2px 3px; margin-left: 0.5rem;">${this.humanFriendlyTime(item.timeTaken)}</div>
+                        <div>${dateFormat(item.createdAt, true)}</div> <div class="tag ${color}" style="padding: 2px 3px; margin-left: 0.5rem;">${escapeHtml(`${item.status} ${this.getStatusText(item.status)}`)}</div> <div class="tag" style="padding: 2px 3px; margin-left: 0.5rem;">${this.humanFriendlyTime(item.timeTaken)}</div>
                     </div>
                     <div style="margin-top: 0.2rem;">
-                        ${requestMethod}${item.name ?? item.url}
+                        ${requestMethod}${escapeHtml(item.name ?? item.url)}
                     </div>
                 `
 
                 return {
                     type: 'option',
-                    label,
+                    labelHtml,
                     value: item
                 }
             })

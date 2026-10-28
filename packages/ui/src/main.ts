@@ -1,14 +1,17 @@
 import { createApp } from 'vue'
 import store from './store'
 import App from './App.vue'
-import VueToast from 'vue-toast-notification'
+import { useToast } from '@/utils/toast'
 import 'vue-toast-notification/dist/theme-default.css'
 import { getCurrentTimestamp } from '@/helpers'
 
 const app = createApp(App)
 
 app.use(store)
-app.use(VueToast)
+// as the library's plugin installs it, with each message shown as typed
+const toast = useToast()
+app.config.globalProperties.$toast = toast
+app.provide('$toast', toast)
 
 app.mount('#app')
 

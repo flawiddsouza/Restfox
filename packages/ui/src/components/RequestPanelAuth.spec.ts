@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, reactive, type App } from 'vue'
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
-vi.mock('vue-toast-notification', () => ({ useToast: () => toast }))
+vi.mock('@/utils/toast', () => ({ useToast: () => toast }))
 vi.mock('./CodeMirrorSingleLine.vue', () => ({ default: defineComponent({ setup: () => () => h('input') }) }))
 import RequestPanelAuth from './RequestPanelAuth.vue'
 import FolderPanel from './FolderPanel.vue'

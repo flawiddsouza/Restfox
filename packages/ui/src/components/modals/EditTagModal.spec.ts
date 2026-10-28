@@ -4,7 +4,7 @@ import { createApp, h, nextTick, type App } from 'vue'
 vi.mock('@/store', () => ({ store: { state: { activeWorkspace: { _id: 'w' }, collection: [] as any[] }, dispatch: vi.fn() } }))
 vi.mock('@/db', () => ({ getResponsesByCollectionId: vi.fn(), getCollectionForWorkspace: vi.fn(async() => ({ collection: [] })) }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-vi.mock('vue-toast-notification', () => ({ useToast: () => toast }))
+vi.mock('@/utils/toast', () => ({ useToast: () => toast }))
 import EditTagModal from './EditTagModal.vue'
 import { store } from '@/store'
 import { getResponsesByCollectionId } from '@/db'

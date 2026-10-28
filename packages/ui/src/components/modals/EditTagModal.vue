@@ -86,7 +86,7 @@ import { flattenTree, prependParentTitleToChildTitle, sortTree, substituteEnviro
 import { CollectionItem } from '@/global'
 import { Base64 } from 'js-base64'
 import { countRememberedPromptValues, forgetPromptValues } from '@/utils/prompt-tag'
-import { useToast } from 'vue-toast-notification'
+import { useToast } from '@/utils/toast'
 
 const toast = useToast()
 

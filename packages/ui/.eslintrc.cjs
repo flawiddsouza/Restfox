@@ -9,6 +9,12 @@ module.exports = {
         'plugin:@typescript-eslint/recommended'
     ],
     'overrides': [
+        {
+            'files': ['src/utils/toast.ts'],
+            'rules': {
+                'no-restricted-imports': 'off'
+            }
+        }
     ],
     'parser': 'vue-eslint-parser',
     'parserOptions': {
@@ -74,6 +80,17 @@ module.exports = {
         'object-curly-spacing': [
             "error",
             "always"
+        ],
+        'no-restricted-imports': [
+            'error',
+            {
+                'paths': [
+                    {
+                        'name': 'vue-toast-notification',
+                        'message': 'Use useToast from @/utils/toast, which shows each message as typed rather than as HTML.'
+                    }
+                ]
+            }
         ],
     }
 }

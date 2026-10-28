@@ -527,3 +527,118 @@ test('the history menu acts on its own request, also in a window of its own whil
 
     panel.unmount()
 })
+
+// small enough to be parsed at once, so no parse of the response viewer is left running after the test
+function finishedSmallJson() {
+    return { ...savedResponse('r-small', '{"ok":true}'), headers: [['content-type', 'application/json']], mimeType: 'application/json' }
+}
+
+// a name, a custom method or a file name from collection data, which may have been imported or read from a shared file workspace
+const markup = '<img src=x onerror="window.ranResponsePanel = true"> &amp;'
+
+test('the history menu shows a response\'s name and custom method as typed, in its usual layout', async() => {
+    const saved = { ...finishedSmallJson(), name: `Login ${markup}`, request: { method: `CUSTOM${markup}`, headers: {}, original: { body: { mimeType: 'No Body' } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+        responses: { tab1: [saved] },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    panel.element.querySelector('.custom-dropdown')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle()
+
+    // the history entry, not an option of the Preview tab's menu
+    const entry = [...panel.element.querySelectorAll('.context-menu-item')].find(item => item.querySelector('.tag'))!
+    expect(entry.querySelector('img')).toBeNull()
+    expect(entry.querySelector('.tag.green')!.textContent).toBe('200 OK')
+    expect(entry.querySelector('[class^="request-method--"]')!.textContent!.trim()).toBe(`CUSTOM${markup}`)
+    expect(entry.textContent).toContain(`Login ${markup}`)
+    panel.unmount()
+})
+
+test('a response with a status code that has no name, such as Cloudflare\'s 520 sent with no status text, shows its code in the panel and the history menu', async() => {
+    const saved = { ...finishedSmallJson(), status: 520, statusText: '' }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+        responses: { tab1: [saved] },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    expect(panel.element.querySelector('.response-panel-address-bar-tag-container .tag')!.textContent!.trim()).toBe('520')
+    panel.element.querySelector('.custom-dropdown')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle()
+    const entry = [...panel.element.querySelectorAll('.context-menu-item')].find(item => item.querySelector('.tag'))!
+    expect(entry.querySelector('.tag.red')!.textContent!.trim()).toBe('520')
+    panel.unmount()
+})
+
+test('the history menu shows a status read from a crafted history file as typed', async() => {
+    const saved = { ...finishedSmallJson(), status: markup }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: { ...finishedSmallJson(), _id: 'r-other' } },
+        responses: { tab1: [saved] },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    panel.element.querySelector('.custom-dropdown')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle()
+    const entry = [...panel.element.querySelectorAll('.context-menu-item')].find(item => item.querySelector('.tag'))!
+    expect(entry.querySelector('img')).toBeNull()
+    expect(entry.querySelector('.tag')!.textContent!.trim()).toBe(markup)
+    panel.unmount()
+})
+
+test('the Request tab names each field and file of a sent multipart body as it is named', async() => {
+    const fileName = `scan ${markup}.png`
+    const fieldName = `doc ${markup}`
+    const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: undefined, original: { body: { mimeType: 'multipart/form-data', params: [{ name: fieldName, type: 'file', files: [new File(['a'], fileName)] }] } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+    requestTab.click()
+    await settle()
+
+    const link = panel.element.querySelector('.content-box a[download]') as HTMLAnchorElement
+    expect(panel.element.querySelector('.content-box img')).toBeNull()
+    expect(panel.element.querySelector('.content-box td')!.textContent).toBe(fieldName)
+    expect(link.textContent).toBe(fileName)
+    expect(link.getAttribute('download')).toBe(fileName)
+    panel.unmount()
+})
+
+test('the Request tab names a sent file as it is named, and downloads it under that name', async() => {
+    const fileName = `report ${markup}.txt`
+    const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: new File(['a'], fileName), original: { body: { mimeType: 'application/octet-stream' } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+    requestTab.click()
+    await settle()
+
+    const link = panel.element.querySelector('.content-box a[download]') as HTMLAnchorElement
+    expect(panel.element.querySelector('.content-box img')).toBeNull()
+    expect(link.textContent).toBe(fileName)
+    expect(link.getAttribute('download')).toBe(fileName)
+    panel.unmount()
+})

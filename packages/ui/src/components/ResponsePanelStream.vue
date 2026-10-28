@@ -121,11 +121,7 @@ export default {
             if(head.statusText !== '') {
                 return head.statusText
             }
-            try {
-                return getStatusText(head.status)
-            } catch {
-                return ''
-            }
+            return getStatusText(head.status)
         },
         elapsed(): number {
             const stream = this.stream

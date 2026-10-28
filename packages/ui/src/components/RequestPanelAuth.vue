@@ -471,7 +471,7 @@ import { CollectionItem, Flags, RequestAuthentication, State } from '@/global'
 import ContextMenu from '@/components/ContextMenu.vue'
 import constants from '@/constants'
 import { createOAuthTokenRequest, describeOAuthTokenError, fetchWrapper, getAuthenticationType, getMissingOAuthTokenFieldsMessage, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, parseOAuthTokenResponse, SendResolver } from '@/helpers'
-import { useToast } from 'vue-toast-notification'
+import { useToast } from '@/utils/toast'
 import { bufferToString } from '@/utils/response'
 
 const toast = useToast()

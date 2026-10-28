@@ -152,7 +152,8 @@ import MobileBottomSheet from './MobileBottomSheet.vue'
 import GrpcMessageList from './GrpcMessageList.vue'
 import { useMobile } from '@/composables/useMobile'
 import { dateFormat, getAlertConfirmPromptContainer, humanFriendlyRunningTime, humanFriendlySize, humanFriendlyTime, setEnvironmentVariable, timeAgo } from '@/helpers'
-import { useToast } from 'vue-toast-notification'
+import { useToast } from '@/utils/toast'
+import { escapeHtml } from '@/utils/escape-html'
 import {
     GRPC_UNAVAILABLE_MESSAGE,
     type GrpcMessageListViewState,
@@ -183,10 +184,6 @@ interface ShownCall {
     name: string | null
     result: GrpcCallResult
     revision: number
-}
-
-function escapeHtml(text: string) {
-    return text.replace(/[&<>"']/g, character => `&#${character.charCodeAt(0)};`)
 }
 
 const props = defineProps<{
@@ -432,13 +429,13 @@ const historyMenuOptions = computed((): any[] => {
         const result = entry.grpc
         const tag = describeEntryStatus(result)
         const name = entry.name ?? getCallName(result)
-        const label = `
+        const labelHtml = `
                     <div style="display: flex; flex-wrap: wrap; align-items: center;">
                         <div>${dateFormat(entry.createdAt, true)}</div> <div class="tag ${tag.color}" style="padding: 2px 3px; margin-left: 0.5rem;">${escapeHtml(tag.label)}</div> <div class="tag" style="padding: 2px 3px; margin-left: 0.5rem;">${humanFriendlyTime(result.timeTaken)}</div>
                     </div>
                     <div style="margin-top: 0.2rem;">${escapeHtml(name)}</div>
                 `
-        return { type: 'option', label, value: entry }
+        return { type: 'option', labelHtml, value: entry }
     })
 })
 

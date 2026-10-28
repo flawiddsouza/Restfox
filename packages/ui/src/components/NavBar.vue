@@ -415,7 +415,8 @@ export default {
             const list =  this.environments.map(item => {
                 return {
                     type: 'option',
-                    label: `<i class="fa fa-circle" style="color:${item.color}"></i>&nbsp;&nbsp;${item.name}`,
+                    label: item.name,
+                    color: item.color,
                     value: `${item.name}`,
                     class: 'context-menu-item-with-left-padding'
                 }

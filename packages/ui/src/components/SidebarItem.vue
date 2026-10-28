@@ -134,7 +134,8 @@ export default {
                 },
                 ...this.sidebarItem.environments.map(env => ({
                     type: 'option',
-                    label: `<i class="fa fa-circle" style="color:${env.color}"></i>&nbsp;&nbsp;${env.name}`,
+                    label: env.name,
+                    color: env.color,
                     value: env.name,
                     class: 'context-menu-item-with-left-padding'
                 }))

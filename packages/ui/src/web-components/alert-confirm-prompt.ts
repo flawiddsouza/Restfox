@@ -1,7 +1,6 @@
-// titles hold names from collection data, and a prompt tag's title, label and default come from it, which may have been imported
-function escapeHtml(text: string) {
-    return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
-}
+// titles, defaults and choices hold names from collection data, and a prompt tag's title, label and default come from it,
+// which may have been imported
+import { escapeHtml } from '@/utils/escape-html'
 
 interface PromptOptions {
     label?: string
@@ -31,7 +30,7 @@ class AlertConfirmPrompt extends HTMLElement {
             } else if (title.toLowerCase().includes('color')) {
                 inputHtml = `
                 <div style="margin-top: 0.5rem;">
-                    <input type="color" value="${defaultValue ?? '#000000'}" class="color-preview" id="dialog-color-input">
+                    <input type="color" value="${escapeHtml(defaultValue ?? '#000000')}" class="color-preview" id="dialog-color-input">
                 </div>
                 `
             }  else if(title.toLowerCase().includes('in seconds')) {
@@ -46,9 +45,9 @@ class AlertConfirmPrompt extends HTMLElement {
             } else {
                 inputHtml = `
                 <div style="margin-top: 0.5rem;">
-                    <input type="text" value="${defaultValue ?? ''}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
+                    <input type="text" value="${escapeHtml(defaultValue ?? '')}" list="selectList" class="dialog-input" id="dialog-input" spellcheck="false">
                     <datalist id="selectList">
-                        ${selectList.map(item => `<option value="${item}"></option>`).join('')}
+                        ${selectList.map(item => `<option value="${escapeHtml(item)}"></option>`).join('')}
                     </datalist>
                 </div>
                 `

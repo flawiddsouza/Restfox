@@ -12,6 +12,7 @@ import {
     RequestAuthentication,
     RequestParam,
     RequestInitialResponse,
+    RequestInitialResponseHeader,
     RequestFinalResponse,
     Plugin,
     CreateRequestDataReturn,
@@ -43,6 +44,7 @@ import type { ParsedResult } from '@/parsers/tag'
 import { getSettingsFile, putSettingsFile, deleteSettingsFile, getAllWorkspaces, getFileWorkspace, getCollectionById, updateWorkspace, updateCollection } from '@/db'
 import { ResponseBodyCollector, getStreamView, isSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
+import { htmlToText } from '@/utils/escape-html'
 import { isGrpcTarget, parseGrpcTarget } from '@/utils/grpc'
 import { PROXY_FRAMES_CONTENT_TYPE, PROXY_FRAME_TYPE, readProxyFrames } from '@/utils/proxy-frames'
 
@@ -2876,16 +2878,17 @@ export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebSta
     return `${protocol}//${serverLocation.host}/proxy-socket/${options}/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
 }
 
+// none for a code the table does not name, such as Cloudflare's 520
 export function getStatusText(statusCode: number): string {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()].title
+    return constants.STATUS_CODE_TEXT_MAPPING[String(statusCode)]?.title ?? ''
 }
 
 export function getStatusDescription(statusCode: number): string {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    return constants.STATUS_CODE_TEXT_MAPPING[statusCode.toString()].description
+    return constants.STATUS_CODE_TEXT_MAPPING[String(statusCode)]?.description ?? ''
 }
 
 export function timeAgo(timestamp: number) {
@@ -3080,15 +3083,25 @@ export function parseOAuthTokenResponse(buffer: ArrayBuffer | undefined): any {
     }
 }
 
-// the start of a non-JSON answer as readable text, an HTML error page loses its markup
-function getResponseTextSnippet(text: string) {
-    const readable = text
-        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
-        .replace(/<[^>]*>/g, ' ')
+// an HTML page, by the type the server gave it, or by its tags when it gave none. JSON never is
+function isHtmlAnswer(answer: { headers?: RequestInitialResponseHeader[] }, text: string, json: unknown) {
+    if(json !== null) {
+        return false
+    }
+    const contentType = getResponseContentType(answer)
+    return contentType ? contentType.toLowerCase().includes('html') : /<!doctype|<\/?[a-z][^>]*>/i.test(text)
+}
+
+// the start of a non-JSON answer as readable text. An HTML error page loses its markup, and its character references,
+// such as &ndash;, are read as the page shows them, since a toast shows text as typed. Other text is shown as it came,
+// so a URL's &copy= stays as it is
+function getResponseTextSnippet(text: string, isHtml: boolean) {
+    const readable = (isHtml ? text.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ') : text)
         .replace(/\s+/g, ' ')
         .trim()
 
-    return readable.length > 120 ? readable.slice(0, 120) + '...' : readable
+    const snippet = readable.length > 120 ? readable.slice(0, 120) + '...' : readable
+    return isHtml ? htmlToText(snippet) : snippet
 }
 
 // says what went wrong with a token request and what to change, for every way it can fail: an HTTP error with or without
@@ -3098,7 +3111,7 @@ export function describeOAuthTokenError(error: any, accessTokenUrl: string): str
         const text = error.buffer ? new TextDecoder().decode(error.buffer) : ''
         const json = parseOAuthTokenResponse(error.buffer)
         // an answer without the OAuth error field, such as an API gateway's own JSON, is shown as its text
-        const snippet = json && typeof json.error === 'string' ? '' : getResponseTextSnippet(text)
+        const snippet = json && typeof json.error === 'string' ? '' : getResponseTextSnippet(text, isHtmlAnswer(error, text, json))
         const statusLine = `HTTP ${error.status}${error.statusText ? ' ' + error.statusText : ''}`
 
         if(json && typeof json.error === 'string') {
