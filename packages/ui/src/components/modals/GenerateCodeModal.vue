@@ -89,6 +89,8 @@ export default {
     },
     watch: {
         collectionItem() {
+            // the previous request's code is not shown under this one's title while its own is worked out
+            this.generatedCode = ''
             this.generateCode()
         }
     },
@@ -123,6 +125,7 @@ export default {
                     collectionItem: this.collectionItem,
                     environment: resolveEnvironmentForRequest(this.$store, request, 'send'),
                     send: new SendResolver(request.workspaceId, 'send'),
+                    pickLatest: null,
                 }
             }
             return this.tagsResolved
@@ -130,14 +133,25 @@ export default {
         async generateCode() {
             if(this.selectedClient) {
                 const tagsResolved = this.resolveTags()
+                const { collectionItem, selectedLanguage, selectedClient } = this
+                // the code of an earlier pick that ends later is not shown
+                const isLatestPick = () => this.collectionItem === collectionItem && this.selectedLanguage === selectedLanguage && this.selectedClient === selectedClient
+                const pick = {}
+                tagsResolved.pickLatest = pick
                 try {
-                    const request = JSON.parse(JSON.stringify(this.collectionItem))
+                    const request = JSON.parse(JSON.stringify(collectionItem))
                     const { environment, parentHeaders, parentAuthentication } = await tagsResolved.environment
-                    const code = await generateCode(request, environment, parentHeaders, parentAuthentication, this.selectedLanguage, this.selectedClient, tagsResolved.send)
-                    this.generatedCode = code
+                    const code = await generateCode(request, environment, parentHeaders, parentAuthentication, selectedLanguage, selectedClient, tagsResolved.send)
+                    if(isLatestPick()) {
+                        this.generatedCode = code
+                    }
                 } catch(e) {
-                    this.generatedCode = e.message
-                    if(this.tagsResolved === tagsResolved) {
+                    if(isLatestPick()) {
+                        this.generatedCode = e.message
+                    }
+                    // the next pick resolves the tags again after the last pick started on them failed. An earlier pick
+                    // failing on its own, such as a client that cannot write the body, leaves them to the later picks
+                    if(this.tagsResolved === tagsResolved && tagsResolved.pickLatest === pick) {
                         this.tagsResolved = null
                     }
                 }

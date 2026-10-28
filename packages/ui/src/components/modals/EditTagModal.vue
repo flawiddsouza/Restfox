@@ -285,6 +285,8 @@ const showModalComp = ref(props.showModal)
 const collectionItems: Ref<CollectionItem[]> = ref([])
 
 const preview = ref('')
+let previewGeneration = 0
+let previewModeLatest: 'display' | 'send' = 'display'
 
 const parsedFuncForEdit = ref(JSON.parse(JSON.stringify(props.parsedFunc)))
 
@@ -400,17 +402,34 @@ function fillDefaultValues() {
 }
 
 async function generatePreview(mode: 'display' | 'send' = 'display') {
+    const generation = ++previewGeneration
+    previewModeLatest = mode
     if (mode === 'send') {
         preview.value = 'Loading...'
     }
 
     try {
-        preview.value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, mode, {
+        const value = await substituteEnvironmentVariables({}, `{% ${toFunctionString(parsedFuncForEdit.value)} %}`, mode, {
             noError: true,
             workspaceId: store.state.activeWorkspace._id,
         })
+        if(generation === previewGeneration) {
+            preview.value = value
+        }
     } catch(error) {
-        preview.value = error instanceof Error ? error.message : String(error)
+        const message = error instanceof Error ? error.message : String(error)
+        if(generation === previewGeneration) {
+            preview.value = message
+        } else if(mode === 'send') {
+            // a newer preview keeps the box, so a Refresh that failed still says so
+            toast.error(message)
+        }
+    }
+
+    // a newer preview read the saved replies while this send ran, so it is shown again with the reply this send saved.
+    // Every call sets the mode, so a display mode here means a newer preview ran
+    if(mode === 'send' && previewModeLatest === 'display') {
+        await generatePreview()
     }
 }
 

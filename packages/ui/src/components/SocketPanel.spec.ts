@@ -67,18 +67,19 @@ afterEach(() => {
     document.body.innerHTML = ''
 })
 
-function mountPanel(clientType?: string) {
-    const activeTab = reactive({
+// a panel mounted again after a tab switch gets the tab and store of the panel it replaces
+function mountPanel(clientType?: string, replaced?: { activeTab: any, store: any }) {
+    const activeTab = replaced?.activeTab ?? reactive({
         _id: 'socket', workspaceId: 'w1', _type: 'socket',
         clients: [{ id: 'client', url: clientType ? 'http://example.test' : 'ws://example.test', ...(clientType ? { type: clientType } : {}), message: 'hello', messages: [], payloads: [{ id: 'payload', name: 'Payload 1', payload: 'hello' }], currentPayloadId: 'payload' }],
     })
-    const state = reactive({
+    const state = replaced?.store.state ?? reactive({
         activeWorkspace: { _id: 'w1' },
         tabEnvironmentResolved: {},
         sockets: {} as Record<string, any>,
         flags: {},
     })
-    const store = {
+    const store = replaced?.store ?? {
         state,
         dispatch: vi.fn(async() => ({ environment: {} })),
     }
@@ -91,7 +92,7 @@ function mountPanel(clientType?: string) {
     app.mount(element)
     mountedApps.push(app)
     const click = (label: string) => [...element.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent!.trim() === label)!.click()
-    return { store, toast, click, activeTab, app }
+    return { store, toast, click, activeTab, app, element }
 }
 
 test('Connect shows an environment error and the next click can connect', async() => {
@@ -117,6 +118,72 @@ test('Send shows an environment error and sends no message', async() => {
     panel.click('Send')
     await vi.waitFor(() => expect(panel.toast.error).toHaveBeenCalledWith('Could not resolve tag'))
     expect(socket.send).not.toHaveBeenCalled()
+})
+
+test('Send sends the message as it was at the click, though it changes while the environment resolves', async() => {
+    const panel = mountPanel()
+    const socket = new TestWebSocket()
+    socket.readyState = TestWebSocket.OPEN
+    panel.store.state.sockets['socket-client'] = socket
+    await nextTick()
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Send')
+    panel.activeTab.clients[0].message = 'edited'
+    finish({ environment: {} })
+    await vi.waitFor(() => expect(socket.send).toHaveBeenCalledOnce())
+    expect(socket.send).toHaveBeenCalledWith('hello')
+})
+
+for(const change of ['closes', 'is replaced by a new Connect']) {
+    test(`Send shows that the message was not sent and saves nothing when the connection ${change} while the environment resolves`, async() => {
+        const panel = mountPanel()
+        const socket = new TestWebSocket()
+        socket.readyState = TestWebSocket.OPEN
+        panel.store.state.sockets['socket-client'] = socket
+        await nextTick()
+        let finish!: (value: { environment: object }) => void
+        panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+            finish = resolve
+        }))
+        panel.click('Send')
+        const replacement = new TestWebSocket()
+        if(change === 'closes') {
+            socket.readyState = TestWebSocket.CLOSED
+        } else {
+            replacement.readyState = TestWebSocket.OPEN
+            panel.store.state.sockets['socket-client'] = replacement
+        }
+        finish({ environment: {} })
+        await vi.waitFor(() => expect(panel.toast.error).toHaveBeenCalledWith('Message not sent: the connection closed'))
+        expect(socket.send).not.toHaveBeenCalled()
+        expect(replacement.send).not.toHaveBeenCalled()
+        expect(panel.activeTab.clients[0].messages).toHaveLength(0)
+    })
+}
+
+test('Socket.IO Send emits and saves the event as it was at the click, though another payload tab is picked while the environment resolves', async() => {
+    const panel = mountPanel('Socket.IO')
+    const socket = new SocketTest('http://example.test')
+    socket.connected = true
+    const emitted = vi.fn()
+    socket.emit = emitted
+    panel.store.state.sockets['socket-client'] = socket
+    ;(panel.activeTab.clients[0] as any).event = 'login'
+    await nextTick()
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Send')
+    ;(panel.activeTab.clients[0] as any).event = 'logout'
+    panel.activeTab.clients[0].message = 'bye'
+    finish({ environment: {} })
+    await vi.waitFor(() => expect(emitted).toHaveBeenCalledOnce())
+    expect(emitted).toHaveBeenCalledWith('login', 'hello')
+    expect((panel.activeTab.clients[0].messages as any[]).at(-1).message).toBe('[login] hello')
 })
 
 for(const clientType of [undefined, 'Socket.IO-v2', 'Socket.IO-v3', 'Socket.IO']) {
@@ -181,6 +248,46 @@ test('Disconnect still cancels a pending Connect while an open socket is shown',
     }
     expect(panel.store.state.sockets['socket-client']).toBeNull()
     expect(first.close).toHaveBeenCalledOnce()
+})
+
+test('Connect opens no socket for a client removed while the environment resolves', async() => {
+    const panel = mountPanel()
+    document.body.appendChild(Object.assign(document.createElement('alert-confirm-prompt'), { createConfirm: vi.fn(async() => true) }))
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Connect')
+    panel.element.querySelector<HTMLButtonElement>('button.icon')!.click()
+    await vi.waitFor(() => expect(panel.activeTab.clients).toHaveLength(0))
+    finish({ environment: {} })
+    for(let index = 0; index < 30; index++) {
+        await Promise.resolve()
+    }
+    expect(panel.store.state.sockets['socket-client']).toBeUndefined()
+})
+
+test('Connect opens no socket for a client removed from the panel rebuilt after a tab switch while the environment resolves', async() => {
+    const panel = mountPanel()
+    document.body.appendChild(Object.assign(document.createElement('alert-confirm-prompt'), { createConfirm: vi.fn(async() => true) }))
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Connect')
+    // the panel's first render finishes before it goes, as a panel shown on screen has
+    await nextTick()
+    // an HTTP tab shown in between unmounts the socket panel, and coming back mounts a new one
+    mountedApps.splice(mountedApps.indexOf(panel.app), 1)
+    panel.app.unmount()
+    const rebuilt = mountPanel(undefined, panel)
+    rebuilt.element.querySelector<HTMLButtonElement>('button.icon')!.click()
+    await vi.waitFor(() => expect(panel.activeTab.clients).toHaveLength(0))
+    finish({ environment: {} })
+    for(let index = 0; index < 30; index++) {
+        await Promise.resolve()
+    }
+    expect(panel.store.state.sockets['socket-client']).toBeUndefined()
 })
 
 for(const firstEndsFirst of [true, false]) {

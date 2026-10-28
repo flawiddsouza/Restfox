@@ -441,6 +441,12 @@ async function connect(client: Client) {
     if(pendingConnections[socketKey] !== attempt) {
         return
     }
+    // a client removed while Connect waited opens no socket, also when its panel was rebuilt after a tab switch and
+    // the removal came from the new one
+    if(!activeTab.value.clients.some((clientItem: Client) => clientItem.id === client.id)) {
+        settleConnectionAttempt()
+        return
+    }
     clientUrlsEnvSubstituted[activeTab.value._id + '-' + client.id] = clientUrlToShow
 
     // a socket Connect is still showing for has failed or is still trying, such as a Socket.IO v2 client that
@@ -682,14 +688,25 @@ async function sendMessage(client: Client) {
         return
     }
 
+    // what was clicked is sent, though the next message is typed or another payload picked while the environment resolves
+    const message = client.message
+    const event = client.event
+
     let messageToSend: string
     let messageToSendMasked: string
 
     try {
         const { environment } = await resolveEnvironmentForRequest(store, activeTab.value, 'send')
-        ;({ textResolved: messageToSend, textResolvedMasked: messageToSendMasked } = await substituteEnvironmentVariablesForSend(environment, client.message, activeWorkspace.value._id))
+        ;({ textResolved: messageToSend, textResolvedMasked: messageToSendMasked } = await substituteEnvironmentVariablesForSend(environment, message, activeWorkspace.value._id))
     } catch (error: any) {
         $toast.error(error.message)
+        return
+    }
+
+    // the connection closed or was replaced while the environment resolved: a closed socket drops the message without an
+    // error, so it would show as sent
+    if (sockets[activeTab.value._id + '-' + client.id] !== socket || !isClientConnected(client)) {
+        $toast.error('Message not sent: the connection closed')
         return
     }
 
@@ -697,15 +714,15 @@ async function sendMessage(client: Client) {
         socket.send(messageToSend)
     }
 
-    if (socket.constructor.name.startsWith('Socket') && client.event !== undefined) {
-        socket.emit(client.event, messageToSend)
+    if (socket.constructor.name.startsWith('Socket') && event !== undefined) {
+        socket.emit(event, messageToSend)
     }
 
     // a value typed into a masked prompt is saved as ******
     let clientMessageToSave = messageToSendMasked
 
     if (socket.constructor.name.startsWith('Socket')) {
-        clientMessageToSave = `[${client.event}] ${clientMessageToSave}`
+        clientMessageToSave = `[${event}] ${clientMessageToSave}`
     }
 
     const clientMessage: ClientMessage = {
