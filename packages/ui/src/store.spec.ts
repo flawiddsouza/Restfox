@@ -1,5 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 vi.mock('./db', () => ({
     fileIPC: vi.fn(),
@@ -47,9 +48,10 @@ const grpcTransport = vi.hoisted(() => ({
 
 vi.mock('./utils/grpc-transport', () => grpcTransport)
 
-import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, getAllWorkspaces, getCollectionById, getCollectionForWorkspace, getFileWorkspace, getResponsesByCollectionId, getWorkspacePlugins, updateCollection, updatePlugin, updateResponse, updateWorkspace } from './db'
+import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, deleteResponsesByCollectionIds, getAllCollectionIdsForGivenWorkspace, getAllWorkspaces, getCollectionById, getCollectionForWorkspace, getFileWorkspace, getResponsesByCollectionId, getWorkspacePlugins, updateCollection, updatePlugin, updateResponse, updateWorkspace } from './db'
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, SetEnvironmentVariableFunction, Workspace } from './global'
 import { store } from './store'
+import { getSocketItemCloses, noteSocketOpened, takeOpenedSocketKeys } from './utils/socket-connections'
 import { emitter } from './event-bus'
 import { INHERITED_AUTHENTICATION_TYPE, SendResolver, handleRequest } from './helpers'
 import * as grpcState from './utils/grpc-calls'
@@ -2673,4 +2675,183 @@ describe('response tag resolution boundaries', () => {
             expect(result.error).toContain('request=\'g\'')
         })
     }
+})
+
+describe('socket connections of items no longer open', () => {
+    const socketItem = (_id: string, ...clientIds: string[]) => ({ _id, _type: 'socket', name: _id, parentId: null, workspaceId: 'workspace-id', clients: clientIds.map(id => ({ id })) }) as unknown as CollectionItem
+    let closes: Record<string, ReturnType<typeof vi.fn>>
+
+    // as Connect opens and records them, the client id after the item's
+    function connect(...keys: string[]) {
+        for(const key of keys) {
+            closes[key] = vi.fn()
+            store.state.sockets[key] = { close: closes[key] } as unknown as WebSocket
+            noteSocketOpened(key.slice(0, key.lastIndexOf('-')), key)
+        }
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.spyOn(console, 'log').mockImplementation(() => undefined)
+        closes = {}
+        for(const key of Object.keys(store.state.sockets)) {
+            delete store.state.sockets[key]
+        }
+        for(const itemId of ['/S.json', '/S2.json', '/Chat', '/Chat-dev.json']) {
+            takeOpenedSocketKeys(itemId)
+        }
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace', environment: {}, environments: [], dotEnv: {} } as unknown as Workspace
+        store.commit('setCollection', [socketItem('/S.json', 'c1', 'c2'), socketItem('/S2.json', 'c1')])
+        store.state.tabs = [socketItem('/S.json', 'c1', 'c2'), socketItem('/S2.json', 'c1')]
+        store.state.detachedTabs = []
+        store.state.activeTab = store.state.tabs[0]
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    test('closing a socket tab closes the connections of its clients, and a Connect it was still waiting on', () => {
+        connect('/S.json-c1', '/S.json-c2', '/S2.json-c1')
+        const closesBefore = getSocketItemCloses('/S.json')
+        store.commit('closeTab', '/S.json')
+        expect(getSocketItemCloses('/S.json')).toBe(closesBefore + 1)
+        expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+        expect(closes['/S.json-c2']).toHaveBeenCalledOnce()
+        expect(closes['/S2.json-c1']).not.toHaveBeenCalled()
+        expect(Object.keys(store.state.sockets)).toEqual(['/S2.json-c1'])
+    })
+
+    test('closing a socket tab closes a connection its Connect opened for a client the tab no longer lists', () => {
+        connect('/S.json-gone')
+        store.commit('closeTab', '/S.json')
+        expect(closes['/S.json-gone']).toHaveBeenCalledOnce()
+    })
+
+    test('closing a tab whose item lists clients that are not an array closes what its Connect opened', () => {
+        store.state.tabs[0] = { ...store.state.tabs[0], clients: {} } as unknown as CollectionItem
+        connect('/S.json-c1')
+        store.commit('closeTab', '/S.json')
+        expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+    })
+
+    test('closing a folder tab leaves the connection of a socket beside it whose path starts the same', () => {
+        store.state.tabs.push({ _id: '/Chat', _type: 'request_group', name: 'Chat', parentId: null, workspaceId: 'workspace-id' } as CollectionItem, socketItem('/Chat-dev.json', 'c1'))
+        connect('/Chat-dev.json-c1')
+        store.commit('closeTab', '/Chat')
+        expect(closes['/Chat-dev.json-c1']).not.toHaveBeenCalled()
+    })
+
+    test('moving a socket tab to a new window keeps its connections, and closing that window closes them', () => {
+        connect('/S.json-c1')
+        store.commit('detachTab', store.state.tabs[0])
+        const closesBefore = getSocketItemCloses('/S.json')
+        store.commit('closeTab', '/S.json')
+        expect(closes['/S.json-c1']).not.toHaveBeenCalled()
+        expect(store.state.sockets['/S.json-c1']).toBeDefined()
+        expect(getSocketItemCloses('/S.json')).toBe(closesBefore)
+        store.commit('closeDetachedTab', store.state.detachedTabs[0])
+        expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+        expect(store.state.sockets['/S.json-c1']).toBeUndefined()
+    })
+
+    test('a socket\'s window that a workspace switch closed closes its connections', () => {
+        connect('/S.json-c1')
+        const tab = store.state.tabs[0]
+        store.commit('detachTab', tab)
+        store.commit('closeTab', '/S.json')
+        // the quick switcher drops the other workspace's windows from the list before they close
+        store.state.detachedTabs = []
+        store.commit('closeDetachedTab', tab)
+        expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+    })
+
+    test('reopening a socket from the sidebar while its window is open takes that window\'s tab back', async() => {
+        // what addTab reads besides the store: a document to scroll the tab into view, and the item's history
+        vi.stubGlobal('document', { querySelector: () => null })
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        connect('/S.json-c1')
+        const tab = store.state.tabs[0]
+        store.commit('detachTab', tab)
+        store.commit('closeTab', '/S.json')
+        // renamed in the sidebar while its window was open
+        await store.dispatch('addTab', { ...socketItem('/S.json', 'c1'), name: 'Renamed' })
+        expect(store.state.tabs.find(openTab => openTab._id === '/S.json')).toBe(tab)
+        expect(tab.name).toBe('Renamed')
+        expect(store.state.detachedTabs).toEqual([])
+        // the window closing afterwards finds it open
+        store.commit('closeDetachedTab', tab)
+        expect(closes['/S.json-c1']).not.toHaveBeenCalled()
+        await nextTick()
+        vi.unstubAllGlobals()
+    })
+
+    test('reopening a folder from the sidebar while its window is open takes the sidebar\'s item, which has edits made elsewhere', async() => {
+        vi.stubGlobal('document', { querySelector: () => null })
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        const folder = { _id: '/F', _type: 'request_group', name: 'F', parentId: null, workspaceId: 'workspace-id', headers: [{ name: 'X-A', value: 'old' }] } as unknown as CollectionItem
+        store.state.detachedTabs.push(JSON.parse(JSON.stringify(folder)))
+        // the window's tab misses a header changed in the folder's settings
+        await store.dispatch('addTab', { ...folder, headers: [{ name: 'X-A', value: 'new' }] })
+        expect(store.state.detachedTabs).toEqual([])
+        expect(store.state.tabs.find(openTab => openTab._id === '/F')!.headers).toEqual([{ name: 'X-A', value: 'new' }])
+        await nextTick()
+        vi.unstubAllGlobals()
+    })
+
+    test('deleting an item while another workspace is opened deletes it in its own workspace and leaves the other\'s', async() => {
+        let release!: () => void
+        vi.mocked(deleteResponsesByCollectionIds).mockImplementationOnce(() => new Promise<any>(resolve => {
+            release = () => resolve(undefined)
+        }))
+        vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as any)
+        const item = { _id: '/S.json', _type: 'request', name: 'S', parentId: null, workspaceId: 'workspace-id' } as CollectionItem
+        store.state.collection = [item]
+        const deleted = store.dispatch('deleteCollectionItem', item)
+        await vi.waitFor(() => expect(release).toBeDefined())
+        // a file workspace with an item at the same path, which has a script
+        const otherItem = { ...item, workspaceId: 'other' }
+        store.state.activeWorkspace = { _id: 'other', _type: 'file', name: 'Other', environment: {}, environments: [], dotEnv: {} } as unknown as Workspace
+        store.state.collection = [otherItem]
+        const otherPlugin = { _id: 'p', type: 'script', name: 'script', code: { pre_request: '', post_request: '' }, workspaceId: 'other', collectionId: '/S.json', enabled: true, createdAt: 0, updatedAt: 0 } as unknown as Plugin
+        store.state.plugins.workspace = [otherPlugin]
+        release()
+        await deleted
+        expect(deleteCollectionsByIds).toHaveBeenCalledWith('workspace-id', ['/S.json'])
+        expect(store.state.collection).toEqual([otherItem])
+        expect(store.state.plugins.workspace).toEqual([otherPlugin])
+    })
+
+    test('Close All closes the connections of every tab and leaves those of a window of their own', () => {
+        connect('/S.json-c1', '/S2.json-c1')
+        store.commit('detachTab', store.state.tabs[1])
+        store.commit('closeTab', '/S2.json')
+        store.commit('closeAllTabs')
+        expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+        expect(closes['/S2.json-c1']).not.toHaveBeenCalled()
+    })
+
+    for(const action of ['closeWorkspace', 'deleteWorkspace']) {
+        test(`${action} on the Workspaces page closes the connections its file workspace kept open in tabs`, async() => {
+            connect('/S.json-c1')
+            // the tabs a workspace keeps, as when it was left for the Workspaces page
+            await store.commit('persistActiveWorkspaceTabs')
+            store.state.activeWorkspace = null
+            store.state.tabs = []
+            // the browser database holds no item of a file workspace
+            vi.mocked(getAllCollectionIdsForGivenWorkspace).mockResolvedValueOnce([])
+            await store.dispatch(action, 'workspace-id')
+            expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+        })
+    }
+
+    test('deleting a socket item open in its own window closes its connections', async() => {
+        connect('/S.json-c1')
+        store.commit('detachTab', store.state.tabs[0])
+        store.commit('closeTab', '/S.json')
+        vi.mocked(deleteCollectionsByIds).mockResolvedValueOnce({ error: null } as any)
+        await store.dispatch('deleteCollectionItem', socketItem('/S.json', 'c1'))
+        expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
+        expect(store.state.detachedTabs).toEqual([])
+    })
 })

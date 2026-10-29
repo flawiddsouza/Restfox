@@ -17,14 +17,7 @@ const activeMobilePanel = computed(() => store.state.activeMobilePanel)
 const activeTab = computed(() => store.state.activeTab)
 const showTabs = computed(() => store.state.flags.showTabs)
 const requestResponseLayoutTopBottom = computed(() => store.state.requestResponseLayout === 'top-bottom')
-const detachedTabs = computed({
-    get() {
-        return store.state.detachedTabs
-    },
-    set(value) {
-        store.state.detachedTabs = value
-    }
-})
+const detachedTabs = computed(() => store.state.detachedTabs)
 const requestPanelRatio = ref(undefined)
 const responsePanelRatio = ref(undefined)
 
@@ -59,7 +52,7 @@ function requestPanelResized(e) {
 }
 
 function handePortalClose(detachedTab) {
-    detachedTabs.value = detachedTabs.value.filter(tab => tab._id !== detachedTab._id)
+    store.commit('closeDetachedTab', detachedTab)
 }
 
 let resizeObserverSidebar

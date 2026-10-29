@@ -77,6 +77,7 @@ import { computeTargetIndex, isDropIntoOwnSubtree } from '@/utils/sidebar-drop'
 import { BODY_INCOMPLETE_MESSAGES, getStreamView, isSendReplaced, markSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
 import { forgetGrpcCallsForItems, forgetGrpcCallsForWorkspace, moveGrpcCallsToNewItemIds } from '@/utils/grpc-calls'
+import { noteSocketItemsClosed, takeOpenedSocketKeys } from '@/utils/socket-connections'
 
 // the sends still running on each tab, so a new send can cancel them
 const runningSends = new Map<string, Set<AbortController>>()
@@ -92,6 +93,22 @@ function dropResponseChunkTimes(state: State, responses: { _id?: string }[] | un
             delete state.responseChunkTimes[response._id]
         }
     })
+}
+
+// A socket item's connections are kept apart from its panel, so a tab switch or moving the tab to a window of its own
+// keeps them. Once the item is open neither in a tab nor in its own window, nothing can show or disconnect them, so the
+// ones its Connect opened are closed: found by its id, never by a prefix of a key, as a file workspace's item id is a
+// path another item's can start with, also for a client its tab no longer lists
+function closeSocketsOfClosedItems(state: State, items: { _id: string }[]) {
+    const openItemIds = new Set([...state.tabs, ...state.detachedTabs].map(tab => tab._id))
+    const closedItems = items.filter(item => !openItemIds.has(item._id))
+    noteSocketItemsClosed(closedItems.map(item => item._id))
+    for(const item of closedItems) {
+        for(const socketKey of takeOpenedSocketKeys(item._id)) {
+            state.sockets[socketKey]?.close()
+            delete state.sockets[socketKey]
+        }
+    }
 }
 
 // a write the storage refused, such as one to a file it cannot read, which it leaves as it is
@@ -485,17 +502,24 @@ export const store = createStore<State>({
                 state.activeTab = tabIndexLeft >= 0 ? state.tabs[tabIndexLeft] : (tabIndexRight <= state.tabs.length - 1 ? state.tabs[tabIndexRight] : null)
             }
 
-            state.tabs.splice(tabIndex, 1)
-
-            // remove socket instances for a tab when a tab is closed
-            Object.keys(state.sockets).filter(key => key.startsWith(collectionItemId)).forEach(key => {
-                delete state.sockets[key]
-            })
+            const [closedTab] = state.tabs.splice(tabIndex, 1)
+            closeSocketsOfClosedItems(state, [closedTab])
         },
         closeAllTabs(state) {
+            const closedTabs = state.tabs
             state.activeTab = null
             state.tabs = []
             persistActiveWorkspaceTabs(state)
+            closeSocketsOfClosedItems(state, closedTabs)
+        },
+        // the tab a window of its own showed, which a workspace switch may already have dropped from the list
+        closeDetachedTab(state, detachedTab: CollectionItem) {
+            state.detachedTabs = state.detachedTabs.filter(tab => tab._id !== detachedTab._id)
+            closeSocketsOfClosedItems(state, [detachedTab])
+        },
+        // the tabs a workspace kept while another was open, or none was, as on the Workspaces page
+        closeWorkspaceSockets(state, workspaceId: string) {
+            closeSocketsOfClosedItems(state, workspaceCache.tabs[workspaceId] ?? [])
         },
         showImportModal(state, value) {
             state.showImportModal = value
@@ -871,7 +895,17 @@ export const store = createStore<State>({
 
             const existingTab = context.state.tabs.find(tabItem => tabItem._id === id)
 
-            if(!existingTab) {
+            const detachedTab = context.state.detachedTabs.find(detachedTab => detachedTab._id === id)
+            if(!existingTab && detachedTab?._type === 'socket') {
+                // a socket's tab its own window showed, as moving it there kept it, so its connections, which add what
+                // they receive to it, go on showing in the tab. It takes the name the sidebar has, which a rename made
+                // while the window was open changed only there. The window's tab of any other item misses more changes
+                // made elsewhere, such as a folder's headers edited in its settings, so it gets a fresh copy below
+                detachedTab.name = tab.name
+                context.state.detachedTabs = context.state.detachedTabs.filter(tab => tab._id !== id)
+                context.state.tabs.push(detachedTab)
+                setActiveTab(context.state, context.state.tabs[context.state.tabs.length - 1])
+            } else if(!existingTab) {
                 // remove from detached tabs if it exists there
                 context.state.detachedTabs = context.state.detachedTabs.filter(detachedTab => detachedTab._id !== id)
 
@@ -916,25 +950,38 @@ export const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
+            // the workspace the delete started in, as another one opened while it waits may have items at the same paths
+            const workspaceId = context.state.activeWorkspace._id
             const childIds = getChildIds(context.state.collection, collectionItem._id)
             // first, so a call that ends meanwhile saves no response for a deleted item
             forgetGrpcCallsForItems(collectionItem.workspaceId, childIds)
             await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
             await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
-            context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
+            if(context.state.activeWorkspace?._id === workspaceId) {
+                context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
+            }
 
-            const result = await deleteCollectionsByIds(context.state.activeWorkspace._id, childIds)
+            const result = await deleteCollectionsByIds(workspaceId, childIds)
 
             if(result.error) {
                 emitter.emit('error', result.error)
                 return
             }
 
+            // the sidebar, tabs and responses shown now are another workspace's, and this one's are loaded again when
+            // it is opened
+            if(context.state.activeWorkspace?._id !== workspaceId) {
+                return
+            }
+
             removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
 
             childIds.forEach(childId => {
+                const detachedTab = context.state.detachedTabs.find(tab => tab._id === childId)
+                if(detachedTab) {
+                    context.commit('closeDetachedTab', detachedTab)
+                }
                 context.commit('closeTab', childId)
-                context.state.detachedTabs = context.state.detachedTabs.filter(detachedTab => detachedTab._id !== childId)
                 // clear unneeded response cache
                 if(childId in context.state.responses) {
                     dropResponseChunkTimes(context.state, context.state.responses[childId])
@@ -1675,6 +1722,7 @@ export const store = createStore<State>({
             collectionIds.forEach(collectionId => {
                 context.commit('closeTab', collectionId)
             })
+            context.commit('closeWorkspaceSockets', workspaceId)
         },
         async closeWorkspace(context, workspaceId) {
             forgetGrpcCallsForWorkspace(workspaceId)
@@ -1682,6 +1730,7 @@ export const store = createStore<State>({
             collectionIds.forEach(collectionId => {
                 context.commit('closeTab', collectionId)
             })
+            context.commit('closeWorkspaceSockets', workspaceId)
             await deleteWorkspace(workspaceId)
             context.state.workspaces = context.state.workspaces.filter(item => item._id !== workspaceId)
         },

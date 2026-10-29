@@ -11,6 +11,7 @@ vi.mock('socket.io-client-v3', () => ({ io: (url: string) => new SocketTest(url)
 vi.mock('socket.io-client-v4', () => ({ io: (url: string) => new SocketTest(url) }))
 
 import SocketPanel from './SocketPanel.vue'
+import { getSocketClientRemovals, noteSocketClientRemoved, noteSocketItemsClosed, takeOpenedSocketKeys } from '@/utils/socket-connections'
 
 const mountedApps: App[] = []
 
@@ -250,6 +251,47 @@ test('Disconnect still cancels a pending Connect while an open socket is shown',
     expect(first.close).toHaveBeenCalledOnce()
 })
 
+test('Disconnect in the panel rebuilt after a tab switch also cancels a Connect the earlier panel still waits on', async() => {
+    const panel = mountPanel()
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.state.sockets['socket-client']).toBeInstanceOf(TestWebSocket))
+    const first = panel.store.state.sockets['socket-client']
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.activeTab.clients[0].url = 'ws://second.test'
+    panel.click('Connect')
+    first.readyState = TestWebSocket.OPEN
+    first.emit('open')
+    await nextTick()
+    // an HTTP tab shown in between unmounts the socket panel, and coming back mounts a new one
+    mountedApps.splice(mountedApps.indexOf(panel.app), 1)
+    panel.app.unmount()
+    const rebuilt = mountPanel(undefined, panel)
+    await nextTick()
+    rebuilt.click('Disconnect')
+    finish({ environment: {} })
+    for(let index = 0; index < 30; index++) {
+        await Promise.resolve()
+    }
+    expect(panel.store.state.sockets['socket-client']).toBeNull()
+})
+
+test('Connect in a panel kept in the background goes ahead when its own waiting attempt was overtaken by another panel', async() => {
+    const panel = mountPanel()
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(() => undefined))
+    panel.click('Connect')
+    // the same item shown in its own window, where Connect fails
+    const other = mountPanel(undefined, panel)
+    panel.store.dispatch.mockRejectedValueOnce(new Error('tag failed'))
+    other.click('Connect')
+    await vi.waitFor(() => expect(other.toast.error).toHaveBeenCalledWith('tag failed'))
+    panel.click('Connect')
+    expect(panel.store.dispatch).toHaveBeenCalledTimes(3)
+    await vi.waitFor(() => expect(panel.store.state.sockets['socket-client']).toBeInstanceOf(TestWebSocket))
+})
+
 test('Connect opens no socket for a client removed while the environment resolves', async() => {
     const panel = mountPanel()
     document.body.appendChild(Object.assign(document.createElement('alert-confirm-prompt'), { createConfirm: vi.fn(async() => true) }))
@@ -265,6 +307,93 @@ test('Connect opens no socket for a client removed while the environment resolve
         await Promise.resolve()
     }
     expect(panel.store.state.sockets['socket-client']).toBeUndefined()
+})
+
+test('Connect opens no socket for an item closed while the environment resolves, such as by closing its tab', async() => {
+    const panel = mountPanel()
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.dispatch).toHaveBeenCalledOnce())
+    noteSocketItemsClosed(['socket'])
+    finish({ environment: {} })
+    for(let index = 0; index < 30; index++) {
+        await Promise.resolve()
+    }
+    expect(panel.store.state.sockets['socket-client']).toBeUndefined()
+    // the next Connect opens
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.state.sockets['socket-client']).toBeInstanceOf(TestWebSocket))
+})
+
+test('Connect after the item closed and opened again goes ahead while the earlier attempt still waits, which then opens nothing', async() => {
+    const panel = mountPanel()
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.dispatch).toHaveBeenCalledOnce())
+    noteSocketItemsClosed(['socket'])
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.state.sockets['socket-client']).toBeInstanceOf(TestWebSocket))
+    const opened = panel.store.state.sockets['socket-client']
+    finish({ environment: {} })
+    for(let index = 0; index < 30; index++) {
+        await Promise.resolve()
+    }
+    expect(panel.store.dispatch).toHaveBeenCalledTimes(2)
+    expect(panel.store.state.sockets['socket-client']).toBe(opened)
+})
+
+test('a socket closed with its item while still connecting is not reported as a failed connection', async() => {
+    const panel = mountPanel()
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.state.sockets['socket-client']).toBeInstanceOf(TestWebSocket))
+    const socket = panel.store.state.sockets['socket-client']
+    // as the store closes it: the browser then reports an error and a close for a socket still connecting
+    noteSocketItemsClosed(['socket'])
+    delete panel.store.state.sockets['socket-client']
+    socket.emit('error')
+    socket.emit('close')
+    await nextTick()
+    expect(panel.activeTab.clients[0].messages.map((message: { message: string }) => message.message).filter((text: string) => text.startsWith('Could not connect'))).toEqual([])
+})
+
+test('Connect opens no socket for a client removed through another copy of its tab while the environment resolves', async() => {
+    const panel = mountPanel()
+    let finish!: (value: { environment: object }) => void
+    panel.store.dispatch.mockImplementationOnce(() => new Promise(resolve => {
+        finish = resolve
+    }))
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.dispatch).toHaveBeenCalledOnce())
+    // the tab a workspace switch loads again is another object, which this panel's tab still lists the client in
+    noteSocketClientRemoved('socket-client')
+    finish({ environment: {} })
+    for(let index = 0; index < 30; index++) {
+        await Promise.resolve()
+    }
+    expect(panel.store.state.sockets['socket-client']).toBeUndefined()
+})
+
+test('removing a client counts the removal, which a Connect through another copy of its tab reads', async() => {
+    const panel = mountPanel()
+    document.body.appendChild(Object.assign(document.createElement('alert-confirm-prompt'), { createConfirm: vi.fn(async() => true) }))
+    const removalsBefore = getSocketClientRemovals('socket-client')
+    panel.element.querySelector<HTMLButtonElement>('button.icon')!.click()
+    await vi.waitFor(() => expect(panel.activeTab.clients).toHaveLength(0))
+    expect(getSocketClientRemovals('socket-client')).toBe(removalsBefore + 1)
+})
+
+test('Connect records the connection it opens under its item, which closing the item closes', async() => {
+    takeOpenedSocketKeys('socket')
+    const panel = mountPanel()
+    panel.click('Connect')
+    await vi.waitFor(() => expect(panel.store.state.sockets['socket-client']).toBeInstanceOf(TestWebSocket))
+    expect(takeOpenedSocketKeys('socket')).toEqual(['socket-client'])
 })
 
 test('Connect opens no socket for a client removed from the panel rebuilt after a tab switch while the environment resolves', async() => {
@@ -289,6 +418,47 @@ test('Connect opens no socket for a client removed from the panel rebuilt after 
     }
     expect(panel.store.state.sockets['socket-client']).toBeUndefined()
 })
+
+for(const firstEndsFirst of [true, false]) {
+    test(`a Connect from before a tab switch does not replace the one the rebuilt panel started, first ends first: ${firstEndsFirst}`, async() => {
+        const panel = mountPanel()
+        const finishes: (() => void)[] = []
+        panel.store.dispatch.mockImplementation(() => new Promise(resolve => {
+            finishes.push(() => resolve({ environment: {} }))
+        }))
+        panel.click('Connect')
+        await nextTick()
+        // an HTTP tab shown in between unmounts the socket panel, and coming back mounts a new one, which shows Connect
+        mountedApps.splice(mountedApps.indexOf(panel.app), 1)
+        panel.app.unmount()
+        panel.activeTab.clients[0].url = 'ws://second.test'
+        const rebuilt = mountPanel(undefined, panel)
+        rebuilt.click('Connect')
+        expect(finishes).toHaveLength(2)
+        const settle = async() => {
+            for(let tick = 0; tick < 20; tick++) {
+                await Promise.resolve()
+            }
+        }
+        if(firstEndsFirst) {
+            // the earlier one opens nothing
+            finishes[0]()
+            await settle()
+            expect(panel.store.state.sockets['socket-client']).toBeUndefined()
+        }
+        finishes[1]()
+        await settle()
+        const current = panel.store.state.sockets['socket-client']
+        expect(current).toBeInstanceOf(TestWebSocket)
+        if(!firstEndsFirst) {
+            // nor does it replace the later one
+            finishes[0]()
+            await settle()
+        }
+        expect(panel.store.state.sockets['socket-client']).toBe(current)
+        expect(current.close).not.toHaveBeenCalled()
+    })
+}
 
 for(const firstEndsFirst of [true, false]) {
     test(`an older Connect failure keeps the newer marker, first ends first: ${firstEndsFirst}`, async() => {

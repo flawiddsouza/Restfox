@@ -256,6 +256,7 @@
 
 <script setup lang="ts">
 import { resolveEnvironmentForRequest } from '@/utils/environment'
+import { getSocketClientRemovals, getSocketItemCloses, isLatestSocketConnect, noteSocketClientRemoved, noteSocketConnectStarted, noteSocketOpened } from '@/utils/socket-connections'
 import { nextTick, onBeforeMount, reactive, computed, inject, ref, toRaw } from 'vue'
 import { useMobile } from '@/composables/useMobile'
 import { Client, ClientPayload, ClientMessage } from './SocketPanel.types'
@@ -304,7 +305,7 @@ const clientUrlsEnvSubstituted: { [key: string]: string } = reactive({})
 
 // the client type and url of each connection attempt still waiting for its first answer. Connect shows until a socket
 // is connected, so a second click for the same attempt, such as a double click, is ignored instead of opening a second socket
-const pendingConnections: { [key: string]: { target: string } } = {}
+const pendingConnections: { [key: string]: { target: string, itemCloses: number, clientRemovals: number, connectStart: number } } = {}
 
 // Computed
 const store = useStore()
@@ -345,6 +346,7 @@ async function removeClient(client: Client) {
         return
     }
     sockets[activeTab.value._id + '-' + client.id]?.close()
+    noteSocketClientRemoved(activeTab.value._id + '-' + client.id)
     activeTab.value.clients = activeTab.value.clients.filter(
         (clientItem: Client) => clientItem.id !== client.id
     )
@@ -372,11 +374,16 @@ async function connect(client: Client) {
     const socketKey = activeTab.value._id + '-' + client.id
     const connectionTarget = `${client.type ?? 'WebSocket'} ${client.url}`
 
-    if (pendingConnections[socketKey]?.target === connectionTarget) {
+    const itemClosesAtStart = getSocketItemCloses(activeTab.value._id)
+    const clientRemovalsAtStart = getSocketClientRemovals(socketKey)
+    // an attempt from before the item closed or the client was removed, or one a later Connect or a Disconnect overtook,
+    // also in another panel, which this panel kept, opens nothing and does not hold this one back
+    const pending = pendingConnections[socketKey]
+    if (pending?.target === connectionTarget && pending.itemCloses === itemClosesAtStart && pending.clientRemovals === clientRemovalsAtStart && isLatestSocketConnect(socketKey, pending.connectStart)) {
         return
     }
 
-    const attempt = { target: connectionTarget }
+    const attempt = { target: connectionTarget, itemCloses: itemClosesAtStart, clientRemovals: clientRemovalsAtStart, connectStart: noteSocketConnectStarted(socketKey) }
     pendingConnections[socketKey] = attempt
     const settleConnectionAttempt = () => {
         if(pendingConnections[socketKey] === attempt) {
@@ -441,6 +448,18 @@ async function connect(client: Client) {
     if(pendingConnections[socketKey] !== attempt) {
         return
     }
+    // a later Connect for the same client, such as from the panel rebuilt after a tab switch, opens its own socket, and
+    // after a Disconnect none opens
+    if(!isLatestSocketConnect(socketKey, attempt.connectStart)) {
+        settleConnectionAttempt()
+        return
+    }
+    // an item closed while Connect waited, such as its tab, which closed what it had open, or its client removed, also
+    // through another copy of the tab
+    if(getSocketItemCloses(activeTab.value._id) !== itemClosesAtStart || getSocketClientRemovals(socketKey) !== clientRemovalsAtStart) {
+        settleConnectionAttempt()
+        return
+    }
     // a client removed while Connect waited opens no socket, also when its panel was rebuilt after a tab switch and
     // the removal came from the new one
     if(!activeTab.value.clients.some((clientItem: Client) => clientItem.id === client.id)) {
@@ -503,6 +522,8 @@ async function connect(client: Client) {
         return
     }
 
+    noteSocketOpened(activeTab.value._id, socketKey)
+
     addClientMessage(client, {
         timestamp: new Date().getTime(),
         message: `Connecting to ${clientUrlToShow}`,
@@ -525,7 +546,8 @@ async function connect(client: Client) {
     function reportConnectionFailure(reason?: string) {
         settleConnectionAttempt()
 
-        if (connectionFailureReported) {
+        // closed by Restfox with its item while it was still connecting, which failed nothing
+        if (connectionFailureReported || getSocketItemCloses(activeTab.value._id) !== itemClosesAtStart) {
             return
         }
 
@@ -749,6 +771,10 @@ function disconnect(client: Client, attempt?: { target: string }) {
     const socketKey = activeTab.value._id + '-' + client.id
     if(attempt === undefined || pendingConnections[socketKey] === attempt) {
         delete pendingConnections[socketKey]
+    }
+    // the user's Disconnect also stops a Connect still waiting in another panel, such as the one shown before a tab switch
+    if(attempt === undefined) {
+        noteSocketConnectStarted(socketKey)
     }
 
     if(socket instanceof WebSocket) {
