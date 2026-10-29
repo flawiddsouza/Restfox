@@ -9,7 +9,7 @@ vi.mock('dexie', () => {
             return {
                 stores: (schema: Record<string, string>) => {
                     for(const table of Object.keys(schema)) {
-                        (this as any)[table] = { get: async() => ({ _id: 'workspace-1', _type: 'file', location: '/w' }) }
+                        (this as any)[table] = { get: async() => ({ _id: 'workspace-1', _type: 'file', location: '/w' }), update: async() => 1 }
                     }
                 },
             }
@@ -23,6 +23,7 @@ const electronIPC = {
     getResponsesByCollectionId: vi.fn(),
     createResponse: vi.fn(),
     getWorkspaceAtLocation: vi.fn(),
+    updateWorkspace: vi.fn(),
 }
 
 async function importDb() {
@@ -58,6 +59,25 @@ test('an inactive file workspace read forwards environments through web-standalo
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ location: '/workspaces/A', getEnvironments: true }),
     })
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+})
+
+test('a file workspace save that throws returns its error, but not one that changes the location', async() => {
+    const { updateWorkspace } = await importDb()
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    electronIPC.updateWorkspace.mockRejectedValue(new Error('EACCES: permission denied, mkdir \'/w/_environments\''))
+    expect(await updateWorkspace('workspace-1', { environments: [] })).toEqual({ error: 'EACCES: permission denied, mkdir \'/w/_environments\'' })
+    // a rename, which the Edit dialog sends with the location it has
+    expect(await updateWorkspace('workspace-1', { name: 'B', location: '/w' })).toEqual({ error: 'EACCES: permission denied, mkdir \'/w/_environments\'' })
+    // a location being corrected is saved without it, also when the storage returns one
+    expect(await updateWorkspace('workspace-1', { location: '/v' })).toEqual({ error: null })
+    electronIPC.updateWorkspace.mockResolvedValue({ error: 'Not saved, as /w/restfox.json cannot be read' })
+    expect(await updateWorkspace('workspace-1', { name: 'B', location: '/v' })).toEqual({ error: null })
+    const renamed = { name: 'B', location: '/w' }
+    expect(await updateWorkspace('workspace-1', renamed)).toEqual({ error: 'Not saved, as /w/restfox.json cannot be read' })
+    // the name is not saved, nor shown, which the store reads from the same fields
+    expect(renamed).toEqual({ location: '/w' })
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
 })

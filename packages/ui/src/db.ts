@@ -162,17 +162,32 @@ export async function putWorkspace(workspace: Workspace) {
     await db.workspaces.put(workspace)
 }
 
-export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>, skipUpdateForFileWorkspace = false) {
+// The error a file workspace's storage returns for a write it refused, such as environments over a file it cannot read
+export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>, skipUpdateForFileWorkspace = false): Promise<{ error: string | null }> {
+    let error: string | null = null
     if(fileIPC && !skipUpdateForFileWorkspace) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             // this will used for updating workspace name, environments & currentEnvironment
+            // a save that moves the workspace to another location fails at the old one when that was wrong, so its
+            // error is not told: the location is saved below all the same, which is how the user fixes it
+            const locationChanged = updatedFields.location !== undefined && updatedFields.location !== workspace.location
             try {
-                await fileIPC.updateWorkspace(workspace, updatedFields)
+                const result = await fileIPC.updateWorkspace(workspace, updatedFields)
+                if(result?.error) {
+                    console.warn('Error updating file workspace', result.error)
+                    error = locationChanged ? null : result.error
+                }
             } catch (e) {
-                // This will error out if updatedFields.location was incorrect in the previous update
-                // so the user will not be able to fix the location if we don't catch this error
                 console.warn('Error updating file workspace', e)
+                // any other save that throws, such as for a folder it may not write to, is told to the user
+                if(!locationChanged) {
+                    error = e instanceof Error ? e.message : String(e)
+                }
+            }
+            // a name the workspace's restfox.json did not take stays as it was, as the error the user is shown says
+            if(error) {
+                delete updatedFields.name
             }
             // we don't want to update these fields into indexedDB if file workspace
             delete updatedFields.currentEnvironment
@@ -182,10 +197,11 @@ export async function updateWorkspace(workspaceId: string, updatedFields: Partia
     }
 
     if(Object.keys(updatedFields).length === 0) {
-        return
+        return { error }
     }
 
     await db.workspaces.update(workspaceId, updatedFields)
+    return { error }
 }
 
 export async function deleteWorkspace(workspaceId: string) {

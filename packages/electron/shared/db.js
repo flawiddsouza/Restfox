@@ -41,9 +41,9 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
             if(getEnvironments) {
                 const envsDirPath = path.join(location, constants.FOLDERS.ENVIRONMENTS)
-                const { environments, environment, currentEnvironment } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
+                const { environments, environment, currentEnvironment, currentEnvironmentUnreadable } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
 
-                if(currentEnvironment !== workspaceData.currentEnvironment) {
+                if(currentEnvironment !== workspaceData.currentEnvironment && !currentEnvironmentUnreadable) {
                     await fileUtils.writeFileJson(path.join(location, constants.FILES.WORKSPACE_CONFIG), { ...workspaceData, currentEnvironment }, fsLog, `Update workspace current environment`)
                 }
 
@@ -74,10 +74,20 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         })
 
         const workspacePath = workspace.location
+        const workspaceConfigPath = path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG)
 
-        const workspaceExisting = JSON.parse(await fs.readFile(path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG), 'utf8'))
+        // such as one holding git merge conflict markers, which the UI shows for an environments save
+        let workspaceExisting
+        try {
+            workspaceExisting = JSON.parse(await fs.readFile(workspaceConfigPath, 'utf8'))
+        } catch (err) {
+            return {
+                error: `Not saved, as ${workspaceConfigPath} cannot be read: ${err.message}`,
+            }
+        }
 
         const update = {}
+        let environmentsError = null
 
         if (updatedFields.name) {
             update.name = updatedFields.name
@@ -85,7 +95,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         if (updatedFields.environments) {
             const envsDirPath = path.join(workspacePath, constants.FOLDERS.ENVIRONMENTS)
-            await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)
+            ;({ error: environmentsError } = await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments))
         }
 
         if (updatedFields.currentEnvironment) {
@@ -94,7 +104,9 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         if (Object.keys(update).length === 0) {
             console.log('No fields to update for workspace')
-            return
+            return {
+                error: environmentsError,
+            }
         }
 
         const workspaceUpdated = {
@@ -104,6 +116,10 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         await fileUtils.writeFileJson(path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG), workspaceUpdated, fsLog, `Update workspace`)
         console.log(`Updated workspace: ${path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG)}`)
+
+        return {
+            error: environmentsError,
+        }
     }
 
     async function ensureEmptyFolderOrEmptyWorkspace(location) {
@@ -488,8 +504,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields || 'headers' in updatedFields || 'authentication' in updatedFields)) {
             if(updatedFields.environments) {
                 const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
-                await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)
-                return
+                return dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)
             }
 
             if('collapsed' in updatedFields) {
@@ -1115,7 +1130,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         }
     }
 
-    return {
+    const database = {
         getWorkspaceAtLocation,
         updateWorkspace,
         ensureEmptyFolderOrEmptyWorkspace,
@@ -1144,4 +1159,30 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         clearCollectionIdMap,
         readCollectionForWorkspace,
     }
+
+    // Each function takes the workspace or its location first. A location typed with forward slashes on Windows, such as
+    // C:/work/api, or with a trailing separator never matches the paths built from it with path.join, so the items' ids
+    // and parents come out wrong and the sidebar is empty. Every function, a later one included, gets it as the platform
+    // writes it
+    return Object.fromEntries(Object.entries(database).map(([name, value]) => [
+        name,
+        typeof value === 'function' ? (workspaceOrLocation, ...rest) => value(withPlatformLocation(workspaceOrLocation), ...rest) : value,
+    ]))
+}
+
+// The platform's separators and no trailing one. A relative location stays relative, as the Electron watcher watches the
+// location as typed and reports its changes in that form, which must match the paths Restfox logs for its own writes
+export function platformLocation(location) {
+    const normalized = path.normalize(location)
+    return normalized.length > path.parse(normalized).root.length && normalized.endsWith(path.sep) ? normalized.slice(0, -1) : normalized
+}
+
+function withPlatformLocation(workspaceOrLocation) {
+    if (typeof workspaceOrLocation === 'string' && workspaceOrLocation !== '') {
+        return platformLocation(workspaceOrLocation)
+    }
+    if (typeof workspaceOrLocation?.location === 'string' && workspaceOrLocation.location !== '') {
+        return { ...workspaceOrLocation, location: platformLocation(workspaceOrLocation.location) }
+    }
+    return workspaceOrLocation
 }

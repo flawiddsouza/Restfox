@@ -941,6 +941,7 @@ describe('script environment writes belong to the request workspace', () => {
         vi.mocked(getCollectionById).mockImplementation(async(_workspaceId, id) => storedItems[id] && copy(storedItems[id]))
         vi.mocked(updateWorkspace).mockImplementation(async(id, fields) => {
             Object.assign(storedWorkspaces.find(workspace => workspace._id === id)!, copy(fields))
+            return { error: null }
         })
         vi.mocked(updateCollection).mockImplementation(async(id, collectionId, fields) => {
             if(id === 'A') {
@@ -1267,10 +1268,11 @@ describe('script environment writes belong to the request workspace', () => {
         const saved = held<void>()
         const update = vi.mocked(updateWorkspace).getMockImplementation()!
         vi.mocked(updateWorkspace).mockImplementation(async(id, fields) => {
-            await update(id, fields)
+            const result = await update(id, fields)
             if(fields.environments) {
                 await saved.promise
             }
+            return result
         })
         const send = controlledScript(async set => {
             await set('token', 'from-A')
@@ -1375,6 +1377,78 @@ describe('script environment writes belong to the request workspace', () => {
         expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environment: { token: 'A' } })
         expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environments: [{ name: 'Default', environment: { token: 'A' } }] })
     })
+
+    test('an environments save the storage refuses, such as over a file it cannot read, shows its error', async() => {
+        activate('A')
+        const refusal = 'Not saved, as Prod.json cannot be read: Unexpected token'
+        vi.mocked(updateCollection).mockResolvedValueOnce({ error: refusal })
+        vi.mocked(updateWorkspace).mockResolvedValueOnce({ error: refusal })
+        vi.spyOn(emitter, 'emit')
+        store.commit('updateCollectionItemEnvironments', { workspaceId: 'A', collectionId: 'Auth', environments: [{ name: 'Prod', environment: {} }] })
+        store.commit('updateWorkspaceEnvironments', { workspaceId: 'A', environments: [{ name: 'Prod', environment: {} }] })
+        await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledTimes(2))
+        expect(vi.mocked(emitter.emit).mock.calls).toEqual([['error', refusal], ['error', refusal]])
+    })
+
+    test('a workspace rename the storage refuses, such as with restfox.json it cannot read, shows its error', async() => {
+        activate('A')
+        const refusal = 'Not saved, as restfox.json cannot be read: Unexpected token'
+        vi.mocked(updateWorkspace).mockResolvedValueOnce({ error: refusal })
+        vi.spyOn(emitter, 'emit')
+        await store.dispatch('updateWorkspace', { _id: 'A', updatedFields: { name: 'Renamed' } })
+        expect(emitter.emit).toHaveBeenCalledWith('error', refusal)
+    })
+
+    test('a folder environment pick that fails to write shows its error and goes to Logs', async() => {
+        activate('A')
+        const failure = new Error('EACCES: permission denied, open \'_.json\'')
+        vi.mocked(updateCollection).mockRejectedValueOnce(failure)
+        vi.spyOn(emitter, 'emit')
+        store.commit('updateCollectionItemCurrentEnvironment', { collectionId: 'Auth', currentEnvironment: 'Prod' })
+        await vi.waitFor(() => expect(console.error).toHaveBeenCalledWith('Error saving folder environment pick', failure))
+        expect(emitter.emit).toHaveBeenCalledWith('error', failure.message)
+    })
+
+    test('a workspace environment pick the storage refuses, such as with restfox.json it cannot read, shows its error', async() => {
+        activate('A')
+        const refusal = 'Not saved, as restfox.json cannot be read: Unexpected token'
+        vi.mocked(updateWorkspace).mockResolvedValueOnce({ error: refusal })
+        vi.spyOn(emitter, 'emit')
+        store.commit('updateWorkspaceCurrentEnvironment', { workspaceId: 'A', currentEnvironment: 'Prod' })
+        await vi.waitFor(() => expect(emitter.emit).toHaveBeenCalledWith('error', refusal))
+    })
+
+    test('a folder environments save that fails to write shows its error and goes to Logs', async() => {
+        activate('A')
+        const failure = new Error('EPERM: operation not permitted')
+        vi.mocked(updateCollection).mockRejectedValueOnce(failure)
+        vi.spyOn(emitter, 'emit')
+        store.commit('updateCollectionItemEnvironments', { workspaceId: 'A', collectionId: 'Auth', environments: [{ name: 'Prod', environment: {} }] })
+        await vi.waitFor(() => expect(console.error).toHaveBeenCalledWith('Error saving folder environments', failure))
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'EPERM: operation not permitted')
+    })
+
+    for(const scope of ['workspace', 'folder'] as const) {
+        test(`a ${scope} environments save refused after switching workspaces goes to Logs and changes no list`, async() => {
+            const refusal = 'Not saved, as Default.json cannot be read: Unexpected token'
+            if(scope === 'workspace') {
+                vi.mocked(updateWorkspace).mockImplementation(async(_id, fields) => ({ error: fields.environments ? refusal : null }))
+            } else {
+                vi.mocked(updateCollection).mockImplementation(async(_id, _collectionId, fields) => ({ error: fields.environments ? refusal : null }))
+            }
+            const send = controlledScript(async set => {
+                await set('token', 'from-A', scope)
+            })
+            const sent = store.dispatch('sendRequest', request)
+            await send.started
+            activate('B')
+            const workspacesBefore = copy(store.state.workspaces)
+            send.finish()
+            await sent
+            await vi.waitFor(() => expect(console.error).toHaveBeenCalledWith(expect.objectContaining({ message: refusal })))
+            expect(store.state.workspaces).toEqual(workspacesBefore)
+        })
+    }
 })
 
 describe('Collection Runner with a body cut short', () => {

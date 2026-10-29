@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import db from './db.js'
 import dbHelpers from './db-helpers.js'
+import { platformLocation } from '../shared/db.js'
 
 let workspace
 
@@ -183,6 +184,197 @@ test('socket saves create missing messages', async() => {
     const { newCollectionId } = await db.createCollection(workspace, { _id: 'socket', _type: 'socket', name: 'Socket', parentId: null })
     await db.updateCollection(workspace, newCollectionId, { _type: 'socket', clients: [{ id: 'client', messages: ['new'] }] })
     expect(readJson('Socket.messages.json')).toEqual({ client: ['new'] })
+})
+
+function writeEnvironmentFiles(files) {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), '{}')
+    const envsDirPath = path.join(workspace.location, '_environments')
+    fs.mkdirSync(envsDirPath, { recursive: true })
+    for (const [name, text] of Object.entries(files)) {
+        fs.writeFileSync(path.join(envsDirPath, name), text)
+    }
+    return envsDirPath
+}
+
+test('saving environments leaves an environment file it cannot read and deletes a removed one', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': conflict, 'Old.json': '{}', 'Old.meta.json': '{"color":"red"}' })
+    await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { a: '1' } }] })
+    expect(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')).toBe(conflict)
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Default.json', 'Prod.json'])
+})
+
+test('an environment named as a file it cannot read is not saved, and the others are', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': conflict, 'Old.json': '{}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { a: '1' } }, { name: 'Prod', environment: { token: 'new' } }] })
+    expect(result.error).toMatch(/^Not saved, as .+Prod\.json cannot be read: .+ is not valid JSON\. Nothing was deleted$/)
+    expect(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')).toBe(conflict)
+    // the others are saved, and nothing deleted
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Default.json', 'Old.json', 'Prod.json'])
+    expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Default.json'), 'utf8'))).toEqual({ a: '1' })
+})
+
+test('a folder environment named as a file it cannot read fails without changing it', async() => {
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'folder', _type: 'request_group', name: 'Folder', parentId: null })
+    const envsDirPath = path.join(workspace.location, 'Folder', '_environments')
+    fs.mkdirSync(envsDirPath, { recursive: true })
+    fs.writeFileSync(path.join(envsDirPath, 'Prod.json'), conflict)
+    const result = await db.updateCollection(workspace, newCollectionId, { environments: [{ name: 'Prod', environment: {} }] })
+    expect(result.error).toMatch(/^Not saved, as .+Prod\.json cannot be read/)
+    expect(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')).toBe(conflict)
+})
+
+test('a location gets the platform separators and no trailing one, and a relative one stays relative', () => {
+    expect(platformLocation('work/api/')).toBe(path.join('work', 'api'))
+    expect(platformLocation(`${workspace.location.replaceAll('\\', '/')}/`)).toBe(workspace.location)
+    expect(platformLocation(path.parse(workspace.location).root)).toBe(path.parse(workspace.location).root)
+})
+
+test('a save refusing an environment says nothing was deleted only when it held back a removal', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': conflict, 'Stage.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: {} }] })
+    expect(result.error).toMatch(/^Not saved, as .+Prod\.json cannot be read: .+ is not valid JSON$/)
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'Stage.json'])
+})
+
+test('an environments save on a restfox.json it cannot read returns its error and writes nothing', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Default.json': '{}' })
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), conflict)
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { a: '1' } }] })
+    expect(result.error).toMatch(/^Not saved, as .+restfox\.json cannot be read: .+ is not valid JSON$/)
+    expect(fs.readFileSync(path.join(envsDirPath, 'Default.json'), 'utf8')).toBe('{}')
+    expect(fs.readFileSync(path.join(workspace.location, 'restfox.json'), 'utf8')).toBe(conflict)
+})
+
+test('an environment whose file cannot be written is reported', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{"a":"old"}' })
+    fs.chmodSync(path.join(envsDirPath, 'Prod.json'), 0o444)
+    try {
+        const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: 'new' } }] })
+        expect(result.error).toMatch(/^Not saved, as .+Prod\.json could not be written: /)
+    } finally {
+        fs.chmodSync(path.join(envsDirPath, 'Prod.json'), 0o644)
+    }
+})
+
+test('an environment file that cannot be deleted is reported', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Default.json': '{}', 'Old.json': '{}' })
+    // as for a file another program holds open
+    vi.spyOn(fsPromises, 'unlink').mockRejectedValueOnce(Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' }))
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: {} }] })
+    expect(result.error).toMatch(/^Not deleted, as .+Old\.json could not be removed: EBUSY/)
+    expect(fs.existsSync(path.join(envsDirPath, 'Old.json'))).toBe(true)
+})
+
+test('an environment color whose file cannot be read is left as it is', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{}', 'Prod.meta.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' }, color: '#ffffff' }] })
+    expect(result.error).toMatch(/^Not saved, as .+Prod\.meta\.json cannot be read: /)
+    expect(fs.readFileSync(path.join(envsDirPath, 'Prod.meta.json'), 'utf8')).toBe(conflict)
+    expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
+})
+
+test('two environments whose names differ only in case keep both sets of variables', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{"a":"1"}' })
+    const caseInsensitive = fs.existsSync(path.join(envsDirPath, 'prod.json'))
+    // in either order, the one already saved under its name is kept
+    for (const environments of [
+        [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: {} }],
+        [{ name: 'prod', environment: {} }, { name: 'Prod', environment: { a: '1' } }],
+    ]) {
+        const result = await db.updateWorkspace(workspace, { environments })
+        if (caseInsensitive) {
+            expect(result.error).toMatch(/^Not saved, as the environment prod is the same file as Prod on this system$/)
+            expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
+            expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
+        } else {
+            expect(result.error).toBeNull()
+            expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'prod.json'])
+        }
+    }
+})
+
+test('two new environments whose names differ only in case keep the first one\'s variables', async() => {
+    const envsDirPath = writeEnvironmentFiles({})
+    const caseInsensitive = fs.existsSync(path.join(workspace.location, '_ENVIRONMENTS'))
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: {} }] })
+    if (caseInsensitive) {
+        expect(result.error).toMatch(/^Not saved, as the environment prod is the same file as Prod on this system$/)
+        expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
+        expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
+    } else {
+        expect(result.error).toBeNull()
+        expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'prod.json'])
+    }
+})
+
+test('an environment named as another one\'s color file is not saved over it', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{}', 'Prod.meta.json': '{"color":"red"}', 'Old.json': '{}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: {}, color: 'red' }, { name: 'Prod.meta', environment: { a: '1' } }] })
+    expect(result.error).toBe('Not saved, as the environment name Prod.meta ends in .meta, which environment colors are saved under. Nothing was deleted')
+    expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.meta.json'), 'utf8'))).toEqual({ color: 'red' })
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Old.json', 'Prod.json', 'Prod.meta.json'])
+})
+
+test('renaming an environment keeps its color file when it cannot be read', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Old.json': '{}', 'Old.meta.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'New', environment: {} }] })
+    expect(result.error).toBeNull()
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['New.json', 'Old.meta.json'])
+    expect(fs.readFileSync(path.join(envsDirPath, 'Old.meta.json'), 'utf8')).toBe(conflict)
+})
+
+test('renaming an environment to the name of a file it cannot read keeps both files', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': conflict, 'Old.json': '{"a":"1"}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' } }] })
+    expect(result.error).toMatch(/^Not saved, as .+Prod\.json cannot be read: .+\. Nothing was deleted$/)
+    expect(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')).toBe(conflict)
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Old.json', 'Prod.json'])
+    expect(fs.readFileSync(path.join(envsDirPath, 'Old.json'), 'utf8')).toBe('{"a":"1"}')
+})
+
+test('a file beside the environments that is not one, such as a backup, is neither loaded nor deleted', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{"a":"1"}', 'Prod.json.bak': '{"a":"0"}' })
+    expect((await db.getWorkspaceAtLocation(workspace.location, true)).environments.map(environment => environment.name)).toEqual(['Prod'])
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '2' } }] })
+    expect(result.error).toBeNull()
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'Prod.json.bak'])
+})
+
+test('an environment whose name holds .json loads under its own name and keeps its color', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json.backup.json': '{"a":"1"}', 'Prod.json.backup.meta.json': '{"color":"red"}', 'Prod.backup.json': '{"a":"2"}' })
+    const { environments } = await db.getWorkspaceAtLocation(workspace.location, true)
+    expect(environments.map(environment => [environment.name, environment.environment.a, environment.color]).sort()).toEqual([['Prod.backup', '2', undefined], ['Prod.json.backup', '1', 'red']])
+    expect((await db.updateWorkspace(workspace, { environments })).error).toBeNull()
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.backup.json', 'Prod.json.backup.json', 'Prod.json.backup.meta.json'])
+})
+
+test('loading keeps the saved environment pick when the picked environment cannot be read', async() => {
+    writeEnvironmentFiles({ 'Default.json': '{}', 'Prod.json': conflict })
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), '{"version":1,"name":"W","currentEnvironment":"Prod"}')
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'folder', _type: 'request_group', name: 'Folder', parentId: null })
+    const folderEnvsDirPath = path.join(workspace.location, 'Folder', '_environments')
+    fs.mkdirSync(folderEnvsDirPath, { recursive: true })
+    fs.writeFileSync(path.join(folderEnvsDirPath, 'Default.json'), '{}')
+    fs.writeFileSync(path.join(folderEnvsDirPath, 'Prod.json'), conflict)
+    fs.writeFileSync(path.join(workspace.location, 'Folder', '_.json'), '{"currentEnvironment":"Prod"}')
+
+    // the first environment stands in until the file is fixed
+    expect((await db.getWorkspaceAtLocation(workspace.location, true)).currentEnvironment).toBe('Default')
+    expect((await dbHelpers.getCollection(new Map(), [], workspace)).find(item => item._id === newCollectionId).currentEnvironment).toBe('Default')
+    expect(fs.readFileSync(path.join(workspace.location, 'restfox.json'), 'utf8')).toBe('{"version":1,"name":"W","currentEnvironment":"Prod"}')
+    expect(fs.readFileSync(path.join(workspace.location, 'Folder', '_.json'), 'utf8')).toBe('{"currentEnvironment":"Prod"}')
+})
+
+test('a location typed with forward slashes or a trailing separator gives the same ids as the platform form', async() => {
+    const typedWorkspace = { ...workspace, location: `${workspace.location.replaceAll('\\', '/')}/` }
+    const folder = await db.createCollection(typedWorkspace, { _id: 'folder', _type: 'request_group', name: 'Folder', parentId: null })
+    const request = await db.createCollection(typedWorkspace, { _id: 'request', _type: 'request', name: 'Get', parentId: folder.newCollectionId, url: '', method: 'GET', body: { mimeType: 'No Body' } })
+    expect([folder.newCollectionId, request.newCollectionId]).toEqual(['/Folder', '/Folder/Get.json'])
+    // the platform form reaches the same item
+    expect(await db.getCollectionById(workspace, request.newCollectionId)).toMatchObject({ name: 'Get' })
+    // deleting reads the id map from the location alone
+    await db.deleteCollectionsByIds(typedWorkspace, [request.newCollectionId])
+    expect(fs.existsSync(path.join(workspace.location, 'Folder', 'Get.json'))).toBe(false)
 })
 
 

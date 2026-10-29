@@ -195,6 +195,172 @@ test('socket saves create missing messages', () => withWorkspace(async workspace
     assert.deepEqual(readJson(workspace, 'Socket.messages.json'), { client: ['new'] })
 }))
 
+function writeEnvironmentFiles(workspace, files) {
+    const envsDirPath = path.join(workspace.location, '_environments')
+    fs.mkdirSync(envsDirPath, { recursive: true })
+    for (const [name, text] of Object.entries(files)) {
+        fs.writeFileSync(path.join(envsDirPath, name), text)
+    }
+    return envsDirPath
+}
+
+test('saving environments leaves an environment file it cannot read and deletes a removed one', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': conflict, 'Old.json': '{}', 'Old.meta.json': '{"color":"red"}' })
+    await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { a: '1' } }] })
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'), conflict)
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Default.json', 'Prod.json'])
+}))
+
+test('an environment named as a file it cannot read is not saved, and the others are', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': conflict, 'Old.json': '{}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { a: '1' } }, { name: 'Prod', environment: { token: 'new' } }] })
+    assert.match(result.error, /^Not saved, as .+Prod\.json cannot be read: .+ is not valid JSON\. Nothing was deleted$/)
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'), conflict)
+    // the others are saved, and nothing deleted
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Default.json', 'Old.json', 'Prod.json'])
+    assert.deepEqual(readJson(workspace, '_environments/Default.json'), { a: '1' })
+}))
+
+test('a save refusing an environment says nothing was deleted only when it held back a removal', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': conflict, 'Stage.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: {} }] })
+    assert.match(result.error, /^Not saved, as .+Prod\.json cannot be read: .+ is not valid JSON$/)
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Prod.json', 'Stage.json'])
+}))
+
+test('an environments save on a restfox.json it cannot read returns its error and writes nothing', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Default.json': '{}' })
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), conflict)
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { a: '1' } }] })
+    assert.match(result.error, /^Not saved, as .+restfox\.json cannot be read: .+ is not valid JSON$/)
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Default.json'), 'utf8'), '{}')
+    assert.equal(fs.readFileSync(path.join(workspace.location, 'restfox.json'), 'utf8'), conflict)
+}))
+
+test('an environment whose file cannot be written is reported', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': '{"a":"old"}' })
+    fs.chmodSync(path.join(envsDirPath, 'Prod.json'), 0o444)
+    try {
+        const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: 'new' } }] })
+        assert.match(result.error, /^Not saved, as .+Prod\.json could not be written: /)
+    } finally {
+        fs.chmodSync(path.join(envsDirPath, 'Prod.json'), 0o644)
+    }
+}))
+
+test('an environment color whose file cannot be read is left as it is', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': '{}', 'Prod.meta.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' }, color: '#ffffff' }] })
+    assert.match(result.error, /^Not saved, as .+Prod\.meta\.json cannot be read: /)
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Prod.meta.json'), 'utf8'), conflict)
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')), { a: '1' })
+}))
+
+test('two environments whose names differ only in case keep both sets of variables', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': '{"a":"1"}' })
+    const caseInsensitive = fs.existsSync(path.join(envsDirPath, 'prod.json'))
+    // in either order, the one already saved under its name is kept
+    for (const environments of [
+        [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: {} }],
+        [{ name: 'prod', environment: {} }, { name: 'Prod', environment: { a: '1' } }],
+    ]) {
+        const result = await db.updateWorkspace(workspace, { environments })
+        if (caseInsensitive) {
+            assert.match(result.error, /^Not saved, as the environment prod is the same file as Prod on this system$/)
+            assert.deepEqual(fs.readdirSync(envsDirPath), ['Prod.json'])
+            assert.deepEqual(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')), { a: '1' })
+        } else {
+            assert.equal(result.error, null)
+            assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Prod.json', 'prod.json'])
+        }
+    }
+}))
+
+test('two new environments whose names differ only in case keep the first one\'s variables', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, {})
+    const caseInsensitive = fs.existsSync(path.join(workspace.location, '_ENVIRONMENTS'))
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: {} }] })
+    if (caseInsensitive) {
+        assert.match(result.error, /^Not saved, as the environment prod is the same file as Prod on this system$/)
+        assert.deepEqual(fs.readdirSync(envsDirPath), ['Prod.json'])
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')), { a: '1' })
+    } else {
+        assert.equal(result.error, null)
+        assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Prod.json', 'prod.json'])
+    }
+}))
+
+test('an environment named as another one\'s color file is not saved over it', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': '{}', 'Prod.meta.json': '{"color":"red"}', 'Old.json': '{}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: {}, color: 'red' }, { name: 'Prod.meta', environment: { a: '1' } }] })
+    assert.equal(result.error, 'Not saved, as the environment name Prod.meta ends in .meta, which environment colors are saved under. Nothing was deleted')
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.meta.json'), 'utf8')), { color: 'red' })
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Old.json', 'Prod.json', 'Prod.meta.json'])
+}))
+
+test('renaming an environment keeps its color file when it cannot be read', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Old.json': '{}', 'Old.meta.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'New', environment: {} }] })
+    assert.equal(result.error, null)
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['New.json', 'Old.meta.json'])
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Old.meta.json'), 'utf8'), conflict)
+}))
+
+test('renaming an environment to the name of a file it cannot read keeps both files', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': conflict, 'Old.json': '{"a":"1"}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' } }] })
+    assert.match(result.error, /^Not saved, as .+Prod\.json cannot be read: .+\. Nothing was deleted$/)
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'), conflict)
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Old.json', 'Prod.json'])
+    assert.equal(fs.readFileSync(path.join(envsDirPath, 'Old.json'), 'utf8'), '{"a":"1"}')
+}))
+
+test('a file beside the environments that is not one, such as a backup, is neither loaded nor deleted', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json': '{"a":"1"}', 'Prod.json.bak': '{"a":"0"}' })
+    assert.deepEqual((await db.getWorkspaceAtLocation(workspace.location, true)).environments.map(environment => environment.name), ['Prod'])
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '2' } }] })
+    assert.equal(result.error, null)
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Prod.json', 'Prod.json.bak'])
+}))
+
+test('an environment whose name holds .json loads under its own name and keeps its color', () => withWorkspace(async workspace => {
+    const envsDirPath = writeEnvironmentFiles(workspace, { 'Prod.json.backup.json': '{"a":"1"}', 'Prod.json.backup.meta.json': '{"color":"red"}', 'Prod.backup.json': '{"a":"2"}' })
+    const { environments } = await db.getWorkspaceAtLocation(workspace.location, true)
+    assert.deepEqual(environments.map(environment => [environment.name, environment.environment.a, environment.color]).sort(), [['Prod.backup', '2', undefined], ['Prod.json.backup', '1', 'red']])
+    assert.equal((await db.updateWorkspace(workspace, { environments })).error, null)
+    assert.deepEqual(fs.readdirSync(envsDirPath).sort(), ['Prod.backup.json', 'Prod.json.backup.json', 'Prod.json.backup.meta.json'])
+}))
+
+test('loading keeps the saved environment pick when the picked environment cannot be read', () => withWorkspace(async workspace => {
+    writeEnvironmentFiles(workspace, { 'Default.json': '{}', 'Prod.json': conflict })
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), '{"version":1,"name":"W","currentEnvironment":"Prod"}')
+    const { newCollectionId } = await db.createCollection(workspace, { _id: 'folder', _type: 'request_group', name: 'Folder', parentId: null })
+    const folderEnvsDirPath = path.join(workspace.location, 'Folder', '_environments')
+    fs.mkdirSync(folderEnvsDirPath, { recursive: true })
+    fs.writeFileSync(path.join(folderEnvsDirPath, 'Default.json'), '{}')
+    fs.writeFileSync(path.join(folderEnvsDirPath, 'Prod.json'), conflict)
+    fs.writeFileSync(path.join(workspace.location, 'Folder', '_.json'), '{"currentEnvironment":"Prod"}')
+
+    // the first environment stands in until the file is fixed
+    assert.equal((await db.getWorkspaceAtLocation(workspace.location, true)).currentEnvironment, 'Default')
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    assert.equal(loaded.collection.find(item => item._id === newCollectionId).currentEnvironment, 'Default')
+    assert.equal(fs.readFileSync(path.join(workspace.location, 'restfox.json'), 'utf8'), '{"version":1,"name":"W","currentEnvironment":"Prod"}')
+    assert.equal(fs.readFileSync(path.join(workspace.location, 'Folder', '_.json'), 'utf8'), '{"currentEnvironment":"Prod"}')
+}))
+
+test('a location typed with forward slashes or a trailing separator loads its items at the root', () => withWorkspace(async workspace => {
+    const typedWorkspace = { ...workspace, location: `${workspace.location.replaceAll('\\', '/')}/` }
+    await db.createCollection(typedWorkspace, { _id: 'request', _type: 'request', name: 'Get', parentId: null, url: '', method: 'GET', body: { mimeType: 'No Body' } })
+    const loaded = await db.getCollectionForWorkspace(typedWorkspace, null)
+    assert.equal(loaded.error, null)
+    assert.deepEqual(loaded.collection.map(item => [item._id, item.parentId]), [['/Get.json', null]])
+    // deleting reads the id map from the location alone
+    const deleted = await db.deleteCollectionsByIds(typedWorkspace, ['/Get.json'])
+    assert.equal(deleted?.error ?? null, null)
+    assert.equal(fs.existsSync(path.join(workspace.location, 'Get.json')), false)
+}))
+
 
 test('a request type only a newer version knows is created as its own file, loads back whole and takes its history', () => withWorkspace(async workspace => {
     // as a duplicate or an import of a workspace that holds one does

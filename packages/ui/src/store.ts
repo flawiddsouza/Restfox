@@ -578,12 +578,18 @@ export const store = createStore<State>({
                     throw new Error('activeWorkspace is null')
                 }
 
-                await updateCollection(workspaceId, collectionId, { environments: JSON.parse(JSON.stringify(environments)) })
+                try {
+                    reportUpdateError(await updateCollection(workspaceId, collectionId, { environments: JSON.parse(JSON.stringify(environments)) }))
+                } catch(error) {
+                    // a failed write, which nothing awaiting a mutation would see, shown as a refused one is
+                    console.error('Error saving folder environments', error)
+                    emitter.emit('error', error instanceof Error ? error.message : String(error))
+                }
             }
         },
         async updateWorkspaceEnvironments(_state, { workspaceId, environments }) {
             if(environments) {
-                await updateWorkspace(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) })
+                reportUpdateError(await updateWorkspace(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) }))
             }
         },
         async updateCollectionItemCurrentEnvironment(state, { collectionId, currentEnvironment }) {
@@ -592,12 +598,18 @@ export const store = createStore<State>({
                     throw new Error('activeWorkspace is null')
                 }
 
-                reportUpdateError(await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment }))
+                try {
+                    reportUpdateError(await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment }))
+                } catch(error) {
+                    // a failed write, which nothing awaiting a mutation would see, shown as a refused one is
+                    console.error('Error saving folder environment pick', error)
+                    emitter.emit('error', error instanceof Error ? error.message : String(error))
+                }
             }
         },
         async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
             if(currentEnvironment) {
-                await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment })
+                reportUpdateError(await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment }))
             }
         },
         setWorkspaces(state, workspaces) {
@@ -1640,7 +1652,7 @@ export const store = createStore<State>({
 
             payload.updatedFields.updatedAt = updatedAt
 
-            await updateWorkspace(payload._id, payload.updatedFields)
+            reportUpdateError(await updateWorkspace(payload._id, payload.updatedFields))
 
             Object.keys(payload.updatedFields).forEach(updatedField => {
                 (workspace as any)[updatedField] = payload.updatedFields[updatedField as keyof Workspace]

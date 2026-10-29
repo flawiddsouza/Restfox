@@ -28,9 +28,9 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
             try {
                 const collectionData = JSON.parse(await fs.readFile(path.join(fullPath, constants.FILES.FOLDER_CONFIG), 'utf8'))
 
-                const { environments, environment, currentEnvironment } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
+                const { environments, environment, currentEnvironment, currentEnvironmentUnreadable } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
 
-                if(currentEnvironment !== collectionData.currentEnvironment) {
+                if(currentEnvironment !== collectionData.currentEnvironment && !currentEnvironmentUnreadable) {
                     await fileUtils.writeFileJson(path.join(fullPath, constants.FILES.FOLDER_CONFIG), {
                         ...collectionData,
                         currentEnvironment,
@@ -194,11 +194,13 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
 
     async function getEnvironments(envsDirPath, currentEnvironment) {
         const environments = []
+        const unreadableNames = new Set()
 
         const envFiles = await fileUtils.readdirIgnoreError(envsDirPath)
 
         for (const fileName of envFiles) {
-            if (fileName.endsWith('.meta.json')) {
+            // another file kept beside them, such as a backup Prod.json.bak, is not an environment
+            if (fileName.endsWith('.meta.json') || !fileName.endsWith('.json')) {
                 continue
             }
 
@@ -207,17 +209,19 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 let envMeta = {}
 
                 try {
-                    const metaFileName = fileName.replace('.json', '.meta.json')
+                    const metaFileName = `${fileName.slice(0, -'.json'.length)}.meta.json`
                     envMeta = JSON.parse(await fs.readFile(path.join(envsDirPath, metaFileName), 'utf8'))
                 } catch {}
 
                 environments.push({
-                    name: fileUtils.decodeFilename(fileName.replace('.json', '')),
+                    // only the final .json is taken off, as a name may hold one, such as Prod.json.backup
+                    name: fileUtils.decodeFilename(fileName.slice(0, -'.json'.length)),
                     environment: envData,
                     ...envMeta,
                 })
             } catch (err) {
                 console.error(`Error reading environment file: ${fileName}`, err)
+                unreadableNames.add(fileUtils.decodeFilename(fileName.slice(0, -'.json'.length)))
             }
         }
 
@@ -248,7 +252,29 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
             returnData.currentEnvironment = constants.DEFAULT_ENVIRONMENT
         }
 
+        // the pick names an environment whose file loading skipped, such as one with git merge conflict markers, so the
+        // first one stands in for it until the file is fixed, and the saved pick is left as it is
+        returnData.currentEnvironmentUnreadable = currentEnvironment !== undefined && unreadableNames.has(currentEnvironment)
+
         return returnData
+    }
+
+    async function isSameFile(filePath, otherFilePath) {
+        try {
+            const [stats, otherStats] = await Promise.all([fs.stat(filePath), fs.stat(otherFilePath)])
+            return stats.dev === otherStats.dev && stats.ino === otherStats.ino
+        } catch {
+            return false
+        }
+    }
+
+    async function getJsonReadError(filePath) {
+        try {
+            JSON.parse(await fs.readFile(filePath, 'utf8'))
+            return null
+        } catch (err) {
+            return err
+        }
     }
 
     async function saveEnvironments(fsLog, envsDirPath, environments) {
@@ -265,38 +291,108 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         const existingEnvironments = await fileUtils.readdirIgnoreError(envsDirPath)
         const environmentNames = environments.map((env) => `${fileUtils.encodeFilename(env.name)}.json`)
 
-        for (const existingEnvironment of existingEnvironments) {
-            if (existingEnvironment.endsWith('.meta.json')) {
+        // A file loading skipped as unreadable, such as one holding git merge conflict markers, was never shown, so it is
+        // neither deleted as removed nor written over by an environment of the same name, which alone is not saved. Each
+        // target is read rather than looked up by name, which a case-insensitive file system can match under another case.
+        // Names that differ only in case, such as Prod and prod, are one file there, which keeps the environment already
+        // saved under its name, or else the first, and the others are not saved. A name ending in .meta is the file of
+        // another environment's color, which loading skips, so it is not saved either. A save that refuses one deletes
+        // nothing, as an environment renamed to that name is missing from the list but has not been saved under its new one
+        const envsDirName = path.basename(envsDirPath)
+        const caseInsensitive = await isSameFile(envsDirPath, path.join(path.dirname(envsDirPath), envsDirName === envsDirName.toUpperCase() ? envsDirName.toLowerCase() : envsDirName.toUpperCase()))
+        const fileKey = (name) => caseInsensitive ? name.toLowerCase() : name
+        const refusedTargets = new Set()
+        const errors = []
+        for (const [index, environmentName] of environmentNames.entries()) {
+            if (fileKey(environmentName).endsWith('.meta.json')) {
+                refusedTargets.add(environmentName)
+                errors.push(`Not saved, as the environment name ${environments[index].name} ends in .meta, which environment colors are saved under`)
+                continue
+            }
+            const sameFile = environmentNames.filter((name) => fileKey(name) === fileKey(environmentName))
+            const keptName = sameFile.find((name) => existingEnvironments.includes(name)) ?? sameFile[0]
+            if (environmentName !== keptName) {
+                refusedTargets.add(environmentName)
+                errors.push(`Not saved, as the environment ${environments[index].name} is the same file as ${environments[environmentNames.indexOf(keptName)].name} on this system`)
+                continue
+            }
+            const readError = await getJsonReadError(path.join(envsDirPath, environmentName))
+            if (readError && readError.code !== 'ENOENT') {
+                refusedTargets.add(environmentName)
+                errors.push(`Not saved, as ${path.join(envsDirPath, environmentName)} cannot be read: ${readError.message}`)
+            }
+        }
+
+        for (const existingEnvironment of refusedTargets.size > 0 ? [] : existingEnvironments) {
+            if (existingEnvironment.endsWith('.meta.json') || !existingEnvironment.endsWith('.json')) {
                 continue
             }
 
             if (!environmentNames.includes(existingEnvironment)) {
+                if (await getJsonReadError(path.join(envsDirPath, existingEnvironment))) {
+                    console.error(`Not deleting environment file it cannot read: ${existingEnvironment}`)
+                    continue
+                }
+
                 // this means the environment was removed
                 try {
                     await fileUtils.deleteFileOrFolder(path.join(envsDirPath, existingEnvironment), fsLog, 'Deleting environment')
 
-                    const metaFileName = existingEnvironment.replace('.json', '.meta.json')
+                    const metaFileName = `${existingEnvironment.slice(0, -'.json'.length)}.meta.json`
                     const metaExists = existingEnvironments.includes(metaFileName)
 
-                    if (metaExists) {
+                    if (metaExists && await getJsonReadError(path.join(envsDirPath, metaFileName))) {
+                        console.error(`Not deleting environment meta file it cannot read: ${metaFileName}`)
+                    } else if (metaExists) {
                         await fileUtils.deleteFileOrFolder(path.join(envsDirPath, metaFileName), fsLog, 'Deleting environment meta')
                     }
                 } catch (err) {
                     console.error(`Error removing environment file: ${existingEnvironment}`, err)
+                    errors.push(`Not deleted, as ${path.join(envsDirPath, existingEnvironment)} could not be removed: ${err.message}`)
                 }
             }
         }
 
         for (const env of environments) {
             const envName = fileUtils.encodeFilename(env.name)
+            if (refusedTargets.has(`${envName}.json`)) {
+                continue
+            }
+            const targetPath = path.join(envsDirPath, `${envName}.json`)
             try {
-                await fileUtils.writeFileJson(path.join(envsDirPath, `${envName}.json`), env.environment, fsLog, 'Saving environment')
-                if (env.color) {
-                    await fileUtils.writeFileJson(path.join(envsDirPath, `${envName}.meta.json`), { color: env.color }, fsLog, 'Saving environment meta')
-                }
+                await fileUtils.writeFileJson(targetPath, env.environment, fsLog, 'Saving environment')
             } catch (err) {
                 console.error(`Error writing environment file: ${envName}.json`, err)
+                errors.push(`Not saved, as ${targetPath} could not be written: ${err.message}`)
+                continue
             }
+            if (env.color) {
+                // its color, kept apart, is left as it is when it cannot be read, as the environment's own file is
+                const metaPath = path.join(envsDirPath, `${envName}.meta.json`)
+                const metaReadError = await getJsonReadError(metaPath)
+                if (metaReadError && metaReadError.code !== 'ENOENT') {
+                    errors.push(`Not saved, as ${metaPath} cannot be read: ${metaReadError.message}`)
+                    continue
+                }
+                try {
+                    await fileUtils.writeFileJson(metaPath, { color: env.color }, fsLog, 'Saving environment meta')
+                } catch (err) {
+                    console.error(`Error writing environment file: ${envName}.meta.json`, err)
+                    errors.push(`Not saved, as ${metaPath} could not be written: ${err.message}`)
+                }
+            }
+        }
+
+        // an environment removed or renamed in the same save keeps its file, which the user is told
+        let keptFiles = false
+        for (const name of refusedTargets.size > 0 ? existingEnvironments : []) {
+            if (!name.endsWith('.meta.json') && name.endsWith('.json') && !environmentNames.includes(name) && !await getJsonReadError(path.join(envsDirPath, name))) {
+                keptFiles = true
+                break
+            }
+        }
+        return {
+            error: errors.length > 0 ? `${errors.join('. ')}${keptFiles ? '. Nothing was deleted' : ''}` : null,
         }
     }
 

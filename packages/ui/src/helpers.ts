@@ -2690,7 +2690,10 @@ export function setRequestEnvironmentVariable(
                         if(applyToActiveWorkspace()) {
                             return
                         }
-                        await updateCollection(workspaceId, folder._id, { environments: folder.environments })
+                        const saved = await updateCollection(workspaceId, folder._id, { environments: folder.environments })
+                        if(saved?.error) {
+                            throw new Error(saved.error)
+                        }
                     }
                     applyToActiveWorkspace(false)
                     return
@@ -2721,7 +2724,10 @@ export function setRequestEnvironmentVariable(
         if(applyToActiveWorkspace()) {
             return
         }
-        await updateWorkspace(workspaceId, { environments })
+        const saved = await updateWorkspace(workspaceId, { environments })
+        if(saved?.error) {
+            throw new Error(saved.error)
+        }
         if(!applyToActiveWorkspace(false)) {
             const workspaceCurrent = store.state.workspaces.find(item => item._id === workspaceId)
             if(workspaceCurrent) {
