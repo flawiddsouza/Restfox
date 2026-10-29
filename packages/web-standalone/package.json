@@ -10,7 +10,8 @@
         "undici": "^8.11.2"
     },
     "scripts": {
-        "start": "node app.js"
+        "start": "node app.js",
+        "test": "node --import ../electron/reserved-test-hosts.mjs --test *.test.js"
     },
     "engines": {
         "node": ">=26"

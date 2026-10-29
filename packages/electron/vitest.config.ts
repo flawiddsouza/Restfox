@@ -5,5 +5,6 @@ export default defineConfig({
         globals: true,
         // packaged builds under out/ carry copies of the specs
         exclude: [...configDefaults.exclude, 'out/**'],
+        setupFiles: ['./reserved-test-hosts.mjs'],
     }
 })
