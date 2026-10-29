@@ -138,7 +138,8 @@ export const grpcSchemas = reactive<Record<string, GrpcSchemaEntry>>({})
 // the schema each item uses, by getGrpcItemKey, null while its server is not known
 export const grpcItemSchemaKeys = reactive<Record<string, string | null>>({})
 // Preparation can fail before an address supplies a schema key.
-export const grpcItemSchemaPreparations = reactive<Record<string, { loading: boolean, error: string | null, failedAt: number | null }>>({})
+// failureSchemaKey is the server the failure was for, in memory only
+export const grpcItemSchemaPreparations = reactive<Record<string, { loading: boolean, error: string | null, failedAt: number | null, failureSchemaKey?: string | null }>>({})
 // A load runs while a caller waits on it. A caller that can stop waiting, such as a Send that is cancelled, passes a
 // signal, and the load stops, closing its connection, once no caller waits on it
 interface SchemaLoad {
@@ -158,6 +159,9 @@ const schemaFailedItemKeys = new Map<string, string>()
 // each item's latest methods request, numbered across all items, so an item deleted and made again at the same path
 // never takes a number its earlier requests had
 const itemSchemaRequests = new Map<string, number>()
+// each item's latest Reload, Load methods or Send, by the same numbering, so a failure that ends after a newer one of
+// them stays off the screen
+const latestExplicitSchemaActions = new Map<string, number>()
 let schemaRequestCount = 0
 
 export function isGrpcCallRunning(call: GrpcLiveCall | null | undefined) {
@@ -359,6 +363,10 @@ export async function loadGrpcSchemaForItem(store: Store<State>, item: Collectio
     const requestNumber = ++schemaRequestCount
     itemSchemaRequests.set(itemKey, requestNumber)
     const isLatestRequest = () => itemSchemaRequests.get(itemKey) === requestNumber
+    if(!automatic) {
+        latestExplicitSchemaActions.set(itemKey, requestNumber)
+    }
+    const isLatestExplicitAction = () => !automatic && latestExplicitSchemaActions.get(itemKey) === requestNumber
     grpcItemSchemaPreparations[itemKey] = { loading: true, error: null, failedAt: null }
     const preparation = grpcItemSchemaPreparations[itemKey]
     const isLatestPreparation = () => isLatestRequest() && grpcItemSchemaPreparations[itemKey] === preparation
@@ -441,22 +449,24 @@ export async function loadGrpcSchemaForItem(store: Store<State>, item: Collectio
         return { ...result, requestPreparation: { ...requestEnvironment, send, stopAbortController } }
     } catch(error) {
         const message = describeError(error)
-        if(isLatestPreparation()) {
-            Object.assign(grpcItemSchemaPreparations[itemKey], { error: message, failedAt: Date.now() })
-        }
-        if(ownsLoad()) {
-            const schemaKey = key
-            if(schemaKey) {
-                grpcSchemas[schemaKey] ??= { loading: false, schema: null, loadedAt: null, error: null, errorCode: null, failedAt: null }
-                Object.assign(grpcSchemas[schemaKey], { error: message, errorCode: null, failedAt: Date.now() })
-                schemaFailedItemKeys.set(schemaKey, itemKey)
-            }
+        // A load's own failure is kept with the server's methods by runSchemaLoad. This one, such as a cancelled prompt or
+        // a metadata value that cannot be resolved, is the item's alone: other items calling the same server are not told.
+        // It still shows when an automatic load of the same server started meanwhile, but not over a newer Reload or a
+        // Send, which shows its own outcome
+        const overtakenByAutomaticLoad = key !== null && grpcItemSchemaKeys[itemKey] === key && isLatestExplicitAction()
+        if(isLatestPreparation() || overtakenByAutomaticLoad) {
+            Object.assign(grpcItemSchemaPreparations[itemKey], { error: message, failedAt: Date.now(), failureSchemaKey: key })
         }
         // Environment preparation never asks a prompt. Later preparation errors are safe only before one was masked.
         return { schema: null, error: message, errorWithoutValues: send?.tookMaskedValue ? undefined : message, connectionStatus: null }
     } finally {
         if(isLatestPreparation()) {
-            grpcItemSchemaPreparations[itemKey].loading = false
+            const preparation = grpcItemSchemaPreparations[itemKey]
+            preparation.loading = false
+            // a failure written while this load moved the item to another server was for the server it left
+            if(preparation.failedAt !== null && preparation.failureSchemaKey !== undefined && preparation.failureSchemaKey !== null && preparation.failureSchemaKey !== grpcItemSchemaKeys[itemKey]) {
+                Object.assign(preparation, { error: null, failedAt: null, failureSchemaKey: undefined })
+            }
         }
     }
 }
@@ -713,6 +723,7 @@ export async function startGrpcCallForItem(store: Store<State>, item: Collection
     }
     const itemKey = getGrpcItemKey(item)
     const schemaPreparation = grpcItemSchemaPreparations[itemKey]
+    latestExplicitSchemaActions.set(itemKey, ++schemaRequestCount)
 
     dropGrpcCall(itemKey)
 
@@ -966,6 +977,7 @@ function forgetGrpcCallsForItemKeys(itemKeys: string[]) {
     for(const itemKey of itemKeys) {
         dropGrpcCall(itemKey)
         itemSchemaRequests.delete(itemKey)
+        latestExplicitSchemaActions.delete(itemKey)
         delete grpcItemSchemaPreparations[itemKey]
         delete grpcCalls[itemKey]
         delete grpcItemSchemaKeys[itemKey]
@@ -993,6 +1005,7 @@ export function moveGrpcCallsToNewItemIds(workspaceId: string, oldItemIds: strin
         delete grpcCalls[oldKey]
         delete grpcItemSchemaKeys[oldKey]
         itemSchemaRequests.delete(oldKey)
+        latestExplicitSchemaActions.delete(oldKey)
         delete grpcItemSchemaPreparations[oldKey]
         return entry
     })
@@ -1044,6 +1057,7 @@ export function resetGrpcCalls() {
     schemaLoads.clear()
     schemaFailedItemKeys.clear()
     itemSchemaRequests.clear()
+    latestExplicitSchemaActions.clear()
     for(const key of Object.keys(grpcItemSchemaPreparations)) {
         delete grpcItemSchemaPreparations[key]
     }

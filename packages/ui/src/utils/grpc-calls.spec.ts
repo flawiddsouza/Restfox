@@ -822,6 +822,81 @@ test('an older Send does not clear a newer Reload preparation failure', async() 
     expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)]).toMatchObject({ loading: false, error: 'new Reload failed' })
 })
 
+test('a Reload failure that lands while an automatic load moves the item to another server is dropped', async() => {
+    const store = createStore()
+    let failTag: (error: Error) => void = () => undefined
+    responseTag.handleResponseTag.mockReset()
+    responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => mode === 'send' ? new Promise((_resolve, reject) => {
+        failTag = reject
+    }) : Promise.resolve('saved-token'))
+    // the other server's methods are loaded already, through another item
+    await loadGrpcSchemaForItem(store, grpcItem({ _id: 'other', url: 'localhost:50052' }), { mode: 'display', automatic: true })
+    const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+
+    const reload = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    await settle()
+    item.url = 'localhost:50052'
+    // the automatic load for the new address waits on its environment while the Reload fails
+    let releaseEnvironment!: () => void
+    const original = store.dispatch.getMockImplementation()!
+    store.dispatch.mockImplementationOnce((action: string, payload: any) => new Promise(resolve => {
+        releaseEnvironment = () => resolve(original(action, payload))
+    }))
+    const automaticLoad = loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+    await vi.waitFor(() => expect(releaseEnvironment).toBeDefined())
+    failTag(new Error('The login request failed'))
+    await reload
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)].error).toContain('The login request failed')
+    releaseEnvironment()
+    await automaticLoad
+
+    expect(grpcItemSchemaKeys[getGrpcItemKey(item)]).toBe('reflection:plaintext:localhost:50052')
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)]).toMatchObject({ loading: false, error: null, failedAt: null })
+})
+
+test('a deleted item\'s Reload that fails later shows nothing on the item made again at its path', async() => {
+    const store = createStore()
+    let failTag: (error: Error) => void = () => undefined
+    responseTag.handleResponseTag.mockReset()
+    responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => mode === 'send' ? new Promise((_resolve, reject) => {
+        failTag = reject
+    }) : Promise.resolve('saved-token'))
+    const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+    const reload = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    await settle()
+
+    forgetGrpcCallsForItems('w1', ['item1'])
+    const again = grpcItem({ headers: item.headers })
+    await loadGrpcSchemaForItem(store, again, { mode: 'display', automatic: true })
+    failTag(new Error('The login request failed'))
+    await reload
+
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(again)]).toMatchObject({ loading: false, error: null })
+})
+
+test('a renamed item\'s Reload that fails later shows nothing on the item made again at its old path', async() => {
+    const store = createStore()
+    let failTag: (error: Error) => void = () => undefined
+    responseTag.handleResponseTag.mockReset()
+    responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => mode === 'send' ? new Promise((_resolve, reject) => {
+        failTag = reject
+    }) : Promise.resolve('saved-token'))
+    const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+    const reload = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    await settle()
+
+    moveGrpcCallsToNewItemIds('w1', ['item1'], new Map([['item1', 'item2']]))
+    const again = grpcItem({ headers: item.headers })
+    await loadGrpcSchemaForItem(store, again, { mode: 'display', automatic: true })
+    failTag(new Error('The login request failed'))
+    await reload
+
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(again)]).toMatchObject({ loading: false, error: null })
+})
+
 test('an automatic load never asks a prompt, Load methods and Reload do', async() => {
     const store = createStore()
     window.createPrompt = vi.fn(async() => 't0k')
@@ -841,6 +916,23 @@ test('an automatic load never asks a prompt, Load methods and Reload do', async(
     await loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
     expect(window.createPrompt).toHaveBeenCalledTimes(1)
     expect(transport.loadGrpcSchema.mock.calls[0][0].metadata).toContainEqual(['authorization', 'Bearer t0k'])
+})
+
+test('a prompt cancelled on one item\'s Reload leaves the methods another item of the same server shows', async() => {
+    const store = createStore()
+    await loadGrpcSchemaForItem(store, grpcItem({ _id: 'first' }), { mode: 'display', automatic: true })
+    const key = grpcItemSchemaKeys[itemKey('first')]!
+    expect(grpcSchemas[key]).toMatchObject({ schema, error: null })
+
+    // Cancel answers the prompt with null
+    window.createPrompt = vi.fn(async() => null)
+    const second = grpcItem({ _id: 'second', headers: [{ name: 'x-secret', value: `{% prompt(title='Secret') %}` }] })
+    const result = await loadGrpcSchemaForItem(store, second, { mode: 'send', force: true })
+    expect(window.createPrompt).toHaveBeenCalledOnce()
+    expect(result?.error).toMatch(/cancelled/)
+    expect(grpcItemSchemaKeys[itemKey('second')]).toBe(key)
+    expect(grpcSchemas[key]).toMatchObject({ schema, error: null, failedAt: null })
+    expect(grpcState.grpcItemSchemaPreparations[itemKey('second')]).toMatchObject({ loading: false, error: result?.error })
 })
 
 test('a schema load answered after a newer one of the same server is dropped', async() => {
@@ -965,8 +1057,116 @@ test('a Reload whose response tag fails says so where the methods are, also when
     failTag(new Error('The login request failed'))
     await reload
 
-    expect(grpcSchemas['reflection:plaintext:localhost:50051'].error).toContain('The login request failed')
+    // the item's own failure, shown over the methods the automatic load reused, which other items keep showing
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)].error).toContain('The login request failed')
+    expect(grpcSchemas['reflection:plaintext:localhost:50051']).toMatchObject({ schema, error: null })
 })
+
+test('a Reload whose response tag fails after a Send of the same item showed its own outcome stays quiet', async() => {
+    const store = createStore()
+    let failTag: (error: Error) => void = () => undefined
+    let sends = 0
+    responseTag.handleResponseTag.mockReset()
+    responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => {
+        if(mode !== 'send') {
+            return Promise.resolve('saved-token')
+        }
+        sends++
+        return sends === 1 ? new Promise((_resolve, reject) => {
+            failTag = reject
+        }) : Promise.resolve('fresh-token')
+    })
+    const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+
+    const reload = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    await settle()
+    await startGrpcCallForItem(store, item)
+    failTag(new Error('The login request failed'))
+    await reload
+
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)]).toBeUndefined()
+})
+
+test('a Reload failing after a newer Reload of the same item loaded the methods shows nothing', async() => {
+    const store = createStore()
+    let failTag: (error: Error) => void = () => undefined
+    let sends = 0
+    responseTag.handleResponseTag.mockReset()
+    responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => {
+        if(mode !== 'send') {
+            return Promise.resolve('saved-token')
+        }
+        sends++
+        return sends === 1 ? new Promise((_resolve, reject) => {
+            failTag = reject
+        }) : Promise.resolve('fresh-token')
+    })
+    const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+
+    const older = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    await settle()
+    await loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    failTag(new Error('The login request failed'))
+    await older
+
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)]).toMatchObject({ loading: false, error: null })
+})
+
+test('a Reload failing after the address changed to another server leaves that server\'s methods alone', async() => {
+    const store = createStore()
+    let failTag: (error: Error) => void = () => undefined
+    responseTag.handleResponseTag.mockReset()
+    responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => mode === 'send' ? new Promise((_resolve, reject) => {
+        failTag = reject
+    }) : Promise.resolve('saved-token'))
+    const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+
+    const reload = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+    await settle()
+    item.url = 'localhost:50052'
+    await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+    failTag(new Error('The login request failed'))
+    await reload
+
+    expect(grpcItemSchemaKeys[getGrpcItemKey(item)]).toBe('reflection:plaintext:localhost:50052')
+    expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)]).toMatchObject({ loading: false, error: null })
+})
+
+for(const newer of ['Send', 'Reload'] as const) {
+    test(`a Reload failing after a newer ${newer} succeeded stays off the screen when the method list opens meanwhile`, async() => {
+        const store = createStore()
+        let failTag: (error: Error) => void = () => undefined
+        let sends = 0
+        responseTag.handleResponseTag.mockReset()
+        responseTag.handleResponseTag.mockImplementation((_tag: unknown, mode: 'display' | 'send') => {
+            if(mode !== 'send') {
+                return Promise.resolve('saved-token')
+            }
+            sends++
+            return sends === 1 ? new Promise((_resolve, reject) => {
+                failTag = reject
+            }) : Promise.resolve('fresh-token')
+        })
+        const item = grpcItem({ headers: [{ name: 'authorization', value: '{% response(request=\'req_1\', path=\'$.token\', behavior=\'always\') %}' }] })
+        await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+
+        const older = loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+        await settle()
+        if(newer === 'Send') {
+            await startGrpcCallForItem(store, item)
+        } else {
+            await loadGrpcSchemaForItem(store, item, { mode: 'send', force: true })
+        }
+        await loadGrpcSchemaForItem(store, item, { mode: 'display', automatic: true })
+        failTag(new Error('The login request failed'))
+        await older
+
+        expect(grpcState.grpcItemSchemaPreparations[getGrpcItemKey(item)]?.error ?? null).toBeNull()
+    })
+}
 
 test('an error Restfox wrote with no copy for history is saved as a fixed text once the send took a masked prompt value', async() => {
     const store = createStore()
