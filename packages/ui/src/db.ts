@@ -266,7 +266,9 @@ export async function getCollectionById(workspaceId: string, collectionId: strin
 interface CreateCollectionResult {
     error: string | null,
     oldCollectionId: string | null,
-    newCollectionId: string | null
+    newCollectionId: string | null,
+    // a file workspace's refusal of some of a folder's environments, which the folder is made without
+    environmentsError?: string | null
 }
 
 export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<CreateCollectionResult> {

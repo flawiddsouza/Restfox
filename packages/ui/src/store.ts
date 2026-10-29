@@ -119,6 +119,14 @@ function reportUpdateError(result: { error: string | null } | undefined) {
     }
 }
 
+// environments a file workspace refused while copying or importing folders, which were made without them, also before
+// an error that stopped the rest
+function reportEnvironmentsErrors(result: { results: { environmentsError?: string | null }[] }) {
+    for(const collectionItemResult of result.results) {
+        reportUpdateError({ error: collectionItemResult.environmentsError ?? null })
+    }
+}
+
 async function loadResponses(state: State, tabId: string) {
     if(tabId in state.responses) {
         return
@@ -1019,6 +1027,8 @@ export const store = createStore<State>({
             const collectionItemsToSave: CollectionItem[] = flattenTree([newCollectionItem])
             const result = await createCollections(collectionItem.workspaceId, collectionItemsToSave)
 
+            reportEnvironmentsErrors(result)
+
             if(result.error) {
                 emitter.emit('error', result.error)
                 return result
@@ -1812,6 +1822,8 @@ export const store = createStore<State>({
 
             const result = await createCollections(newWorkspaceId, flattenTree(collectionTree))
 
+            reportEnvironmentsErrors(result)
+
             if(result.error) {
                 emitter.emit('error', result.error)
                 return result
@@ -1940,6 +1952,8 @@ export const store = createStore<State>({
 
             const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
             const result = await createCollections(context.state.activeWorkspace._id, flattenedCollectionTree)
+
+            reportEnvironmentsErrors(result)
 
             if(result.error) {
                 emitter.emit('error', result.error)

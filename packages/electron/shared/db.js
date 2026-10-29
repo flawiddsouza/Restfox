@@ -186,6 +186,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const oldCollectionId = collection._id
         const collectionName = fileUtils.encodeFilename(collection.name)
+        let environmentsError = null
 
         try {
             let collectionPath = ''
@@ -208,7 +209,10 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
                 if (collection.environments) {
                     const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
-                    await dbHelpers.saveEnvironments(fsLog, envsDirPath, collection.environments)
+                    // an environment the save refuses, such as one whose name differs from another only in case, is
+                    // told with the result, not as its error, which would stop an import or a duplicate there
+                    const { error } = await dbHelpers.saveEnvironments(fsLog, envsDirPath, collection.environments)
+                    environmentsError = error ? `${collection.name}: ${error}` : null
                     collectionToSave.currentEnvironment = collection.currentEnvironment ?? 'Default'
                 }
 
@@ -260,6 +264,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 error: null,
                 oldCollectionId,
                 newCollectionId: collectionPathWithoutWorkspaceLocation,
+                environmentsError,
             }
         } catch (err) {
             if (err.code === 'EEXIST') {

@@ -1898,6 +1898,32 @@ describe('writes the storage refuses, such as to a file holding merge conflict m
         expect(store.state.plugins.workspace).toEqual([])
     })
 
+    const environmentsRefused = { error: null, oldCollectionId: 'Source', newCollectionId: 'Source (2)', environmentsError: 'Source: Not saved, as the environment name prod differs from Prod only in case, which Windows and macOS save as one file' }
+    // a later item the file system refused, which stops the rest
+    const stopped = 'Error creating collection: CON: EINVAL'
+
+    test('environments refused on duplicating a folder are reported, also when a later item failed', async() => {
+        store.state.collection = [folder('Source', 0)]
+        store.state.collectionTree = [folder('Source', 0)]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: stopped, results: [environmentsRefused] } as never)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+
+        await store.dispatch('duplicateCollectionItem', folder('Source', 0))
+
+        expect(vi.mocked(emitter.emit).mock.calls).toEqual([['error', environmentsRefused.environmentsError], ['error', stopped]])
+    })
+
+    test('environments refused on importing a folder are reported, also when a later item failed', async() => {
+        store.state.collection = []
+        store.state.collectionTree = []
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: stopped, results: [environmentsRefused] } as never)
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [folder('Source', 0)] } as never)
+
+        await store.dispatch('setCollectionTree', { collectionTree: [folder('Source', 0)] })
+
+        expect(vi.mocked(emitter.emit).mock.calls).toEqual([['error', environmentsRefused.environmentsError], ['error', stopped]])
+    })
+
     test('a folder\'s selected environment is reported', async() => {
         vi.mocked(updateCollection).mockResolvedValueOnce(refused)
 
@@ -1951,6 +1977,27 @@ describe('duplicateWorkspace', () => {
             ['typed in the editor', null, newRequestId],
             ['imported', newWorkspaceId, newRequestId],
         ])
+    })
+
+    test('environments refused for a folder are reported, also when a later item failed', async() => {
+        const environmentsError = 'Envs: Not saved, as the environment name prod differs from Prod only in case, which Windows and macOS save as one file'
+        vi.spyOn(emitter, 'emit')
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({
+            collection: [{ _id: 'folder', _type: 'request_group', name: 'Envs', parentId: null, workspaceId: 'source' }],
+        } as never)
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: 'Error creating collection: CON: EINVAL', results: [{ error: null, oldCollectionId: 'folder', newCollectionId: 'Envs', environmentsError }] } as never)
+        vi.mocked(getWorkspacePlugins).mockResolvedValueOnce([])
+
+        try {
+            await store.dispatch('duplicateWorkspace', {
+                sourceWorkspace: { _id: 'source', _type: 'local', name: 'Source' }, name: 'Copy', type: 'local', location: '', includeResponseHistory: false,
+            })
+
+            expect(vi.mocked(emitter.emit).mock.calls).toEqual([['error', environmentsError], ['error', 'Error creating collection: CON: EINVAL']])
+        } finally {
+            vi.mocked(getCollectionForWorkspace).mockReset()
+            vi.mocked(emitter.emit).mockRestore()
+        }
     })
 })
 

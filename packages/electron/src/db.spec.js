@@ -273,38 +273,80 @@ test('an environment color whose file cannot be read is left as it is', async() 
     expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
 })
 
-test('two environments whose names differ only in case keep both sets of variables', async() => {
+const differsInCase = 'Not saved, as the environment name prod differs from Prod only in case, which Windows and macOS save as one file'
+
+test('an environment whose name differs from a saved one only in case is not saved, on any system', async() => {
     const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{"a":"1"}' })
-    const caseInsensitive = fs.existsSync(path.join(envsDirPath, 'prod.json'))
     // in either order, the one already saved under its name is kept
     for (const environments of [
         [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: {} }],
         [{ name: 'prod', environment: {} }, { name: 'Prod', environment: { a: '1' } }],
     ]) {
         const result = await db.updateWorkspace(workspace, { environments })
-        if (caseInsensitive) {
-            expect(result.error).toMatch(/^Not saved, as the environment prod is the same file as Prod on this system$/)
-            expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
-            expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
-        } else {
-            expect(result.error).toBeNull()
-            expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'prod.json'])
-        }
+        expect(result.error).toBe(differsInCase)
+        expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
+        expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
     }
 })
 
-test('two new environments whose names differ only in case keep the first one\'s variables', async() => {
+test('two new environments whose names differ only in case keep the first one\'s variables, on any system', async() => {
     const envsDirPath = writeEnvironmentFiles({})
-    const caseInsensitive = fs.existsSync(path.join(workspace.location, '_ENVIRONMENTS'))
     const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: {} }] })
-    if (caseInsensitive) {
-        expect(result.error).toMatch(/^Not saved, as the environment prod is the same file as Prod on this system$/)
-        expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
-        expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
-    } else {
-        expect(result.error).toBeNull()
-        expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'prod.json'])
+    expect(result.error).toBe(differsInCase)
+    expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
+    expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8'))).toEqual({ a: '1' })
+})
+
+test('an environment whose name differs only in case from a file it cannot read is not saved', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': conflict })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'prod', environment: { a: '1' } }] })
+    // a case-insensitive file system reads Prod.json as prod.json
+    expect(result.error).toMatch(new RegExp(`^(Not saved, as .+prod\\.json cannot be read: .+|${differsInCase})$`))
+    expect(fs.readdirSync(envsDirPath)).toEqual(['Prod.json'])
+    expect(fs.readFileSync(path.join(envsDirPath, 'Prod.json'), 'utf8')).toBe(conflict)
+})
+
+test('a folder copied or imported with environments whose names differ only in case is made, and the refusal comes with it', async() => {
+    const result = await db.createCollections(workspace, [{ _id: 'folder', _type: 'request_group', name: 'Folder', parentId: null, environments: [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: { b: '2' } }] }])
+    expect(result.error).toBeNull()
+    expect(result.results[0].environmentsError).toBe(`Folder: ${differsInCase}`)
+    expect(fs.readdirSync(path.join(workspace.location, 'Folder', '_environments'))).toEqual(['Prod.json'])
+})
+
+test('an environment saved under a name ending in .META goes on being saved, and a new one is not', async() => {
+    const envsDirPath = writeEnvironmentFiles({ 'Foo.META.json': '{"a":"1"}', 'Old.json': '{}' })
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Foo.META', environment: { a: '2' } }] })
+    expect(result.error).toBeNull()
+    expect(fs.readdirSync(envsDirPath)).toEqual(['Foo.META.json'])
+    expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Foo.META.json'), 'utf8'))).toEqual({ a: '2' })
+    const added = await db.updateWorkspace(workspace, { environments: [{ name: 'Foo.META', environment: { a: '2' } }, { name: 'Bar.Meta', environment: {} }] })
+    expect(added.error).toBe('Not saved, as the environment name Bar.Meta ends in .meta, which environment colors are saved under')
+    expect(fs.readdirSync(envsDirPath)).toEqual(['Foo.META.json'])
+})
+
+test('an environment saved under a name ending in .META keeps its variables when the environment it names gets a color', async() => {
+    for (const environments of [
+        [{ name: 'Foo.META', environment: { token: 'secret' } }, { name: 'Foo', environment: {}, color: 'blue' }],
+        [{ name: 'Foo', environment: {}, color: 'blue' }, { name: 'Foo.META', environment: { token: 'secret' } }],
+    ]) {
+        const envsDirPath = writeEnvironmentFiles({ 'Foo.META.json': '{"token":"secret"}' })
+        const result = await db.updateWorkspace(workspace, { environments })
+        expect(result.error).toBe('Not saved, as the color of the environment Foo would go in the file of the environment Foo.META, which Windows and macOS save as one file')
+        expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'Foo.META.json'), 'utf8'))).toEqual({ token: 'secret' })
+        fs.rmSync(envsDirPath, { recursive: true })
     }
+})
+
+test('both of a pair whose names differ only in case, saved on a case-sensitive system, go on being saved', async(context) => {
+    const envsDirPath = writeEnvironmentFiles({ 'Prod.json': '{"a":"1"}', 'prod.json': '{"b":"2"}' })
+    // a case-insensitive file system holds them as one file
+    if (fs.readdirSync(envsDirPath).length < 2) {
+        context.skip()
+    }
+    const result = await db.updateWorkspace(workspace, { environments: [{ name: 'Prod', environment: { a: '1' } }, { name: 'prod', environment: { b: '3' } }] })
+    expect(result.error).toBeNull()
+    expect(fs.readdirSync(envsDirPath).sort()).toEqual(['Prod.json', 'prod.json'])
+    expect(JSON.parse(fs.readFileSync(path.join(envsDirPath, 'prod.json'), 'utf8'))).toEqual({ b: '3' })
 })
 
 test('an environment named as another one\'s color file is not saved over it', async() => {

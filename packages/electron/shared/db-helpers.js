@@ -259,15 +259,6 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         return returnData
     }
 
-    async function isSameFile(filePath, otherFilePath) {
-        try {
-            const [stats, otherStats] = await Promise.all([fs.stat(filePath), fs.stat(otherFilePath)])
-            return stats.dev === otherStats.dev && stats.ino === otherStats.ino
-        } catch {
-            return false
-        }
-    }
-
     async function getJsonReadError(filePath) {
         try {
             JSON.parse(await fs.readFile(filePath, 'utf8'))
@@ -294,32 +285,46 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         // A file loading skipped as unreadable, such as one holding git merge conflict markers, was never shown, so it is
         // neither deleted as removed nor written over by an environment of the same name, which alone is not saved. Each
         // target is read rather than looked up by name, which a case-insensitive file system can match under another case.
-        // Names that differ only in case, such as Prod and prod, are one file there, which keeps the environment already
-        // saved under its name, or else the first, and the others are not saved. A name ending in .meta is the file of
-        // another environment's color, which loading skips, so it is not saved either. A save that refuses one deletes
-        // nothing, as an environment renamed to that name is missing from the list but has not been saved under its new one
-        const envsDirName = path.basename(envsDirPath)
-        const caseInsensitive = await isSameFile(envsDirPath, path.join(path.dirname(envsDirPath), envsDirName === envsDirName.toUpperCase() ? envsDirName.toLowerCase() : envsDirName.toUpperCase()))
-        const fileKey = (name) => caseInsensitive ? name.toLowerCase() : name
+        // A name ending in .meta is the file of another environment's color, which loading skips, so it is not saved
+        // either. A save that refuses one deletes nothing, as an environment renamed to that name is missing from the list
+        // but has not been saved under its new one
+        const unreadableKept = new Set()
+        for (const existingEnvironment of existingEnvironments) {
+            if (existingEnvironment.endsWith('.json') && !existingEnvironment.endsWith('.meta.json') && !environmentNames.includes(existingEnvironment) && await getJsonReadError(path.join(envsDirPath, existingEnvironment))) {
+                unreadableKept.add(existingEnvironment)
+            }
+        }
         const refusedTargets = new Set()
         const errors = []
         for (const [index, environmentName] of environmentNames.entries()) {
-            if (fileKey(environmentName).endsWith('.meta.json')) {
+            // in any case, as Windows and macOS read Prod.META.json as Prod's color file, except a name already saved
+            // under its own file, such as by a version or a system that allowed it
+            if (environmentName.endsWith('.meta.json') || (environmentName.toLowerCase().endsWith('.meta.json') && !existingEnvironments.includes(environmentName))) {
                 refusedTargets.add(environmentName)
                 errors.push(`Not saved, as the environment name ${environments[index].name} ends in .meta, which environment colors are saved under`)
-                continue
-            }
-            const sameFile = environmentNames.filter((name) => fileKey(name) === fileKey(environmentName))
-            const keptName = sameFile.find((name) => existingEnvironments.includes(name)) ?? sameFile[0]
-            if (environmentName !== keptName) {
-                refusedTargets.add(environmentName)
-                errors.push(`Not saved, as the environment ${environments[index].name} is the same file as ${environments[environmentNames.indexOf(keptName)].name} on this system`)
                 continue
             }
             const readError = await getJsonReadError(path.join(envsDirPath, environmentName))
             if (readError && readError.code !== 'ENOENT') {
                 refusedTargets.add(environmentName)
                 errors.push(`Not saved, as ${path.join(envsDirPath, environmentName)} cannot be read: ${readError.message}`)
+                continue
+            }
+            // Names that differ only in case, such as Prod and prod, are one file on Windows and macOS, so a workspace
+            // shared through git loses one of them there, on every system. A name not saved under its own file yet is
+            // refused when another is saved or kept under it in another case, or comes before it in the list. Both of a
+            // pair already saved, as on Linux, go on being saved
+            if (existingEnvironments.includes(environmentName)) {
+                continue
+            }
+            const sameFileName = [
+                ...environmentNames.filter((name, nameIndex) => name !== environmentName && (nameIndex < index || existingEnvironments.includes(name))),
+                ...unreadableKept,
+            ].find((name) => name.toLowerCase() === environmentName.toLowerCase())
+            if (sameFileName !== undefined) {
+                refusedTargets.add(environmentName)
+                const sameFileEnvironment = environments[environmentNames.indexOf(sameFileName)]
+                errors.push(`Not saved, as the environment name ${environments[index].name} differs from ${sameFileEnvironment ? sameFileEnvironment.name : fileUtils.decodeFilename(sameFileName.slice(0, -'.json'.length))} only in case, which Windows and macOS save as one file`)
             }
         }
 
@@ -367,6 +372,13 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 continue
             }
             if (env.color) {
+                // an environment saved under a name such as Prod.META has the file Windows and macOS read as Prod's
+                // color file, so the color is not written over it, on every system
+                const colorSameFileName = environmentNames.find((name) => !refusedTargets.has(name) && name.toLowerCase() === `${envName}.meta.json`.toLowerCase())
+                if (colorSameFileName !== undefined) {
+                    errors.push(`Not saved, as the color of the environment ${env.name} would go in the file of the environment ${environments[environmentNames.indexOf(colorSameFileName)].name}, which Windows and macOS save as one file`)
+                    continue
+                }
                 // its color, kept apart, is left as it is when it cannot be read, as the environment's own file is
                 const metaPath = path.join(envsDirPath, `${envName}.meta.json`)
                 const metaReadError = await getJsonReadError(metaPath)
