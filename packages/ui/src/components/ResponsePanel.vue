@@ -251,6 +251,7 @@
 
 <script lang="ts">
 import { markRaw, nextTick, toRaw } from 'vue'
+import type { RequestParam } from '@/global'
 import CodeMirrorResponsePanelPreview from './CodeMirrorResponsePanelPreview.vue'
 import ContextMenu from './ContextMenu.vue'
 import MobileBottomSheet from './MobileBottomSheet.vue'
@@ -338,6 +339,9 @@ export default {
             scrollableAreaScrollTop: null,
             largeResponseConfirmed: false,
             LARGE_RESPONSE_THRESHOLD: 3 * 1024 * 1024, // 3MB threshold
+            // the download links of this panel's Request tab, revoked when it shows another body or goes, never by another
+            // panel, such as that of a tab kept open in the background, whose links would stop working
+            requestBodyObjectUrls: markRaw([]) as string[],
         }
     },
     computed: {
@@ -496,13 +500,20 @@ export default {
             return null
         },
         responseRequestBodyOutput() {
+            // prevent memory leak, also when there is no body to show now
+            this.revokeRequestBodyObjectUrls()
+
             // a multipart body is shown from its unresolved fields in any case
             const maskedPromptOmitted = this.response.request.maskedPromptOmitted
             if(maskedPromptOmitted && (maskedPromptOmitted.reason === 'script-read' || maskedPromptOmitted.body) && this.response.request.original.body.mimeType !== 'multipart/form-data') {
                 return null
             }
 
-            if(this.response.request.body === null && !this.response.request.original.body.params) {
+            // the rows of a multipart body, which history saves as null, that went out: the send skips one turned off, and
+            // a File row with no file, and a body with none, such as every row deleted, has nothing to show either.
+            // Another body type keeps the rows of one picked before it, which were not sent
+            const paramsSent = this.response.request.original.body.mimeType === 'multipart/form-data' ? (this.response.request.original.body.params ?? []).filter((param: RequestParam) => !param.disabled && (param.type === 'text' || (param.files?.length ?? 0) > 0)) : []
+            if(this.response.request.body === null && paramsSent.length === 0) {
                 return null
             }
 
@@ -511,47 +522,31 @@ export default {
             }
 
             if(this.response.request.body instanceof File) {
-                // prevent memory leak
-                if('responseRequestBodyObjectUrls' in window) {
-                    window.responseRequestBodyObjectUrls.forEach(objectUrl => {
-                        URL.revokeObjectURL(objectUrl)
-                    })
-                } else {
-                    window.responseRequestBodyObjectUrls = []
-                }
-                const downloadUrl = URL.createObjectURL(this.response.request.body)
-                window.responseRequestBodyObjectUrls.push(downloadUrl)
+                const downloadUrl = this.createRequestBodyObjectUrl(this.response.request.body)
                 // a file name may hold markup characters, as one read back from a shared file workspace's history can
                 return `<div><a href="${downloadUrl}" download="${escapeHtml(this.response.request.body.name)}">${escapeHtml(this.response.request.body.name)}</a></div>`
             } else {
-                if(this.response.request.original.body.mimeType === 'multipart/form-data' && this.response.request.original.body.params && this.response.request.original.body.params.length > 0) {
-                    // prevent memory leak
-                    if('responseRequestBodyObjectUrls' in window) {
-                        window.responseRequestBodyObjectUrls.forEach(objectUrl => {
-                            URL.revokeObjectURL(objectUrl)
-                        })
-                    } else {
-                        window.responseRequestBodyObjectUrls = []
-                    }
+                // a body history kept, such as one a pre-request script set in place of the multipart rows, is the one sent
+                if((this.response.request.body ?? null) === null && paramsSent.length > 0) {
                     let html = '<table style="border-collapse: collapse; width: 100%;"><tbody>'
                     const tdStyle = 'border: 1px solid var(--default-border-color); padding: 0.5rem;'
-                    html += this.response.request.original.body.params.map(param => {
+                    html += paramsSent.map(param => {
                         const handleFile = item => {
-                            const downloadUrl = URL.createObjectURL(item)
-                            window.responseRequestBodyObjectUrls.push(downloadUrl)
+                            const downloadUrl = this.createRequestBodyObjectUrl(item)
                             return `<div><a href="${downloadUrl}" download="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>`
                         }
                         return `
                             <tr>
                                 <td style="${tdStyle}">${escapeHtml(param.name)}</td>
-                                <td style="${tdStyle}">${param.type === 'text' ? param.value : param.files.map(handleFile)}</td>
+                                <td style="${tdStyle}">${param.type === 'text' ? escapeHtml(param.value) : param.files.map(handleFile).join('')}</td>
                             </tr>
                         `
                     }).join('')
                     html += '</tbody></table>'
                     return html
                 }
-                return `<div>${this.response.request.body}</div>`
+                // as sent, so an XML or HTML body keeps its tags and markup in it never runs
+                return `<div>${escapeHtml(this.response.request.body)}</div>`
             }
         },
         responseContentType() {
@@ -722,6 +717,17 @@ export default {
         }
     },
     methods: {
+        createRequestBodyObjectUrl(file: File) {
+            const objectUrl = URL.createObjectURL(file)
+            this.requestBodyObjectUrls.push(objectUrl)
+            return objectUrl
+        },
+        revokeRequestBodyObjectUrls() {
+            for(const objectUrl of this.requestBodyObjectUrls) {
+                URL.revokeObjectURL(objectUrl)
+            }
+            this.requestBodyObjectUrls.length = 0
+        },
         getStatusDescription,
         describeMaskedPromptOmitted,
         timeAgo,
@@ -1016,6 +1022,7 @@ export default {
         this.isDeactivated = true
     },
     beforeUnmount() {
+        this.revokeRequestBodyObjectUrls()
         this.$refs.scrollableArea?.removeEventListener('scroll', this.scrollableAreaOnScroll, true)
         this.scrollableAreaEventListenerAttached = false
     },

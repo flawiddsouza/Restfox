@@ -668,6 +668,152 @@ test('Restore keeps the file of a binary body that history saved no copy of, as 
     prompt.remove()
 })
 
+test('the Request tab shows a sent body and multipart text values as text, tags included', async() => {
+    const cases = [
+        { request: { method: 'POST', headers: {}, body: '<user><name>Ann</name></user>', original: { body: { mimeType: 'text/plain' } } }, shown: '<user><name>Ann</name></user>' },
+        { request: { method: 'POST', headers: {}, body: null, original: { body: { mimeType: 'multipart/form-data', params: [{ name: 'note', type: 'text', value: `<b>bold</b> ${markup}` }] } } }, shown: `<b>bold</b> ${markup}` },
+    ]
+    for(const { request, shown } of cases) {
+        const state = storeState({
+            activeTab: { _id: 'tab1' },
+            requestResponseStatus: { tab1: 'loaded' },
+            requestResponses: { tab1: { ...finishedSmallJson(), request } },
+        })
+        const panel = mountPanel(state)
+        await settle()
+
+        const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+        requestTab.click()
+        await settle()
+
+        const box = panel.element.querySelector('.content-box')!
+        expect(box.textContent).toContain(shown)
+        expect(box.querySelector('user, b, img')).toBeNull()
+        panel.unmount()
+    }
+})
+
+test('the Request tab lists each file of a multipart row once, and leaves out a File row with no file picked, which the send skips', async() => {
+    const params = [
+        { name: 'files', type: 'file', files: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')] },
+        // switched to File, with no file picked, which the send skips and history keeps
+        { name: 'empty', type: 'file' },
+    ]
+    const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: null, original: { body: { mimeType: 'multipart/form-data', params } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+    requestTab.click()
+    await settle()
+
+    const box = panel.element.querySelector('.content-box')!
+    expect([...box.querySelectorAll('a[download]')].map(link => link.textContent)).toEqual(['a.txt', 'b.txt'])
+    expect([...box.querySelectorAll('td')].map(cell => cell.textContent!.trim())).toEqual(['files', 'a.txtb.txt'])
+    panel.unmount()
+})
+
+test('the Request tab of one panel keeps its download link working while another panel shows its own, and revokes it once it goes', async() => {
+    const revoke = vi.spyOn(URL, 'revokeObjectURL')
+    const panels = []
+    for(const name of ['a.txt', 'b.txt']) {
+        const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: new File(['a'], name), original: { body: { mimeType: 'application/octet-stream' } } } }
+        const panel = mountPanel(storeState({
+            activeTab: { _id: 'tab1' },
+            requestResponseStatus: { tab1: 'loaded' },
+            requestResponses: { tab1: saved },
+        }))
+        await settle()
+        const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+        requestTab.click()
+        await settle()
+        panels.push(panel)
+    }
+    const links = panels.map(panel => (panel.element.querySelector('.content-box a[download]') as HTMLAnchorElement).href)
+    expect(revoke).not.toHaveBeenCalledWith(links[0])
+    panels[0].unmount()
+    expect(revoke).toHaveBeenCalledWith(links[0])
+    expect(revoke).not.toHaveBeenCalledWith(links[1])
+    panels[1].unmount()
+    revoke.mockRestore()
+})
+
+for(const [mimeType, rows, description] of [
+    ['multipart/form-data', [], 'a multipart body whose rows were all deleted'],
+    ['multipart/form-data', [{ name: 'a', value: '1', type: 'text', disabled: true }], 'a multipart body whose rows were all turned off'],
+    // switching the body type keeps the rows of the one before
+    ['No Body', [{ name: 'a', value: '1', type: 'text' }], 'No Body kept with the rows of a multipart body picked before'],
+    // a file picked and cleared again leaves an empty list
+    ['multipart/form-data', [{ name: 'f', type: 'file' }, { name: 'g', type: 'file', files: [] }], 'a multipart body whose File rows have no file'],
+] as const) {
+    test(`the Request tab shows no body for ${description}`, async() => {
+        const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: null, original: { body: { mimeType, params: rows } } } }
+        const state = storeState({
+            activeTab: { _id: 'tab1' },
+            requestResponseStatus: { tab1: 'loaded' },
+            requestResponses: { tab1: saved },
+        })
+        const panel = mountPanel(state)
+        await settle()
+
+        const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+        requestTab.click()
+        await settle()
+
+        expect(panel.element.querySelector('.content-box')!.textContent).not.toContain('null')
+        expect(panel.element.querySelector('.content-box td')).toBeNull()
+        panel.unmount()
+    })
+}
+
+test('the Request tab shows the body a pre-request script sent in place of the multipart rows', async() => {
+    const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: '{"a":1}', original: { body: { mimeType: 'multipart/form-data', params: [{ name: 'row', value: '1', type: 'text' }] } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+    requestTab.click()
+    await settle()
+
+    const box = panel.element.querySelector('.content-box')!
+    expect(box.querySelector('td')).toBeNull()
+    expect(box.textContent).toContain('{"a":1}')
+    panel.unmount()
+})
+
+test('the Request tab leaves out the multipart rows that were turned off, which the send skips', async() => {
+    const params = [
+        { name: 'sent', value: '1', type: 'text' },
+        { name: 'off', value: '2', type: 'text', disabled: true },
+        { name: 'offFile', type: 'file', files: [new File(['a'], 'a.txt')], disabled: true },
+    ]
+    const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: null, original: { body: { mimeType: 'multipart/form-data', params } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+    requestTab.click()
+    await settle()
+
+    expect([...panel.element.querySelectorAll('.content-box td')].map(cell => cell.textContent!.trim())).toEqual(['sent', '1'])
+    panel.unmount()
+})
+
 test('the Request tab names a sent file as it is named, and downloads it under that name', async() => {
     const fileName = `report ${markup}.txt`
     const saved = { ...finishedSmallJson(), request: { method: 'POST', headers: {}, body: new File(['a'], fileName), original: { body: { mimeType: 'application/octet-stream' } } } }
