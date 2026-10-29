@@ -243,7 +243,8 @@ async function handleSendRequest(data, emit) {
         const { result: response, headersSent } = await withSentHeadersCapture(() => fetch(url, {
             method,
             headers: headersToSend,
-            body: method !== 'GET' ? body : undefined,
+            // fetch refuses a body for GET and HEAD, in any letter case, and takes a missing method as GET
+            body: !['GET', 'HEAD'].includes((method ?? 'GET').toUpperCase()) ? body : undefined,
             signal: requestAbortController.signal,
             dispatcher: getAgentForRequest(urlParsed, disableSSLVerification, proxyUrl, proxyToken),
         }))

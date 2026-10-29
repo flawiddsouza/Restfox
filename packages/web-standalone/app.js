@@ -176,7 +176,8 @@ app.post('/proxy', async(req, res) => {
 
     // Stream the request body directly to the target. No in-memory buffering.
     // This allows large file uploads without loading the file into RAM.
-    const body = method !== 'GET' ? Readable.toWeb(req) : undefined
+    // fetch refuses a body for GET and HEAD, in any letter case, also an empty one, which every proxied request has
+    const body = !['GET', 'HEAD'].includes(String(method).toUpperCase()) ? Readable.toWeb(req) : undefined
     const abortController = new AbortController()
     const abortUpstreamRequest = () => abortController.abort()
     let timedOut = false

@@ -273,6 +273,7 @@ import {
     responseStatusColorMapping,
     getStatusDescription,
     describeMaskedPromptOmitted,
+    methodSendsBody,
 } from '@/helpers'
 import {
     bufferToJSONString,
@@ -505,7 +506,7 @@ export default {
                 return null
             }
 
-            if(this.response.request.method === 'GET') {
+            if(!methodSendsBody(this.response.request.method)) {
                 return null
             }
 
@@ -817,6 +818,8 @@ export default {
             }
 
             this.activeTab.url = this.response.request.original.url
+            // as sent, which history keeps, so a restored body goes out with the method it went with
+            this.activeTab.method = this.response.request.method
 
             const originalRequestBody = this.response.request.original.body
 
@@ -834,7 +837,8 @@ export default {
                 this.activeTab.body.params = params
             }
 
-            if(originalRequestBody.mimeType === 'application/octet-stream') {
+            // the file sent, which history keeps in place of the original's, and not for GET or HEAD, which send none
+            if(originalRequestBody.mimeType === 'application/octet-stream' && this.response.request.body instanceof File) {
                 this.activeTab.body.fileName = this.response.request.body
             }
 

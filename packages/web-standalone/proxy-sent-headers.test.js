@@ -160,6 +160,27 @@ test('proxy reports the transfer-encoding added for a streamed request body', as
     }
 })
 
+// fetch refuses a body for GET and HEAD, and every proxied request has one, if empty
+for(const [method, body] of [['HEAD', undefined], ['head', undefined], ['HEAD', 'hello'], ['get', 'hello']]) {
+    test(`proxy sends ${method}${body ? ' with a body set' : ''} without a body`, async() => {
+        const upstream = await startRawServer(method.toUpperCase() === 'HEAD' ? 'HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n' : 'HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok')
+        const proxy = await listenApp()
+
+        try {
+            const result = await proxyRequest(proxy, { url: `http://127.0.0.1:${upstream.port}/`, method, headers: { 'content-type': 'text/plain' }, body })
+
+            assert.equal(result.event, 'response')
+            const wire = upstream.received()
+            assert.equal(wire.requestLine, `${method.toUpperCase()} / HTTP/1.1`)
+            assert.equal(wire.body, '')
+            assert.ok(!wire.headers.some(([name]) => ['content-length', 'transfer-encoding'].includes(name)))
+        } finally {
+            proxy.close()
+            upstream.server.close()
+        }
+    })
+}
+
 test('proxy reports the header block sent on an HTTP/2 connection', async() => {
     const upstream = await startHttp2Server()
     const proxy = await listenApp()

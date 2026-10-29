@@ -4,6 +4,7 @@ import { markRaw, toRaw } from 'vue'
 import { ActionContext, createStore } from 'vuex'
 import { nanoid } from 'nanoid'
 import {
+    copyRequestForSend,
     toTree,
     flattenTree,
     handleRequest,
@@ -1449,6 +1450,8 @@ export const store = createStore<State>({
         async sendRequest(context, payload: CollectionItem | { collectionItem: CollectionItem, cancelEarlierSends: boolean }) {
             const { collectionItem: activeTab, cancelEarlierSends } = 'collectionItem' in payload ? payload : { collectionItem: payload, cancelEarlierSends: false }
             const workspaceId = activeTab.workspaceId
+            // as it is at the click, as its environment may take a while to resolve, such as a folder's response tag
+            const requestAtClick = copyRequestForSend(activeTab)
 
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
@@ -1476,7 +1479,7 @@ export const store = createStore<State>({
 
             let environmentResolved: RequestEnvironment
             try {
-                environmentResolved = await resolveEnvironmentForRequest(context, activeTab, 'send')
+                environmentResolved = await resolveEnvironmentForRequest(context, requestAtClick, 'send')
             } catch(error: any) {
                 console.error(error)
                 tabSends.delete(abortController)
@@ -1617,7 +1620,7 @@ export const store = createStore<State>({
             }
 
             try {
-                const response = await handleRequest(activeTab, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, abortController.signal, context.state.flags, onResponseProgress)
+                const response = await handleRequest(requestAtClick, environment, parentHeaders, parentAuthentication, setEnvironmentVariableWrapper, enabledPlugins, context.state.activeWorkspace.location ?? null, abortController.signal, context.state.flags, onResponseProgress)
 
                 // a body that ended before the newer Send is a whole response and is kept
                 if(isSendReplaced(abortController.signal) && 'bodyIncomplete' in response && response.bodyIncomplete === 'cancelled') {

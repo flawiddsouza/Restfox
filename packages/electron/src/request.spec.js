@@ -97,6 +97,21 @@ test('includes the content-length the transport adds for a request body', async(
     expect(result.eventData.requestHeadersSent).toEqual(wire.headers)
 })
 
+for(const [method, body] of [['HEAD', null], ['HEAD', 'hello'], ['head', 'hello'], ['get', 'hello'], [undefined, 'hello']]) {
+    test(`sends ${method}${body ? ' with a body set' : ''} without a body`, async() => {
+        const server = await startRawServer(method?.toUpperCase() === 'HEAD' ? 'HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n' : 'HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok')
+
+        const result = await send({ url: `http://127.0.0.1:${server.port}/`, method, headers: { 'content-type': 'text/plain' }, body })
+
+        expect(result.event).toBe('response')
+        const wire = server.received()
+        expect(wire.requestLine).toBe(`${(method ?? 'GET').toUpperCase()} / HTTP/1.1`)
+        expect(wire.body).toBe('')
+        expect(wire.headers.map(([name]) => name)).not.toContain('content-length')
+        expect(wire.headers.map(([name]) => name)).not.toContain('transfer-encoding')
+    })
+}
+
 test('reports the header block sent on an HTTP/2 connection', async() => {
     const server = await startHttp2Server()
 

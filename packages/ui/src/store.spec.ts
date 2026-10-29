@@ -652,6 +652,21 @@ describe('sendRequest while a response arrives', () => {
         expect('response-2' in store.state.responseChunkTimes).toBe(false)
     })
 
+    test('a request edited while its environment resolves goes out as it was at the click', async() => {
+        const send = controlledSend()
+        const sent = store.dispatch('sendRequest', tab)
+        const urlAtClick = tab.url
+        tab.url = 'http://127.0.0.1/edited'
+        try {
+            await send.started
+            expect(vi.mocked(handleRequest).mock.calls.at(-1)![0]).toMatchObject({ url: urlAtClick })
+            send.finish(responseOf('response-1', []))
+            await sent
+        } finally {
+            tab.url = urlAtClick
+        }
+    })
+
     test('an earlier send still arriving on the tab never writes into a newer send\'s entry, nor removes it', async() => {
         // the history of an open tab is already loaded
         store.state.responses[tab._id] = []

@@ -40,6 +40,7 @@ import {
     flattenTree,
     humanFriendlyRunningTime,
     humanFriendlyTime,
+    methodSendsBody,
 } from './helpers'
 import { store as requestStore } from './store'
 import { getResponsesByCollectionId } from './db'
@@ -627,6 +628,19 @@ describe('Streaming responses', () => {
             }
         }
 
+        test('GET and HEAD, in any letter case, are fetched without a body set on them, other methods with it', async() => {
+            const bodies: unknown[] = []
+            vi.stubGlobal('fetch', async(_url: string, init: FetchInitWithSignal & { body?: unknown }) => {
+                bodies.push(init.body)
+                return new Response(null, { status: 204 })
+            })
+            for(const method of ['HEAD', 'head', 'get', 'POST', undefined]) {
+                await fetchWrapper(requestUrl, method as string, {}, 'text', new AbortController().signal, fetchFlags())
+            }
+            // a missing method goes out as GET, which page fetch already sent with no body
+            expect(bodies).toEqual([null, null, null, 'text', undefined])
+        })
+
         const samples: { name: string, makeResponse: () => Response }[] = [
             { name: 'JSON', makeResponse: () => new Response(closedBody(unevenChunks(jsonBody)), { status: 201, statusText: 'Created', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Trace': 't1' } }) },
             { name: 'binary', makeResponse: () => new Response(closedBody(unevenChunks(binaryBody)), { headers: { 'content-type': 'application/octet-stream' } }) },
@@ -1002,6 +1016,15 @@ describe('Streaming responses', () => {
             (window as WindowWithExtensionHook).__EXTENSION_HOOK__ = 'Restfox CORS Helper Enabled'
         })
 
+        test('a HEAD request posts no body set on it to the extension', async() => {
+            const { sent } = stubExtension()
+            const promise = fetchWrapper(requestUrl, 'head', {}, 'text', new AbortController().signal, fetchFlags())
+            await vi.waitFor(() => expect(sent()).toBeDefined())
+            expect(sent().eventData.body).toBeNull()
+            replyInParts(sent().eventId, jsonBody)
+            await promise
+        })
+
         const send = async(onResponseProgress?: ReturnType<typeof vi.fn>, signal = new AbortController().signal, requestTimeout = 0) => {
             const promise = fetchWrapper(requestUrl, 'GET', {}, null, signal, fetchFlags(requestTimeout), onResponseProgress)
             // the message is posted once the body is ready to go
@@ -1226,6 +1249,15 @@ describe('Streaming responses', () => {
         afterEach(async() => {
             vi.unstubAllEnvs()
             await saveCACertificates(null)
+        })
+
+        test('a GET or HEAD request goes to the server without a body set on it, in any letter case, and no method as GET', async() => {
+            for(const method of ['HEAD', 'get', 'POST', undefined]) {
+                proxyReplies.push(() => jsonResponse(envelope(new Uint8Array())))
+                await fetchWrapper(requestUrl, method as string, {}, 'text', new AbortController().signal, fetchFlags())
+            }
+            expect(proxyRequests.map(request => (request as { body?: unknown }).body ?? null)).toEqual([null, null, 'text', null])
+            expect(proxyRequests.map(request => request.headers['x-proxy-req-method'])).toEqual(['HEAD', 'get', 'POST', 'GET'])
         })
 
         test('asks for frames, and a frames reply split at every byte offset gives exactly what the JSON reply gave, with or without a handler', async() => {
@@ -1466,6 +1498,10 @@ describe('Streaming responses', () => {
     })
 })
 
+test('a method sends a body unless it is GET or HEAD, in any letter case, and no method is GET', () => {
+    expect(['POST', 'get', 'Head', undefined].map(methodSendsBody)).toEqual([true, false, false, false])
+})
+
 describe(`Function: ${handleRequest.name}`, () => {
     test('returns timeout error when requestTimeout elapses', async() => {
         vi.useFakeTimers()
@@ -1527,6 +1563,114 @@ describe(`Function: ${handleRequest.name}`, () => {
             requestTimeout: 0,
         }
     )
+
+    test('history keeps no body for a HEAD request, or one with no method, which send none', async() => {
+        vi.stubGlobal('fetch', async() => new Response(null, { status: 200 }))
+        const send = (method: string | undefined) => handleRequest(
+            { _id: 'request-id', _type: 'request', name: 'Request', parentId: null, workspaceId: 'workspace-id', url: 'https://example.com', method, body: { mimeType: 'text/plain', text: 'payload' } } as CollectionItem,
+            {}, {}, undefined, async() => undefined, [], null, new AbortController().signal,
+            { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 },
+        )
+        expect(((await send('HEAD')) as RequestFinalResponse).request.body).toBeNull()
+        expect(((await send(undefined)) as RequestFinalResponse).request.body).toBeNull()
+        expect(((await send('POST')) as RequestFinalResponse).request.body).toBe('payload')
+    })
+
+    test('history keeps the request as it was sent, also when it is edited while the response arrives', async() => {
+        let answer!: () => void
+        vi.stubGlobal('fetch', () => new Promise<Response>(resolve => {
+            answer = () => resolve(new Response(null, { status: 200 }))
+        }))
+        const request = {
+            _id: 'request-id', _type: 'request', name: 'Request', parentId: null, workspaceId: 'workspace-id',
+            url: 'https://example.com/a', method: 'POST', body: { mimeType: 'text/plain', text: 'payload' },
+            parameters: [{ name: 'q', value: '1' }], headers: [{ name: 'X-A', value: '1' }], authentication: { type: 'No Auth' },
+        } as CollectionItem
+        const sent = handleRequest(request, {}, {}, undefined, async() => undefined, [], null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 })
+        await vi.waitFor(() => expect(answer).toBeDefined())
+        request.method = 'HEAD'
+        request.url = 'https://example.com/b'
+        // a multipart body holds files, which history cannot keep in this form
+        request.body = { mimeType: 'multipart/form-data', params: [{ name: 'f', value: '', type: 'file', files: [new File(['x'], 'x.txt')] }] }
+        request.parameters![0].value = '2'
+        request.headers![0].value = '2'
+        request.authentication = { type: 'bearer', token: 't' }
+        answer()
+        const response = (await sent) as RequestFinalResponse
+        expect(response.request.method).toBe('POST')
+        expect(response.request.body).toBe('payload')
+        expect(response.request.original).toEqual({
+            url: 'https://example.com/a', body: { mimeType: 'text/plain', text: 'payload' },
+            parameters: [{ name: 'q', value: '1' }], headers: [{ name: 'X-A', value: '1' }], authentication: { type: 'No Auth' },
+        })
+    })
+
+    test('history keeps no body for a multipart body sent, also when another body type is picked while the response arrives', async() => {
+        let answer!: () => void
+        vi.stubGlobal('fetch', () => new Promise<Response>(resolve => {
+            answer = () => resolve(new Response(null, { status: 200 }))
+        }))
+        const request = {
+            _id: 'request-id', _type: 'request', name: 'Request', parentId: null, workspaceId: 'workspace-id',
+            url: 'https://example.com', method: 'POST', body: { mimeType: 'multipart/form-data', params: [{ name: 'a', value: '1', type: 'text' }] },
+        } as CollectionItem
+        const sent = handleRequest(request, {}, {}, undefined, async() => undefined, [], null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 })
+        await vi.waitFor(() => expect(answer).toBeDefined())
+        request.body = { mimeType: 'application/json', text: '{}' }
+        answer()
+        const response = (await sent) as RequestFinalResponse
+        // the form sent, which history could not store
+        expect(response.request.body).toBeNull()
+        expect(response.request.original.body).toEqual({ mimeType: 'multipart/form-data', params: [{ name: 'a', value: '1', type: 'text' }] })
+    })
+
+    test('a request edited while it is prepared, such as while a response tag\'s request runs, goes out and is kept as it was at the click', async() => {
+        const sent: { url: string, body: unknown, headers: string | null }[] = []
+        vi.stubGlobal('fetch', async(url: string | URL, init: RequestInit) => {
+            sent.push({ url: String(url), body: init.body, headers: new Headers(init.headers).get('X-A') })
+            return new Response(null, { status: 200 })
+        })
+        let answer!: (value: string) => void
+        ;(window as any).createPrompt = vi.fn(() => new Promise(resolve => {
+            answer = resolve
+        }))
+        try {
+            const request = {
+                _id: 'request-id', _type: 'request', name: 'Request', parentId: null, workspaceId: 'workspace-id',
+                url: 'https://example.com/a', method: 'POST', body: { mimeType: 'text/plain', text: `payload{% prompt(title='A') %}` },
+                headers: [{ name: 'X-A', value: '1' }],
+            } as CollectionItem
+            const sending = handleRequest(request, {}, {}, undefined, async() => undefined, [], null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 })
+            await vi.waitFor(() => expect(answer).toBeDefined())
+            // the body, read first, waits on its prompt, which stands in for a response tag's request here, and the URL and
+            // headers are read after it
+            request.url = 'https://example.com/b'
+            request.headers = [{ name: 'X-A', value: '2' }]
+            request.body = { mimeType: 'text/plain', text: 'edited' }
+            answer('')
+            const response = (await sending) as RequestFinalResponse
+            expect(sent).toEqual([{ url: 'https://example.com/a', body: 'payload', headers: '1' }])
+            expect(response.request.original).toMatchObject({ url: 'https://example.com/a', body: { mimeType: 'text/plain', text: `payload{% prompt(title='A') %}` }, headers: [{ name: 'X-A', value: '1' }] })
+        } finally {
+            delete (window as any).createPrompt
+        }
+    })
+
+    test('a request with no method goes out and is kept as GET', async() => {
+        vi.stubGlobal('fetch', async() => new Response(null, { status: 200 }))
+        const request = { _id: 'request-id', _type: 'request', name: 'Request', parentId: null, workspaceId: 'workspace-id', url: 'https://example.com', body: { mimeType: 'No Body' } } as CollectionItem
+        const response = (await handleRequest(request, {}, {}, undefined, async() => undefined, [], null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 })) as RequestFinalResponse
+        expect(response.request.method).toBe('GET')
+    })
+
+    test('history keeps no body for form data a script set, which it cannot store', async() => {
+        vi.stubGlobal('fetch', async() => new Response(null, { status: 200 }))
+        const request = { _id: 'request-id', _type: 'request', name: 'Request', parentId: null, workspaceId: 'workspace-id', url: 'https://example.com', method: 'POST', body: { mimeType: 'text/plain', text: 'payload' } } as CollectionItem
+        const script = { _id: 'p', type: 'script' as const, name: 'script', code: { pre_request: `rf.request.setBody({ mimeType: 'multipart/form-data', params: [{ name: 'a', value: '1', type: 'text' }] })`, post_request: '' }, workspaceId: null, collectionId: 'request-id', enabled: true, createdAt: 0, updatedAt: 0 }
+        const response = (await handleRequest(request, {}, {}, undefined, async() => undefined, [script], null, new AbortController().signal, { electronSwitchToChromiumFetch: false, disableSSLVerification: false, requestTimeout: 0 })) as RequestFinalResponse
+        expect(response.request.body).toBeNull()
+        expect(() => structuredClone(response)).not.toThrow()
+    })
 
     test('a cancel the user asked for is reported in the panel, not logged as an error', async() => {
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)

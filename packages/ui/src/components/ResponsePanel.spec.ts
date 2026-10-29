@@ -77,7 +77,7 @@ function giveScrollerLayout(scroller: HTMLElement, clientHeight: number) {
 function mountPanel(state: Record<string, any>, keepAliveShown?: { value: boolean }) {
     const element = document.createElement('div')
     document.body.appendChild(element)
-    const activeTab = { _id: 'tab1', _type: 'request', name: 'SSE', method: 'GET', url: 'http://127.0.0.1/sse' }
+    const activeTab: Record<string, any> = { _id: 'tab1', _type: 'request', name: 'SSE', method: 'GET', url: 'http://127.0.0.1/sse' }
     const app = createApp({
         render: () => keepAliveShown
             ? h(KeepAlive, null, [keepAliveShown.value ? h(ResponsePanel, { activeTab, key: 'panel' }) : h('div', { key: 'other' }, 'another tab')])
@@ -90,6 +90,7 @@ function mountPanel(state: Record<string, any>, keepAliveShown?: { value: boolea
     return {
         element,
         commit,
+        activeTab,
         scroller: () => element.querySelector('.response-event-list-scroller') as HTMLElement,
         pathInput: () => element.querySelector('.response-event-list-path input') as HTMLInputElement,
         detailTitle: () => element.querySelector('.response-event-list-detail .response-event-list-pane-header span')?.textContent ?? null,
@@ -619,6 +620,52 @@ test('the Request tab names each field and file of a sent multipart body as it i
     expect(link.textContent).toBe(fileName)
     expect(link.getAttribute('download')).toBe(fileName)
     panel.unmount()
+})
+
+for(const method of ['HEAD', 'head', 'get']) {
+    test(`the Request tab shows no body for ${method}, which sends none`, async() => {
+        const saved = { ...finishedSmallJson(), request: { method, headers: {}, body: null, original: { body: { mimeType: 'multipart/form-data', params: [{ name: 'field', type: 'text', value: 'value' }] } } } }
+        const state = storeState({
+            activeTab: { _id: 'tab1' },
+            requestResponseStatus: { tab1: 'loaded' },
+            requestResponses: { tab1: saved },
+        })
+        const panel = mountPanel(state)
+        await settle()
+
+        const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+        requestTab.click()
+        await settle()
+
+        expect(panel.element.querySelector('.content-box td')).toBeNull()
+        panel.unmount()
+    })
+}
+
+test('Restore keeps the file of a binary body that history saved no copy of, as for a HEAD request', async() => {
+    const prompt = Object.assign(document.createElement('alert-confirm-prompt'), { createConfirm: vi.fn(async() => true) })
+    document.body.appendChild(prompt)
+    const file = new File(['a'], 'a.bin')
+    const saved = { ...finishedSmallJson(), request: { method: 'HEAD', headers: {}, body: null, original: { url: 'http://127.0.0.1/a', body: { mimeType: 'application/octet-stream', fileName: file } } } }
+    const state = storeState({
+        activeTab: { _id: 'tab1' },
+        requestResponseStatus: { tab1: 'loaded' },
+        requestResponses: { tab1: saved },
+    })
+    const panel = mountPanel(state)
+    await settle()
+
+    const requestTab = [...panel.element.querySelectorAll('.response-panel-tab')].find(tab => tab.textContent!.trim() === 'Request') as HTMLElement
+    requestTab.click()
+    await settle()
+    ;[...panel.element.querySelectorAll('button')].find(button => button.textContent!.trim() === 'Restore')!.click()
+    await vi.waitFor(() => expect(panel.activeTab.url).toBe('http://127.0.0.1/a'))
+
+    expect(panel.activeTab.body.fileName).toMatchObject({ name: 'a.bin' })
+    // the method it was sent with, as the tab had GET
+    expect(panel.activeTab.method).toBe('HEAD')
+    panel.unmount()
+    prompt.remove()
 })
 
 test('the Request tab names a sent file as it is named, and downloads it under that name', async() => {

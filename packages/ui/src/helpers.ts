@@ -592,6 +592,13 @@ export async function fetchWrapper(url: URL, method: string, headers: Record<str
     disableSSLVerification: boolean,
     requestTimeout?: number
 }, onResponseProgress?: ResponseProgressHandler): Promise<RequestInitialResponse> {
+    // for every transport, the CORS Helper's and Electron's too. A request with no method, such as one imported without
+    // it, goes out as GET, as fetch sends it, also through web-standalone, which gets the method in a header
+    method = method ?? 'GET'
+    if(!methodSendsBody(method)) {
+        body = null
+    }
+
     const requestTimeoutRaw = flags.requestTimeout ?? 0
     const requestTimeout = Number.isFinite(requestTimeoutRaw) && requestTimeoutRaw > 0 ? Math.floor(requestTimeoutRaw) : 0
     let timedOut = false
@@ -1310,6 +1317,21 @@ function describePluginError(e: any, currentPlugin: string | null): { descriptio
     }
 }
 
+// A copy of the request as it is now, for a send, which is prepared from it and saves it in history, though the tab may
+// be edited meanwhile, such as while a response tag's request runs or a stream arrives. A missing method goes out as
+// GET, as fetch takes it
+export function copyRequestForSend(request: CollectionItem): CollectionItem {
+    return {
+        ...toRaw(request),
+        method: request.method ?? 'GET',
+        body: structuredClone(toRaw(request.body)),
+        ...(request.parameters ? { parameters: JSON.parse(JSON.stringify(request.parameters)) } : {}),
+        ...(request.pathParameters ? { pathParameters: JSON.parse(JSON.stringify(request.pathParameters)) } : {}),
+        ...(request.headers ? { headers: JSON.parse(JSON.stringify(request.headers)) } : {}),
+        ...(request.authentication ? { authentication: JSON.parse(JSON.stringify(request.authentication)) } : {}),
+    }
+}
+
 export async function handleRequest(
     request: CollectionItem,
     environment: any,
@@ -1335,11 +1357,23 @@ export async function handleRequest(
     const send = new SendResolver(request.workspaceId, 'send')
 
     try {
-        const { url, headers, body } = await createRequestData(state, request, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation, send)
+        // the request as it was at the click, which the send is prepared from and history keeps
+        const requestAtClick = copyRequestForSend(request)
+        const method = requestAtClick.method!
+        const original = {
+            url: requestAtClick.url,
+            body: structuredClone(requestAtClick.body),
+            ...(requestAtClick.parameters ? { parameters: structuredClone(requestAtClick.parameters) } : {}),
+            ...(requestAtClick.pathParameters ? { pathParameters: structuredClone(requestAtClick.pathParameters) } : {}),
+            ...(requestAtClick.headers ? { headers: structuredClone(requestAtClick.headers) } : {}),
+            ...(requestAtClick.authentication ? { authentication: structuredClone(requestAtClick.authentication) } : {}),
+        } as CollectionItem
+
+        const { url, headers, body } = await createRequestData(state, requestAtClick, environment, parentHeaders, parentAuthentication, setEnvironmentVariable, plugins, workspaceLocation, send)
 
         setDefaultUserAgent(headers)
 
-        const response = await fetchWrapper(url, request.method!, headers, body, abortControllerSignal, flags, onResponseProgress)
+        const response = await fetchWrapper(url, method, headers, body, abortControllerSignal, flags, onResponseProgress)
         onResponseProgress?.({ type: 'end' })
 
         const headersToSave = JSON.parse(JSON.stringify(headers))
@@ -1380,8 +1414,6 @@ export async function handleRequest(
             })
         }
 
-        const originRequestBodyToSave = structuredClone(toRaw(request.body))
-
         let responseToSend: RequestFinalResponse = {
             _id: nanoid(),
             collectionId: request._id,
@@ -1395,34 +1427,16 @@ export async function handleRequest(
             headTimeTaken: response.headTimeTaken,
             bodyTimeTaken: response.bodyTimeTaken,
             request: {
-                method: request.method!,
+                method,
                 query: url.search,
                 headers: headersToSave,
                 headersSent,
-                body: request.method !== 'GET' && request.body && request.body.mimeType === 'multipart/form-data' === false ? body : null,
-                original: {
-                    url: request.url,
-                    body: originRequestBodyToSave
-                } as CollectionItem
+                // form data, which history cannot store, such as a multipart body, also one a script set, is not kept
+                body: methodSendsBody(method) && original.body && !(body instanceof FormData) ? body : null,
+                original,
             },
             createdAt: new Date().getTime(),
             testResults: [],
-        }
-
-        if(request.parameters) {
-            responseToSend.request.original.parameters = JSON.parse(JSON.stringify(request.parameters))
-        }
-
-        if(request.pathParameters) {
-            responseToSend.request.original.pathParameters = JSON.parse(JSON.stringify(request.pathParameters))
-        }
-
-        if(request.headers) {
-            responseToSend.request.original.headers = JSON.parse(JSON.stringify(request.headers))
-        }
-
-        if(request.authentication) {
-            responseToSend.request.original.authentication = JSON.parse(JSON.stringify(request.authentication))
         }
 
         // only set on a body cut short, so a complete one is saved as before
@@ -1467,7 +1481,7 @@ export async function handleRequest(
         responseToSend.testResults = state.testResults
 
         // after the scripts, which still read the resolved url
-        return send.omitMaskedPromptParts(responseToSend, request)
+        return send.omitMaskedPromptParts(responseToSend, original)
     } catch(e: any) {
         // a cancel the user asked for is reported in the panel, every other failure also goes to Logs
         if(e?.name !== 'AbortError') {
@@ -2882,6 +2896,12 @@ export function getSocketConnectionUrl(url: string, flags: Pick<Flags, 'isWebSta
     const protocol = parsedUrl.protocol.startsWith('ws') ? (serverLocation.protocol === 'https:' ? 'wss:' : 'ws:') : serverLocation.protocol
 
     return `${protocol}//${serverLocation.host}/proxy-socket/${options}/${encodeURIComponent(parsedUrl.origin)}${parsedUrl.pathname}${parsedUrl.search}`
+}
+
+// fetch refuses a body for GET and HEAD, in any letter case, so a body set on such a request is not sent. A request
+// with no method, such as one imported without it, goes out as GET
+export function methodSendsBody(method: string | undefined) {
+    return !['GET', 'HEAD'].includes((method ?? 'GET').toUpperCase())
 }
 
 // none for a code the table does not name, such as Cloudflare's 520
