@@ -20,6 +20,7 @@ vi.mock('dexie', () => {
 vi.mock('@flawiddsouza/dexie-export-import', () => ({}))
 
 const electronIPC = {
+    updateCollection: vi.fn(),
     getResponsesByCollectionId: vi.fn(),
     createResponse: vi.fn(),
     getWorkspaceAtLocation: vi.fn(),
@@ -165,4 +166,27 @@ test('plugins a duplicate made in 0.41.0 left are skipped, so each item runs its
         // a plugin added in the Plugins modal, which has no type
         { ...plugin('other kind', 'B', 'request-a', 4), type: undefined, code: '' },
     ], 'A'))).toEqual(['typed in the editor', 'imported', 'named', 'other kind'])
+})
+
+test('a save calls onSending once its body files are read and its data handed to the storage, not before', async() => {
+    const { updateCollection } = await importDb()
+    let finishReading!: (buffer: ArrayBuffer) => void
+    const file = new File(['body'], 'body.bin')
+    vi.spyOn(file, 'arrayBuffer').mockReturnValue(new Promise(resolve => {
+        finishReading = resolve
+    }))
+    electronIPC.updateCollection.mockResolvedValue({ error: null, version: 'v2' })
+    const onSending = vi.fn()
+
+    const saving = updateCollection('workspace-1', '/R.json', { _type: 'request', body: { mimeType: 'application/octet-stream', fileName: file } } as never, 'v1', onSending)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(onSending).not.toHaveBeenCalled()
+    expect(electronIPC.updateCollection).not.toHaveBeenCalled()
+
+    finishReading(new ArrayBuffer(4))
+    expect(await saving).toEqual({ error: null, version: 'v2' })
+    expect(onSending).toHaveBeenCalledOnce()
+    expect(electronIPC.updateCollection.mock.invocationCallOrder[0]).toBeLessThan(onSending.mock.invocationCallOrder[0])
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
 })

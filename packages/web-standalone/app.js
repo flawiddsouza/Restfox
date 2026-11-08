@@ -794,7 +794,7 @@ app.post('/api/getCollectionForWorkspace',        apiRoute(({ workspace, type })
 app.post('/api/getCollectionById',                apiRoute(({ workspace, collectionId }) => db.getCollectionById(workspace, collectionId)))
 app.post('/api/createCollection',                 apiRoute(({ workspace, collection }) => db.createCollection(workspace, collection)))
 app.post('/api/createCollections',                apiRoute(({ workspace, collections }) => db.createCollections(workspace, collections)))
-app.post('/api/updateCollection',                 apiRoute(({ workspace, collectionId, updatedFields }) => db.updateCollection(workspace, collectionId, updatedFields)))
+app.post('/api/updateCollection',                 apiRoute(({ workspace, collectionId, updatedFields, version }) => db.updateCollection(workspace, collectionId, updatedFields, version)))
 app.post('/api/deleteCollectionsByWorkspaceId',   apiRoute(({ workspace }) => db.deleteCollectionsByWorkspaceId(workspace)))
 app.post('/api/deleteCollectionsByIds',           apiRoute(({ workspace, collectionIds }) => db.deleteCollectionsByIds(workspace, collectionIds)))
 

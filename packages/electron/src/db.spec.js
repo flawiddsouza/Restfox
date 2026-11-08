@@ -1,11 +1,15 @@
-import { test, expect, beforeEach, afterEach, vi } from 'vitest'
+import { test, expect, beforeEach, afterEach, vi, describe } from 'vitest'
 import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import db from './db.js'
 import dbHelpers from './db-helpers.js'
-import { platformLocation } from '../shared/db.js'
+import { createRequire } from 'node:module'
+// the instance db.js requires, which a vitest import would load a second time
+const fileUtils = createRequire(import.meta.url)('./file-utils.js')
+import { platformLocation, createDatabase } from '../shared/db.js'
+import { hashText, itemFileVersion } from '../shared/helpers.js'
 
 let workspace
 
@@ -402,7 +406,7 @@ test('loading keeps the saved environment pick when the picked environment canno
 
     // the first environment stands in until the file is fixed
     expect((await db.getWorkspaceAtLocation(workspace.location, true)).currentEnvironment).toBe('Default')
-    expect((await dbHelpers.getCollection(new Map(), [], workspace)).find(item => item._id === newCollectionId).currentEnvironment).toBe('Default')
+    expect((await dbHelpers.getCollection(new Map(), workspace)).find(item => item._id === newCollectionId).currentEnvironment).toBe('Default')
     expect(fs.readFileSync(path.join(workspace.location, 'restfox.json'), 'utf8')).toBe('{"version":1,"name":"W","currentEnvironment":"Prod"}')
     expect(fs.readFileSync(path.join(workspace.location, 'Folder', '_.json'), 'utf8')).toBe('{"currentEnvironment":"Prod"}')
 })
@@ -436,7 +440,7 @@ test('a gRPC item is stored in its own item file, like a request', async() => {
         authentication: grpcItem().authentication,
     })
 
-    const collection = await dbHelpers.getCollection(new Map(), [], workspace)
+    const collection = await dbHelpers.getCollection(new Map(), workspace)
 
     expect(collection).toEqual([{
         ...grpcItem(),
@@ -453,7 +457,7 @@ test('a request type only a newer version knows is created as its own file, load
     expect(result.error).toBe(null)
     expect(result.newCollectionId).toBe('/From Later.json')
     expect(readJson('From Later.json')).toEqual({ _type: 'newer-kind', url: 'x://y', settings: { deep: [1, 2] } })
-    expect(await dbHelpers.getCollection(new Map(), [], workspace)).toEqual([{ ...newer, _id: result.newCollectionId }])
+    expect(await dbHelpers.getCollection(new Map(), workspace)).toEqual([{ ...newer, _id: result.newCollectionId }])
 
     await db.createResponse(workspace, { _id: 'response-1', collectionId: result.newCollectionId, createdAt: 1, newer: { saved: true } })
     expect((await db.getResponsesByCollectionId(workspace, result.newCollectionId)).map(response => response._id)).toEqual(['response-1'])
@@ -609,7 +613,7 @@ test('a workspace without gRPC items loads as before', async() => {
     }
     await db.createResponse(workspace, structuredClone(response))
 
-    const collection = await dbHelpers.getCollection(new Map(), [], workspace)
+    const collection = await dbHelpers.getCollection(new Map(), workspace)
     expect(collection.map(item => [item._type, item.name]).sort()).toEqual([['request', 'Get'], ['socket', 'Socket']])
 
     const [responseRead] = await db.getResponsesByCollectionId(workspace, newCollectionId)
@@ -652,4 +656,493 @@ test('renaming or moving a folder leaves a folder whose name starts the same alo
     await db.updateCollection(workspace, folder.newCollectionId, { parentId: target.newCollectionId })
     await db.updateCollection(workspace, chat.newCollectionId, item('Chat', folder2.newCollectionId, { url: 'http://changed-again/' }))
     expect(readJson('Folder2/Chat.json').url).toBe('http://changed-again/')
+})
+
+function requestItem(name = 'Item') {
+    return { _id: 'new', _type: 'request', name, parentId: null, workspaceId: workspace._id, method: 'GET', url: 'https://api.example/a', body: { mimeType: 'No Body' } }
+}
+
+// a workspace the loader accepts, with one request whose id, a path in the workspace, is returned
+async function workspaceWithItem(item = requestItem()) {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const created = await db.createCollection(workspace, item)
+    return { id: created.newCollectionId, version: created.version }
+}
+
+function fileVersion(name) {
+    return itemFileVersion(fs.readFileSync(path.join(workspace.location, name), 'utf8'))
+}
+
+test('a whole item save made from the version on disk goes through and gives the new version', async() => {
+    const { id, version } = await workspaceWithItem()
+    expect(version).toBe(fileVersion('Item.json'))
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    expect(loaded.versions).toEqual({ [id]: version })
+
+    const result = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/b' }, version)
+
+    expect(result).toEqual({ error: null, version: fileVersion('Item.json') })
+    expect(readJson('Item.json').url).toBe('https://api.example/b')
+})
+
+test('a whole item save is refused when the file changed outside Restfox since its version, or the screen has none', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    const outside = JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4)
+    fs.writeFileSync(path.join(workspace.location, 'Item.json'), outside)
+
+    for (const staleVersion of [version, null]) {
+        const result = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/typed' }, staleVersion)
+        expect(result.changedOutside).toBe(true)
+        expect(fs.readFileSync(path.join(workspace.location, 'Item.json'), 'utf8')).toBe(outside)
+    }
+
+    // a page from before versions sends none and is not checked
+    await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/old-page' })
+    expect(readJson('Item.json').url).toBe('https://api.example/old-page')
+})
+
+test('a refused socket save leaves its messages file alone, and a file deleted outside refuses a save', async() => {
+    const { id, version } = await workspaceWithItem({ _id: 'new', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'kept' }] }] })
+    await db.getCollectionForWorkspace(workspace, null)
+    const messagesPath = path.join(workspace.location, 'Chat.messages.json')
+    const messagesBefore = fs.readFileSync(messagesPath, 'utf8')
+    fs.writeFileSync(path.join(workspace.location, 'Chat.json'), JSON.stringify({ _type: 'socket', clients: [{ id: 'c1' }], outside: true }))
+
+    const result = await db.updateCollection(workspace, id, { _type: 'socket', clients: [{ id: 'c1', messages: [{ text: 'typed' }] }] }, version)
+
+    expect(result.changedOutside).toBe(true)
+    expect(fs.readFileSync(messagesPath, 'utf8')).toBe(messagesBefore)
+
+    fs.rmSync(path.join(workspace.location, 'Chat.json'))
+    expect((await db.updateCollection(workspace, id, { _type: 'socket', clients: [] }, version)).changedOutside).toBe(true)
+    expect(fs.existsSync(path.join(workspace.location, 'Chat.json'))).toBe(false)
+})
+
+test('a merge of one field keeps a change made outside Restfox and gives the versions before and after it', async() => {
+    const { id } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+    const versionBefore = fileVersion('Item.json')
+
+    const result = await db.updateCollection(workspace, id, { sortOrder: 3 })
+
+    expect(result).toEqual({ error: null, versionBefore, version: fileVersion('Item.json') })
+    expect(readJson('Item.json')).toMatchObject({ url: 'https://api.example/outside', sortOrder: 3 })
+})
+
+test('the version leaves out the sort order, which a whole save keeps as the file has it, so a sidebar change from another window refuses no save', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    // another window dragged the item
+    const merged = await db.updateCollection(workspace, id, { sortOrder: 4 })
+    expect(merged.versionBefore).toBe(version)
+    expect(merged.version).toBe(version)
+
+    const saved = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/typed', sortOrder: 1 }, version)
+
+    expect(saved).toEqual({ error: null, version: fileVersion('Item.json') })
+    expect(readJson('Item.json')).toMatchObject({ url: 'https://api.example/typed', sortOrder: 4 })
+})
+
+test('a merge into an item file deleted outside Restfox is refused rather than making the file again', async() => {
+    const { id } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    fs.rmSync(path.join(workspace.location, 'Item.json'))
+
+    const result = await db.updateCollection(workspace, id, { sortOrder: 3 })
+
+    expect(result.changedOutside).toBe(true)
+    expect(fs.existsSync(path.join(workspace.location, 'Item.json'))).toBe(false)
+})
+
+test('a save whose write fails partway, such as on a full disk, leaves the file as it was', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    const itemPath = path.join(workspace.location, 'Item.json')
+    const textBefore = fs.readFileSync(itemPath, 'utf8')
+    const writeFile = fsPromises.writeFile
+    vi.spyOn(fsPromises, 'writeFile').mockImplementationOnce(async(target, text) => {
+        await writeFile(target, String(text).slice(0, 10))
+        throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+    })
+
+    await expect(db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/typed' }, version)).rejects.toThrow('ENOSPC')
+
+    expect(fs.readFileSync(itemPath, 'utf8')).toBe(textBefore)
+    expect(fs.readdirSync(workspace.location).filter(name => name.endsWith('.tmp'))).toEqual([])
+    // the next save goes through, as the file still has the version the page holds
+    expect((await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/typed' }, version)).error).toBe(null)
+})
+
+test('a save keeps the file\'s permissions, and writes in place where the file beside it cannot be made or the file is another user\'s', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    const itemPath = path.join(workspace.location, 'Item.json')
+    const save = async(url, from) => (await db.updateCollection(workspace, id, { ...requestItem(), url }, from)).version
+
+    const chmod = vi.spyOn(fsPromises, 'chmod')
+    let current = await save('https://api.example/mode', version)
+    expect(chmod).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), fs.statSync(itemPath).mode & 0o7777)
+
+    // a folder this process may not create files in
+    const writeFile = fsPromises.writeFile
+    vi.spyOn(fsPromises, 'writeFile').mockImplementationOnce(async() => {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+    }).mockImplementation(writeFile)
+    current = await save('https://api.example/folder-not-writable', current)
+    expect(readJson('Item.json').url).toBe('https://api.example/folder-not-writable')
+
+    // a file system that cannot set permissions
+    chmod.mockRejectedValueOnce(Object.assign(new Error('ENOSYS: function not implemented'), { code: 'ENOSYS' }))
+    current = await save('https://api.example/no-chmod', current)
+    expect(readJson('Item.json').url).toBe('https://api.example/no-chmod')
+    expect(fs.readdirSync(workspace.location).filter(name => name.endsWith('.tmp'))).toEqual([])
+
+    // a file another user or group owns
+    const rename = vi.spyOn(fsPromises, 'rename')
+    const { getuid, getgid } = process
+    try {
+        for (const [owner, ids] of [['user', { uid: 1, gid: 0 }], ['group', { uid: 0, gid: 1 }]]) {
+            process.getuid = () => fs.statSync(itemPath).uid + ids.uid
+            process.getgid = () => fs.statSync(itemPath).gid + ids.gid
+            current = await save(`https://api.example/other-${owner}`, current)
+            expect(readJson('Item.json').url).toBe(`https://api.example/other-${owner}`)
+        }
+    } finally {
+        process.getuid = getuid
+        process.getgid = getgid
+    }
+    expect(rename).not.toHaveBeenCalled()
+
+    // a file with another hard link, which goes on showing the same text
+    const linkPath = path.join(workspace.location, 'linked-copy.txt')
+    fs.linkSync(itemPath, linkPath)
+    await save('https://api.example/hard-linked', current)
+    expect(JSON.parse(fs.readFileSync(linkPath, 'utf8')).url).toBe('https://api.example/hard-linked')
+    expect(rename).not.toHaveBeenCalled()
+})
+
+test('a save to a request file that is a link replaces the file it points to, which a write failing partway leaves as it was', async(context) => {
+    const { id, version } = await workspaceWithItem()
+    const itemPath = path.join(workspace.location, 'Item.json')
+    const targetPath = path.join(workspace.location, 'linked', 'Item.json')
+    fs.mkdirSync(path.dirname(targetPath))
+    fs.renameSync(itemPath, targetPath)
+    try {
+        fs.symlinkSync(targetPath, itemPath, 'file')
+    } catch {
+        // Windows makes links only with developer mode or as an administrator
+        context.skip()
+    }
+    await db.getCollectionForWorkspace(workspace, null)
+    const textBefore = fs.readFileSync(targetPath, 'utf8')
+    const writeFile = fsPromises.writeFile
+    vi.spyOn(fsPromises, 'writeFile').mockImplementationOnce(async(target, text) => {
+        await writeFile(target, String(text).slice(0, 10))
+        throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+    })
+
+    await expect(db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/typed' }, version)).rejects.toThrow('ENOSPC')
+    expect(fs.readFileSync(targetPath, 'utf8')).toBe(textBefore)
+
+    await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/typed' }, version)
+    expect(fs.lstatSync(itemPath).isSymbolicLink()).toBe(true)
+    expect(JSON.parse(fs.readFileSync(targetPath, 'utf8')).url).toBe('https://api.example/typed')
+})
+
+test('a move into a folder from a page whose ids came from before the server started reaches the folder', async() => {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id })
+    const { id } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    const restarted = createDatabase(fileUtils, dbHelpers, createRequire(import.meta.url)('dotenv'))
+
+    expect((await restarted.updateCollection(workspace, id, { parentId: folder.newCollectionId })).error).toBe(null)
+    expect(fs.existsSync(path.join(workspace.location, 'Folder', 'Item.json'))).toBe(true)
+    expect((await restarted.updateCollection(workspace, '/Folder/Item.json', { parentId: '/Gone' })).changedOutside).toBe(true)
+})
+
+test('a scan whose read fails leaves the ids the page holds reaching their files, renamed ones included', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    await db.updateCollection(workspace, id, { name: 'Renamed' })
+    // the instance db.js requires
+    const requiredDbHelpers = createRequire(import.meta.url)('./db-helpers.js')
+    vi.spyOn(requiredDbHelpers, 'getCollection').mockRejectedValueOnce(Object.assign(new Error('EIO: i/o error'), { code: 'EIO' }))
+
+    const failed = await db.getCollectionForWorkspace(workspace, null)
+    expect(failed.error.message).toBe('EIO: i/o error')
+
+    const saved = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/after-failed-scan' }, version)
+    expect(saved.error).toBe(null)
+    expect(readJson('Renamed.json').url).toBe('https://api.example/after-failed-scan')
+
+    // and one that fails before it reads, as the workspace is checked
+    vi.spyOn(requiredDbHelpers, 'ensureRestfoxCollection').mockRejectedValueOnce(Object.assign(new Error('EIO: i/o error'), { code: 'EIO' }))
+    expect((await db.getCollectionForWorkspace(workspace, null)).error.message).toBe('EIO: i/o error')
+    const savedAgain = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/after-failed-check' }, saved.version)
+    expect(savedAgain.error).toBe(null)
+})
+
+test('a save from a page whose ids came from before the server started reaches the file, still checked against its version', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    // a server started again, which has scanned nothing yet
+    const restarted = createDatabase(fileUtils, dbHelpers, createRequire(import.meta.url)('dotenv'))
+
+    expect((await restarted.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/after-restart' }, version)).error).toBe(null)
+    expect(readJson('Item.json').url).toBe('https://api.example/after-restart')
+    expect((await restarted.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/stale' }, version)).changedOutside).toBe(true)
+    // an id that is not a path inside the workspace reaches nothing, even where a file is
+    const outsideName = `${path.basename(workspace.location)}-outside.json`
+    const outsidePath = path.join(workspace.location, '..', outsideName)
+    fs.writeFileSync(outsidePath, fs.readFileSync(path.join(workspace.location, 'Item.json')))
+    try {
+        const outsideVersion = itemFileVersion(fs.readFileSync(outsidePath, 'utf8'))
+        expect((await restarted.updateCollection(workspace, `/../${outsideName}`, { ...requestItem(), url: 'https://api.example/escaped' }, outsideVersion)).changedOutside).toBe(true)
+        expect(JSON.parse(fs.readFileSync(outsidePath, 'utf8')).url).not.toBe('https://api.example/escaped')
+    } finally {
+        fs.rmSync(outsidePath, { force: true })
+    }
+})
+
+test('moving a socket into a folder takes its messages along', async() => {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id })
+    const socket = await db.createCollection(workspace, { _id: 's', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'kept' }] }] })
+
+    await db.updateCollection(workspace, socket.newCollectionId, { parentId: folder.newCollectionId })
+
+    expect(fs.existsSync(path.join(workspace.location, 'Chat.messages.json'))).toBe(false)
+    expect(readJson('Folder/Chat.messages.json')).toEqual({ c1: [{ text: 'kept' }] })
+})
+
+test('a sort order update writes in place, as it reaches every sibling, and is still known as Restfox\'s own, while other one-field updates replace the file', async() => {
+    const { id } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    const itemPath = path.join(workspace.location, 'Item.json')
+    const rename = vi.spyOn(fsPromises, 'rename')
+
+    await db.updateCollection(workspace, id, { sortOrder: 3 })
+    expect(rename).not.toHaveBeenCalled()
+    expect(readJson('Item.json').sortOrder).toBe(3)
+    expect(fileUtils.ownWrites.get(itemPath)).toMatchObject({ kind: 'file', hash: hashText(fs.readFileSync(itemPath, 'utf8')) })
+
+    await db.updateCollection(workspace, id, { headers: [{ name: 'X', value: '1' }] })
+    expect(rename).toHaveBeenCalledOnce()
+    expect(readJson('Item.json')).toMatchObject({ sortOrder: 3, headers: [{ name: 'X', value: '1' }] })
+})
+
+test('a save of an item whose name is near the limit on a file name goes through', async() => {
+    const { id, version } = await workspaceWithItem(requestItem('a'.repeat(240)))
+    await db.getCollectionForWorkspace(workspace, null)
+
+    const saved = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/long-name' }, version)
+
+    expect(saved.error).toBe(null)
+    expect(readJson(`${'a'.repeat(240)}.json`).url).toBe('https://api.example/long-name')
+})
+
+test('duplicating a socket under the name of the item it copies leaves that item\'s messages alone', async() => {
+    const { version } = await workspaceWithItem({ _id: 'new', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'newer' }] }] })
+    const messagesBefore = fs.readFileSync(path.join(workspace.location, 'Chat.messages.json'), 'utf8')
+
+    const result = await db.createCollection(workspace, { _id: 'copy', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'older copy' }] }] })
+
+    expect(result.error).toBe('Cannot create Chat as it already exists')
+    expect(fs.readFileSync(path.join(workspace.location, 'Chat.messages.json'), 'utf8')).toBe(messagesBefore)
+    expect(fileVersion('Chat.json')).toBe(version)
+})
+
+test('a write that fails forgets what Restfox left at the path, so a change there is not taken for its own', async() => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    const itemPath = path.join(workspace.location, 'Item.json')
+    expect(fileUtils.ownWrites.get(itemPath)).toMatchObject({ kind: 'file', hash: hashText(fs.readFileSync(itemPath, 'utf8')) })
+
+    fs.chmodSync(itemPath, 0o444)
+    try {
+        await expect(db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/failed' }, version)).rejects.toThrow()
+    } finally {
+        fs.chmodSync(itemPath, 0o666)
+    }
+
+    expect(fileUtils.ownWrites.has(itemPath)).toBe(false)
+})
+
+test('an id from before a rename reaches the renamed file for one more scan, and no file after the next', async() => {
+    const { id } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    await db.updateCollection(workspace, id, { name: 'Renamed' })
+    await db.getCollectionForWorkspace(workspace, null)
+    const version = fileVersion('Renamed.json')
+
+    // a save the screen sent while that scan ran, with the id it still had
+    const saved = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/after-rename' }, version)
+    expect(saved.error).toBe(null)
+    expect(readJson('Renamed.json').url).toBe('https://api.example/after-rename')
+    expect(fs.existsSync(path.join(workspace.location, 'Item.json'))).toBe(false)
+
+    await db.getCollectionForWorkspace(workspace, null)
+    const textBefore = fs.readFileSync(path.join(workspace.location, 'Renamed.json'), 'utf8')
+    await expect(db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/stale' })).rejects.toThrow()
+    // a page that holds the item, such as another window, reloads rather than failing on every edit
+    expect((await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/stale' }, saved.version)).changedOutside).toBe(true)
+    expect((await db.updateCollection(workspace, id, { sortOrder: 2 })).changedOutside).toBe(true)
+    expect(fs.readFileSync(path.join(workspace.location, 'Renamed.json'), 'utf8')).toBe(textBefore)
+})
+
+test('an id kept from before a rename that a new item takes stays that item\'s at the next scan, and an import with a kept id creates its item', async() => {
+    const { id } = await workspaceWithItem(requestItem('a'))
+    await db.getCollectionForWorkspace(workspace, null)
+    await db.updateCollection(workspace, id, { name: 'b' })
+    await db.getCollectionForWorkspace(workspace, null)
+
+    // an import of an export made before the rename, whose item has the id kept for b
+    const imported = await db.createCollections(workspace, [{ ...requestItem('a'), _id: id, sortOrder: 7 }])
+    expect(imported.results[0].newCollectionId).toBe(id)
+    expect(fs.existsSync(path.join(workspace.location, 'a.json'))).toBe(true)
+    expect(readJson('b.json').sortOrder).toBe(undefined)
+
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    expect(loaded.idMap.get(id)).toBe(id)
+    await db.updateCollection(workspace, id, { ...requestItem('a'), url: 'https://api.example/new-a' }, fileVersion('a.json'))
+    expect(readJson('a.json').url).toBe('https://api.example/new-a')
+})
+
+describe('the watcher', () => {
+    let events
+    let spareWorkspace
+
+    beforeEach(() => {
+        events = []
+        globalThis.electronApplicationWindow = { webContents: { send: (channel, event, changedPath, controlledChange) => events.push({ event, path: changedPath, controlledChange }) } }
+        spareWorkspace = { _id: 'spare', _type: 'file', location: fs.mkdtempSync(path.join(os.tmpdir(), 'restfox-db-spec-spare-')) }
+    })
+
+    afterEach(async() => {
+        // the watcher moves off the folder the test deletes
+        await db.getCollectionForWorkspace(spareWorkspace, null, true)
+        fs.rmSync(spareWorkspace.location, { recursive: true, force: true })
+    })
+
+    const eventsFor = name => events.filter(event => event.path === path.join(workspace.location, name))
+    // Restfox's writes go through the queue the IPC handlers use, as in the app
+    const queued = run => db.operationQueue.enqueue(run)
+
+    async function watchWithItem() {
+        const item = await workspaceWithItem()
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.whenWorkspaceWatcherReady()
+        return item
+    }
+
+    // A change made outside Restfox is reported with the text it left, so every report after it, also a late one of
+    // Restfox's own earlier write, finds that text and calls it outside
+    async function expectOutsideChangeReported(name, change) {
+        const from = eventsFor(name).length
+        change()
+        await vi.waitFor(() => expect(eventsFor(name).slice(from).at(-1)?.controlledChange).toBe(false), { timeout: 10000 })
+    }
+
+    test('a change made outside Restfox after quick writes it reports as one is not taken for Restfox\'s own', async() => {
+        let { id, version } = await watchWithItem()
+        for (const letter of 'abcdef') {
+            version = (await queued(() => db.updateCollection(workspace, id, { ...requestItem(), url: `https://api.example/${letter}` }, version))).version
+        }
+        await vi.waitFor(() => expect(eventsFor('Item.json').length).toBeGreaterThan(0), { timeout: 10000 })
+        expect(eventsFor('Item.json').every(event => event.controlledChange)).toBe(true)
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        })
+    }, 20000)
+
+    test('a rename by Restfox is its own', async() => {
+        const { id } = await watchWithItem()
+        await queued(() => db.updateCollection(workspace, id, { name: 'Renamed' }))
+        await vi.waitFor(() => {
+            expect(eventsFor('Renamed.json').length).toBeGreaterThan(0)
+            expect(eventsFor('Item.json').length).toBeGreaterThan(0)
+        }, { timeout: 10000 })
+        // the previous test's folder, deleted as it ends, can still be reported here
+        const workspaceEvents = events.filter(event => event.path.startsWith(workspace.location + path.sep))
+        expect(workspaceEvents.filter(event => !event.controlledChange)).toEqual([])
+    }, 20000)
+
+    test('once another program changed a file, text Restfox wrote there before is not taken for its own', async() => {
+        await watchWithItem()
+        const itemPath = path.join(workspace.location, 'Item.json')
+        expect(fileUtils.ownWrites.has(itemPath)).toBe(true)
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(itemPath, JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/other-branch' }, null, 4))
+        })
+
+        // a checkout back to the branch with Restfox's text then reloads too
+        expect(fileUtils.ownWrites.has(itemPath)).toBe(false)
+    }, 20000)
+
+    test('a file changed while another workspace was shown, then checked out back to Restfox\'s text, is not taken for its own', async() => {
+        await watchWithItem()
+        const itemPath = path.join(workspace.location, 'Item.json')
+        const restfoxText = fs.readFileSync(itemPath, 'utf8')
+        await db.getCollectionForWorkspace(spareWorkspace, null, true)
+        fs.writeFileSync(itemPath, JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/other-branch' }, null, 4))
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.whenWorkspaceWatcherReady()
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(itemPath, restfoxText)
+        })
+    }, 20000)
+
+    test('a change the watcher reported as a reload replaced it is not taken for Restfox\'s own when checked out back', async() => {
+        await watchWithItem()
+        const itemPath = path.join(workspace.location, 'Item.json')
+        const restfoxText = fs.readFileSync(itemPath, 'utf8')
+        // a slow call holds the queue, so the watcher's check of the change below waits behind it
+        let releaseQueue
+        queued(() => new Promise(resolve => {
+            releaseQueue = resolve
+        }))
+        const enqueue = vi.spyOn(db.operationQueue, 'enqueue')
+        fs.writeFileSync(itemPath, JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        await vi.waitFor(() => expect(enqueue).toHaveBeenCalled(), { timeout: 10000 })
+        // the reload the change leads to replaces the watcher before that check runs
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.whenWorkspaceWatcherReady()
+        releaseQueue()
+        await queued(async() => undefined)
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(itemPath, restfoxText)
+        })
+    }, 20000)
+
+    test('a reload that cannot read the folder for a moment leaves the watcher on it', async() => {
+        await watchWithItem()
+        const requiredDbHelpers = createRequire(import.meta.url)('./db-helpers.js')
+        vi.spyOn(requiredDbHelpers, 'ensureRestfoxCollection').mockRejectedValueOnce(Object.assign(new Error('EIO: i/o error'), { code: 'EIO' }))
+
+        expect((await db.getCollectionForWorkspace(workspace, null, true)).error.message).toBe('EIO: i/o error')
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        })
+    }, 20000)
+
+    test('loading another workspace for an export or a copy leaves the watcher on the one shown', async() => {
+        await watchWithItem()
+        const other = { _id: 'other', _type: 'file', location: fs.mkdtempSync(path.join(os.tmpdir(), 'restfox-db-spec-other-')) }
+        try {
+            await db.getCollectionForWorkspace(other, null)
+            await expectOutsideChangeReported('Item.json', () => {
+                fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+            })
+        } finally {
+            fs.rmSync(other.location, { recursive: true, force: true })
+        }
+    }, 20000)
 })

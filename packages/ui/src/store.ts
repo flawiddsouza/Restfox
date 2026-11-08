@@ -53,9 +53,28 @@ import {
     updatePlugin,
     deletePlugin,
     createPlugins,
+    type UpdateCollectionResult,
 } from './db'
 import { nextTick } from 'vue'
 import { clearSkipPersistingActiveTabAfterUpdate } from '@/utils/skip-persisting-active-tab'
+import {
+    beginItemReload,
+    endItemReload,
+    enqueueItemWrite,
+    forgetItems,
+    getItemEntry,
+    holdUnloadWhile,
+    itemWritesSettled,
+    loadedSince,
+    noteItemCreated,
+    noteItemsDeleted,
+    createdSince,
+    deletedSince,
+    peekItemEntry,
+    queueWholeItemSave,
+    renameItemIds,
+    setItemVersion,
+} from '@/utils/item-file-versions'
 import constants from './constants'
 import { emitter } from './event-bus'
 import {
@@ -112,10 +131,301 @@ function closeSocketsOfClosedItems(state: State, items: { _id: string }[]) {
     }
 }
 
+// one reload of the workspace shown, see refreshWorkspaceCollection
+async function reloadWorkspaceCollection(context: ActionContext<State, State>): Promise<boolean> {
+    console.log('refreshWorkspaceCollection')
+
+    if(context.state.activeWorkspace === null) {
+        throw new Error('activeWorkspace is null')
+    }
+
+    const activeWorkspaceId = context.state.activeWorkspace._id
+    const previousIds = context.state.collection.map(item => item._id)
+    const load = beginItemReload(activeWorkspaceId)
+    try {
+        return await applyWorkspaceReload(context, activeWorkspaceId, previousIds, load)
+    } finally {
+        endItemReload()
+    }
+}
+
+async function applyWorkspaceReload(context: ActionContext<State, State>, activeWorkspaceId: string, previousIds: string[], load: number): Promise<boolean> {
+    let read: Awaited<ReturnType<typeof getCollectionForWorkspace>>
+    try {
+        read = await getCollectionForWorkspace(activeWorkspaceId, null, true)
+    } catch(error) {
+        // a lost connection to web-standalone rejects where a storage failure answers with an error
+        read = { error: error instanceof Error ? error.message : String(error), collection: [], workspace: null, idMap: null }
+    }
+    const { error, collection, workspace, idMap, versions } = read
+
+    // a read that failed, such as of a network share gone for a moment, leaves what the page shows and its versions as
+    // they are
+    if(error) {
+        const message = typeof error === 'string' ? error : (error as { message?: string }).message ?? String(error)
+        console.error(`The workspace could not be reloaded: ${message}`)
+        emitter.emit('error', `The workspace could not be reloaded: ${message}`)
+        // a save refused again, once the read works, is told and reloads again, as this reload did not take its place
+        itemsWithRefusedSaveShown = new WeakSet()
+        return false
+    }
+
+    // the ids the page knew, as the map also holds ids from before the last reload
+    const previousIdByNewId = new Map<string, string>()
+    for(const [previousId, newId] of idMap ?? []) {
+        if(previousId !== newId && peekItemEntry(activeWorkspaceId, previousId) !== undefined) {
+            previousIdByNewId.set(newId, previousId)
+        }
+    }
+    const previousIdOf = (id: string) => previousIdByNewId.get(id) ?? id
+
+    // A save the server ran before the read was asked for before the read's reply came, so once the writes asked for
+    // by now have ended, every version the files held before the read is in its entry's history
+    await Promise.all(collection.map((item: CollectionItem) => itemWritesSettled(activeWorkspaceId, previousIdOf(item._id))))
+
+    // a newer load was applied meanwhile, such as after the user opened another workspace and came back
+    if(loadedSince(load) || context.state.activeWorkspace?._id !== activeWorkspaceId) {
+        return false
+    }
+
+    // items this page deleted after the read began, which the read still found, also under the id a rename the read
+    // came after gave them
+    const deletedIds = new Set(collection.map((item: CollectionItem) => item._id).filter((id: string) => deletedSince(activeWorkspaceId, id, load)))
+    for(const [previousId, newId] of idMap ?? []) {
+        if(deletedSince(activeWorkspaceId, previousId, load)) {
+            deletedIds.add(newId)
+        }
+    }
+    for(let index = collection.length - 1; index >= 0; index--) {
+        if(deletedIds.has(collection[index]._id)) {
+            collection.splice(index, 1)
+        }
+    }
+
+    // An item whose file the reload read at a version its entry held since the reload began keeps its object, so what
+    // the user typed while the files were read stays, as do the saves still to send, and keeps its entry's version,
+    // which a save since may have moved on. Only an item whose file changed outside Restfox is replaced, and saves
+    // asked for before then are not sent
+    const objectsById = itemObjectsById(context.state, activeWorkspaceId)
+    const kept = collection.map((item: CollectionItem) => {
+        const previousId = previousIdOf(item._id)
+        const version = versions?.[item._id]
+        if(version === undefined) {
+            return item
+        }
+        const entry = getItemEntry(activeWorkspaceId, previousId)
+        // the object the user edits: the tab open now, else the collection's
+        const previous = objectsById.get(previousId)?.[0]
+        if(previous && previous._type === item._type && entry.history.includes(version)) {
+            return previous
+        }
+        // saves asked for from the object replaced are not sent
+        if(previous) {
+            entry.generation++
+        }
+        setItemVersion(entry, version)
+        return item
+    })
+
+    kept.forEach((previous: CollectionItem, index: number) => {
+        if(previous !== collection[index]) {
+            previous._id = collection[index]._id
+            previous.parentId = collection[index].parentId
+            previous.name = collection[index].name
+            // the read order is older than one a merge of this page set since, such as a drag in the sidebar
+            if(!peekItemEntry(activeWorkspaceId, previousIdOf(collection[index]._id))?.sortOrderMerged) {
+                previous.sortOrder = collection[index].sortOrder
+            }
+        }
+    })
+    // in the same turn as the ids change on the kept objects, before a save of one is asked for under its new id
+    renameItemIds(activeWorkspaceId, previousIdByNewId)
+    const readIds = new Set(collection.map((item: CollectionItem) => item._id))
+    const renamedIds = new Set(previousIdByNewId.values())
+    forgetItems(activeWorkspaceId, previousIds.filter(id => !readIds.has(id) && !renamedIds.has(id)))
+    // items this page created after the read began, which it did not see
+    const createdMeanwhile = context.state.collection.filter(item => !readIds.has(item._id) && createdSince(activeWorkspaceId, item._id, load))
+    collection.splice(0, collection.length, ...kept, ...createdMeanwhile)
+    // and their tabs, which the tabs reload finds through the map
+    createdMeanwhile.forEach(item => idMap?.set(item._id, item._id))
+    // and of items the read found at the id the page had, which the server's map can lack, as after web-standalone
+    // restarted or a new item took the path of one deleted outside Restfox
+    previousIds.filter(id => readIds.has(id) && !idMap?.has(id)).forEach(id => idMap?.set(id, id))
+    // a running gRPC call follows its item to a new id, as after a rename or a move in a file workspace, and
+    // stops when its item is gone, as nothing could stop or show it then
+    const collectionIds = new Set(collection.map((item: CollectionItem) => item._id))
+    if(idMap) {
+        // the map also holds items whose files went away outside Restfox, which the collection no longer has
+        moveGrpcCallsToNewItemIds(activeWorkspaceId, previousIds, new Map([...idMap].filter(([, newId]) => collectionIds.has(newId))))
+    } else {
+        forgetGrpcCallsForItems(activeWorkspaceId, previousIds.filter(id => !collectionIds.has(id)))
+    }
+    context.commit('setCollection', collection)
+    context.state.idMap = idMap
+
+    // is not null if file workspace
+    if(workspace) {
+        context.state.activeWorkspace.name = workspace.name
+        if(workspace.environment) {
+            context.state.activeWorkspace.environment = workspace.environment
+            context.state.activeWorkspace.environments = workspace.environments
+            context.state.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+            context.state.activeWorkspace.dotEnv = workspace.dotEnv
+            emitter.emit('dotenv', 'reloaded')
+        }
+    }
+    return true
+}
+
+// A reload starts once the one before it has applied, as one asked for earlier but done later, after waiting for writes,
+// would otherwise lay its older read over the newer one
+let collectionReloads: Promise<void> = Promise.resolve()
+
+function inReloadTurn<T>(run: () => Promise<T>): Promise<T> {
+    const result = collectionReloads.then(run)
+    collectionReloads = result.then(() => undefined, () => undefined)
+    return result
+}
+
 // a write the storage refused, such as one to a file it cannot read, which it leaves as it is
 function reportUpdateError(result: { error: string | null } | undefined) {
     if(result?.error) {
         emitter.emit('error', result.error)
+    }
+}
+
+// The objects that stand for one item of a workspace, the tab the user edits first: an import can leave a tab on an
+// object the collection no longer holds, and another workspace, such as a copy, can have an item of the same id. A
+// write of the item goes through the first one's queue, so it keeps its order with the tab's own saves, and all of
+// them take the file's new version
+// Compared on the raw objects, so a large collection is not read through Vue's proxies once per item looked up, and
+// the reactive object is taken only for a match, so a change to it reaches the page
+function itemObjectsForId(state: State, workspaceId: string, id: string): CollectionItem[] {
+    const objects: CollectionItem[] = []
+    const seen = new Set<object>()
+    for(const list of itemObjectLists(state)) {
+        const rawList = toRaw(list)
+        for(let index = 0; index < rawList.length; index++) {
+            const raw = toRaw(rawList[index])
+            if(raw && raw._id === id && raw.workspaceId === workspaceId && !seen.has(raw)) {
+                seen.add(raw)
+                objects.push(list[index])
+            }
+        }
+    }
+    return objects
+}
+
+// A new item took the id of one the page still shows, whose file was deleted outside Restfox: the old objects go, tabs
+// included, and saves still asked for from them are not sent, as they would otherwise pass as saves of the new file
+function dropObjectsReplacedByCreate(context: ActionContext<State, State>, workspaceId: string, id: string) {
+    const objects = itemObjectsForId(context.state, workspaceId, id)
+    if(objects.length === 0) {
+        return
+    }
+    getItemEntry(workspaceId, id).generation++
+    const detachedTab = context.state.detachedTabs.find(tab => tab._id === id)
+    if(detachedTab) {
+        context.commit('closeDetachedTab', detachedTab)
+    }
+    context.commit('closeTab', id)
+    context.state.collection = context.state.collection.filter(item => item._id !== id)
+    removeFromTree(context.state.collectionTree, '_id', id)
+}
+
+// the same for every item of a workspace at once, as a reload looks up each item it read
+function itemObjectsById(state: State, workspaceId: string): Map<string, CollectionItem[]> {
+    const objectsById = new Map<string, CollectionItem[]>()
+    const seen = new Set<object>()
+    for(const list of itemObjectLists(state)) {
+        const rawList = toRaw(list)
+        for(let index = 0; index < rawList.length; index++) {
+            const raw = toRaw(rawList[index])
+            if(raw && raw.workspaceId === workspaceId && !seen.has(raw)) {
+                seen.add(raw)
+                const objects = objectsById.get(raw._id) ?? []
+                objects.push(list[index])
+                objectsById.set(raw._id, objects)
+            }
+        }
+    }
+    return objectsById
+}
+
+function itemObjectLists(state: State): CollectionItem[][] {
+    return [state.activeTab ? [state.activeTab] : [], state.tabs, state.detachedTabs, state.collection]
+}
+
+// A merge of one field into an item's file, such as its sort order, which keeps a change made outside Restfox. When the
+// page held the version the file had before, the objects for the item take the merged fields, as the field may have
+// been set on a copy, such as the sidebar's during a drag, and the entry the new version. When it held another, the file
+// had such a change, which the merge would otherwise hide from the watcher, so the workspace shown reloads. A folder,
+// a browser workspace or a server that sends no version has nothing to compare
+async function mergeIntoItemFile(context: ActionContext<State, State>, item: CollectionItem, updatedFields: Partial<CollectionItem>): Promise<UpdateCollectionResult> {
+    const workspaceId = item.workspaceId
+    const result = await enqueueItemWrite(getItemEntry(workspaceId, item._id), async(entry, sent) => {
+        let result: UpdateCollectionResult
+        try {
+            result = await updateCollection(workspaceId, item._id, updatedFields, undefined, sent)
+        } catch(error) {
+            // such as a write to a read-only file, which the callers show as they show a refusal
+            return { result: { error: error instanceof Error ? error.message : String(error) }, changedOutside: false }
+        }
+        // the file is gone
+        if(result.changedOutside) {
+            return { result, changedOutside: true }
+        }
+        if(result.error || entry.version === null || result.version === undefined) {
+            return { result, changedOutside: false }
+        }
+        if(entry.version === result.versionBefore) {
+            setItemVersion(entry, result.version)
+            if('sortOrder' in updatedFields) {
+                entry.sortOrderMerged = true
+            }
+            return { result, changedOutside: false }
+        }
+        return { result, changedOutside: entry.version !== result.version }
+    })
+    if(!result.result.error && !result.changedOutside) {
+        // the id the item has now, as a reload may have moved it meanwhile
+        for(const object of itemObjectsForId(context.state, workspaceId, item._id)) {
+            Object.assign(object, updatedFields)
+        }
+    }
+    if(result.changedOutside && context.state.activeWorkspace?._id === workspaceId) {
+        context.dispatch('refreshWorkspace')
+    }
+    return result.result
+}
+
+// a toast for an item whose saves keep failing is shown once, until one of them goes through
+const itemsWithFailedSaveShown = new WeakSet<object>()
+let itemsWithRefusedSaveShown = new WeakSet<object>()
+
+function reportItemSaveFailure(item: CollectionItem, error: string) {
+    const message = `${item.name} could not be saved: ${error}`
+    console.error(message)
+    if(!itemsWithFailedSaveShown.has(toRaw(item))) {
+        itemsWithFailedSaveShown.add(toRaw(item))
+        emitter.emit('error', message)
+    }
+}
+
+// the reload replaces the object, as its file changed, so later edits go to the item as it is on disk
+function reportItemChangedOutside(context: ActionContext<State, State>, item: CollectionItem) {
+    const shown = context.state.activeWorkspace?._id === item.workspaceId
+    const message = shown
+        ? `${item.name} changed outside Restfox and was reloaded. Your last edit to it was not saved.`
+        : `${item.name} changed outside Restfox, so your last edit to it was not saved.`
+    console.warn(message)
+    if(itemsWithRefusedSaveShown.has(toRaw(item))) {
+        return
+    }
+    itemsWithRefusedSaveShown.add(toRaw(item))
+    emitter.emit('error', message)
+    if(shown) {
+        context.dispatch('refreshWorkspace')
     }
 }
 
@@ -551,38 +861,6 @@ export const store = createStore<State>({
         setCollectionFilter(state, filter) {
             state.collectionFilter = filter
         },
-        persistCollectionItem(state, collectionItem) {
-            if(state.activeTab && state.activeTab._id === collectionItem._id) {
-                if(state.skipPersistingActiveTab) {
-                    console.log('persistCollectionItem: skipPersistingActiveTab is true, so skipping')
-                    state.skipPersistingActiveTab = false
-                    return
-                }
-            }
-
-            console.log('persistCollectionItem', collectionItem._id)
-
-            const collectionItemToSaveJSON = JSON.stringify(collectionItem)
-            const collectionItemToSave = JSON.parse(collectionItemToSaveJSON)
-
-            if('body' in collectionItem && 'params' in collectionItem.body) {
-                const params: RequestParam[] = []
-                for(const param of collectionItem.body.params) {
-                    const paramExtracted = { ...param }
-                    if('files' in paramExtracted) {
-                        paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
-                    }
-                    params.push(paramExtracted)
-                }
-                collectionItemToSave.body.params = params
-            }
-
-            if('body' in collectionItem && 'fileName' in collectionItem.body) {
-                collectionItemToSave.body.fileName = toRaw(collectionItem.body.fileName)
-            }
-
-            updateCollection(collectionItem.workspaceId, collectionItem._id, collectionItemToSave)
-        },
         setActiveSidebarItemForContextMenu(state, payload) {
             state.activeSidebarItemForContextMenu = payload.sidebarItem
             state.sidebarContextMenuElement = payload.element
@@ -962,20 +1240,47 @@ export const store = createStore<State>({
             // the workspace the delete started in, as another one opened while it waits may have items at the same paths
             const workspaceId = context.state.activeWorkspace._id
             const childIds = getChildIds(context.state.collection, collectionItem._id)
+            // a save of an item still running ends before its file goes, and one asked for meanwhile, such as by a
+            // connected socket's tab as messages arrive, is dropped. Before any wait, as a reload may move the entries to
+            // new ids during one, and they then say what the items are called when the delete ends
+            const deleting = childIds.map(id => getItemEntry(workspaceId, id))
+            deleting.forEach(entry => entry.deleting = true)
+            // the items stay, so a save dropped while the delete waited, such as of a socket's latest messages, goes out
+            const keepItems = () => deleting.forEach(entry => {
+                entry.deleting = false
+                const dropped = entry.savedWhileDeleting
+                entry.savedWhileDeleting = null
+                if(dropped && entry.generation > dropped.generation) {
+                    reportItemChangedOutside(context, dropped.object as CollectionItem)
+                } else if(dropped) {
+                    context.dispatch('persistCollectionItem', dropped.object)
+                }
+            })
             // first, so a call that ends meanwhile saves no response for a deleted item
             forgetGrpcCallsForItems(collectionItem.workspaceId, childIds)
-            await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
-            await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
-            if(context.state.activeWorkspace?._id === workspaceId) {
-                context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
+            let result: Awaited<ReturnType<typeof deleteCollectionsByIds>>
+            try {
+                await deleteResponsesByCollectionIds(collectionItem.workspaceId, childIds)
+                await deletePluginsByCollectionIds(collectionItem.workspaceId, childIds)
+                if(context.state.activeWorkspace?._id === workspaceId) {
+                    context.state.plugins.workspace = context.state.plugins.workspace.filter(plugin => childIds.includes(plugin.collectionId) === false)
+                }
+                result = await holdUnloadWhile(Promise.all(childIds.map(id => itemWritesSettled(workspaceId, id))).then(() => deleteCollectionsByIds(workspaceId, childIds)))
+            } catch(error) {
+                keepItems()
+                throw error
             }
 
-            const result = await deleteCollectionsByIds(workspaceId, childIds)
-
             if(result.error) {
+                keepItems()
                 emitter.emit('error', result.error)
                 return
             }
+            // the ids the items have now, as a reload that read before the delete, such as one a rename asked for, may
+            // have moved them to new ones while it waited
+            const deletedIds = deleting.map(entry => entry.id)
+            forgetItems(workspaceId, deletedIds)
+            noteItemsDeleted(workspaceId, deletedIds)
 
             // the sidebar, tabs and responses shown now are another workspace's, and this one's are loaded again when
             // it is opened
@@ -983,9 +1288,9 @@ export const store = createStore<State>({
                 return
             }
 
-            removeFromTree(context.state.collectionTree, '_id', collectionItem._id)
+            deletedIds.forEach(deletedId => removeFromTree(context.state.collectionTree, '_id', deletedId))
 
-            childIds.forEach(childId => {
+            deletedIds.forEach(childId => {
                 const detachedTab = context.state.detachedTabs.find(tab => tab._id === childId)
                 if(detachedTab) {
                     context.commit('closeDetachedTab', detachedTab)
@@ -1001,15 +1306,88 @@ export const store = createStore<State>({
                 delete context.state.requestResponseStreams[childId]
                 delete context.state.extractPathInputs[childId]
             })
-            context.state.collection = context.state.collection.filter(item => childIds.includes(item._id) === false)
+            context.state.collection = context.state.collection.filter(item => deletedIds.includes(item._id) === false)
 
             if(collectionItem._type === 'request_group') {
                 emitter.emit('request_group', 'deleted')
             }
 
-            if(childIds.length > 0) {
+            if(deletedIds.length > 0) {
                 persistActiveWorkspaceTabs(context.state)
             }
+        },
+        // A change to an open item, saved whole. The version of its file goes with the save, so a file changed outside
+        // Restfox since is not written over: the workspace reloads and the user is told the change was not saved
+        persistCollectionItem(context, collectionItem) {
+            const state = context.state
+
+            if(state.activeTab && state.activeTab._id === collectionItem._id) {
+                if(state.skipPersistingActiveTab) {
+                    console.log('persistCollectionItem: skipPersistingActiveTab is true, so skipping')
+                    state.skipPersistingActiveTab = false
+                    return
+                }
+            }
+
+            console.log('persistCollectionItem', collectionItem._id)
+
+            const workspaceId = collectionItem.workspaceId
+            // the entry as asked for, which a rename meanwhile moves to the item's new id
+            const entry = getItemEntry(workspaceId, collectionItem._id)
+            queueWholeItemSave(entry, collectionItem, async(collectionItem, generation, sent) => {
+                if(entry.deleting) {
+                    entry.savedWhileDeleting = { object: collectionItem, generation }
+                    return
+                }
+                // a reload replaced the item since this save was asked for, as its file changed outside Restfox
+                if(entry.generation > generation) {
+                    reportItemChangedOutside(context, collectionItem)
+                    return
+                }
+
+                // the item as it is when the save starts, which takes in every change made while an earlier save ran
+                const collectionItemToSave = JSON.parse(JSON.stringify(collectionItem))
+
+                if('body' in collectionItem && 'params' in collectionItem.body) {
+                    const params: RequestParam[] = []
+                    for(const param of collectionItem.body.params) {
+                        const paramExtracted = { ...param }
+                        if('files' in paramExtracted) {
+                            paramExtracted.files = [...paramExtracted.files].filter(file => file instanceof File)
+                        }
+                        params.push(paramExtracted)
+                    }
+                    collectionItemToSave.body.params = params
+                }
+
+                if('body' in collectionItem && 'fileName' in collectionItem.body) {
+                    collectionItemToSave.body.fileName = toRaw(collectionItem.body.fileName)
+                }
+
+                let result: UpdateCollectionResult
+                try {
+                    result = await updateCollection(workspaceId, collectionItem._id, collectionItemToSave, entry.version, sent)
+                } catch(error) {
+                    reportItemSaveFailure(collectionItem, error instanceof Error ? error.message : String(error))
+                    return
+                }
+
+                if(result.changedOutside) {
+                    reportItemChangedOutside(context, collectionItem)
+                    return
+                }
+
+                if(result.error) {
+                    reportItemSaveFailure(collectionItem, result.error)
+                    return
+                }
+
+                itemsWithFailedSaveShown.delete(toRaw(collectionItem))
+                itemsWithRefusedSaveShown.delete(toRaw(collectionItem))
+                if(result.version !== undefined) {
+                    setItemVersion(entry, result.version)
+                }
+            }, collectionItem => reportItemChangedOutside(context, collectionItem))
         },
         async duplicateCollectionItem(context, collectionItem) {
             const newCollectionItem = structuredClone(collectionItem)
@@ -1063,6 +1441,15 @@ export const store = createStore<State>({
                 recursivelyUpdateIdsAndParentIds(newCollectionItem)
             }
 
+            result.results.forEach(collectionItemResult => {
+                if(collectionItemResult.newCollectionId) {
+                    dropObjectsReplacedByCreate(context, collectionItem.workspaceId, collectionItemResult.newCollectionId)
+                    noteItemCreated(collectionItem.workspaceId, collectionItemResult.newCollectionId)
+                }
+                if(collectionItemResult.newCollectionId && collectionItemResult.version !== undefined) {
+                    setItemVersion(getItemEntry(collectionItem.workspaceId, collectionItemResult.newCollectionId), collectionItemResult.version)
+                }
+            })
             context.state.collection = context.state.collection.concat(collectionItemsToSave)
 
             if(collectionItem.parentId) {
@@ -1078,7 +1465,7 @@ export const store = createStore<State>({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
+                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
                 })
             } else {
                 const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
@@ -1086,7 +1473,7 @@ export const store = createStore<State>({
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
+                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
                 })
             }
 
@@ -1207,6 +1594,12 @@ export const store = createStore<State>({
                 newCollectionItem._id = result.newCollectionId
             }
 
+            dropObjectsReplacedByCreate(context, newCollectionItem.workspaceId, newCollectionItem._id)
+            noteItemCreated(newCollectionItem.workspaceId, newCollectionItem._id)
+            if(result.version !== undefined) {
+                setItemVersion(getItemEntry(newCollectionItem.workspaceId, newCollectionItem._id), result.version)
+            }
+
             context.state.collection.push(newCollectionItem)
 
             if(newCollectionItem.parentId) {
@@ -1221,14 +1614,14 @@ export const store = createStore<State>({
                 // new sort order for new item and its siblings
                 parentCollection.children.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
+                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
                 })
             } else {
                 context.state.collectionTree.splice(0, 0, newCollectionItem)
                 // new sort order for new item and its siblings
                 context.state.collectionTree.forEach((item, index) => {
                     item.sortOrder = index
-                    updateCollection(item.workspaceId, item._id, { sortOrder: index }).then(reportUpdateError)
+                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
                 })
             }
 
@@ -1256,6 +1649,8 @@ export const store = createStore<State>({
             if(isDropIntoOwnSubtree(context.state.collectionTree, payload.from.id, payload.to.parentId)) {
                 return
             }
+
+            const workspaceId = context.state.activeWorkspace?._id
 
             let targetKey = 'parentId'
             if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') { // dropping an item into a folder, bottom = pink highlight
@@ -1285,6 +1680,8 @@ export const store = createStore<State>({
 
             const sourceIndex = sourceParentCollection.findIndex(item => item._id === payload.from.id)
             const sourceItem = sourceParentCollection[sourceIndex]
+            // the folder each open object of the item is in before the move, taken before any of them changes
+            const movedObjects = itemObjectsForId(context.state, sourceItem.workspaceId, sourceItem._id).map(object => ({ object, parentId: object.parentId }))
             sourceParentCollection.splice(sourceIndex, 1)
             sourceItem.parentId = payload.to[targetKey] ?? null
 
@@ -1295,14 +1692,34 @@ export const store = createStore<State>({
             })
             targetParentCollection.splice(targetIndex, 0, sourceItem)
 
-            const collectionItemIndex = context.state.collection.findIndex(item => item._id === sourceItem._id)
-            if (collectionItemIndex !== -1) {
-                context.state.collection[collectionItemIndex].parentId = sourceItem.parentId
+            // every open copy too, such as the item's tab, which saves whole when the sort order merges reach it and
+            // would otherwise write its old folder back in a browser workspace
+            for(const { object } of movedObjects) {
+                object.parentId = sourceItem.parentId
+            }
+            // A move the storage refused leaves the item where it is, so its open copies go on inheriting from there, and
+            // the sidebar shows it there again, as a browser workspace moved the sidebar's own object. A refusal for a
+            // change outside Restfox, such as of a folder another window deleted, reloads the workspace shown
+            const putBack = (changedOutside = false) => {
+                movedObjects.forEach(({ object, parentId }) => object.parentId = parentId)
+                if(context.state.activeWorkspace?._id === workspaceId) {
+                    context.commit('setCollection', context.state.collection)
+                    if(changedOutside) {
+                        context.dispatch('refreshWorkspace')
+                    }
+                }
             }
 
-            const result = await updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })
+            let result: UpdateCollectionResult
+            try {
+                result = await holdUnloadWhile(itemWritesSettled(sourceItem.workspaceId, sourceItem._id).then(() => updateCollection(sourceItem.workspaceId, sourceItem._id, { parentId: sourceItem.parentId })))
+            } catch(error) {
+                putBack()
+                throw error
+            }
 
             if(result.error) {
+                putBack(result.changedOutside)
                 emitter.emit('error', result.error)
                 return
             }
@@ -1311,11 +1728,16 @@ export const store = createStore<State>({
 
             targetParentCollection.forEach((item, index) => {
                 item.sortOrder = index
-                sortOrderUpdates.push(updateCollection(item.workspaceId, item._id, { sortOrder: index }))
+                sortOrderUpdates.push(mergeIntoItemFile(context, item, { sortOrder: index }))
             })
 
             const sortOrderResults = await Promise.all(sortOrderUpdates)
             sortOrderResults.forEach(reportUpdateError)
+
+            // the reload reads the workspace shown, which the user may have left while the files were written
+            if(context.state.activeWorkspace?._id !== workspaceId) {
+                return
+            }
 
             if(context.state.activeWorkspace?._type === 'file') {
                 context.dispatch('refreshWorkspace')
@@ -1948,10 +2370,15 @@ export const store = createStore<State>({
                 collectionTree = context.state.collectionTree.concat(collectionTree)
             }
 
+            // the order each item had, so only items the import moved merge a new one
+            const sortOrderBefore = new Map(context.state.collection.map(item => [item._id, item.sortOrder]))
             addSortOrderToTree(collectionTree)
 
-            const flattenedCollectionTree = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
-            const result = await createCollections(context.state.activeWorkspace._id, flattenedCollectionTree)
+            const flattenedCollectionTree: CollectionItem[] = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
+            // an item already in the workspace only takes its new sort order, merged into its file after its own writes,
+            // so an open tab's save, which the renumbering itself can start, keeps its turn and its version
+            const existingIds = new Set(context.state.collection.map(item => item._id))
+            const result = await createCollections(context.state.activeWorkspace._id, flattenedCollectionTree.filter(item => !existingIds.has(item._id)))
 
             reportEnvironmentsErrors(result)
 
@@ -1988,9 +2415,18 @@ export const store = createStore<State>({
                 }
             }
 
-            const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+            const sortOrderResults = await Promise.all(flattenedCollectionTree.filter(item => existingIds.has(item._id) && sortOrderBefore.get(item._id) !== item.sortOrder).map(item => mergeIntoItemFile(context, item, { sortOrder: item.sortOrder })))
+            sortOrderResults.forEach(reportUpdateError)
 
-            context.commit('setCollection', collection)
+            // in a file workspace a reload, rather than a new collection alone, so an open tab and its item are one object
+            // again. A workspace in the browser keeps its tabs on their objects, which a connected socket adds what it
+            // receives to
+            if(context.state.activeWorkspace._type === 'file') {
+                await context.dispatch('refreshWorkspace')
+            } else {
+                const { collection } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
+                context.commit('setCollection', collection)
+            }
 
             return result
         },
@@ -2014,36 +2450,7 @@ export const store = createStore<State>({
             }))
         },
         async refreshWorkspaceCollection(context) {
-            console.log('refreshWorkspaceCollection')
-
-            if(context.state.activeWorkspace === null) {
-                throw new Error('activeWorkspace is null')
-            }
-
-            const { collection, workspace, idMap } = await getCollectionForWorkspace(context.state.activeWorkspace._id)
-            // a running gRPC call follows its item to a new id, as after a rename or a move in a file workspace, and
-            // stops when its item is gone, as nothing could stop or show it then
-            const collectionIds = new Set(collection.map((item: CollectionItem) => item._id))
-            if(idMap) {
-                // the map also holds items whose files went away outside Restfox, which the collection no longer has
-                moveGrpcCallsToNewItemIds(context.state.activeWorkspace._id, context.state.collection.map(item => item._id), new Map([...idMap].filter(([, newId]) => collectionIds.has(newId))))
-            } else {
-                forgetGrpcCallsForItems(context.state.activeWorkspace._id, context.state.collection.map(item => item._id).filter(id => !collectionIds.has(id)))
-            }
-            context.commit('setCollection', collection)
-            context.state.idMap = idMap
-
-            // is not null if file workspace
-            if(workspace) {
-                context.state.activeWorkspace.name = workspace.name
-                if(workspace.environment) {
-                    context.state.activeWorkspace.environment = workspace.environment
-                    context.state.activeWorkspace.environments = workspace.environments
-                    context.state.activeWorkspace.currentEnvironment = workspace.currentEnvironment
-                    context.state.activeWorkspace.dotEnv = workspace.dotEnv
-                    emitter.emit('dotenv', 'reloaded')
-                }
-            }
+            return inReloadTurn(() => reloadWorkspaceCollection(context))
         },
         async refreshWorkspaceTabs(context) {
             console.log('refreshWorkspaceTabs')
@@ -2061,23 +2468,35 @@ export const store = createStore<State>({
             context.commit('persistActiveWorkspaceTabs')
         },
         async refreshWorkspace(context) {
-            await context.dispatch('refreshWorkspaceCollection')
-            await context.dispatch('refreshWorkspaceTabs')
-            context.commit('loadWorkspacePlugins')
+            // the tabs in the same turn as the collection, as a reload after this one takes the open tabs as its own
+            return inReloadTurn(async() => {
+                // the collection reload gives up when the user opened another workspace while it read, and so do the tabs
+                if(await reloadWorkspaceCollection(context) === false) {
+                    return
+                }
+                await context.dispatch('refreshWorkspaceTabs')
+                context.commit('loadWorkspacePlugins')
+            })
         },
         async updateCollectionItemName(context, collectionItem) {
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
 
-            const result = await updateCollection(context.state.activeWorkspace._id, collectionItem._id, { name: collectionItem.name })
+            const workspace = context.state.activeWorkspace
+            const result = await holdUnloadWhile(itemWritesSettled(workspace._id, collectionItem._id).then(() => updateCollection(workspace._id, collectionItem._id, { name: collectionItem.name })))
 
             if(result.error) {
                 emitter.emit('error', result.error)
+                // the item changed outside Restfox, such as deleted from another window, which the reload shows
+                if(result.changedOutside && context.state.activeWorkspace?._id === workspace._id) {
+                    context.dispatch('refreshWorkspace')
+                }
                 return result
             }
 
-            if(context.state.activeWorkspace._type === 'file') {
+            // only while it is still the workspace shown, as the reload reads the one shown
+            if(workspace._type === 'file' && context.state.activeWorkspace?._id === workspace._id) {
                 context.dispatch('refreshWorkspace')
             }
 
@@ -2087,7 +2506,10 @@ export const store = createStore<State>({
 
             return result
         },
-        async updateCollectionItem(context, { collectionId, name, parentId, headers, authentication }) {
+        // headers and authentication are compared only when given, as Properties, which edits the name and the folder
+        // alone, would otherwise put back the ones it opened with over a change a reload brought in meanwhile
+        async updateCollectionItem(context, payload) {
+            const { collectionId, name, parentId, headers, authentication } = payload
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
@@ -2108,11 +2530,11 @@ export const store = createStore<State>({
                 propertiesToUpdate.parentId = parentId
             }
 
-            if(JSON.stringify(collectionItem.headers) !== JSON.stringify(headers)) {
+            if('headers' in payload && JSON.stringify(collectionItem.headers) !== JSON.stringify(headers)) {
                 propertiesToUpdate.headers = headers
             }
 
-            if(JSON.stringify(collectionItem.authentication) !== JSON.stringify(authentication)) {
+            if('authentication' in payload && JSON.stringify(collectionItem.authentication) !== JSON.stringify(authentication)) {
                 propertiesToUpdate.authentication = authentication
             }
 
@@ -2128,25 +2550,39 @@ export const store = createStore<State>({
             if(context.state.activeWorkspace._type === 'file') {
                 // we split the operations, as the file workspace does not support updating name, parentId, headers & authentication together
 
-                if('name' in propertiesToUpdate) {
-                    const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
-                        name
-                    })
+                const workspaceId = context.state.activeWorkspace._id
+                // the wait for the item's writes and the rename and move sent after it hold leaving the page, see
+                // holdUnloadWhile. The first refused, as the item or folder changed outside Restfox, such as deleted from
+                // another window, is told and the reload shows it
+                if('name' in propertiesToUpdate || 'parentId' in propertiesToUpdate) {
+                    const refusedResult = await holdUnloadWhile((async(): Promise<UpdateCollectionResult | null> => {
+                        await itemWritesSettled(workspaceId, collectionId)
+                        if('name' in propertiesToUpdate) {
+                            const result = await updateCollection(workspaceId, collectionId, { name })
+                            if(result.error) {
+                                return result
+                            }
+                        }
+                        if('parentId' in propertiesToUpdate) {
+                            const result = await updateCollection(workspaceId, collectionId, { parentId })
+                            if(result.error) {
+                                return result
+                            }
+                        }
+                        return null
+                    })())
 
-                    if(result.error) {
-                        emitter.emit('error', result.error)
-                        return result
+                    if(refusedResult) {
+                        emitter.emit('error', refusedResult.error)
+                        if(refusedResult.changedOutside && context.state.activeWorkspace?._id === workspaceId) {
+                            context.dispatch('refreshWorkspace')
+                        }
+                        return refusedResult
                     }
                 }
 
-                if('parentId' in propertiesToUpdate) {
-                    await updateCollection(context.state.activeWorkspace._id, collectionId, {
-                        parentId
-                    })
-                }
-
                 if('headers' in propertiesToUpdate) {
-                    const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    const result = await mergeIntoItemFile(context, collectionItem, {
                         headers
                     })
 
@@ -2157,7 +2593,7 @@ export const store = createStore<State>({
                 }
 
                 if('authentication' in propertiesToUpdate) {
-                    const result = await updateCollection(context.state.activeWorkspace._id, collectionId, {
+                    const result = await mergeIntoItemFile(context, collectionItem, {
                         authentication
                     })
 

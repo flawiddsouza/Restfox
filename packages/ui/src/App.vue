@@ -13,6 +13,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 
 <script>
 import { getCollectionForWorkspace, fileIPC } from './db'
+import { allItemWritesSettled, itemWritesPending, loadItemVersions, workspaceWritesSettled } from '@/utils/item-file-versions'
 import constants from './constants'
 import {
     checkHotkeyAgainstKeyEvent,
@@ -30,6 +31,16 @@ import { getAnalyticsPageUrl, sendPageView } from '@/utils/analytics'
 import { forgetFailedGrpcSchemaLoads } from '@/utils/grpc-calls'
 import { emitter } from './event-bus'
 import './web-components/alert-confirm-prompt'
+
+// raised by each load of the workspace shown, so a load the user overtook, such as by opening another workspace while
+// it waited, neither moves the watcher nor shows its workspace's items
+let workspaceLoadCount = 0
+
+// how long Electron holds a close or reload for the saves asked for before it, after which the window goes anyway, so a
+// save that never ends cannot keep it open
+const UNLOAD_HOLD_LIMIT_MS = 10000
+// the close or reload Electron is asked to repeat goes without being held again, see holdUnloadForPendingSaves
+let unloadAfterHold = false
 
 export default {
     data() {
@@ -118,13 +129,24 @@ export default {
             })
         },
         async fetchSetCollectionForWorkspace() {
+            const load = ++workspaceLoadCount
             if(!this.activeWorkspace) {
                 this.activeWorkspaceLoaded = false
                 this.$store.commit('setCollection', [])
                 return
             }
 
-            const { error, collection: collections, workspace } = await getCollectionForWorkspace(this.activeWorkspace._id)
+            const workspaceId = this.activeWorkspace._id
+            // a save still waiting, such as one queued behind a slow one, is read by this load rather than written over
+            // what it shows
+            await workspaceWritesSettled(workspaceId)
+            if(load !== workspaceLoadCount) {
+                return
+            }
+            const { error, collection: collections, workspace, versions } = await getCollectionForWorkspace(workspaceId, null, true)
+            if(load !== workspaceLoadCount) {
+                return
+            }
 
             if(error) {
                 this.$store.commit('setActiveWorkspace', null)
@@ -160,10 +182,34 @@ export default {
             this.activeWorkspaceLoaded = true
 
             if(collections.length >= 0) {
+                // the items saved from now on are these objects, read at these versions
+                loadItemVersions(workspaceId, versions)
                 this.$store.commit('setCollection', collections)
             }
 
             this.$store.dispatch('loadWorkspaceTabs')
+        },
+        // An edit typed while its item's previous save runs waits for it in the page, so leaving now would lose it.
+        // The browser asks the user, and Electron, which shows no such prompt, closes or reloads once the saves end
+        holdUnloadForPendingSaves(event) {
+            if(unloadAfterHold) {
+                unloadAfterHold = false
+                return
+            }
+            if(!itemWritesPending()) {
+                return
+            }
+            event.preventDefault()
+            event.returnValue = ''
+            if(this.$store.state.flags.isElectron) {
+                const limit = new Promise(resolve => setTimeout(() => resolve('limit'), UNLOAD_HOLD_LIMIT_MS))
+                Promise.race([allItemWritesSettled(), limit]).then(() => {
+                    // saves asked for since the user chose to leave, such as for a socket's next message, or one still
+                    // running at the limit, go with the window rather than hold it again
+                    unloadAfterHold = true
+                    window.electronIPC.retryUnload()
+                })
+            }
         },
         handleGlobalKeydown(event) {
             if(this.openContextMenuElement) {
@@ -380,6 +426,8 @@ export default {
 
         window.addEventListener('keydown', this.handleGlobalKeydown)
 
+        window.addEventListener('beforeunload', this.holdUnloadForPendingSaves)
+
         const savedTheme = localStorage.getItem(constants.LOCAL_STORAGE_KEY.THEME)
         const savedGithubStarCount = localStorage.getItem(constants.LOCAL_STORAGE_KEY.GITHUB_STAR_COUNT)
         let savedDisablePageViewAnalyticsTracking = localStorage.getItem(constants.LOCAL_STORAGE_KEY.DISABLE_PAGE_VIEW_ANALYTICS_TRACKING)
@@ -522,6 +570,7 @@ export default {
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.handleGlobalKeydown)
+        window.removeEventListener('beforeunload', this.holdUnloadForPendingSaves)
         emitter.off('error', this.handleError)
     }
 }

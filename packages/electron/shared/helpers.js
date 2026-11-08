@@ -1,7 +1,30 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { platform } from 'os'
+import { createHash } from 'crypto'
 import { pathExists } from './file-utils.js'
+
+export function hashText(text) {
+    return createHash('sha256').update(text).digest('hex')
+}
+
+// The version of a request, socket or gRPC item's file: a save is refused when the file no longer holds what the screen
+// came from. Its sort order is left out, as only merges and creates write it, so a sidebar change made in another
+// window does not refuse that window's next save of the item. A text that is not JSON is taken whole
+export function itemFileVersion(text) {
+    let data
+    try {
+        data = JSON.parse(text)
+    } catch {
+        return hashText(text)
+    }
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+        return hashText(text)
+    }
+    const rest = { ...data }
+    delete rest.sortOrder
+    return hashText(JSON.stringify(rest))
+}
 
 const LOG_ONLY_METHOD_NAME = true
 const LOG_ONLY_METHOD_NAME_EXCEPT = []

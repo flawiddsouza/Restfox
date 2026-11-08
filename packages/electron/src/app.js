@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, screen, autoUpdater } = require('electron')
 const { resolve } = require('path')
 const fs = require('fs')
 const net = require('net')
@@ -8,7 +8,6 @@ const open = import('open')
 const requests = require('./request')
 const db = require('./db')
 const helpers = require('./helpers')
-const TaskQueue = require('./task-queue')
 const updateElectronApp = require('update-electron-app')
 const windowStateKeeper = require('./utils/window-state')
 const { trustSystemCACertificates, getCACertificatesWithCustom } = require('./ca-certificates')
@@ -95,8 +94,55 @@ function createWindow() {
         win.show()
     })
 
+    // A close or reload the page held, as an edit waited behind a save (App.vue holdUnloadForPendingSaves), goes ahead
+    // when the page asks again. Which one it was is known only here: a close is announced before the page's unload
+    let closeAsked = false
+    win.on('close', () => {
+        closeAsked = true
+    })
+    win.webContents.on('will-prevent-unload', () => {
+        heldUnloads.set(win.webContents, updateAsked ? 'update' : quitAsked ? 'quit' : closeAsked ? 'close' : 'reload')
+        closeAsked = false
+        quitAsked = false
+        updateAsked = false
+    })
+
     globalThis.electronApplicationWindow = win
 }
+
+const heldUnloads = new WeakMap()
+
+// a quit, such as Cmd+Q on macOS, where closing the last window leaves the app running, closes the windows first
+let quitAsked = false
+app.on('before-quit', () => {
+    quitAsked = true
+})
+
+// a restart to install an update, whose before-quit comes only after the windows closed
+let updateAsked = false
+if (process.platform === 'darwin' || process.platform === 'win32') {
+    autoUpdater.on('before-quit-for-update', () => {
+        updateAsked = true
+    })
+}
+
+ipcMain.on('retryUnload', event => {
+    const heldUnload = heldUnloads.get(event.sender)
+    heldUnloads.delete(event.sender)
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win || !heldUnload) {
+        return
+    }
+    if (heldUnload === 'update') {
+        autoUpdater.quitAndInstall()
+    } else if (heldUnload === 'quit') {
+        app.quit()
+    } else if (heldUnload === 'close') {
+        win.close()
+    } else {
+        event.sender.reload()
+    }
+})
 
 app.whenReady().then(async() => {
     const isSingleInstance = app.requestSingleInstanceLock()
@@ -282,7 +328,8 @@ app.whenReady().then(async() => {
 
     ipcMain.handle('grpcCancelCall', (_, callId) => grpcCalls.get(callId)?.cancel())
 
-    const operationQueue = new TaskQueue()
+    // the watcher's checks of outside changes run on the same queue
+    const { operationQueue } = db
 
     ipcMain.handle('getWorkspaceAtLocation', (_, ...args) => {
         return operationQueue.enqueue(() => db.getWorkspaceAtLocation(...args))

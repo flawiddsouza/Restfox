@@ -635,8 +635,6 @@ export default {
                 collectionId: collectionItem._id,
                 name: collectionItem.name,
                 parentId: collectionItem.parentId,
-                headers: toRaw(collectionItem.headers),
-                authentication: toRaw(collectionItem.authentication),
             })
 
             if(result.error) {

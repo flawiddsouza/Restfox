@@ -17,11 +17,53 @@ async function readFileJson(filePath, emptyValue) {
     }
 }
 
+// the text of a file about to be written, null when it does not exist, with the same refusal as readFileJson for a
+// file that cannot be read or parsed
+async function readFileTextBeforeWrite(filePath) {
+    let text
+    try {
+        text = await fs.readFile(filePath, 'utf8')
+    } catch (err) {
+        if (err.code !== 'ENOENT') {
+            throw new Error(`Not saved, as ${filePath} cannot be read: ${err.message}`, { cause: err })
+        }
+        return { text: null, data: null }
+    }
+    try {
+        return { text, data: JSON.parse(text) }
+    } catch (err) {
+        throw new Error(`Not saved, as ${filePath} cannot be read: ${err.message}`, { cause: err })
+    }
+}
+
 export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher = () => null) {
     // item ids to paths, one map per workspace location, so a workspace other than the open one, such as one whose call
     // ends after the user switched away, reads and writes its own files when another workspace has an item at the same path
     const workspaceIdMaps = new Map()
-    const fsLog = []
+    // per workspace location, the ids a scan kept for the scan after it only, see readCollectionForWorkspace
+    const workspaceIdAliases = new Map()
+    // the workspace locations scanned since this process started
+    const scannedLocations = new Set()
+    // per workspace location, the map and kept ids a scan cleared, put back when its read fails, so the ids the page
+    // holds keep reaching their files
+    const clearedIdMaps = new Map()
+
+    // An id a page sent before this process scanned the workspace, as after web-standalone restarts with a tab open: the
+    // page's ids are paths relative to the workspace as its last scan found them, so the path is the id, when a file is
+    // still there. A save to it is still checked against the version the page holds
+    async function resolveIdBeforeFirstScan(workspace, collectionId) {
+        if (scannedLocations.has(workspace.location) || typeof collectionId !== 'string') {
+            return undefined
+        }
+        // an id is the path after the workspace's, such as /Folder/Login.json
+        const candidate = path.join(workspace.location, collectionId)
+        const relative = path.relative(workspace.location, candidate)
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !await fileUtils.pathExists(candidate)) {
+            return undefined
+        }
+        getIdMap(workspace.location).set(collectionId, candidate)
+        return candidate
+    }
 
     function getIdMap(workspaceLocation) {
         if (!workspaceIdMaps.has(workspaceLocation)) {
@@ -44,7 +86,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 const { environments, environment, currentEnvironment, currentEnvironmentUnreadable } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
 
                 if(currentEnvironment !== workspaceData.currentEnvironment && !currentEnvironmentUnreadable) {
-                    await fileUtils.writeFileJson(path.join(location, constants.FILES.WORKSPACE_CONFIG), { ...workspaceData, currentEnvironment }, fsLog, `Update workspace current environment`)
+                    await fileUtils.writeFileJson(path.join(location, constants.FILES.WORKSPACE_CONFIG), { ...workspaceData, currentEnvironment }, `Update workspace current environment`)
                 }
 
                 workspaceData.environments = environments
@@ -95,7 +137,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         if (updatedFields.environments) {
             const envsDirPath = path.join(workspacePath, constants.FOLDERS.ENVIRONMENTS)
-            ;({ error: environmentsError } = await dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments))
+            ;({ error: environmentsError } = await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments))
         }
 
         if (updatedFields.currentEnvironment) {
@@ -114,7 +156,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             ...update,
         }
 
-        await fileUtils.writeFileJson(path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG), workspaceUpdated, fsLog, `Update workspace`)
+        await fileUtils.writeFileJson(path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG), workspaceUpdated, `Update workspace`)
         console.log(`Updated workspace: ${path.join(workspacePath, constants.FILES.WORKSPACE_CONFIG)}`)
 
         return {
@@ -171,7 +213,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         const collectionPath = idMap.get(collectionId)
         const collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
 
-        return dbHelpers.getCollectionItem(fsLog, workspace, collectionPath, collectionPathWithoutWorkspaceLocation)
+        return dbHelpers.getCollectionItem(workspace, collectionPath, collectionPathWithoutWorkspaceLocation)
     }
 
     async function createCollection(workspace, collection) {
@@ -187,6 +229,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         const oldCollectionId = collection._id
         const collectionName = fileUtils.encodeFilename(collection.name)
         let environmentsError = null
+        let version
 
         try {
             let collectionPath = ''
@@ -198,7 +241,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 } else {
                     collectionPath = path.join(workspace.location, collectionName)
                 }
-                await fileUtils.mkdir(collectionPath, fsLog, 'Create collection item folder')
+                await fileUtils.mkdir(collectionPath, 'Create collection item folder')
 
                 collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
                 idMap.set(collectionPathWithoutWorkspaceLocation, collectionPath)
@@ -211,7 +254,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                     const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
                     // an environment the save refuses, such as one whose name differs from another only in case, is
                     // told with the result, not as its error, which would stop an import or a duplicate there
-                    const { error } = await dbHelpers.saveEnvironments(fsLog, envsDirPath, collection.environments)
+                    const { error } = await dbHelpers.saveEnvironments(envsDirPath, collection.environments)
                     environmentsError = error ? `${collection.name}: ${error}` : null
                     collectionToSave.currentEnvironment = collection.currentEnvironment ?? 'Default'
                 }
@@ -221,7 +264,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 }
 
                 if (Object.keys(collectionToSave).length > 0) {
-                    await fileUtils.writeFileJsonNewOnly(path.join(collectionPath, constants.FILES.FOLDER_CONFIG), collectionToSave, fsLog, `Create collection item folder config`)
+                    await fileUtils.writeFileJsonNewOnly(path.join(collectionPath, constants.FILES.FOLDER_CONFIG), collectionToSave, `Create collection item folder config`)
                     console.log(`Created file: ${path.join(collectionPath, constants.FILES.FOLDER_CONFIG)}`)
                 }
             }
@@ -241,18 +284,24 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 delete collection.name
                 delete collection.plugins
 
+                let messages = null
                 if (collection._type === 'socket') {
                     if (collection.clients) {
-                        let messages = {}
+                        messages = {}
                         for(const client of collection.clients) {
                             messages[client.id] = client.messages
                             delete client.messages
                         }
-                        await fileUtils.writeFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), messages, fsLog, 'Save socket client messages')
                     }
                 }
 
-                await fileUtils.writeFileJsonNewOnly(collectionPath, collection, fsLog, `Create collection item of type ${collection._type}`)
+                version = helpers.itemFileVersion(await fileUtils.writeFileJsonNewOnly(collectionPath, collection, `Create collection item of type ${collection._type}`))
+
+                // only once the item's own file is made, as a name another item has, such as a duplicate's, fails there
+                // and must leave that item's messages alone
+                if (messages) {
+                    await fileUtils.writeFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), messages, 'Save socket client messages')
+                }
 
                 collectionPathWithoutWorkspaceLocation = helpers.removePrefixFromString(collectionPath, workspace.location)
                 idMap.set(collectionPathWithoutWorkspaceLocation, collectionPath)
@@ -265,6 +314,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 oldCollectionId,
                 newCollectionId: collectionPathWithoutWorkspaceLocation,
                 environmentsError,
+                // the item file's version, absent for a folder
+                version,
             }
         } catch (err) {
             if (err.code === 'EEXIST') {
@@ -294,7 +345,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         for (const collection of collections) {
             let result = null
 
-            if (idMap.get(collection._id)) {
+            if (idMap.get(collection._id) && workspaceIdAliases.get(workspace.location)?.get(collection._id) !== idMap.get(collection._id)) {
                 // we only allow updating sortOrder for existing collections - no other fields
                 // as that is the only use case of this if block
                 result = await updateCollection(workspace, collection._id, {
@@ -367,16 +418,29 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         }
     }
 
-    async function updateCollection(workspace, collectionId, updatedFields) {
+    // version is what a save of a whole request, socket or gRPC item was made from: its file's version when the screen
+    // read or last saved it, or null when the screen has none. The save is refused when the file holds anything else, as
+    // it was changed outside Restfox since. Left out, as by a page from before versions, nothing is checked
+    async function updateCollection(workspace, collectionId, updatedFields, version) {
         logMethodCall('updateCollection', {
             workspace,
             collectionId,
             updatedFields,
+            version,
         })
 
         const idMap = getIdMap(workspace.location)
 
-        const collectionPath = idMap.get(collectionId)
+        const collectionPath = idMap.get(collectionId) ?? await resolveIdBeforeFirstScan(workspace, collectionId)
+
+        // an id the server no longer maps, such as one another window renamed two scans ago: the page holds an item
+        // whose file it cannot find, so it reloads rather than failing on every edit
+        if (collectionPath === undefined && (version !== undefined || Object.keys(updatedFields).length === 1)) {
+            return {
+                error: `Not saved, as ${collectionId} was changed outside Restfox`,
+                changedOutside: true,
+            }
+        }
 
         if (Object.keys(updatedFields).length === 1 && 'name' in updatedFields) {
             updatedFields.name = fileUtils.encodeFilename(updatedFields.name)
@@ -401,8 +465,9 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 }
             }
 
-            await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Rename collection item`, getWorkspaceWatcher())
+            await fileUtils.renameFileOrFolder(renameFrom, renameTo, `Rename collection item`, getWorkspaceWatcher())
             idMap.set(collectionId, renameTo)
+            workspaceIdAliases.get(workspace.location)?.delete(collectionId)
 
             if (renameFrom.endsWith('.json')) {
                 const responsesRenameFrom = renameFrom.replace('.json', constants.FILES.RESPONSES)
@@ -410,7 +475,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
                 try {
                     await fs.access(responsesRenameFrom)
-                    await fileUtils.renameFileOrFolder(responsesRenameFrom, responsesRenameTo, fsLog, `Rename responses file`)
+                    await fileUtils.renameFileOrFolder(responsesRenameFrom, responsesRenameTo, `Rename responses file`)
                 } catch (err) {
                     console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
                 }
@@ -420,7 +485,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
                 try {
                     await fs.access(pluginsRenameFrom)
-                    await fileUtils.renameFileOrFolder(pluginsRenameFrom, pluginsRenameTo, fsLog, `Rename plugins file`)
+                    await fileUtils.renameFileOrFolder(pluginsRenameFrom, pluginsRenameTo, `Rename plugins file`)
                 } catch (err) {
                     console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
                 }
@@ -430,7 +495,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
                 try {
                     await fs.access(messagesRenameFrom)
-                    await fileUtils.renameFileOrFolder(messagesRenameFrom, messagesRenameTo, fsLog, `Rename messages file`)
+                    await fileUtils.renameFileOrFolder(messagesRenameFrom, messagesRenameTo, `Rename messages file`)
                 } catch (err) {
                     console.log(`Skipping renaming messages file: ${messagesRenameFrom} as it does not exist`)
                 }
@@ -449,7 +514,17 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         if (Object.keys(updatedFields).length === 1 && 'parentId' in updatedFields) {
             const renameFrom = collectionPath
-            const renameTo = path.join(updatedFields.parentId != null ? idMap.get(updatedFields.parentId) : workspace.location, path.basename(collectionPath))
+            const parentPath = updatedFields.parentId != null
+                ? idMap.get(updatedFields.parentId) ?? await resolveIdBeforeFirstScan(workspace, updatedFields.parentId)
+                : workspace.location
+            // a folder the server does not know, such as one deleted outside Restfox: the page reloads
+            if (parentPath === undefined) {
+                return {
+                    error: `Not moved, as ${updatedFields.parentId} was changed outside Restfox`,
+                    changedOutside: true,
+                }
+            }
+            const renameTo = path.join(parentPath, path.basename(collectionPath))
 
             if (renameFrom === renameTo) {
                 // no change in parent
@@ -464,8 +539,9 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                         error: `An item of the same name already exists in the destination folder. Please rename the item and try again.`
                     }
                 }
-                await fileUtils.renameFileOrFolder(renameFrom, renameTo, fsLog, `Move collection item`)
+                await fileUtils.renameFileOrFolder(renameFrom, renameTo, `Move collection item`)
                 idMap.set(collectionId, renameTo)
+                workspaceIdAliases.get(workspace.location)?.delete(collectionId)
             }  catch (err) {
                 console.error(`Error renaming ${renameFrom} to ${renameTo}`, err)
                 return {
@@ -480,7 +556,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
                 try {
                     await fs.access(responsesRenameFrom)
-                    await fileUtils.renameFileOrFolder(responsesRenameFrom, responsesRenameTo, fsLog, `Rename responses file`)
+                    await fileUtils.renameFileOrFolder(responsesRenameFrom, responsesRenameTo, `Rename responses file`)
                 } catch (err) {
                     console.log(`Skipping renaming responses file: ${responsesRenameFrom} as it does not exist`)
                 }
@@ -490,9 +566,20 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
                 try {
                     await fs.access(pluginsRenameFrom)
-                    await fileUtils.renameFileOrFolder(pluginsRenameFrom, pluginsRenameTo, fsLog, `Rename plugins file`)
+                    await fileUtils.renameFileOrFolder(pluginsRenameFrom, pluginsRenameTo, `Rename plugins file`)
                 } catch (err) {
                     console.log(`Skipping renaming plugins file: ${pluginsRenameFrom} as it does not exist`)
+                }
+
+                // a socket's messages go with it, as on a rename
+                const messagesRenameFrom = renameFrom.replace('.json', constants.FILES.MESSAGES)
+                const messagesRenameTo = renameTo.replace('.json', constants.FILES.MESSAGES)
+
+                try {
+                    await fs.access(messagesRenameFrom)
+                    await fileUtils.renameFileOrFolder(messagesRenameFrom, messagesRenameTo, 'Move messages file')
+                } catch {
+                    console.log(`Skipping moving messages file: ${messagesRenameFrom} as it does not exist`)
                 }
             } else {
                 // if folder, we also need to update idMap with the new parent folder for all children inside this folder, else they'll have the old parent path in their id
@@ -509,21 +596,21 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields || 'headers' in updatedFields || 'authentication' in updatedFields)) {
             if(updatedFields.environments) {
                 const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
-                return dbHelpers.saveEnvironments(fsLog, envsDirPath, updatedFields.environments)
+                return dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments)
             }
 
             if('collapsed' in updatedFields) {
                 const collapsedFilePath = path.join(collectionPath, constants.FILES.COLLAPSED)
                 if (updatedFields.collapsed) {
                     try {
-                        await fileUtils.writeEmptyFileNewOnly(collapsedFilePath, fsLog, `Mark directory as collapsed`)
+                        await fileUtils.writeEmptyFileNewOnly(collapsedFilePath, `Mark directory as collapsed`)
                         console.log(`Marked as collapsed: ${collapsedFilePath}`)
                     } catch (err) {
                         console.error(`Error marking directory as collapsed: ${collapsedFilePath}`, err)
                     }
                 } else {
                     try {
-                        await fileUtils.deleteFileOrFolder(collapsedFilePath, fsLog, `Mark directory as expanded`)
+                        await fileUtils.deleteFileOrFolder(collapsedFilePath, `Mark directory as expanded`)
                         console.log(`Marked as expanded (collapsed file removed): ${collapsedFilePath}`)
                     } catch (err) {
                         console.error(`Error marking directory as expanded: ${collapsedFilePath}`, err)
@@ -537,32 +624,52 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             const fieldToUpdate = Object.keys(updatedFields)[0]
             let collectionPathCopy = collectionPath
 
-            const stats = await fs.stat(collectionPath)
+            let stats
+            try {
+                stats = await fs.stat(collectionPath)
+            } catch (err) {
+                // a file gone since the screen read it, which a merge would otherwise make again with one field
+                if (err.code === 'ENOENT') {
+                    return {
+                        error: `Not saved, as ${collectionPath} was changed outside Restfox`,
+                        changedOutside: true,
+                    }
+                }
+                throw err
+            }
 
             if (stats.isDirectory()) {
                 collectionPathCopy = path.join(collectionPath, constants.FILES.FOLDER_CONFIG)
             }
 
+            let collectionExistingText
             let collectionExisting
 
             try {
-                collectionExisting = await readFileJson(collectionPathCopy, {})
+                const existing = await readFileTextBeforeWrite(collectionPathCopy)
+                collectionExistingText = existing.text
+                collectionExisting = existing.data ?? {}
             } catch (err) {
                 return {
                     error: err.message,
                 }
             }
 
+            // one field merged into the file as it is now, which keeps any change made outside Restfox
             const collectionUpdated = {
                 ...collectionExisting,
                 ...updatedFields,
             }
 
-            await fileUtils.writeFileJson(collectionPathCopy, collectionUpdated, fsLog, `Update ${fieldToUpdate}`)
+            const write = fieldToUpdate === 'sortOrder' ? fileUtils.writeFileJsonInPlace : fileUtils.writeFileJson
+            const writtenText = await write(collectionPathCopy, collectionUpdated, `Update ${fieldToUpdate}`)
             console.log(`Updated ${fieldToUpdate} for ${collectionPathCopy}`)
 
+            // the screen takes the new version only where it held versionBefore, as the file then had no change it missed
             return {
                 error: null,
+                versionBefore: collectionExistingText === null ? null : helpers.itemFileVersion(collectionExistingText),
+                version: helpers.itemFileVersion(writtenText),
             }
         }
 
@@ -572,7 +679,25 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             delete updatedFields.workspaceId
             delete updatedFields.name
 
-            const collectionExisting = JSON.parse(await fs.readFile(collectionPath, 'utf8'))
+            let collectionExistingText = null
+            try {
+                collectionExistingText = await fs.readFile(collectionPath, 'utf8')
+            } catch (err) {
+                // a file gone since the screen read it is a change made outside Restfox too
+                if (err.code !== 'ENOENT' || version === undefined) {
+                    throw err
+                }
+            }
+
+            // checked before any write, so a refused save of a socket leaves its messages file alone too
+            if (version !== undefined && (collectionExistingText === null || helpers.itemFileVersion(collectionExistingText) !== version)) {
+                return {
+                    error: `Not saved, as ${collectionPath} was changed outside Restfox`,
+                    changedOutside: true,
+                }
+            }
+
+            const collectionExisting = JSON.parse(collectionExistingText)
 
             if (updatedFields._type === 'socket') {
                 if (updatedFields.clients) {
@@ -588,7 +713,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                             delete existingMessages[clientId]
                         }
                     })
-                    await fileUtils.writeFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), existingMessages, fsLog, 'Save socket client messages')
+                    await fileUtils.writeFileJson(collectionPath.replace('.json', constants.FILES.MESSAGES), existingMessages, 'Save socket client messages')
                 }
             }
 
@@ -599,9 +724,19 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 ...updatedFields,
             }
 
-            await fileUtils.writeFileJson(collectionPath, collectionUpdated, fsLog, 'Update collection item')
+            // the order is written by merges and creates alone, so a window whose copy of it is older keeps the file's
+            if ('sortOrder' in collectionExisting) {
+                collectionUpdated.sortOrder = collectionExisting.sortOrder
+            } else {
+                delete collectionUpdated.sortOrder
+            }
+
+            const writtenText = await fileUtils.writeFileJson(collectionPath, collectionUpdated, 'Update collection item')
             console.log(`Updated file: ${collectionPath}`)
-            return
+            return {
+                error: null,
+                version: helpers.itemFileVersion(writtenText),
+            }
         }
     }
 
@@ -627,7 +762,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 }
             } else {
                 if (item.name.endsWith('.json')) {
-                    await fileUtils.deleteFileOrFolder(itemPath, fsLog, `Delete collection item`)
+                    await fileUtils.deleteFileOrFolder(itemPath, `Delete collection item`)
                 }
             }
         }
@@ -655,10 +790,10 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             console.log(`Deleting collection item: ${collectionItem.collectionPath}`)
 
             if (collectionItem.collectionPath.endsWith('.json') === false) {
-                await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.FOLDER_CONFIG), fsLog, `Delete collection item folder config`)
+                await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.FOLDER_CONFIG), `Delete collection item folder config`)
 
                 try {
-                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.COLLAPSED), fsLog, `Delete collection item collapsed state marker`)
+                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FILES.COLLAPSED), `Delete collection item collapsed state marker`)
                 } catch {
                     console.log(`No collapsed state marker found for deletion for collection item: ${collectionItem.collectionPath}`)
                 }
@@ -666,21 +801,21 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 try {
                     const environmentsDir = await fs.readdir(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS))
                     for (const envFile of environmentsDir) {
-                        await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS, envFile), fsLog, `Delete collection item environment`)
+                        await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS, envFile), `Delete collection item environment`)
                     }
-                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS), fsLog, `Delete collection item environments folder`)
+                    await fileUtils.deleteFileOrFolder(path.join(collectionItem.collectionPath, constants.FOLDERS.ENVIRONMENTS), `Delete collection item environments folder`)
                 } catch {
                     console.log(`No environments found for deletion for collection item: ${collectionItem.collectionPath}`)
                 }
             } else {
                 try {
-                    await fileUtils.deleteFileOrFolder(collectionItem.collectionPath.replace('.json', constants.FILES.MESSAGES), fsLog, `Delete messages for collection item`)
+                    await fileUtils.deleteFileOrFolder(collectionItem.collectionPath.replace('.json', constants.FILES.MESSAGES), `Delete messages for collection item`)
                 } catch {
                     console.log(`No messages found for deletion for collection item: ${collectionItem.collectionPath}`)
                 }
             }
 
-            await fileUtils.deleteFileOrFolder(collectionItem.collectionPath, fsLog, `Delete collection item`)
+            await fileUtils.deleteFileOrFolder(collectionItem.collectionPath, `Delete collection item`)
             idMap.delete(collectionItem.collectionId)
         }
 
@@ -745,7 +880,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         responses.push(response)
 
-        await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Create response`)
+        await fileUtils.writeFileJson(responsesPath, responses, `Create response`)
     }
 
     async function updateResponse(workspace, collectionId, responseId, updatedFields) {
@@ -775,7 +910,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             ...updatedFields,
         }
 
-        await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Update response`)
+        await fileUtils.writeFileJson(responsesPath, responses, `Update response`)
     }
 
     async function deleteResponse(workspace, collectionId, responseId) {
@@ -802,12 +937,12 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         responses.splice(responseIndex, 1)
 
         if (responses.length === 0) {
-            await fileUtils.deleteFileOrFolder(responsesPath, fsLog, `Delete responses file`)
+            await fileUtils.deleteFileOrFolder(responsesPath, `Delete responses file`)
             console.log(`Deleted responses file: ${responsesPath}`)
             return
         }
 
-        await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Delete response`)
+        await fileUtils.writeFileJson(responsesPath, responses, `Delete response`)
         console.log(`Deleted response: ${responseId} from ${responsesPath}`)
     }
 
@@ -828,7 +963,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         responses = responses.filter((response) => !responseIds.includes(response._id))
 
-        await fileUtils.writeFileJson(responsesPath, responses, fsLog, `Delete responses`)
+        await fileUtils.writeFileJson(responsesPath, responses, `Delete responses`)
 
         console.log(`Deleted responses: ${responseIds} from ${responsesPath}`)
     }
@@ -865,7 +1000,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 continue
             }
 
-            await fileUtils.deleteFileOrFolder(responsesPath, fsLog, `Delete responses for collection item`)
+            await fileUtils.deleteFileOrFolder(responsesPath, `Delete responses for collection item`)
 
             console.log(`Deleted responses for collection: ${collectionId} from ${responsesPath}`)
         }
@@ -883,7 +1018,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const responsesPath = collectionPath.replace('.json', constants.FILES.RESPONSES)
 
-        await fileUtils.deleteFileOrFolder(responsesPath, fsLog, `Delete responses for collection item`)
+        await fileUtils.deleteFileOrFolder(responsesPath, `Delete responses for collection item`)
 
         console.log(`Deleted responses for collection: ${collectionId} from ${responsesPath}`)
     }
@@ -911,7 +1046,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         }
 
         // Collection and Folder Plugins
-        const collectionItems = await dbHelpers.getCollection(idMap, fsLog, workspace)
+        const collectionItems = await dbHelpers.getCollection(idMap, workspace)
         for (const item of collectionItems) {
             const collectionPath = idMap.get(item._id)
             if (item._type === 'request_group') {
@@ -971,7 +1106,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         delete plugin.collectionId
 
         existingPlugins.push(plugin)
-        await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Create plugin`)
+        await fileUtils.writeFileJson(pluginPath, existingPlugins, `Create plugin`)
         console.log(`Plugin created at: ${pluginPath}`)
     }
 
@@ -1006,7 +1141,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         delete updatedFields.collectionId
 
         existingPlugins[pluginIndex] = { ...existingPlugins[pluginIndex], ...updatedFields }
-        await fileUtils.writeFileJson(pluginPath, existingPlugins, fsLog, `Update plugin`)
+        await fileUtils.writeFileJson(pluginPath, existingPlugins, `Update plugin`)
         console.log(`Plugin ${pluginId} updated in ${pluginPath}`)
     }
 
@@ -1032,10 +1167,10 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         }
 
         if (collectionId === null && filteredPlugins.length === 0) {
-            await fileUtils.deleteFileOrFolder(pluginPath, fsLog, `Delete workspace plugins`)
+            await fileUtils.deleteFileOrFolder(pluginPath, `Delete workspace plugins`)
             console.log(`All workspace plugins deleted: ${workspace.location}`)
         } else {
-            await fileUtils.writeFileJson(pluginPath, filteredPlugins, fsLog, `Delete plugin`)
+            await fileUtils.writeFileJson(pluginPath, filteredPlugins, `Delete plugin`)
             console.log(`Plugin ${pluginId} deleted in ${pluginPath}`)
         }
     }
@@ -1048,7 +1183,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         const workspacePluginsPath = path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
         try {
             await fs.access(workspacePluginsPath)
-            await fileUtils.deleteFileOrFolder(workspacePluginsPath, fsLog, `Delete workspace plugins`)
+            await fileUtils.deleteFileOrFolder(workspacePluginsPath, `Delete workspace plugins`)
             console.log(`All workspace plugins deleted: ${workspace.location}`)
         } catch (err) {
             console.log(`No workspace plugins found for deletion in: ${workspace.location}`)
@@ -1074,7 +1209,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             const pluginPath = collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
 
             try {
-                await fileUtils.deleteFileOrFolder(pluginPath, fsLog, `Delete plugins for collection item`)
+                await fileUtils.deleteFileOrFolder(pluginPath, `Delete plugins for collection item`)
                 console.log(`Deleted plugins for collection: ${collectionId}`)
             } catch(err) {
                 console.log(`No plugins found for deletion for collection: ${collectionId}`)
@@ -1094,9 +1229,15 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
     }
 
     async function clearCollectionIdMap(workspace) {
+        // first, so a workspace that cannot be read now, such as on a network share gone for a moment, clears nothing
+        await dbHelpers.ensureRestfoxCollection(workspace)
         const idMap = getIdMap(workspace.location)
-        fsLog.length = 0
-        const idMapBeforeClear = new Map(idMap)
+        // ids the scan before kept only for its own time expire here, so a stale one never reaches a path another
+        // item has taken since
+        const aliases = workspaceIdAliases.get(workspace.location) ?? new Map()
+        clearedIdMaps.set(workspace.location, { idMap: new Map(idMap), aliases })
+        workspaceIdAliases.delete(workspace.location)
+        const idMapBeforeClear = new Map([...idMap].filter(([id, idPath]) => aliases.get(id) !== idPath))
         // loop through idMapBeforeClear and remove prefix from values
         // as the idMap needed for the ui and electron is not the same
         for (const [key, value] of idMapBeforeClear) {
@@ -1104,18 +1245,50 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         }
         idMap.clear()
 
-        await dbHelpers.ensureRestfoxCollection(workspace)
         return idMapBeforeClear
     }
 
     async function readCollectionForWorkspace(workspace, type, idMapBeforeClear) {
         const idMap = getIdMap(workspace.location)
-        const [ collection, workspaceData ] = await Promise.all([
-            // we do not want to modify the idMap if returning the request_group type
-            // this messes up the idMap - as ui and elecron will go out of sync
-            dbHelpers.getCollection(type === null ? idMap : new Map(), fsLog, workspace),
-            getWorkspaceAtLocation(workspace.location, true),
-        ])
+        // item id to the version of its file
+        const versions = {}
+        let collection
+        let workspaceData
+        try {
+            [ collection, workspaceData ] = await Promise.all([
+                // we do not want to modify the idMap if returning the request_group type
+                // this messes up the idMap - as ui and elecron will go out of sync
+                dbHelpers.getCollection(type === null ? idMap : new Map(), workspace, workspace.location, versions),
+                getWorkspaceAtLocation(workspace.location, true),
+            ])
+        } catch (err) {
+            const cleared = clearedIdMaps.get(workspace.location)
+            if (type === null && cleared) {
+                clearedIdMaps.delete(workspace.location)
+                idMap.clear()
+                cleared.idMap.forEach((idPath, id) => idMap.set(id, idPath))
+                workspaceIdAliases.set(workspace.location, cleared.aliases)
+            }
+            throw err
+        }
+        if (type === null) {
+            clearedIdMaps.delete(workspace.location)
+            scannedLocations.add(workspace.location)
+        }
+
+        // An id from before this scan, such as an item's before a rename, keeps reaching the path it had reached until
+        // the next scan, so a save the screen sent with it while this scan ran still finds the file. Ids this scan read
+        // win, and the screen's version check refuses a save that reaches an item it was not made from
+        if (type === null && idMapBeforeClear) {
+            const aliases = new Map()
+            for (const [previousId, relativePath] of idMapBeforeClear) {
+                if (!idMap.has(previousId)) {
+                    idMap.set(previousId, path.join(workspace.location, relativePath))
+                    aliases.set(previousId, idMap.get(previousId))
+                }
+            }
+            workspaceIdAliases.set(workspace.location, aliases)
+        }
 
         // this is the only type filter that's required by the app
         if (type === 'request_group') {
@@ -1132,6 +1305,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             collection,
             workspace: workspaceData,
             idMap: idMapBeforeClear,
+            versions,
         }
     }
 
@@ -1160,7 +1334,6 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         deletePluginsByCollectionIds,
         createPlugins,
         getIdMap,
-        fsLog,
         clearCollectionIdMap,
         readCollectionForWorkspace,
     }

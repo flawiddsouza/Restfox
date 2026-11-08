@@ -34,11 +34,11 @@ const webStandaloneIPC = {
     getWorkspaceAtLocation:             (location: string, getEnvironments = false) => callWebStandaloneAPI('getWorkspaceAtLocation', { location, getEnvironments }),
     updateWorkspace:                    (workspace: any, updatedFields: any) => callWebStandaloneAPI('updateWorkspace', { workspace, updatedFields }),
     ensureEmptyFolderOrEmptyWorkspace:  (location: string) => callWebStandaloneAPI('ensureEmptyFolderOrEmptyWorkspace', { location }),
-    getCollectionForWorkspace:          (workspace: any, type: any) => callWebStandaloneAPI('getCollectionForWorkspace', { workspace, type }),
+    getCollectionForWorkspace:          (workspace: any, type: any, watch: boolean) => callWebStandaloneAPI('getCollectionForWorkspace', { workspace, type, watch }),
     getCollectionById:                  (workspace: any, collectionId: string) => callWebStandaloneAPI('getCollectionById', { workspace, collectionId }),
     createCollection:                   (workspace: any, collection: any) => callWebStandaloneAPI('createCollection', { workspace, collection }),
     createCollections:                  (workspace: any, collections: any[]) => callWebStandaloneAPI('createCollections', { workspace, collections }),
-    updateCollection:                   (workspace: any, collectionId: string, updatedFields: any) => callWebStandaloneAPI('updateCollection', { workspace, collectionId, updatedFields }),
+    updateCollection:                   (workspace: any, collectionId: string, updatedFields: any, version?: string | null) => callWebStandaloneAPI('updateCollection', { workspace, collectionId, updatedFields, version }),
     deleteCollectionsByWorkspaceId:     (workspace: any) => callWebStandaloneAPI('deleteCollectionsByWorkspaceId', { workspace }),
     deleteCollectionsByIds:             (workspace: any, collectionIds: string[]) => callWebStandaloneAPI('deleteCollectionsByIds', { workspace, collectionIds }),
     getResponsesByCollectionId:         (workspace: any, collectionId: string) => callWebStandaloneAPI('getResponsesByCollectionId', { workspace, collectionId }),
@@ -214,11 +214,14 @@ export async function getAllCollectionIdsForGivenWorkspace(workspaceId: string) 
     return db.collections.where({ workspaceId }).primaryKeys()
 }
 
-export async function getCollectionForWorkspace(workspaceId: string, type = null): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null, idMap: Map<string, string> | null }> {
+// watch is for loading the workspace the window shows, which Electron then watches for changes made outside Restfox.
+// Leave it off for anything else, such as an export, so the watcher stays on the open workspace
+// versions holds the version of each request, socket and gRPC item's file in a file workspace, by id
+export async function getCollectionForWorkspace(workspaceId: string, type = null, watch = false): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null, idMap: Map<string, string> | null, versions?: Record<string, string> }> {
     if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
-            const result = await fileIPC.getCollectionForWorkspace(workspace, type)
+            const result = await fileIPC.getCollectionForWorkspace(workspace, type, watch)
 
             // web-standalone: idMap is serialized as array of entries over HTTP (JSON doesn't support Map)
             if (Array.isArray(result.idMap)) {
@@ -269,6 +272,17 @@ interface CreateCollectionResult {
     newCollectionId: string | null,
     // a file workspace's refusal of some of a folder's environments, which the folder is made without
     environmentsError?: string | null
+    // file workspace: the version of a created item's file
+    version?: string
+}
+
+export interface UpdateCollectionResult {
+    error: string | null
+    // file workspace: the save was refused, as the file changed outside Restfox since the version it was made from
+    changedOutside?: boolean
+    // file workspace: the item file's version after the write, and before it for a merge of one field
+    version?: string
+    versionBefore?: string | null
 }
 
 export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<CreateCollectionResult> {
@@ -408,16 +422,24 @@ function deserializeRequestResponseFiles(response: RequestFinalResponse) {
     }
 }
 
-export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>): Promise<{ error: string | null }> {
+// version is what a save of a whole request, socket or gRPC item was made from, see utils/item-file-versions; a file workspace
+// refuses the save when its file holds anything else. Saves of one field merge into the file and leave it out.
+// onSending is called as the storage call starts, after a request's body files are read
+export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>, version?: string | null, onSending?: () => void): Promise<UpdateCollectionResult> {
     if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
             await serializeRequestFiles(updatedFields)
-            return fileIPC.updateCollection(workspace, collectionId, updatedFields)
+            const sending = fileIPC.updateCollection(workspace, collectionId, updatedFields, version)
+            onSending?.()
+            // older servers answer a whole item's save with nothing
+            return (await sending) ?? { error: null }
         }
     }
 
-    await db.collections.update(collectionId, updatedFields)
+    const updating = db.collections.update(collectionId, updatedFields)
+    onSending?.()
+    await updating
 
     return {
         error: null,

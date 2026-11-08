@@ -1,19 +1,70 @@
-const { logMethodCall } = require('../shared/helpers.js')
+const { logMethodCall, hashText } = require('../shared/helpers.js')
 const chokidar = require('chokidar')
+const fs = require('fs').promises
+const path = require('path')
 const dotenv = require('dotenv')
 const dbHelpers = require('./db-helpers')
 const fileUtils = require('./file-utils')
+const TaskQueue = require('./task-queue')
 const { createDatabase } = require('../shared/db.js')
 
 /** @type{chokidar.FSWatcher} */
 let workspaceWatcher = null
+// the folder the watcher is on, null when none
+let workspaceWatcherLocation = null
+// settles once the watcher has read the folder, before which it reports no change
+let workspaceWatcherReady = Promise.resolve()
 const database = createDatabase(fileUtils, dbHelpers, dotenv, () => workspaceWatcher)
-const { getIdMap, fsLog } = database
+const { getIdMap } = database
 
-async function getCollectionForWorkspace(workspace, type) {
+// every file workspace call runs here one at a time, and so does the watcher's check of a change, which then never
+// reads a file while Restfox is still writing it
+const operationQueue = new TaskQueue()
+
+// Restfox's own write when the path still holds what Restfox last left there, so a change another program made, also
+// right after or between Restfox's writes, reloads the workspace
+async function isOwnChange(event, path) {
+    const ownWrite = fileUtils.ownWrites.get(path)
+    if (!ownWrite) {
+        return null
+    }
+    const kindForEvent = { add: 'file', change: 'file', addDir: 'dir', unlink: 'absent', unlinkDir: 'absent' }[event]
+    return ownWrite.kind === kindForEvent && await holdsOwnWrite(path, ownWrite) ? ownWrite : null
+}
+
+async function holdsOwnWrite(path, ownWrite) {
+    try {
+        if (ownWrite.kind === 'file') {
+            return ownWrite.hash === hashText(await fs.readFile(path, 'utf8'))
+        }
+        if (ownWrite.kind === 'dir') {
+            return (await fs.stat(path)).isDirectory()
+        }
+        return !await fileUtils.pathExists(path)
+    } catch {
+        // gone or unreadable since: not what Restfox left
+        return false
+    }
+}
+
+// A path another program changed while no watcher saw it, such as a branch checked out while another workspace was
+// shown, is that program's, so text Restfox wrote there before is not taken for its own once the watcher is back
+async function forgetOwnWritesChangedSince(location) {
+    for (const [ownPath, ownWrite] of fileUtils.ownWrites) {
+        const relative = path.relative(location, ownPath)
+        if (relative && !relative.startsWith('..') && !path.isAbsolute(relative) && !await holdsOwnWrite(ownPath, ownWrite)) {
+            fileUtils.ownWrites.delete(ownPath)
+        }
+    }
+}
+
+// watch is for the workspace the window shows: a read for anything else, such as an export, the Edit Tag list or a
+// duplicate's copy, leaves the watcher on the open workspace
+async function getCollectionForWorkspace(workspace, type, watch = false) {
     logMethodCall('getCollectionForWorkspace', {
         workspace,
         type,
+        watch,
     })
 
     getIdMap(workspace.location)
@@ -22,32 +73,52 @@ async function getCollectionForWorkspace(workspace, type) {
         let idMapBeforeClear = null
 
         if (type === null) {
-            if (workspaceWatcher) {
-                await workspaceWatcher.close()
-                workspaceWatcher = null
-            }
-
+            // first, as it checks the folder can be read, so a folder gone for a moment, such as on a network share,
+            // leaves the watcher where it was
             idMapBeforeClear = await database.clearCollectionIdMap(workspace)
 
-            workspaceWatcher = chokidar.watch(workspace.location, {
-                ignored: (path) => /(^|[\/\\])\../.test(path) && !/\.env$/.test(path), // ignore dotfiles except .env
-                ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
-                awaitWriteFinish: {
-                    stabilityThreshold: 80,
-                    pollInterval: 10
-                }, // was getting an add & change event even thought there was only one fs.writeFile wx call - this seems to fix it
-            }).on('all', (event, path) => {
-                console.log(event, path)
-                let controlledChange = false
-                let controlledChangeReason = null
-                const checkIfFsLogExists = fsLog.findIndex((log) => log.path === path && log.event === event)
-                if (checkIfFsLogExists !== -1) {
-                    controlledChangeReason = fsLog[checkIfFsLogExists].reason ?? null
-                    fsLog.splice(checkIfFsLogExists, 1)
-                    controlledChange = true
+            // the watcher comes from another folder or none, so changes to this one went unseen meanwhile
+            const watcherMoves = watch && workspaceWatcherLocation !== workspace.location
+            if (watch) {
+                if (workspaceWatcher) {
+                    await workspaceWatcher.close()
+                    workspaceWatcher = null
+                    workspaceWatcherLocation = null
                 }
-                globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path, controlledChange, controlledChangeReason)
-            })
+            }
+
+            if (watch) {
+                if (watcherMoves) {
+                    await forgetOwnWritesChangedSince(workspace.location)
+                }
+                const watcher = chokidar.watch(workspace.location, {
+                    ignored: (path) => /(^|[\/\\])\../.test(path) && !/\.env$/.test(path), // ignore dotfiles except .env
+                    ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
+                    awaitWriteFinish: {
+                        stabilityThreshold: 80,
+                        pollInterval: 10
+                    }, // was getting an add & change event even thought there was only one fs.writeFile wx call - this seems to fix it
+                }).on('all', (event, path) => {
+                    console.log(event, path)
+                    operationQueue.enqueue(async() => {
+                        const ownWrite = await isOwnChange(event, path)
+                        // once another program changed the path, text Restfox wrote there before, such as a branch checked
+                        // out again, is that program's too, also for a change the watcher reported just before a reload
+                        // replaced it, which the new one does not report
+                        if (ownWrite === null) {
+                            fileUtils.ownWrites.delete(path)
+                        }
+                        // the watcher that replaced this one, or the reload that started it, covers the page from here
+                        if (workspaceWatcher !== watcher) {
+                            return
+                        }
+                        globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path, ownWrite !== null, ownWrite?.reason ?? null)
+                    }).catch(error => console.error('workspaceChanged', error))
+                })
+                workspaceWatcher = watcher
+                workspaceWatcherLocation = workspace.location
+                workspaceWatcherReady = new Promise(resolve => watcher.once('ready', resolve))
+            }
         }
 
         const result = await database.readCollectionForWorkspace(workspace, type, idMapBeforeClear)
@@ -81,6 +152,8 @@ async function deleteCollectionsByIds(workspace, collectionIds) {
 }
 
 module.exports = {
+    operationQueue,
+    whenWorkspaceWatcherReady: () => workspaceWatcherReady,
     getWorkspaceAtLocation: database.getWorkspaceAtLocation,
     updateWorkspace: database.updateWorkspace,
     ensureEmptyFolderOrEmptyWorkspace: database.ensureEmptyFolderOrEmptyWorkspace,

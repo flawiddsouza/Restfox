@@ -63,4 +63,7 @@ electronIPC.onGrpcEvent = (callback) => {
     ipcRenderer.on('grpcEvent', (_, callId, grpcEvent) => callback(callId, grpcEvent))
 }
 
+// the close or reload the page held for saves still running goes ahead, see holdUnloadForPendingSaves in App.vue
+electronIPC.retryUnload = () => ipcRenderer.send('retryUnload')
+
 contextBridge.exposeInMainWorld('electronIPC', electronIPC)

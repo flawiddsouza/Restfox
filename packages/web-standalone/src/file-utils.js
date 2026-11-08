@@ -3,19 +3,23 @@ import { transformSavedFileObjectToFileObject as transformSavedFileObjectToFileO
 export { readdirIgnoreError, pathExists, encodeFilename, decodeFilename, transformFileObjectToSaveableFileObject } from '../../electron/shared/file-utils.js'
 import fs from 'fs/promises'
 
-export async function writeFileJson(filePath, data, _fsLog, _reason) {
-    await fileUtilsShared.writeFileJson(filePath, data)
+export async function writeFileJson(filePath, data, _reason) {
+    return fileUtilsShared.writeFileJson(filePath, data)
 }
 
-export async function writeFileJsonNewOnly(filePath, data, _fsLog, _reason) {
-    await fileUtilsShared.writeFileJsonNewOnly(filePath, data)
+export async function writeFileJsonInPlace(filePath, data, _reason) {
+    return fileUtilsShared.writeFileJsonInPlace(filePath, data)
 }
 
-export async function writeEmptyFileNewOnly(filePath, _fsLog, _reason) {
-    await fileUtilsShared.writeEmptyFileNewOnly(filePath)
+export async function writeFileJsonNewOnly(filePath, data, _reason) {
+    return fileUtilsShared.writeFileJsonNewOnly(filePath, data)
 }
 
-export async function deleteFileOrFolder(filePath, _fsLog, _reason) {
+export async function writeEmptyFileNewOnly(filePath, _reason) {
+    return fileUtilsShared.writeEmptyFileNewOnly(filePath)
+}
+
+export async function deleteFileOrFolder(filePath, _reason) {
     const stat = await fs.stat(filePath)
     if (stat.isDirectory()) {
         // Use recursive removal to handle non-empty directories (e.g. folder groups with child requests)
@@ -25,11 +29,11 @@ export async function deleteFileOrFolder(filePath, _fsLog, _reason) {
     }
 }
 
-export async function mkdir(dirPath, _fsLog, _reason) {
+export async function mkdir(dirPath, _reason) {
     await fileUtilsShared.mkdir(dirPath)
 }
 
-export async function renameFileOrFolder(oldPath, newPath, _fsLog, _reason) {
+export async function renameFileOrFolder(oldPath, newPath, _reason) {
     try {
         await fs.rename(oldPath, newPath)
     } catch {

@@ -1,70 +1,90 @@
 const fileUtilsShared = require('../shared/file-utils.js')
+const { hashText } = require('../shared/helpers.js')
 const { readdirIgnoreError, pathExists, encodeFilename, decodeFilename, transformFileObjectToSaveableFileObject, transformSavedFileObjectToFileObject } = fileUtilsShared
 const fs = require('fs').promises
 const fse = require('fs-extra')
 const pathLib = require('path')
 
-async function writeFileJson(path, data, fsLog, fsLogReason) {
-    const id = Date.now()
-    const event = await pathExists(path) ? 'change' : 'add'
-    fsLog.push({ id, event: event, path, reason: fsLogReason })
+// What Restfox itself last left at each path it wrote: { kind: 'file', hash }, { kind: 'dir' } or { kind: 'absent' },
+// with the reason. The workspace watcher takes a change as Restfox's own only when the path still holds exactly that,
+// so writes the watcher reports as one change, or an outside change made right after, are told apart by content
+const ownWrites = new Map()
+
+function recordOwnWrite(path, state, reason) {
+    ownWrites.set(path, { ...state, reason })
+}
+
+// after a write that failed partway, what the path holds is unknown, so a change there counts as made outside Restfox
+function forgetOwnWrite(path) {
+    ownWrites.delete(path)
+}
+
+async function writeRecorded(path, write, reason) {
     try {
-        await fileUtilsShared.writeFileJson(path, data)
+        const text = await write()
+        recordOwnWrite(path, { kind: 'file', hash: hashText(text) }, reason)
+        return text
     } catch (e) {
-        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        forgetOwnWrite(path)
         throw e
     }
 }
 
-async function writeFileJsonNewOnly(path, data, fsLog, fsLogReason) {
-    const id = Date.now()
-    fsLog.push({ id, event: 'add', path, reason: fsLogReason })
+function writeFileJson(path, data, reason) {
+    return writeRecorded(path, () => fileUtilsShared.writeFileJson(path, data), reason)
+}
+
+function writeFileJsonInPlace(path, data, reason) {
+    return writeRecorded(path, () => fileUtilsShared.writeFileJsonInPlace(path, data), reason)
+}
+
+// with wx, a file that already exists is left untouched, so what Restfox last left there still stands
+async function writeNewOnly(path, write, reason) {
     try {
-        await fileUtilsShared.writeFileJsonNewOnly(path, data)
+        const text = await write()
+        recordOwnWrite(path, { kind: 'file', hash: hashText(text) }, reason)
+        return text
     } catch (e) {
-        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        if (e.code !== 'EEXIST') {
+            forgetOwnWrite(path)
+        }
         throw e
     }
 }
 
-async function writeEmptyFileNewOnly(path, fsLog, fsLogReason) {
-    const id = Date.now()
-    fsLog.push({ id, event: 'add', path, reason: fsLogReason })
-    try {
-        await fileUtilsShared.writeEmptyFileNewOnly(path)
-    } catch (e) {
-        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
-        throw e
-    }
+function writeFileJsonNewOnly(path, data, reason) {
+    return writeNewOnly(path, () => fileUtilsShared.writeFileJsonNewOnly(path, data), reason)
 }
 
-async function deleteFileOrFolder(path, fsLog, fsLogReason) {
-    const id = Date.now()
+function writeEmptyFileNewOnly(path, reason) {
+    return writeNewOnly(path, () => fileUtilsShared.writeEmptyFileNewOnly(path), reason)
+}
+
+async function deleteFileOrFolder(path, reason) {
     const isDirectory = (await fs.stat(path)).isDirectory()
-    const event = isDirectory ? 'unlinkDir' : 'unlink'
-    fsLog.push({ id, event, path, reason: fsLogReason })
     try {
         if (isDirectory) {
             await fs.rmdir(path)
         } else {
             await fs.unlink(path)
         }
+        recordOwnWrite(path, { kind: 'absent' }, reason)
     } catch (e) {
-        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        forgetOwnWrite(path)
         throw e
     }
 }
 
-async function mkdir(path, fsLog, fsLogReason)
-{
-    const id = Date.now()
-    fsLog.push({ id, event: 'addDir', path, reason: fsLogReason })
+async function mkdir(path, reason) {
     try {
         await fileUtilsShared.mkdir(path)
     } catch (e) {
-        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        if (e.code !== 'EEXIST') {
+            forgetOwnWrite(path)
+        }
         throw e
     }
+    recordOwnWrite(path, { kind: 'dir' }, reason)
 }
 
 async function hasSubFolders(dir) {
@@ -78,18 +98,33 @@ async function hasSubFolders(dir) {
     return false
 }
 
-async function renameFileOrFolder(oldPath, newPath, fsLog, fsLogReason, workspaceWatcher = null) {
+// the paths in a folder, relative to it, with whether each is a folder
+async function listTree(dir, relativeDir = '') {
+    const entries = []
+    for (const entry of await fs.readdir(pathLib.join(dir, relativeDir), { withFileTypes: true })) {
+        const relativePath = pathLib.join(relativeDir, entry.name)
+        entries.push({ relativePath, isDirectory: entry.isDirectory() })
+        if (entry.isDirectory()) {
+            entries.push(...await listTree(dir, relativePath))
+        }
+    }
+    return entries
+}
+
+// the move itself is done, so a moved file that cannot be read back is only forgotten
+async function recordMovedFile(path, reason) {
+    try {
+        recordOwnWrite(path, { kind: 'file', hash: hashText(await fs.readFile(path, 'utf8')) }, reason)
+    } catch {
+        forgetOwnWrite(path)
+    }
+}
+
+async function renameFileOrFolder(oldPath, newPath, reason, workspaceWatcher = null) {
     console.log('Renaming', oldPath, 'to', newPath)
 
-    const id = Date.now()
     const isDirectory = (await fs.stat(oldPath)).isDirectory()
-
-    if (isDirectory) {
-        await renameAndLogRecursively(oldPath, newPath, fsLog, fsLogReason, id)
-    } else {
-        logEvent(fsLog, id, 'unlink', oldPath, fsLogReason)
-        logEvent(fsLog, id, 'add', newPath, fsLogReason)
-    }
+    const entries = isDirectory ? await listTree(oldPath) : []
 
     try {
         if (process.platform === 'win32' && isDirectory && await hasSubFolders(oldPath)) {
@@ -105,37 +140,26 @@ async function renameFileOrFolder(oldPath, newPath, fsLog, fsLogReason, workspac
             await fs.rename(oldPath, newPath)
         }
     } catch (e) {
-        fsLog.slice(fsLog.findIndex(e => e.id === id), 1)
+        for (const path of [oldPath, newPath, ...entries.flatMap(entry => [pathLib.join(oldPath, entry.relativePath), pathLib.join(newPath, entry.relativePath)])]) {
+            forgetOwnWrite(path)
+        }
         throw e
     }
-}
 
-async function renameAndLogRecursively(oldPath, newPath, fsLog, fsLogReason, id, isSubFolder = false) {
-    if (!isSubFolder) { // Only log the root folder being renamed on the first call
-        logEvent(fsLog, id, 'unlinkDir', oldPath, fsLogReason)
-        logEvent(fsLog, id, 'addDir', newPath, fsLogReason)
-    }
-
-    let entries = await fs.readdir(oldPath, { withFileTypes: true })
-    for (let entry of entries) {
-        const oldEntryPath = pathLib.join(oldPath, entry.name)
-        const newEntryPath = pathLib.join(newPath, entry.name)
-
-        if (entry.isDirectory()) {
-            // Log and rename subdirectories recursively
-            logEvent(fsLog, id, 'unlinkDir', oldEntryPath, fsLogReason)
-            logEvent(fsLog, id, 'addDir', newEntryPath, fsLogReason)
-            await renameAndLogRecursively(oldEntryPath, newEntryPath, fsLog, fsLogReason, id, true)
-        } else {
-            // Log rename events for files
-            logEvent(fsLog, id, 'unlink', oldEntryPath, fsLogReason)
-            logEvent(fsLog, id, 'add', newEntryPath, fsLogReason)
+    recordOwnWrite(oldPath, { kind: 'absent' }, reason)
+    if (isDirectory) {
+        recordOwnWrite(newPath, { kind: 'dir' }, reason)
+        for (const entry of entries) {
+            recordOwnWrite(pathLib.join(oldPath, entry.relativePath), { kind: 'absent' }, reason)
+            if (entry.isDirectory) {
+                recordOwnWrite(pathLib.join(newPath, entry.relativePath), { kind: 'dir' }, reason)
+            } else {
+                await recordMovedFile(pathLib.join(newPath, entry.relativePath), reason)
+            }
         }
+    } else {
+        await recordMovedFile(newPath, reason)
     }
-}
-
-function logEvent(fsLog, id, event, path, reason) {
-    fsLog.push({ id, event, path, reason })
 }
 
 module.exports = {
@@ -144,6 +168,7 @@ module.exports = {
     encodeFilename,
     decodeFilename,
     writeFileJson,
+    writeFileJsonInPlace,
     writeFileJsonNewOnly,
     writeEmptyFileNewOnly,
     deleteFileOrFolder,
@@ -151,4 +176,5 @@ module.exports = {
     renameFileOrFolder,
     transformFileObjectToSaveableFileObject,
     transformSavedFileObjectToFileObject,
+    ownWrites,
 }

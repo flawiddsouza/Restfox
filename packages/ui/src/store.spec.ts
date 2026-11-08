@@ -52,6 +52,9 @@ import { createCollection, createCollections, createPlugin, createPlugins, creat
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, SetEnvironmentVariableFunction, Workspace } from './global'
 import { store } from './store'
 import { getSocketItemCloses, noteSocketOpened, takeOpenedSocketKeys } from './utils/socket-connections'
+import { getItemEntry, getItemVersion, itemWritesPending, itemWritesSettled, loadItemVersions, setItemVersion } from './utils/item-file-versions'
+import { toRaw } from 'vue'
+import type { UpdateCollectionResult } from './db'
 import { emitter } from './event-bus'
 import { INHERITED_AUTHENTICATION_TYPE, SendResolver, handleRequest } from './helpers'
 import * as grpcState from './utils/grpc-calls'
@@ -1546,7 +1549,9 @@ describe('Collection Runner with a body cut short', () => {
 describe('setActiveTab', () => {
     beforeEach(() => {
         // the tab is scrolled into view, where the page has one
-        vi.stubGlobal('document', { querySelector: () => null })
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
         vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
         store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace' } as Workspace
         store.state.activeTab = null
@@ -1887,6 +1892,8 @@ describe('writes the storage refuses, such as to a file holding merge conflict m
         vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
         vi.mocked(createPlugins).mockRejectedValueOnce(new Error('Cannot write plugins'))
         vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [folder('Imported', 0)] } as never)
+        // the import ends with a reload, which reads the workspace's scripts back
+        vi.mocked(getWorkspacePlugins).mockResolvedValueOnce([])
 
         await store.dispatch('setCollectionTree', {
             collectionTree: [folder('Imported', 0)],
@@ -2830,7 +2837,9 @@ describe('socket connections of items no longer open', () => {
 
     test('reopening a socket from the sidebar while its window is open takes that window\'s tab back', async() => {
         // what addTab reads besides the store: a document to scroll the tab into view, and the item's history
-        vi.stubGlobal('document', { querySelector: () => null })
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
         vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
         connect('/S.json-c1')
         const tab = store.state.tabs[0]
@@ -2849,7 +2858,9 @@ describe('socket connections of items no longer open', () => {
     })
 
     test('reopening a folder from the sidebar while its window is open takes the sidebar\'s item, which has edits made elsewhere', async() => {
-        vi.stubGlobal('document', { querySelector: () => null })
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
         vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
         const folder = { _id: '/F', _type: 'request_group', name: 'F', parentId: null, workspaceId: 'workspace-id', headers: [{ name: 'X-A', value: 'old' }] } as unknown as CollectionItem
         store.state.detachedTabs.push(JSON.parse(JSON.stringify(folder)))
@@ -2915,5 +2926,1243 @@ describe('socket connections of items no longer open', () => {
         await store.dispatch('deleteCollectionItem', socketItem('/S.json', 'c1'))
         expect(closes['/S.json-c1']).toHaveBeenCalledOnce()
         expect(store.state.detachedTabs).toEqual([])
+    })
+})
+
+describe('a request whose file changed outside Restfox', () => {
+    const request = (id: string, url = 'https://api.example/login') => ({ _id: id, _type: 'request', name: id.replace('.json', ''), parentId: null, workspaceId: 'workspace-id', method: 'GET', url, body: { mimeType: 'No Body' } }) as CollectionItem
+    const changedOutside = { error: 'Not saved, as Login.json was changed outside Restfox', changedOutside: true }
+    const changedOutsideToast = 'Login changed outside Restfox and was reloaded. Your last edit to it was not saved.'
+
+    // the version this page holds for an item of the workspace shown, as a load or a write leaves it
+    const setVersion = (id: string, version: string) => setItemVersion(getItemEntry('workspace-id', id), version)
+    const versionOf = (id: string) => getItemVersion('workspace-id', id)
+    const settled = (...ids: string[]) => Promise.all(ids.map(id => itemWritesSettled('workspace-id', id)))
+    const readResult = (collection: CollectionItem[], versions: Record<string, string>, idMap: Map<string, string> | null = null) => ({ collection, workspace: null, idMap, versions })
+
+    function held<T>() {
+        let release!: (value: T) => void
+        const promise = new Promise<T>(resolve => {
+            release = resolve
+        })
+        return { promise, release }
+    }
+
+    function open(...items: CollectionItem[]) {
+        store.commit('setCollection', items)
+        store.state.tabs = [...store.state.collection]
+        store.state.detachedTabs = []
+        store.state.activeTab = store.state.collection[0]
+        store.state.skipPersistingActiveTab = false
+        return store.state.collection
+    }
+
+    function errorToasts() {
+        return (vi.mocked(emitter.emit).mock.calls as unknown[][]).filter(call => call[0] === 'error').map(call => call[1])
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(updateCollection).mockReset()
+        vi.mocked(getCollectionForWorkspace).mockReset()
+        vi.spyOn(emitter, 'emit')
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace' } as Workspace
+        store.state.plugins.workspace = []
+        store.state.idMap = null
+        loadItemVersions('workspace-id', {})
+        loadItemVersions('copy-workspace', {})
+    })
+
+    // a reload's read left waiting holds every later reload until it ends, as in the app, so each ends with its test
+    const pendingReads: ((value: unknown) => void)[] = []
+    function pendingRead() {
+        return new Promise(resolve => {
+            pendingReads.push(resolve)
+        }) as never
+    }
+
+    // a read the test releases itself, which still ends with the test when the test stops first
+    function heldRead() {
+        const read = held<unknown>()
+        pendingReads.push(read.release)
+        return read
+    }
+
+    afterEach(async() => {
+        store.state.activeWorkspace = { _id: 'workspace-after-test', _type: 'file', name: 'After' } as Workspace
+        pendingReads.splice(0).forEach(resolve => resolve({ collection: [], workspace: null, idMap: null }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        vi.restoreAllMocks()
+        vi.unstubAllGlobals()
+    })
+
+    test('a save carries the version the item was read with and takes the version its reply gives', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, version: 'v2' })
+
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+        login.url += '/me'
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+
+        expect(vi.mocked(updateCollection).mock.calls.map(call => call[3])).toEqual(['v1', 'v2'])
+        expect(versionOf('Login.json')).toBe('v2')
+    })
+
+    test('a save counts as pending until the storage takes its data, so leaving the page meanwhile is held', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const reading = held<void>()
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, _id, _fields, _version, onSending) => {
+            // the body files are read before the data leaves the page
+            await reading.promise
+            onSending?.()
+            return { error: null, version: 'v2' }
+        })
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        expect(itemWritesPending()).toBe(true)
+        reading.release()
+        await settled('Login.json')
+        expect(itemWritesPending()).toBe(false)
+    })
+
+    test('edits made while a save runs go out in one more save, made from the version that save\'s reply gave', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const firstReply = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(firstReply.promise).mockResolvedValue({ error: null, version: 'v3' })
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        login.url += 'a'
+        store.dispatch('persistCollectionItem', login)
+        login.url += 'b'
+        store.dispatch('persistCollectionItem', login)
+        firstReply.release({ error: null, version: 'v2' })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(2))
+        await settled('Login.json')
+
+        expect(vi.mocked(updateCollection).mock.calls[1][2].url).toBe('https://api.example/loginab')
+        expect(vi.mocked(updateCollection).mock.calls[1][3]).toBe('v2')
+    })
+
+    test('a tab saves from the version its item was read with, as both stand for one item', async() => {
+        const [login] = open(request('Login.json'))
+        store.state.tabs = []
+        store.state.activeTab = null
+        setVersion('Login.json', 'v1')
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, version: 'v2' })
+
+        await store.dispatch('addTab', login)
+        const tab = store.state.activeTab as CollectionItem
+        expect(toRaw(tab)).not.toBe(toRaw(login))
+        tab.url += '/typed'
+        store.dispatch('persistCollectionItem', tab)
+        await settled('Login.json')
+        expect(vi.mocked(updateCollection).mock.calls[0][3]).toBe('v1')
+
+        tab.url += '/more'
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([request('Login.json')], { 'Login.json': 'v2' }) as never)
+        await store.dispatch('refreshWorkspaceCollection')
+
+        expect(toRaw(store.state.collection[0])).toBe(toRaw(tab))
+        expect(store.state.collection[0].url).toBe('https://api.example/login/typed/more')
+    })
+
+    test('a refused save tells the user once and reloads the workspace once', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+        // an edit made while the reload reads is refused again from the same stale object
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(2))
+        read.release(readResult([], {}))
+        await settled('Login.json')
+
+        expect(errorToasts()).toEqual([changedOutsideToast])
+        expect(getCollectionForWorkspace).toHaveBeenCalledOnce()
+    })
+
+    test('a save refused for a workspace no longer shown is told without reloading the one shown', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+        store.state.activeWorkspace = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+
+        expect(emitter.emit).toHaveBeenCalledWith('error', 'Login changed outside Restfox, so your last edit to it was not saved.')
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+    })
+
+    test('a failed save is told once until a save of the item goes through, and each failure reaches Logs', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection)
+            .mockRejectedValueOnce(new Error('EPERM: operation not permitted'))
+            .mockResolvedValueOnce({ error: 'Not saved, as Login.json cannot be read' })
+            .mockResolvedValueOnce({ error: null, version: 'v2' })
+            .mockRejectedValueOnce(new Error('ENOSPC: no space left on device'))
+
+        for(let i = 0; i < 4; i++) {
+            store.dispatch('persistCollectionItem', login)
+            await settled('Login.json')
+        }
+
+        expect(errorToasts()).toEqual([
+            'Login could not be saved: EPERM: operation not permitted',
+            'Login could not be saved: ENOSPC: no space left on device',
+        ])
+        expect(console.error).toHaveBeenCalledWith('Login could not be saved: Not saved, as Login.json cannot be read')
+    })
+
+    test('a reload keeps an item whose file it read unchanged, with what the user typed, and replaces one changed outside', async() => {
+        const [login, other] = open(request('Login.json'), request('Other.json', 'https://api.example/other'))
+        setVersion('Login.json', 'login-v1')
+        setVersion('Other.json', 'other-v1')
+        login.url += '/typed-while-reading'
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([request('Login.json'), request('Other.json', 'https://api.example/changed-outside')], { 'Login.json': 'login-v1', 'Other.json': 'other-outside' }) as never)
+
+        await store.dispatch('refreshWorkspaceCollection')
+
+        expect(store.state.collection[0]).toBe(login)
+        expect(store.state.collection[0].url).toBe('https://api.example/login/typed-while-reading')
+        expect(store.state.collection[1]).not.toBe(other)
+        expect(store.state.collection[1].url).toBe('https://api.example/changed-outside')
+        expect(versionOf('Other.json')).toBe('other-outside')
+    })
+
+    test('a reload keeps an item it read before a later save of it, and one it renamed, each with the version the page holds now', async() => {
+        const [login, renamed] = open(request('Login.json'), request('Old.json'))
+        setVersion('Login.json', 'v1')
+        setVersion('Old.json', 'renamed-v1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, version: 'v2' })
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        login.url += '/typed'
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+
+        read.release(readResult([request('Login.json'), request('New.json')], { 'Login.json': 'v1', 'New.json': 'renamed-v1' }, new Map([['Login.json', 'Login.json'], ['Old.json', 'New.json']])))
+        await reload
+
+        expect(store.state.collection[0]).toBe(login)
+        expect(store.state.collection[1]).toBe(renamed)
+        expect(renamed._id).toBe('New.json')
+        expect(renamed.name).toBe('New')
+        expect(vi.mocked(updateCollection).mock.calls[0][2].url).toBe('https://api.example/login/typed')
+        // the read came before the save, whose version the page keeps, so the next save is not refused
+        expect(versionOf('Login.json')).toBe('v2')
+        expect(versionOf('New.json')).toBe('renamed-v1')
+        expect(versionOf('Old.json')).toBe(null)
+    })
+
+    test.each(['reply first', 'read first'])('a reload waits for a save asked for before its read returned, so the save\'s reply is not taken for an outside change (%s)', async(order) => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const reply = held<UpdateCollectionResult>()
+        const read = heldRead()
+        vi.mocked(updateCollection).mockReturnValueOnce(reply.promise).mockResolvedValue({ error: null, version: 'v3' })
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        // asked for after the reload began, and run by the server before the read, so the read has its version
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        if(order === 'reply first') {
+            reply.release({ error: null, version: 'v2' })
+            await settled('Login.json')
+            read.release(readResult([request('Login.json')], { 'Login.json': 'v2' }))
+        } else {
+            read.release(readResult([request('Login.json')], { 'Login.json': 'v2' }))
+            await new Promise(resolve => setTimeout(resolve, 0))
+            reply.release({ error: null, version: 'v2' })
+        }
+        await reload
+        login.url += '/next'
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+
+        expect(store.state.collection[0]).toBe(login)
+        expect(vi.mocked(updateCollection).mock.calls[1][3]).toBe('v2')
+        expect(errorToasts()).toEqual([])
+    })
+
+    test('a reload whose read fails, such as on a network share gone for a moment, keeps what the page shows and tells the user', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({ error: { message: 'EIO: i/o error' }, collection: [], workspace: null, idMap: null } as never)
+
+        await store.dispatch('refreshWorkspace')
+
+        expect(store.state.collection).toEqual([login])
+        expect(store.state.tabs).toEqual([login])
+        expect(versionOf('Login.json')).toBe('v1')
+        expect(errorToasts()).toEqual(['The workspace could not be reloaded: EIO: i/o error'])
+    })
+
+    test.each(['answers with an error', 'rejects, as on a lost connection'])('a save refused again after the reload it caused failed reloads again, when the read %s', async(failure) => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        if(failure === 'answers with an error') {
+            vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ error: { message: 'EIO: i/o error' }, collection: [], workspace: null, idMap: null } as never)
+        } else {
+            vi.mocked(getCollectionForWorkspace).mockRejectedValueOnce(new Error('EIO: i/o error'))
+        }
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(errorToasts()).toContain('The workspace could not be reloaded: EIO: i/o error'))
+        login.url += '/typed'
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledTimes(2))
+        expect(errorToasts().filter(message => message === changedOutsideToast)).toHaveLength(2)
+    })
+
+    test('a reload whose workspace the user left while it waited changes nothing', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const reply = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValue(reply.promise)
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([request('Login.json', 'https://api.example/changed-outside')], { 'Login.json': 'outside' }) as never)
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        const shownCollection = store.state.collection
+        store.state.activeWorkspace = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+        reply.release({ error: null, version: 'v2' })
+        await reload
+
+        expect(store.state.collection).toBe(shownCollection)
+    })
+
+    test('a reload during which the workspace was loaded again, as after leaving it and coming back, changes nothing', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        // the load App.vue makes when the workspace is opened again, which read the file after this reload did
+        loadItemVersions('workspace-id', { 'Login.json': 'v2' })
+        read.release(readResult([request('Login.json', 'https://api.example/older-read')], { 'Login.json': 'outside' }))
+        await reload
+
+        expect(store.state.collection[0]).toBe(login)
+        expect(versionOf('Login.json')).toBe('v2')
+    })
+
+    test('a sort order merged into an item file is taken where the page held the version before it, and a file changed outside reloads', async() => {
+        const [login, other] = open(request('Login.json'), request('Other.json'))
+        store.state.collectionTree = [login, other]
+        setVersion('Login.json', 'login-v1')
+        setVersion('Other.json', 'other-v1')
+        vi.mocked(createCollection).mockResolvedValueOnce({ error: null, oldCollectionId: 'n', newCollectionId: 'New.json', version: 'new-v1' })
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId) => ({
+            'New.json': { error: null, versionBefore: 'new-v1', version: 'new-v2' },
+            'Login.json': { error: null, versionBefore: 'login-v1', version: 'login-v2' },
+            // the file had a change made outside Restfox, which the page lacks
+            'Other.json': { error: null, versionBefore: 'other-outside', version: 'other-v2' },
+        })[collectionId as string] as UpdateCollectionResult)
+
+        // the new request opens in a tab, which loads its history and scrolls the tab bar
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+
+        await store.dispatch('createCollectionItem', { type: 'request', name: 'New', method: 'GET', mimeType: 'No Body', parentId: null })
+        await settled('New.json', 'Login.json', 'Other.json')
+
+        expect(versionOf('New.json')).toBe('new-v2')
+        expect(versionOf('Login.json')).toBe('login-v2')
+        expect(versionOf('Other.json')).toBe('other-v1')
+        // the merge hid the outside change from the watcher, so the workspace reloads to show it
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('a merge into an item whose version the page does not hold, such as a folder, reloads nothing', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        open(folder)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, versionBefore: 'f1', version: 'f2' })
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }], authentication: undefined })
+
+        expect(vi.mocked(updateCollection).mock.calls[0].slice(0, 3)).toEqual(['workspace-id', 'Folder', { headers: [{ name: 'X', value: '1' }] }])
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+    })
+
+    test('a merge whose write fails, such as to a read-only file, tells the user', async() => {
+        open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection).mockRejectedValue(new Error('EPERM: operation not permitted'))
+
+        const result = await store.dispatch('updateCollectionItem', { collectionId: 'Login.json', name: 'Login', parentId: null, headers: [{ name: 'X', value: '1' }] })
+
+        expect(result.error).toBe('EPERM: operation not permitted')
+        expect(errorToasts()).toEqual(['EPERM: operation not permitted'])
+    })
+
+    test('a merge into a file deleted outside Restfox tells the user and reloads', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Login.json', name: login.name, parentId: null, headers: [{ name: 'X', value: '1' }], authentication: undefined })
+
+        expect(errorToasts()).toEqual([changedOutside.error])
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('Properties, which sends no headers or authentication, puts back none it opened with over ones a reload brought in', async() => {
+        const login = { ...request('Login.json'), headers: [{ name: 'X-Outside', value: '1' }], authentication: { type: 'bearer', token: 'outside' } } as CollectionItem
+        open(login)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([{ ...login, _id: 'Renamed.json', name: 'Renamed' }], { 'Renamed.json': 'v1' }) as never)
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Login.json', name: 'Renamed', parentId: null })
+
+        expect(vi.mocked(updateCollection).mock.calls).toEqual([['workspace-id', 'Login.json', { name: 'Renamed' }]])
+    })
+
+    test('a request created while a reload reads stays, with its tab, when the reload read before it was made', async() => {
+        const [login] = open(request('Login.json'))
+        store.state.collectionTree = [login]
+        setVersion('Login.json', 'v1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+        vi.mocked(createCollection).mockResolvedValueOnce({ error: null, oldCollectionId: 'n', newCollectionId: 'New.json', version: 'new-v1' })
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+
+        const reload = store.dispatch('refreshWorkspace')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        await store.dispatch('createCollectionItem', { type: 'request', name: 'New', method: 'GET', mimeType: 'No Body', parentId: null })
+        read.release(readResult([request('Login.json')], { 'Login.json': 'v1' }, new Map([['Login.json', 'Login.json']])))
+        await reload
+
+        expect(store.state.collection.map(item => item._id)).toEqual(['Login.json', 'New.json'])
+        expect(store.state.tabs.map(tab => tab._id)).toContain('New.json')
+    })
+
+    test('a request deleted while a reload reads stays gone when the reload read it before the delete', async() => {
+        const [login, other] = open(request('Login.json'), request('Other.json'))
+        setVersion('Login.json', 'v1')
+        setVersion('Other.json', 'o1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+        vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        await store.dispatch('deleteCollectionItem', other)
+        read.release(readResult([request('Login.json'), request('Other.json')], { 'Login.json': 'v1', 'Other.json': 'o1' }))
+        await reload
+
+        expect(store.state.collection.map(item => item._id)).toEqual(['Login.json'])
+        expect(store.state.collection[0]).toBe(login)
+    })
+
+    test('a request renamed and then deleted while the rename\'s reload reads stays gone under its new id', async() => {
+        const [login, old] = open(request('Login.json'), request('Old.json'))
+        setVersion('Login.json', 'v1')
+        setVersion('Old.json', 'o1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+        vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        // deleted under the id it had, which the server keeps for the renamed file
+        await store.dispatch('deleteCollectionItem', old)
+        read.release(readResult([request('Login.json'), request('New.json')], { 'Login.json': 'v1', 'New.json': 'o1' }, new Map([['Login.json', 'Login.json'], ['Old.json', 'New.json']])))
+        await reload
+
+        expect(store.state.collection.map(item => item._id)).toEqual(['Login.json'])
+        expect(store.state.collection[0]).toBe(login)
+    })
+
+    test('a request deleted while the reload a rename asked for reads goes, whichever ends first', async() => {
+        for(const order of ['reload first', 'delete first']) {
+            loadItemVersions('workspace-id', {})
+            vi.mocked(getCollectionForWorkspace).mockReset()
+            const [old] = open(request('Old.json'))
+            setVersion('Old.json', 'o1')
+            const read = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+            const deleteReply = held<{ error: null }>()
+            vi.mocked(deleteCollectionsByIds).mockReturnValueOnce(deleteReply.promise as never)
+
+            const reload = store.dispatch('refreshWorkspaceCollection')
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            const deleted = store.dispatch('deleteCollectionItem', old)
+            await vi.waitFor(() => expect(deleteCollectionsByIds).toHaveBeenCalled())
+            const readRenamed = readResult([request('New.json')], { 'New.json': 'o1' }, new Map([['Old.json', 'New.json']]))
+            if(order === 'reload first') {
+                read.release(readRenamed)
+                await reload
+                expect(old._id).toBe('New.json')
+                deleteReply.release({ error: null })
+                await deleted
+            } else {
+                deleteReply.release({ error: null })
+                await deleted
+                read.release(readRenamed)
+                await reload
+            }
+
+            expect(store.state.collection).toEqual([])
+            expect(store.state.tabs).toEqual([])
+            expect(versionOf('New.json')).toBe(null)
+            vi.mocked(deleteCollectionsByIds).mockReset()
+        }
+    })
+
+    test('a request whose reload applies while its delete still clears its history goes under its new id', async() => {
+        const [old] = open(request('Old.json'))
+        setVersion('Old.json', 'o1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+        const history = held<void>()
+        vi.mocked(deleteResponsesByCollectionIds).mockReturnValueOnce(history.promise as never)
+        vi.mocked(deleteCollectionsByIds).mockResolvedValueOnce({ error: null } as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        const deleted = store.dispatch('deleteCollectionItem', old)
+        await vi.waitFor(() => expect(deleteResponsesByCollectionIds).toHaveBeenCalled())
+        read.release(readResult([request('New.json')], { 'New.json': 'o1' }, new Map([['Old.json', 'New.json']])))
+        await reload
+        history.release()
+        await deleted
+
+        expect(store.state.collection).toEqual([])
+        expect(store.state.tabs).toEqual([])
+        expect(versionOf('New.json')).toBe(null)
+    })
+
+    test('a folder deleted while the reload its rename asked for reads goes when the reload applies first', async() => {
+        const folder = (id: string) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id' }) as unknown as CollectionItem
+        const [old] = open(folder('Old'))
+        store.state.tabs = []
+        store.state.activeTab = null
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+        const deleteReply = held<{ error: null }>()
+        vi.mocked(deleteCollectionsByIds).mockReturnValueOnce(deleteReply.promise as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        const deleted = store.dispatch('deleteCollectionItem', old)
+        await vi.waitFor(() => expect(deleteCollectionsByIds).toHaveBeenCalled())
+        read.release(readResult([folder('New')], {}, new Map([['Old', 'New']])))
+        await reload
+        deleteReply.release({ error: null })
+        await deleted
+
+        expect(store.state.collection).toEqual([])
+    })
+
+    test('a reload keeps the tab of an item it read at the same id when the server\'s map lacks that id, as after a restart', async() => {
+        const [first, second] = open(request('A.json'), request('C.json'))
+        setVersion('A.json', 'a1')
+        setVersion('C.json', 'c1')
+        Object.assign(store.state.activeWorkspace as Workspace, { tabIds: ['A.json', 'C.json'], activeTabId: 'C.json' })
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([request('A2.json'), request('C.json')], { 'A2.json': 'a1', 'C.json': 'c1' }, new Map([['A.json', 'A2.json']])) as never)
+
+        await store.dispatch('refreshWorkspace')
+
+        expect(store.state.tabs.map(tab => tab._id)).toEqual(['A2.json', 'C.json'])
+        expect(toRaw(store.state.tabs[1])).toBe(toRaw(second))
+        expect(first._id).toBe('A2.json')
+    })
+
+    test('a new request created at the id of one whose file was deleted outside replaces it, so the old tab cannot save over it', async() => {
+        const [old] = open(request('New.json', 'https://api.example/old'))
+        store.state.collectionTree = [old]
+        setVersion('New.json', 'old-v1')
+        vi.mocked(createCollection).mockResolvedValueOnce({ error: null, oldCollectionId: 'n', newCollectionId: 'New.json', version: 'new-v1' })
+        vi.mocked(updateCollection).mockImplementation(async() => ({ error: null, versionBefore: 'new-v1', version: 'new-v2' }))
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+
+        await store.dispatch('createCollectionItem', { type: 'request', name: 'New', method: 'POST', mimeType: 'No Body', parentId: null })
+        await settled('New.json')
+
+        expect(store.state.collection).toHaveLength(1)
+        expect(toRaw(store.state.collection[0])).not.toBe(toRaw(old))
+        expect(store.state.collection[0].method).toBe('POST')
+        expect(store.state.tabs.map(tab => toRaw(tab))).not.toContain(toRaw(old))
+        expect(store.state.tabs.map(tab => tab._id)).toEqual(['New.json'])
+    })
+
+    test('a duplicate that lands at the id of one whose file was deleted outside replaces it too', async() => {
+        const [source, stale] = open(request('Login.json'), request('Login (2).json', 'https://api.example/stale'))
+        store.state.collectionTree = [source, stale]
+        store.state.tabs = [stale]
+        store.state.activeTab = stale
+        setVersion('Login.json', 'v1')
+        setVersion('Login (2).json', 'stale-v1')
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+        vi.mocked(createCollections).mockImplementationOnce(async(_workspaceId, collections) => ({ error: null, results: [{ error: null, oldCollectionId: collections[0]._id, newCollectionId: 'Login (2).json', version: 'dup-v1' }] }))
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId) => ({ error: null, versionBefore: collectionId === 'Login.json' ? 'v1' : 'dup-v1', version: `${collectionId}-merged` }))
+
+        await store.dispatch('duplicateCollectionItem', toRaw(source))
+        await settled('Login.json', 'Login (2).json')
+
+        expect(store.state.collection.filter(item => item._id === 'Login (2).json')).toHaveLength(1)
+        expect(store.state.collection.find(item => item._id === 'Login (2).json')?.url).toBe('https://api.example/login')
+        expect(store.state.tabs.map(tab => toRaw(tab))).not.toContain(toRaw(stale))
+    })
+
+    test('a rename holds leaving the page until the storage has answered it', async() => {
+        const [login] = open(request('Login.json'))
+        const reply = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(reply.promise)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        const rename = store.dispatch('updateCollectionItemName', { ...login, name: 'Renamed' })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        expect(itemWritesPending()).toBe(true)
+        reply.release({ error: null })
+        await rename
+        expect(itemWritesPending()).toBe(false)
+    })
+
+    test('a rename waits for the item\'s save still running, and does not reload a workspace the user left meanwhile', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const reply = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(reply.promise).mockResolvedValue({ error: null })
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        const rename = store.dispatch('updateCollectionItemName', { ...login, name: 'Renamed' })
+        await Promise.resolve()
+        expect(updateCollection).toHaveBeenCalledOnce()
+        store.state.activeWorkspace = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+        reply.release({ error: null, version: 'v2' })
+        await rename
+
+        expect(vi.mocked(updateCollection).mock.calls[1]).toEqual(['workspace-id', 'Login.json', { name: 'Renamed' }])
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+    })
+
+    test('a save asked for while a reload applies goes out under the id it has, and its reply reaches the renamed item', async() => {
+        const [renamed, other] = open(request('Old.json'), request('Other.json'))
+        setVersion('Old.json', 'v1')
+        setVersion('Other.json', 'o1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+        const otherSave = held<UpdateCollectionResult>()
+        const renamedSave = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(otherSave.promise).mockReturnValueOnce(renamedSave.promise)
+
+        // a save the reload waits for, so the rename's save below starts before the reload applies
+        store.dispatch('persistCollectionItem', other)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        read.release(readResult([request('New.json'), request('Other.json')], { 'New.json': 'v1', 'Other.json': 'o2' }, new Map([['Old.json', 'New.json']])))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        renamed.url += '/typed'
+        store.dispatch('persistCollectionItem', renamed)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(2))
+        // the server keeps the id from before the rename for one more scan
+        expect(vi.mocked(updateCollection).mock.calls[1].slice(1, 2)).toEqual(['Old.json'])
+        expect(vi.mocked(updateCollection).mock.calls[1][3]).toBe('v1')
+        otherSave.release({ error: null, version: 'o2' })
+        await reload
+        expect(renamed._id).toBe('New.json')
+        renamedSave.release({ error: null, version: 'v2' })
+        await settled('New.json')
+
+        expect(store.state.collection[0]).toBe(renamed)
+        expect(versionOf('New.json')).toBe('v2')
+    })
+    test('a running gRPC call follows its kept item to the id a rename gave it', async() => {
+        const call = { _id: 'Old.json', _type: 'grpc', name: 'Old', parentId: null, workspaceId: 'workspace-id' } as unknown as CollectionItem
+        open(call)
+        setVersion('Old.json', 'v1')
+        resetGrpcCalls()
+        const oldKey = getGrpcItemKey({ workspaceId: 'workspace-id', _id: 'Old.json' })
+        grpcCalls[oldKey] = { id: 'call-1', phase: 'open' } as unknown as GrpcLiveCall
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([{ ...call, _id: 'New.json', name: 'New' } as CollectionItem], { 'New.json': 'v1' }, new Map([['Old.json', 'New.json']])) as never)
+
+        await store.dispatch('refreshWorkspaceCollection')
+
+        expect(store.state.collection[0]._id).toBe('New.json')
+        expect(grpcCalls[getGrpcItemKey({ workspaceId: 'workspace-id', _id: 'New.json' })]?.id).toBe('call-1')
+        expect(grpcCalls[oldKey]).toBeUndefined()
+        resetGrpcCalls()
+    })
+
+    test('a reload given up as the user opened another workspace reloads no tabs', async() => {
+        open(request('Login.json'))
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+
+        const refresh = store.dispatch('refreshWorkspace')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        const other = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+        store.state.activeWorkspace = other
+        read.release(readResult([request('Login.json')], {}))
+        await refresh
+
+        expect(other.tabIds).toBeUndefined()
+        expect(getWorkspacePlugins).not.toHaveBeenCalled()
+    })
+
+    test('two reloads asked for close together, with an edit between them, both end and the edit is saved', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const firstRead = heldRead()
+        const secondRead = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(firstRead.promise as never).mockReturnValueOnce(secondRead.promise as never)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, version: 'v2' })
+
+        const first = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        login.url += '/typed'
+        store.dispatch('persistCollectionItem', login)
+        const second = store.dispatch('refreshWorkspaceCollection')
+        firstRead.release(readResult([request('Login.json')], { 'Login.json': 'v1' }))
+        await first
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledTimes(2))
+        secondRead.release(readResult([request('Login.json')], { 'Login.json': 'v2' }))
+        await second
+
+        expect(vi.mocked(updateCollection).mock.calls[0][2].url).toBe('https://api.example/login/typed')
+        expect(store.state.collection[0]).toBe(login)
+    })
+
+    test('a drag in a file workspace shows the new order at once, also in an open tab copied from the item', async() => {
+        const [first, second] = open(request('A.json'), request('B.json'))
+        first.sortOrder = 0
+        second.sortOrder = 1
+        store.state.collectionTree = [first, second]
+        setVersion('A.json', 'a1')
+        setVersion('B.json', 'b1')
+        const secondTab = { ...second } as CollectionItem
+        store.state.tabs = [first, secondTab]
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId, fields) => 'sortOrder' in fields
+            ? { error: null, versionBefore: collectionId === 'A.json' ? 'a1' : 'b1', version: `${collectionId}-${fields.sortOrder}` }
+            : { error: null })
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'B.json', parentId: null }, to: { id: 'A.json', parentId: null, type: 'request', cursorPosition: 'top' } })
+
+        expect([first.sortOrder, second.sortOrder, secondTab.sortOrder]).toEqual([1, 0, 0])
+        expect(versionOf('B.json')).toBe('B.json-0')
+    })
+
+    test('a drag into another folder in a browser workspace moves the item\'s open tab too, whose whole save would otherwise put it back', async() => {
+        const folder = (id: string) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id', sortOrder: 0 }) as unknown as CollectionItem
+        const item = { ...request('R'), parentId: 'F1', sortOrder: 0 } as CollectionItem
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'local', name: 'Browser' } as Workspace
+        open(folder('F1'), folder('F2'), item)
+        // the tab addTab opens is a copy of the item
+        const tab = { ...item } as CollectionItem
+        store.state.tabs = [tab]
+        store.state.activeTab = tab
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'R', parentId: 'F1' }, to: { id: 'F2', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+
+        expect(tab.parentId).toBe('F2')
+        expect(vi.mocked(updateCollection).mock.calls[0]).toEqual(['workspace-id', 'R', { parentId: 'F2' }])
+    })
+
+    test.each(['refused', 'failed on the way'])('a move the storage %s leaves the open tab in its folder, which it inherits from', async(outcome) => {
+        const folder = (id: string) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id', sortOrder: 0 }) as unknown as CollectionItem
+        const item = { ...request('A/R.json'), parentId: 'A', sortOrder: 0 } as CollectionItem
+        open(folder('A'), folder('B'), item)
+        const tab = { ...item } as CollectionItem
+        store.state.tabs = [tab]
+        store.state.activeTab = tab
+        if(outcome === 'refused') {
+            vi.mocked(updateCollection).mockResolvedValue({ error: 'Cannot move R as it already exists in B' })
+        } else {
+            vi.mocked(updateCollection).mockRejectedValue(new Error('Failed to fetch'))
+        }
+
+        const move = store.dispatch('reorderCollectionItem', { from: { id: 'A/R.json', parentId: 'A' }, to: { id: 'B', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+        if(outcome === 'refused') {
+            await move
+        } else {
+            await expect(move).rejects.toThrow('Failed to fetch')
+        }
+
+        expect(tab.parentId).toBe('A')
+        expect(store.state.collection.find(object => object._id === 'A/R.json')?.parentId).toBe('A')
+    })
+
+    test('a drag refused as the folder changed outside Restfox tells the user and reloads', async() => {
+        const folder = (id: string) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id', sortOrder: 0 }) as unknown as CollectionItem
+        open(folder('A'), folder('B'), { ...request('A/R.json'), parentId: 'A', sortOrder: 0 } as CollectionItem)
+        const refusedMove = { error: 'Not moved, as B was changed outside Restfox', changedOutside: true }
+        vi.mocked(updateCollection).mockResolvedValue(refusedMove)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'A/R.json', parentId: 'A' }, to: { id: 'B', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+
+        expect(errorToasts()).toEqual([refusedMove.error])
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('a reload ends its window for versions, so later saves keep only the latest', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([request('Login.json')], { 'Login.json': 'v1' }) as never)
+        await store.dispatch('refreshWorkspaceCollection')
+        vi.mocked(updateCollection).mockResolvedValueOnce({ error: null, version: 'v2' }).mockResolvedValueOnce({ error: null, version: 'v3' })
+
+        for(const letter of 'ab') {
+            login.url += letter
+            store.dispatch('persistCollectionItem', login)
+            await settled('Login.json')
+        }
+
+        expect(getItemEntry('workspace-id', 'Login.json').history).toEqual(['v3'])
+    })
+
+    test('a move a browser workspace failed to store shows the item in its folder again', async() => {
+        const folder = (id: string) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id', sortOrder: 0 }) as unknown as CollectionItem
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'local', name: 'Browser' } as Workspace
+        open(folder('A'), folder('B'), { ...request('R'), parentId: 'A', sortOrder: 0 } as CollectionItem)
+        store.state.tabs = []
+        store.state.activeTab = null
+        vi.mocked(updateCollection).mockRejectedValue(new Error('QuotaExceededError'))
+
+        await expect(store.dispatch('reorderCollectionItem', { from: { id: 'R', parentId: 'A' }, to: { id: 'B', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })).rejects.toThrow('QuotaExceededError')
+
+        expect(store.state.collection.find(item => item._id === 'R')?.parentId).toBe('A')
+        const childrenOf = (id: string) => store.state.collectionTree.find(item => item._id === id)?.children?.map(item => item._id)
+        expect([childrenOf('A'), childrenOf('B')]).toEqual([['R'], []])
+    })
+
+    test.each([
+        ['a rename', { name: 'Renamed' }],
+        ['a Properties move', { parentId: 'Gone' }],
+        ['a Properties rename', { name: 'Renamed', fromProperties: true }],
+    ])('%s refused as the item or folder changed outside Restfox tells the user and reloads', async(_label, change: { name?: string, parentId?: string, fromProperties?: boolean }) => {
+        const [login] = open(request('Login.json'))
+        const refusedChange = { error: 'Not saved, as /Login.json was changed outside Restfox', changedOutside: true }
+        vi.mocked(updateCollection).mockResolvedValue(refusedChange)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        if(change.parentId !== undefined || change.fromProperties) {
+            await store.dispatch('updateCollectionItem', { collectionId: 'Login.json', name: change.name ?? login.name, parentId: change.parentId ?? null })
+        } else {
+            await store.dispatch('updateCollectionItemName', { ...login, name: change.name })
+        }
+
+        expect(errorToasts()).toEqual([refusedChange.error])
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('a merge whose reply comes after the user opened a copy of the workspace leaves the copy\'s items alone', async() => {
+        const [first, second] = open(request('A.json'), request('B.json'))
+        store.state.collectionTree = [first, second]
+        setVersion('A.json', 'a1')
+        setVersion('B.json', 'b1')
+        const move = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId, fields) => 'parentId' in fields
+            ? move.promise
+            : { error: null, versionBefore: collectionId === 'A.json' ? 'a1' : 'b1', version: 'merged' })
+
+        const reorder = store.dispatch('reorderCollectionItem', { from: { id: 'B.json', parentId: null }, to: { id: 'A.json', parentId: null, type: 'request', cursorPosition: 'top' } })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        // the copy has items at the same paths, read at the same versions
+        store.state.activeWorkspace = { _id: 'copy-workspace', _type: 'file', name: 'Copy' } as Workspace
+        const copies = [request('A.json'), request('B.json')].map(item => ({ ...item, workspaceId: 'copy-workspace', sortOrder: 7 }))
+        loadItemVersions('copy-workspace', { 'A.json': 'a1', 'B.json': 'b1' })
+        open(...copies)
+        move.release({ error: null })
+        await reorder
+
+        expect(['A.json', 'B.json'].map(id => getItemVersion('copy-workspace', id))).toEqual(['a1', 'b1'])
+        expect(store.state.collection.map(item => item.sortOrder)).toEqual([7, 7])
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+    })
+
+    test('a reload that keeps an item takes the sort order it read', async() => {
+        const [login] = open(request('Login.json'))
+        login.sortOrder = 5
+        setVersion('Login.json', 'v1')
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([{ ...request('Login.json'), sortOrder: 2 } as CollectionItem], { 'Login.json': 'v1' }) as never)
+
+        await store.dispatch('refreshWorkspaceCollection')
+
+        expect(store.state.collection[0]).toBe(login)
+        expect(login.sortOrder).toBe(2)
+    })
+
+    test('a reload that read before a drag keeps the order the drag gave', async() => {
+        const [first, second] = open(request('A.json'), request('B.json'))
+        first.sortOrder = 0
+        second.sortOrder = 1
+        store.state.collectionTree = [first, second]
+        setVersion('A.json', 'a1')
+        setVersion('B.json', 'b1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId, fields) => 'sortOrder' in fields
+            ? { error: null, versionBefore: collectionId === 'A.json' ? 'a1' : 'b1', version: collectionId === 'A.json' ? 'a1' : 'b1' }
+            : { error: null })
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        await store.dispatch('reorderCollectionItem', { from: { id: 'B.json', parentId: null }, to: { id: 'A.json', parentId: null, type: 'request', cursorPosition: 'top' } })
+        read.release(readResult([{ ...request('A.json'), sortOrder: 0 }, { ...request('B.json'), sortOrder: 1 }] as CollectionItem[], { 'A.json': 'a1', 'B.json': 'b1' }))
+        await reload
+
+        expect(store.state.collection.map(item => [item._id, item.sortOrder])).toEqual([['A.json', 1], ['B.json', 0]])
+    })
+
+    test('a reload keeps the tab the user opened again while it read, with what was typed there', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        // closed and opened again: a new copy of the item
+        const reopened = { ...login, url: 'https://api.example/login/typed-after-reopening' } as CollectionItem
+        store.state.tabs = [reopened]
+        store.state.activeTab = reopened
+        read.release(readResult([request('Login.json')], { 'Login.json': 'v1' }))
+        await reload
+
+        expect(toRaw(store.state.collection[0])).toBe(toRaw(reopened))
+        expect(store.state.collection[0].url).toBe('https://api.example/login/typed-after-reopening')
+    })
+
+    test('a reload asked for while another runs reads after that one has reloaded its tabs too', async() => {
+        open(request('Login.json'))
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        const firstRead = heldRead()
+        let tabsReloadedBeforeSecondRead: boolean | null = null
+        vi.mocked(getCollectionForWorkspace)
+            .mockReturnValueOnce(firstRead.promise as never)
+            .mockImplementationOnce(async() => {
+                tabsReloadedBeforeSecondRead = (store.state.activeWorkspace as Workspace).tabIds !== undefined
+                return readResult([request('Login.json')], {}) as never
+            })
+
+        const first = store.dispatch('refreshWorkspace')
+        const second = store.dispatch('refreshWorkspace')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        firstRead.release(readResult([request('Login.json')], {}))
+        await first
+        await second
+
+        expect(tabsReloadedBeforeSecondRead).toBe(true)
+    })
+
+    // A reload that waits on another item's save, so the steps below run between its read and the moment it applies
+    async function replaceLoginWhileItsSaveWaits() {
+        const [login] = open(request('Login.json'), request('Other.json'))
+        setVersion('Login.json', 'v1')
+        setVersion('Other.json', 'o1')
+        const otherSave = held<UpdateCollectionResult>()
+        const loginSave = held<UpdateCollectionResult>()
+        const read = heldRead()
+        vi.mocked(updateCollection).mockReturnValueOnce(otherSave.promise).mockReturnValueOnce(loginSave.promise).mockResolvedValue({ error: null, version: 'v3' })
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never).mockReturnValue(pendingRead())
+
+        store.dispatch('persistCollectionItem', store.state.collection[1])
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        read.release(readResult([request('Login.json', 'https://api.example/changed-outside'), request('Other.json')], { 'Login.json': 'outside', 'Other.json': 'o2' }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        // a save of the item the reload is about to replace, which the reload does not wait for, and an edit after it
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(2))
+        login.url += '/before-the-reload'
+        store.dispatch('persistCollectionItem', login)
+        otherSave.release({ error: null, version: 'o2' })
+        await reload
+        expect(store.state.collection[0]).not.toBe(login)
+        return { login, fresh: store.state.collection[0], loginSave }
+    }
+
+    test('a save asked for before a reload replaced its item for an outside change is not sent', async() => {
+        const { loginSave } = await replaceLoginWhileItsSaveWaits()
+        loginSave.release(changedOutside)
+        await settled('Login.json')
+
+        expect(updateCollection).toHaveBeenCalledTimes(2)
+        expect(errorToasts()).toEqual([changedOutsideToast])
+    })
+
+    test('an edit made after a reload replaced its item is saved, while one still queued from before is not', async() => {
+        const { fresh, loginSave } = await replaceLoginWhileItsSaveWaits()
+        fresh.url += '/after-the-reload'
+        store.dispatch('persistCollectionItem', fresh)
+        loginSave.release(changedOutside)
+        await settled('Login.json')
+
+        expect(updateCollection).toHaveBeenCalledTimes(3)
+        expect(vi.mocked(updateCollection).mock.calls[2][2].url).toBe('https://api.example/changed-outside/after-the-reload')
+        expect(vi.mocked(updateCollection).mock.calls[2][3]).toBe('outside')
+        expect(errorToasts()).toEqual([changedOutsideToast])
+    })
+
+    test('the tab a duplicate opens saves from the version its sort order merge gave', async() => {
+        const [source] = open(request('Login.json'))
+        store.state.collectionTree = [source]
+        store.state.tabs = []
+        store.state.activeTab = null
+        setVersion('Login.json', 'v1')
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+        // the server answers with the id the duplicate sent and the path it gave the copy
+        vi.mocked(createCollections).mockImplementationOnce(async(_workspaceId, collections) => ({ error: null, results: [{ error: null, oldCollectionId: collections[0]._id, newCollectionId: 'Login (2).json', version: 'dup-v1' }] }))
+        vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId, fields, version) => {
+            // a merge sends the one field, a whole save the item, which has a sort order too
+            if(Object.keys(fields).length === 1 && 'sortOrder' in fields) {
+                return { error: null, versionBefore: collectionId === 'Login.json' ? 'v1' : 'dup-v1', version: `${collectionId}-merged` }
+            }
+            return version === 'Login (2).json-merged' ? { error: null, version: 'dup-v3' } : changedOutside
+        })
+
+        await store.dispatch('duplicateCollectionItem', toRaw(source))
+        await settled('Login.json', 'Login (2).json')
+        const tab = store.state.activeTab as CollectionItem
+        tab.url += '/typed'
+        store.dispatch('persistCollectionItem', tab)
+        await settled('Login (2).json')
+
+        expect(emitter.emit).not.toHaveBeenCalledWith('error', expect.stringContaining('changed outside Restfox'))
+        expect(versionOf('Login (2).json')).toBe('dup-v3')
+    })
+
+    test('an import merges the sort order only of items it moved', async() => {
+        const [login] = open({ ...request('Login.json'), sortOrder: 0 } as CollectionItem)
+        store.state.collectionTree = [login]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] })
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        const imported = store.dispatch('setCollectionTree', { collectionTree: [request('Imported.json')], parentId: null })
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalled())
+
+        expect(updateCollection).not.toHaveBeenCalled()
+        void imported
+    })
+
+    test('an import into a workspace kept in the browser leaves the open tabs on their objects', async() => {
+        const [login] = open(request('Login.json'))
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'local', name: 'Browser' } as Workspace
+        store.state.collectionTree = [login]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] })
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({ collection: [request('Login.json'), request('Imported.json')], workspace: null, idMap: null } as never)
+
+        await store.dispatch('setCollectionTree', { collectionTree: [request('Imported.json')], parentId: null })
+
+        expect(store.state.tabs[0]).toBe(login)
+        expect(store.state.collection.map(item => item._id)).toEqual(['Login.json', 'Imported.json'])
+    })
+
+    test('a delete waits for a save of the item still running, and holds leaving the page while it waits', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const save = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockImplementationOnce(async(_workspaceId, _id, _fields, _version, onSending) => {
+            onSending?.()
+            return save.promise
+        })
+        vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as never)
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        expect(itemWritesPending()).toBe(false)
+        const deleted = store.dispatch('deleteCollectionItem', login)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(deleteCollectionsByIds).not.toHaveBeenCalled()
+        expect(itemWritesPending()).toBe(true)
+        save.release({ error: null, version: 'v2' })
+        await deleted
+
+        expect(deleteCollectionsByIds).toHaveBeenCalledOnce()
+        expect(versionOf('Login.json')).toBe(null)
+    })
+
+    test('a delete that fails on the way, such as on a lost connection, leaves later saves of the item going out', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        vi.mocked(deleteCollectionsByIds).mockRejectedValueOnce(new Error('Failed to fetch'))
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, version: 'v2' })
+
+        await expect(store.dispatch('deleteCollectionItem', login)).rejects.toThrow('Failed to fetch')
+        login.url += '/typed'
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+
+        expect(updateCollection).toHaveBeenCalledOnce()
+    })
+
+    test.each(['refused', 'failed on the way'])('a delete the storage %s saves what the user changed while it waited', async(outcome) => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const save = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(save.promise).mockResolvedValue({ error: null, version: 'v3' })
+        if(outcome === 'refused') {
+            vi.mocked(deleteCollectionsByIds).mockResolvedValueOnce({ error: 'EBUSY: resource busy or locked' } as never)
+        } else {
+            vi.mocked(deleteCollectionsByIds).mockRejectedValueOnce(new Error('Failed to fetch'))
+        }
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        const deleted = store.dispatch('deleteCollectionItem', login)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        // a message arrives on the socket, which the tab saves
+        login.url += '/latest'
+        store.dispatch('persistCollectionItem', login)
+        save.release({ error: null, version: 'v2' })
+        await deleted.catch(() => undefined)
+        await settled('Login.json')
+
+        expect(updateCollection).toHaveBeenCalledTimes(2)
+        expect(vi.mocked(updateCollection).mock.calls[1][2].url).toBe('https://api.example/login/latest')
+        expect(vi.mocked(updateCollection).mock.calls[1][3]).toBe('v2')
+    })
+
+    test('a save dropped by a delete that then fails is not sent when a reload replaced the item meanwhile', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const deleteReply = held<{ error: string }>()
+        vi.mocked(deleteCollectionsByIds).mockReturnValueOnce(deleteReply.promise as never)
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce(readResult([request('Login.json', 'https://api.example/changed-outside')], { 'Login.json': 'outside' }) as never).mockReturnValue(pendingRead())
+
+        const deleted = store.dispatch('deleteCollectionItem', login)
+        await vi.waitFor(() => expect(deleteCollectionsByIds).toHaveBeenCalled())
+        login.url += '/typed'
+        store.dispatch('persistCollectionItem', login)
+        await settled('Login.json')
+        await store.dispatch('refreshWorkspaceCollection')
+        expect(store.state.collection[0]).not.toBe(login)
+        deleteReply.release({ error: 'EBUSY: resource busy or locked' })
+        await deleted
+        await settled('Login.json')
+
+        expect(updateCollection).not.toHaveBeenCalled()
+        expect(errorToasts()).toEqual(expect.arrayContaining(['EBUSY: resource busy or locked', changedOutsideToast]))
+        expect(errorToasts()).toHaveLength(2)
+    })
+
+    test('a delete drops the saves that would start while it waits, such as a connected socket\'s, without telling the user', async() => {
+        const [login] = open(request('Login.json'))
+        setVersion('Login.json', 'v1')
+        const save = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(save.promise).mockResolvedValue(changedOutside)
+        vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as never)
+
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        // a message arrives on the socket, which the tab saves
+        store.dispatch('persistCollectionItem', login)
+        const deleted = store.dispatch('deleteCollectionItem', login)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        store.dispatch('persistCollectionItem', login)
+        save.release({ error: null, version: 'v2' })
+        await deleted
+
+        expect(updateCollection).toHaveBeenCalledOnce()
+        expect(errorToasts()).toEqual([])
+    })
+
+    test('an import creates only the new items, merges the sort order of one already open after its save through its writes, and ends with a reload that keeps the open tab', async() => {
+        const [login] = open(request('Login.json'))
+        store.state.collectionTree = [login]
+        Object.assign(store.state.activeWorkspace as Workspace, { tabIds: ['Login.json'], activeTabId: 'Login.json' })
+        // the open tab is a copy of the item, as addTab makes it
+        const tab = { ...login } as CollectionItem
+        setVersion('Login.json', 'v1')
+        store.state.tabs = [tab]
+        store.state.activeTab = tab
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        vi.stubGlobal('document', {
+            querySelector: () => null,
+        })
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] })
+        const save = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(save.promise).mockResolvedValue({ error: null, versionBefore: 'v2', version: 'v3' })
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue(readResult([request('Login.json')], { 'Login.json': 'v3' }) as never)
+
+        // an edit whose save is still running when the import renumbers the tree
+        store.dispatch('persistCollectionItem', tab)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        const imported = store.dispatch('setCollectionTree', { collectionTree: [request('Imported.json')], parentId: null })
+        await vi.waitFor(() => expect(createCollections).toHaveBeenCalledOnce())
+        expect(vi.mocked(createCollections).mock.calls[0][1].map(item => item._id)).toEqual(['Imported.json'])
+        expect(updateCollection).toHaveBeenCalledOnce()
+        save.release({ error: null, version: 'v2' })
+        await imported
+
+        expect(vi.mocked(updateCollection).mock.calls[1].slice(0, 3)).toEqual(['workspace-id', 'Login.json', { sortOrder: 0 }])
+        expect(versionOf('Login.json')).toBe('v3')
+        expect(getCollectionForWorkspace).toHaveBeenCalledWith('workspace-id', null, true)
+        expect(toRaw(store.state.collection[0])).toBe(toRaw(tab))
+        expect(toRaw(store.state.tabs[0])).toBe(toRaw(tab))
     })
 })

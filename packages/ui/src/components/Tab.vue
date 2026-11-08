@@ -110,7 +110,7 @@ watch(() => props.collectionItem, (newValue, oldValue) => {
             return
         }
 
-        store.commit('persistCollectionItem', newValue)
+        store.dispatch('persistCollectionItem', newValue)
 
         // keep sidebarItem properties in sync with collectionItem
         const sidebarItem = findItemInTreeById(store.state.collectionTree, props.collectionItem._id)

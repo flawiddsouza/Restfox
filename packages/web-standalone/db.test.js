@@ -6,6 +6,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as db from './src/db.js'
 import app from './app.js'
+import { itemFileVersion } from '../electron/shared/helpers.js'
+import { createDatabase } from '../electron/shared/db.js'
+import dotenv from 'dotenv'
+import * as dbHelpers from './src/db-helpers.js'
+import * as fileUtils from './src/file-utils.js'
 
 // the file workspace code logs every call
 const consoleLog = console.log
@@ -657,3 +662,165 @@ for(const kind of ['grpc', 'http']) {
         }
     }))
 }
+
+function requestItem(workspace, name = 'Item') {
+    return { _id: 'new', _type: 'request', name, parentId: null, workspaceId: workspace._id, method: 'GET', url: 'https://api.example/a', body: { mimeType: 'No Body' } }
+}
+
+function fileText(workspace, name) {
+    return fs.readFileSync(path.join(workspace.location, name), 'utf8')
+}
+
+test('a whole item save is checked against the version of its file, and a merge of one field gives the versions before and after', async() => {
+    await withWorkspace(async(workspace) => {
+        const created = await db.createCollection(workspace, requestItem(workspace))
+        assert.equal(created.version, itemFileVersion(fileText(workspace, 'Item.json')))
+        const id = created.newCollectionId
+        const loaded = await db.getCollectionForWorkspace(workspace, null)
+        assert.deepEqual(loaded.versions, { [id]: created.version })
+
+        const saved = await db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/b' }, created.version)
+        assert.deepEqual(saved, { error: null, version: itemFileVersion(fileText(workspace, 'Item.json')) })
+
+        const outside = JSON.stringify({ ...JSON.parse(fileText(workspace, 'Item.json')), url: 'https://api.example/outside' }, null, 4)
+        fs.writeFileSync(path.join(workspace.location, 'Item.json'), outside)
+        for (const staleVersion of [saved.version, null]) {
+            const refused = await db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/typed' }, staleVersion)
+            assert.equal(refused.changedOutside, true)
+            assert.equal(fileText(workspace, 'Item.json'), outside)
+        }
+
+        const merged = await db.updateCollection(workspace, id, { sortOrder: 3 })
+        assert.deepEqual(merged, { error: null, versionBefore: itemFileVersion(outside), version: itemFileVersion(fileText(workspace, 'Item.json')) })
+        assert.equal(JSON.parse(fileText(workspace, 'Item.json')).url, 'https://api.example/outside')
+    })
+})
+
+test('the save route passes the version, and a page sending none is not checked', async() => {
+    await withWorkspace(async(workspace) => {
+        const { newCollectionId: id, version } = await db.createCollection(workspace, requestItem(workspace))
+        fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...JSON.parse(fileText(workspace, 'Item.json')), url: 'https://api.example/outside' }, null, 4))
+        const server = app.listen(0, '127.0.0.1')
+        try {
+            await new Promise(resolve => server.once('listening', resolve))
+            const post = body => fetch(`http://127.0.0.1:${server.address().port}/api/updateCollection`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(res => res.json())
+
+            const refused = await post({ workspace, collectionId: id, updatedFields: { ...requestItem(workspace), url: 'https://api.example/typed' }, version })
+            assert.equal(refused.result.changedOutside, true)
+
+            await post({ workspace, collectionId: id, updatedFields: { ...requestItem(workspace), url: 'https://api.example/old-page' } })
+            assert.equal(JSON.parse(fileText(workspace, 'Item.json')).url, 'https://api.example/old-page')
+        } finally {
+            server.close()
+        }
+    })
+})
+
+test('the version leaves out the sort order, which a whole save keeps as the file has it, and a merge into a deleted file is refused', async() => {
+    await withWorkspace(async(workspace) => {
+        const { newCollectionId: id, version } = await db.createCollection(workspace, requestItem(workspace))
+        const merged = await db.updateCollection(workspace, id, { sortOrder: 4 })
+        assert.equal(merged.version, version)
+
+        const saved = await db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/typed', sortOrder: 1 }, version)
+        assert.equal(saved.error, null)
+        assert.equal(JSON.parse(fileText(workspace, 'Item.json')).sortOrder, 4)
+
+        fs.rmSync(path.join(workspace.location, 'Item.json'))
+        assert.equal((await db.updateCollection(workspace, id, { sortOrder: 3 })).changedOutside, true)
+        assert.equal(fs.existsSync(path.join(workspace.location, 'Item.json')), false)
+    })
+})
+
+test('a save whose write fails partway leaves the file as it was, a server started again reaches files by id, and a moved socket takes its messages', async(t) => {
+    await withWorkspace(async(workspace) => {
+        const { newCollectionId: id, version } = await db.createCollection(workspace, requestItem(workspace))
+        const textBefore = fileText(workspace, 'Item.json')
+        const writeFile = fsPromises.writeFile
+        t.mock.method(fsPromises, 'writeFile', async(target, text) => {
+            await writeFile(target, String(text).slice(0, 10))
+            throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+        }, { times: 1 })
+        await assert.rejects(db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/typed' }, version), /ENOSPC/)
+        assert.equal(fileText(workspace, 'Item.json'), textBefore)
+        assert.deepEqual(fs.readdirSync(workspace.location).filter(name => name.endsWith('.tmp')), [])
+
+        const restarted = createDatabase(fileUtils, dbHelpers, dotenv)
+        assert.equal((await restarted.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/after-restart' }, version)).error, null)
+        assert.equal(JSON.parse(fileText(workspace, 'Item.json')).url, 'https://api.example/after-restart')
+
+        const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id })
+        const socket = await db.createCollection(workspace, { _id: 's', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'kept' }] }] })
+        await db.updateCollection(workspace, socket.newCollectionId, { parentId: folder.newCollectionId })
+        assert.deepEqual(JSON.parse(fileText(workspace, path.join('Folder', 'Chat.messages.json'))), { c1: [{ text: 'kept' }] })
+    })
+})
+
+test('a sort order update writes in place, as it reaches every sibling', async(t) => {
+    await withWorkspace(async(workspace) => {
+        const { newCollectionId: id } = await db.createCollection(workspace, requestItem(workspace))
+        const rename = t.mock.method(fsPromises, 'rename')
+        await db.updateCollection(workspace, id, { sortOrder: 3 })
+        assert.equal(rename.mock.callCount(), 0)
+        assert.equal(JSON.parse(fileText(workspace, 'Item.json')).sortOrder, 3)
+    })
+})
+
+test('a save of an item whose name is near the limit on a file name goes through', async() => {
+    await withWorkspace(async(workspace) => {
+        const name = 'a'.repeat(240)
+        const { newCollectionId: id, version } = await db.createCollection(workspace, requestItem(workspace, name))
+        const saved = await db.updateCollection(workspace, id, { ...requestItem(workspace, name), url: 'https://api.example/long-name' }, version)
+        assert.equal(saved.error, null)
+        assert.equal(JSON.parse(fileText(workspace, `${name}.json`)).url, 'https://api.example/long-name')
+    })
+})
+
+test('duplicating a socket under the name of the item it copies leaves that item\'s messages alone', async() => {
+    await withWorkspace(async(workspace) => {
+        await db.createCollection(workspace, { _id: 'new', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'newer' }] }] })
+        const messagesBefore = fileText(workspace, 'Chat.messages.json')
+
+        const result = await db.createCollection(workspace, { _id: 'copy', _type: 'socket', name: 'Chat', parentId: null, workspaceId: workspace._id, clients: [{ id: 'c1', messages: [{ text: 'older copy' }] }] })
+
+        assert.equal(result.error, 'Cannot create Chat as it already exists')
+        assert.equal(fileText(workspace, 'Chat.messages.json'), messagesBefore)
+    })
+})
+
+test('an id from before a rename reaches the renamed file for one more scan, and no file after the next', async() => {
+    await withWorkspace(async(workspace) => {
+        const { newCollectionId: id } = await db.createCollection(workspace, requestItem(workspace))
+        await db.getCollectionForWorkspace(workspace, null)
+        await db.updateCollection(workspace, id, { name: 'Renamed' })
+        await db.getCollectionForWorkspace(workspace, null)
+
+        const saved = await db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/after-rename' }, itemFileVersion(fileText(workspace, 'Renamed.json')))
+        assert.equal(saved.error, null)
+        assert.equal(JSON.parse(fileText(workspace, 'Renamed.json')).url, 'https://api.example/after-rename')
+
+        await db.getCollectionForWorkspace(workspace, null)
+        const textBefore = fileText(workspace, 'Renamed.json')
+        await assert.rejects(db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/stale' }))
+        // a page that holds the item, such as another tab, reloads rather than failing on every edit
+        assert.equal((await db.updateCollection(workspace, id, { ...requestItem(workspace), url: 'https://api.example/stale' }, saved.version)).changedOutside, true)
+        assert.equal((await db.updateCollection(workspace, id, { sortOrder: 2 })).changedOutside, true)
+        assert.equal(fileText(workspace, 'Renamed.json'), textBefore)
+    })
+})
+
+test('an id kept from before a rename that a new item takes stays that item\'s at the next scan, and an import with a kept id creates its item', async() => {
+    await withWorkspace(async(workspace) => {
+        const { newCollectionId: id } = await db.createCollection(workspace, requestItem(workspace, 'a'))
+        await db.getCollectionForWorkspace(workspace, null)
+        await db.updateCollection(workspace, id, { name: 'b' })
+        await db.getCollectionForWorkspace(workspace, null)
+
+        const imported = await db.createCollections(workspace, [{ ...requestItem(workspace, 'a'), _id: id, sortOrder: 7 }])
+        assert.equal(imported.results[0].newCollectionId, id)
+        assert.equal(JSON.parse(fileText(workspace, 'b.json')).sortOrder, undefined)
+
+        const loaded = await db.getCollectionForWorkspace(workspace, null)
+        assert.deepEqual(new Map(loaded.idMap).get(id), id)
+    })
+})
