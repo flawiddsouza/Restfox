@@ -82,3 +82,36 @@ test('the current failed URL preview still shows its placeholder', async() => {
     await RequestPanel.methods!.getUrlPreview.call(panel)
     expect(panel.urlPreview).toBe('https://old.test/<no value found>')
 })
+
+test('a script save carries the code the text was typed on, which a reload before the save goes out can replace', () => {
+    const code = { pre_request: 'file', post_request: '' }
+    const panel = { skipScriptUpdate: false, activeTab: { _id: 'r', workspaceId: 'w' }, script: { pre_request: 'typed', post_request: '' }, scriptPlugin: { code }, handleScriptSave: vi.fn() }
+    ;(RequestPanel as unknown as { watch: { script: { handler: (this: unknown) => void } } }).watch.script.handler.call(panel)
+    expect(panel.handleScriptSave).toHaveBeenCalledWith(panel, expect.objectContaining({ basedOn: code, typedInWorkspaceId: 'w' }))
+})
+
+const scriptPluginWatcher = (RequestPanel as unknown as { watch: { scriptPlugin: { handler: (this: unknown, plugin: unknown, previous: unknown) => void } } }).watch.scriptPlugin.handler
+
+test('a reload that brings a script unchanged leaves what is being typed in the editor', () => {
+    const code = { pre_request: 'file', post_request: '' }
+    const scriptPlugin = { _id: 'p', code: { ...code } }
+    const panel = { skipScriptUpdate: false, script: { pre_request: 'typed', post_request: '' }, scriptPlugin }
+    scriptPluginWatcher.call(panel, scriptPlugin, { _id: 'p', code })
+    expect(panel.script.pre_request).toBe('typed')
+    expect(panel.skipScriptUpdate).toBe(false)
+})
+
+test.each([
+    ['a reload that brings other code', { _id: 'p', code: { pre_request: 'typed before', post_request: '' } }],
+    ['another request\'s script', { _id: 'other', code: { pre_request: 'file', post_request: '' } }],
+])('%s replaces the editor\'s text', (_label, previous) => {
+    const panel = { skipScriptUpdate: false, script: { pre_request: 'typed', post_request: '' }, scriptPlugin: { _id: 'p', code: { pre_request: 'file', post_request: '' } } }
+    scriptPluginWatcher.call(panel, panel.scriptPlugin, previous)
+    expect(panel.script.pre_request).toBe('file')
+})
+
+test('a script typed before the page knew of one is saved with no base', () => {
+    const panel = { skipScriptUpdate: false, activeTab: { _id: 'r', workspaceId: 'w' }, script: { pre_request: 'typed', post_request: '' }, scriptPlugin: undefined, handleScriptSave: vi.fn() }
+    ;(RequestPanel as unknown as { watch: { script: { handler: (this: unknown) => void } } }).watch.script.handler.call(panel)
+    expect(panel.handleScriptSave).toHaveBeenCalledWith(panel, expect.objectContaining({ basedOn: null }))
+})

@@ -1,5 +1,5 @@
-// What this page knows about the file of each request, socket or gRPC item in a file workspace, kept by workspace and
-// item id, which every copy of an item keeps, such as the tab opened on it, so all copies save from one version. It is
+// What this page knows about the file of each item in a file workspace, a folder's being its headers and auth, and the
+// order of each script's saves, kept by workspace and item id, which every copy of an item keeps, such as the tab opened on it, so all copies save from one version. It is
 // kept in memory only, never in the item, so it is never saved or exported. An entry is changed in place and never
 // replaced, so a write that started on it still reaches it after its item was renamed
 export interface ItemFileEntry {
@@ -77,13 +77,21 @@ export function setItemVersion(entry: ItemFileEntry, version: string) {
     }
 }
 
+// the queue of one script's saves, by the script's own id, which a rename of its request leaves as it is
+const SCRIPT_WRITES_PREFIX = 'plugin:'
+
+export function scriptWriteKey(pluginId: string) {
+    return `${SCRIPT_WRITES_PREFIX}${pluginId}`
+}
+
 // The versions a load of the workspace shown read, whose objects replace those shown before. Entries of ids it did
 // not read are forgotten
 export function loadItemVersions(workspaceId: string, versions: Record<string, string> | undefined) {
     workspaceLoads++
     const entries = entriesOf(workspaceId)
     for(const id of [...entries.keys()]) {
-        if(versions?.[id] === undefined) {
+        // a load knows nothing of a script's saves, and one may still be running
+        if(versions?.[id] === undefined && !id.startsWith(SCRIPT_WRITES_PREFIX)) {
             entries.delete(id)
         }
     }

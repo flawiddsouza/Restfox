@@ -30,13 +30,10 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
             try {
                 const collectionData = JSON.parse(await fs.readFile(path.join(fullPath, constants.FILES.FOLDER_CONFIG), 'utf8'))
 
-                const { environments, environment, currentEnvironment, currentEnvironmentUnreadable } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
+                const { environments, environment, currentEnvironment } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
 
-                if(currentEnvironment !== collectionData.currentEnvironment && !currentEnvironmentUnreadable) {
-                    await fileUtils.writeFileJson(path.join(fullPath, constants.FILES.FOLDER_CONFIG), {
-                        ...collectionData,
-                        currentEnvironment,
-                    }, 'Update current environment in folder config')
+                if (versions) {
+                    versions[idForCollectionitem] = helpers.folderSettingsVersion(collectionData)
                 }
 
                 collectionItem.currentEnvironment = currentEnvironment
@@ -119,7 +116,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 const fullPathWithoutWorkspaceLocation = helpers.removePrefixFromString(fullPath, workspace.location)
 
                 if (fileOrFolder.isDirectory()) {
-                    const collection = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation)
+                    const collection = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions)
 
                     if(collection) {
                         items.push(collection)
@@ -201,7 +198,6 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
 
     async function getEnvironments(envsDirPath, currentEnvironment) {
         const environments = []
-        const unreadableNames = new Set()
 
         const envFiles = await fileUtils.readdirIgnoreError(envsDirPath)
 
@@ -228,7 +224,6 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 })
             } catch (err) {
                 console.error(`Error reading environment file: ${fileName}`, err)
-                unreadableNames.add(fileUtils.decodeFilename(fileName.slice(0, -'.json'.length)))
             }
         }
 
@@ -258,10 +253,6 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
             returnData.environment = {}
             returnData.currentEnvironment = constants.DEFAULT_ENVIRONMENT
         }
-
-        // the pick names an environment whose file loading skipped, such as one with git merge conflict markers, so the
-        // first one stands in for it until the file is fixed, and the saved pick is left as it is
-        returnData.currentEnvironmentUnreadable = currentEnvironment !== undefined && unreadableNames.has(currentEnvironment)
 
         return returnData
     }

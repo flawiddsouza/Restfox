@@ -61,6 +61,7 @@ import {
     beginItemReload,
     endItemReload,
     enqueueItemWrite,
+    scriptWriteKey,
     forgetItems,
     getItemEntry,
     holdUnloadWhile,
@@ -183,6 +184,16 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
     // by now have ended, every version the files held before the read is in its entry's history
     await Promise.all(collection.map((item: CollectionItem) => itemWritesSettled(activeWorkspaceId, previousIdOf(item._id))))
 
+    // a folder's object is replaced, and the Folder panel with it, so its saves asked for during that wait go first, or
+    // the panel would go back to what the last reply left
+    const folderChains = () => collection.filter((item: CollectionItem) => item._type === 'request_group').map((item: CollectionItem) => peekItemEntry(activeWorkspaceId, previousIdOf(item._id))?.chain)
+    for(let chains = folderChains(); ; chains = folderChains()) {
+        await Promise.all(chains)
+        if(folderChains().every((chain: Promise<void> | undefined, index: number) => chain === chains[index])) {
+            break
+        }
+    }
+
     // a newer load was applied meanwhile, such as after the user opened another workspace and came back
     if(loadedSince(load) || context.state.activeWorkspace?._id !== activeWorkspaceId) {
         return false
@@ -214,6 +225,21 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
             return item
         }
         const entry = getItemEntry(activeWorkspaceId, previousId)
+        // a folder holds no typing, so its object is replaced, and only its version follows what was read
+        if(item._type === 'request_group') {
+            if(!entry.history.includes(version)) {
+                setItemVersion(entry, version)
+            } else if(entry.version !== version) {
+                // a save came after the read, so what it wrote stays on screen for the next save to build on. Raw, as
+                // a drag and Duplicate clone the raw items
+                const previous = toRaw(objectsById.get(previousId)?.[0])
+                if(previous) {
+                    item.headers = previous.headers
+                    item.authentication = previous.authentication
+                }
+            }
+            return item
+        }
         // the object the user edits: the tab open now, else the collection's
         const previous = objectsById.get(previousId)?.[0]
         if(previous && previous._type === item._type && entry.history.includes(version)) {
@@ -359,19 +385,21 @@ function itemObjectLists(state: State): CollectionItem[][] {
 // A merge of one field into an item's file, such as its sort order, which keeps a change made outside Restfox. When the
 // page held the version the file had before, the objects for the item take the merged fields, as the field may have
 // been set on a copy, such as the sidebar's during a drag, and the entry the new version. When it held another, the file
-// had such a change, which the merge would otherwise hide from the watcher, so the workspace shown reloads. A folder,
-// a browser workspace or a server that sends no version has nothing to compare
+// had such a change, which the merge would otherwise hide from the watcher, so the workspace shown reloads. A browser
+// workspace or a server that sends no version has nothing to compare
 async function mergeIntoItemFile(context: ActionContext<State, State>, item: CollectionItem, updatedFields: Partial<CollectionItem>): Promise<UpdateCollectionResult> {
     const workspaceId = item.workspaceId
+    // a folder's headers and auth, which replace the file's, go from the version the page holds
+    const checksFolderSettings = item._type === 'request_group' && ('headers' in updatedFields || 'authentication' in updatedFields)
     const result = await enqueueItemWrite(getItemEntry(workspaceId, item._id), async(entry, sent) => {
         let result: UpdateCollectionResult
         try {
-            result = await updateCollection(workspaceId, item._id, updatedFields, undefined, sent)
+            result = await updateCollection(workspaceId, item._id, updatedFields, checksFolderSettings ? entry.version ?? undefined : undefined, sent)
         } catch(error) {
             // such as a write to a read-only file, which the callers show as they show a refusal
             return { result: { error: error instanceof Error ? error.message : String(error) }, changedOutside: false }
         }
-        // the file is gone
+        // the file is gone, or a folder's headers or auth changed outside Restfox
         if(result.changedOutside) {
             return { result, changedOutside: true }
         }
@@ -392,6 +420,11 @@ async function mergeIntoItemFile(context: ActionContext<State, State>, item: Col
         for(const object of itemObjectsForId(context.state, workspaceId, item._id)) {
             Object.assign(object, updatedFields)
         }
+    }
+    // told once and reloaded once, as the Folder panel asks for a save on every keystroke
+    if(checksFolderSettings && result.changedOutside) {
+        reportItemChangedOutside(context, item)
+        return { error: null, changedOutside: true }
     }
     if(result.changedOutside && context.state.activeWorkspace?._id === workspaceId) {
         context.dispatch('refreshWorkspace')
@@ -427,6 +460,39 @@ function reportItemChangedOutside(context: ActionContext<State, State>, item: Co
     if(shown) {
         context.dispatch('refreshWorkspace')
     }
+}
+
+// A script's code changed outside Restfox: the workspace's scripts are read again, and the editor shows the file's code
+function scriptChangedOutside(workspaceId: string) {
+    const shown = store.state.activeWorkspace?._id === workspaceId
+    const message = shown
+        ? 'This script changed outside Restfox and was reloaded. Your last change to it was not saved.'
+        : 'This script changed outside Restfox, so your last change to it was not saved.'
+    console.warn(message)
+    emitter.emit('error', message)
+    if(shown) {
+        store.commit('loadWorkspacePlugins')
+    }
+}
+
+// A script's save failed: its code goes back, on the object shown now too, as a read may have replaced the one the save
+// began on, unless a later save has set its own
+function putBackScriptCode(plugin: Plugin, codeAsked: unknown, previousCode: Plugin['code']) {
+    const shown = store.state.plugins.workspace.find(item => item._id === plugin._id)
+    for(const object of shown ? [plugin, shown] : [plugin]) {
+        if(toRaw(object.code) === toRaw(codeAsked)) {
+            object.code = previousCode
+        }
+    }
+}
+
+// when each script's save was last asked for, so a read of the scripts begun before it does not put older code on screen
+let scriptSavesAsked = 0
+let scriptReadsAsked = 0
+const scriptSaveAskedAt = new Map<string, number>()
+
+function noteScriptSaveAsked(pluginId: string) {
+    scriptSaveAskedAt.set(pluginId, ++scriptSavesAsked)
 }
 
 // environments a file workspace refused while copying or importing folders, which were made without them, also before
@@ -940,7 +1006,27 @@ export const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
             console.log('loadWorkspacePlugins')
-            state.plugins.workspace = await getWorkspacePlugins(state.activeWorkspace._id)
+            const load = ++scriptReadsAsked
+            const workspaceId = state.activeWorkspace._id
+            const savesAskedBefore = scriptSavesAsked
+            // a save already asked for reaches the storage first, or the read brings older code than the page holds
+            await Promise.all(state.plugins.workspace.map(plugin => itemWritesSettled(workspaceId, scriptWriteKey(plugin._id))))
+            const plugins = await getWorkspacePlugins(workspaceId)
+            // a newer read has been asked for, or the workspace was left
+            if(load !== scriptReadsAsked || state.activeWorkspace?._id !== workspaceId) {
+                return
+            }
+            const askedSince = (pluginId: string) => (scriptSaveAskedAt.get(pluginId) ?? 0) > savesAskedBefore
+            const pluginsShown = new Map(state.plugins.workspace.map(plugin => [plugin._id, plugin]))
+            for(const plugin of plugins) {
+                const shown = pluginsShown.get(plugin._id)
+                if(shown && askedSince(plugin._id)) {
+                    plugin.code = toRaw(shown.code)
+                }
+                pluginsShown.delete(plugin._id)
+            }
+            // and one made since, which the read did not find
+            state.plugins.workspace = [...plugins, ...[...pluginsShown.values()].filter(plugin => askedSince(plugin._id))]
             emitter.emit('plugins', {
                 name: 'loaded'
             })
@@ -986,6 +1072,8 @@ export const store = createStore<State>({
                 const foundPlugin = [...state.plugins.global, ...state.plugins.workspace].find(item => item._id === plugin._id)
                 const previousWorkspaceId = foundPlugin.workspaceId
                 const newWorkspaceId = plugin.workspaceId
+                // the code too, unless it was set when the save was asked for, where a later save may have set its own
+                let fieldsSaved: Partial<typeof updatePluginData> = updatePluginData
 
                 // plugin scope changed from global to workspace
                 if(!previousWorkspaceId && newWorkspaceId && state.activeWorkspace?._type === 'file') {
@@ -1002,10 +1090,30 @@ export const store = createStore<State>({
                         throw new Error('activeWorkspace is null')
                     }
 
-                    await updatePlugin(plugin._id, updatePluginData, state.activeWorkspace._id, foundPlugin.collectionId ?? null)
+                    const workspaceId = state.activeWorkspace._id
+                    const expectedCode = JSON.parse(JSON.stringify(foundPlugin.code))
+                    const previousCode = foundPlugin.code
+                    const putBackCode = () => putBackScriptCode(foundPlugin, updatePluginData.code, previousCode)
+                    // at once, as the next save of this script goes from what this one leaves, and a read of the scripts
+                    // already running keeps it
+                    foundPlugin.code = updatePluginData.code
+                    noteScriptSaveAsked(plugin._id)
+                    let result
+                    try {
+                        result = await enqueueItemWrite(getItemEntry(workspaceId, scriptWriteKey(plugin._id)), () => updatePlugin(plugin._id, updatePluginData, workspaceId, foundPlugin.collectionId ?? null, expectedCode))
+                    } catch(error) {
+                        putBackCode()
+                        throw error
+                    }
+                    if(result?.changedOutside) {
+                        putBackCode()
+                        scriptChangedOutside(workspaceId)
+                        return
+                    }
+                    fieldsSaved = { name: updatePluginData.name, workspaceId: updatePluginData.workspaceId, updatedAt: updatePluginData.updatedAt }
                 }
 
-                Object.assign(foundPlugin, updatePluginData)
+                Object.assign(foundPlugin, fieldsSaved)
 
                 if(!previousWorkspaceId && newWorkspaceId) {
                     state.plugins.global = state.plugins.global.filter(item => item._id !== foundPlugin._id)
@@ -1748,10 +1856,20 @@ export const store = createStore<State>({
         async loadGlobalPlugins(context) {
             context.state.plugins.global = await getGlobalPlugins()
         },
-        async saveRequestScript(context, { collectionId, code }: {
+        async saveRequestScript(context, { collectionId, code, basedOn, typedInWorkspaceId }: {
             collectionId: string,
-            code: { pre_request: string, post_request: string }
+            code: { pre_request: string, post_request: string },
+            // the script's code when the text was typed, which a reload since may have replaced, and null when the page
+            // knew of no script then, so a script found since is not written over
+            basedOn?: { pre_request: string, post_request: string } | null,
+            typedInWorkspaceId?: string,
         }) {
+            // the workspace was left before the save went out, and another can hold a script of the same id
+            if(typedInWorkspaceId !== undefined && context.state.activeWorkspace?._id !== typedInWorkspaceId) {
+                console.warn('A script edit made just before leaving its workspace was not saved')
+                return false
+            }
+
             if(context.state.activeWorkspace === null) {
                 throw new Error('activeWorkspace is null')
             }
@@ -1770,23 +1888,40 @@ export const store = createStore<State>({
 
             try {
                 if(scriptPlugin && !scriptPluginsNotSaved.has(scriptPlugin._id)) {
-                    await updatePlugin(scriptPlugin._id, {
-                        name: null,
-                        code: scriptCode,
-                        workspaceId: scriptPlugin.workspaceId,
-                        updatedAt,
-                    }, workspaceId, collectionId)
+                    const previousCode = scriptPlugin.code
+                    const expectedCode = JSON.parse(JSON.stringify(basedOn === undefined ? previousCode : basedOn))
+                    // at once, as the base of the next edit is the text this save leaves in the file
+                    scriptPlugin.code = scriptCode
+                    noteScriptSaveAsked(scriptPlugin._id)
+                    let result
+                    try {
+                        // one save of a script at a time, as each is checked against the one before it
+                        result = await enqueueItemWrite(getItemEntry(workspaceId, scriptWriteKey(scriptPlugin._id)), () => updatePlugin(scriptPlugin._id, {
+                            name: null,
+                            code: scriptCode,
+                            workspaceId: scriptPlugin.workspaceId,
+                            updatedAt,
+                        }, workspaceId, collectionId, expectedCode))
+                    } catch(error) {
+                        putBackScriptCode(scriptPlugin, scriptCode, previousCode)
+                        throw error
+                    }
+
+                    if(result?.changedOutside) {
+                        scriptChangedOutside(workspaceId)
+                        return false
+                    }
 
                     scriptPlugin.name = null
-                    scriptPlugin.code = scriptCode
                     scriptPlugin.updatedAt = updatedAt
                 } else if(scriptPlugin) {
                     scriptPlugin.code = scriptCode
+                    noteScriptSaveAsked(scriptPlugin._id)
                     scriptPlugin.updatedAt = updatedAt
                     // marked saved before the wait, as a first create is, so another edit meanwhile updates it
                     scriptPluginsNotSaved.delete(scriptPlugin._id)
                     try {
-                        await createPlugin(toRaw(scriptPlugin), workspaceId)
+                        await enqueueItemWrite(getItemEntry(workspaceId, scriptWriteKey(scriptPlugin._id)), () => createPlugin(toRaw(scriptPlugin), workspaceId))
                     } catch(error) {
                         scriptPluginsNotSaved.add(scriptPlugin._id)
                         throw error
@@ -1807,8 +1942,9 @@ export const store = createStore<State>({
                     // Reserve the script plugin before persistence so another edit cannot create a
                     // second plugin while the filesystem write is still in progress.
                     context.state.plugins.workspace.push(newPlugin)
+                    noteScriptSaveAsked(newPlugin._id)
                     try {
-                        await createPlugin(newPlugin, workspaceId)
+                        await enqueueItemWrite(getItemEntry(workspaceId, scriptWriteKey(newPlugin._id)), () => createPlugin(newPlugin, workspaceId))
                     } catch(error) {
                         scriptPluginsNotSaved.add(newPlugin._id)
                         throw error
@@ -2590,6 +2726,11 @@ export const store = createStore<State>({
                         emitter.emit('error', result.error)
                         return result
                     }
+
+                    // the file holds something else, which the reload brings
+                    if(result.changedOutside) {
+                        return result
+                    }
                 }
 
                 if('authentication' in propertiesToUpdate) {
@@ -2599,6 +2740,10 @@ export const store = createStore<State>({
 
                     if(result.error) {
                         emitter.emit('error', result.error)
+                        return result
+                    }
+
+                    if(result.changedOutside) {
                         return result
                     }
                 }
@@ -2618,7 +2763,7 @@ export const store = createStore<State>({
                 collectionItem.authentication = authentication
 
                 // keep tab properties in tabs in sync with collectionItem
-                const tab = store.state.tabs.find(tab => tab._id === collectionItem._id)
+                const tab = store.state.tabs.find(tab => tab._id === collectionItem._id && tab.workspaceId === collectionItem.workspaceId)
                 if(tab) {
                     Object.assign(tab, collectionItem)
                 }

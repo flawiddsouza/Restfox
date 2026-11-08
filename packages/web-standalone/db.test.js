@@ -766,6 +766,62 @@ test('a sort order update writes in place, as it reaches every sibling', async(t
     })
 })
 
+test('opening a workspace writes neither its settings nor a folder\'s when an environment has to stand in for the pick', async() => {
+    await withWorkspace(async(workspace) => {
+        const config = path.join(workspace.location, 'restfox.json')
+        fs.writeFileSync(config, JSON.stringify({ version: 1, name: 'W' }))
+        fs.mkdirSync(path.join(workspace.location, 'Folder'))
+        const folderConfig = path.join(workspace.location, 'Folder', '_.json')
+        fs.writeFileSync(folderConfig, JSON.stringify({ sortOrder: 0, currentEnvironment: 'Gone' }))
+        const before = [fs.readFileSync(config, 'utf8'), fs.readFileSync(folderConfig, 'utf8')]
+
+        const loaded = await db.getCollectionForWorkspace(workspace, null)
+
+        assert.deepEqual([fs.readFileSync(config, 'utf8'), fs.readFileSync(folderConfig, 'utf8')], before)
+        assert.equal(loaded.workspace.currentEnvironment, 'Default')
+    })
+})
+
+test('a folder duplicated or imported keeps its headers and auth in web-standalone too', () => withWorkspace(async workspace => {
+    const headers = [{ name: 'X-Folder', value: '1' }]
+    await db.createCollections(workspace, [{ _id: 'f', _type: 'request_group', name: 'Copy', parentId: null, workspaceId: workspace._id, headers }])
+    const folder = (await db.getCollectionForWorkspace(workspace, null)).collection.find(item => item.name === 'Copy')
+    assert.deepEqual(folder.headers, headers)
+}))
+
+test('a script\'s save reaches a request after the server restarted, and is refused for an id it cannot find', () => withWorkspace(async workspace => {
+    const created = await db.createCollection(workspace, { _id: 'r', _type: 'request', name: 'Item', parentId: null, workspaceId: workspace._id, method: 'GET', url: '', headers: [], parameters: [], body: { mimeType: 'No Body' } })
+    const code = { pre_request: 'file', post_request: '' }
+    await db.createPlugin(workspace, { _id: 'p1', type: 'script', name: null, code, collectionId: created.newCollectionId, enabled: true })
+    await db.getCollectionForWorkspace(workspace, null)
+    const restarted = createDatabase(fileUtils, dbHelpers, dotenv)
+    const typed = { pre_request: 'typed', post_request: '' }
+
+    assert.ok(!(await restarted.updatePlugin(workspace, created.newCollectionId, 'p1', { code: typed }, code))?.changedOutside)
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workspace.location, 'Item.plugins.json'), 'utf8'))[0].code, typed)
+    assert.equal((await restarted.updatePlugin(workspace, '/Gone.json', 'p1', { code: typed }, typed)).changedOutside, true)
+
+    const pluginsFile = path.join(workspace.location, 'Item.plugins.json')
+    await createDatabase(fileUtils, dbHelpers, dotenv).createPlugin(workspace, { _id: 'p2', type: 'script', name: null, code, collectionId: created.newCollectionId, enabled: true })
+    assert.deepEqual(JSON.parse(fs.readFileSync(pluginsFile, 'utf8')).map(plugin => plugin._id), ['p1', 'p2'])
+    await createDatabase(fileUtils, dbHelpers, dotenv).deletePlugin(workspace, created.newCollectionId, 'p2')
+    assert.deepEqual(JSON.parse(fs.readFileSync(pluginsFile, 'utf8')).map(plugin => plugin._id), ['p1'])
+}))
+
+test('a folder\'s headers and a script\'s code are checked in web-standalone too', async() => {
+    await withWorkspace(async(workspace) => {
+        const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id })
+        const file = path.join(workspace.location, 'Folder', '_.json')
+        fs.writeFileSync(file, JSON.stringify({ headers: [{ name: 'X-Outside', value: '1' }] }))
+        assert.equal((await db.updateCollection(workspace, folder.newCollectionId, { headers: [] }, folder.version)).changedOutside, true)
+        assert.equal(JSON.parse(fileText(workspace, path.join('Folder', '_.json'))).headers[0].name, 'X-Outside')
+
+        await db.createPlugin(workspace, { _id: 'p1', type: 'script', name: 's', code: { pre_request: 'page', post_request: '' }, enabled: true })
+        const refused = await db.updatePlugin(workspace, null, 'p1', { code: { pre_request: 'x', post_request: '' } }, { pre_request: 'older', post_request: '' })
+        assert.equal(refused.changedOutside, true)
+    })
+})
+
 test('a save of an item whose name is near the limit on a file name goes through', async() => {
     await withWorkspace(async(workspace) => {
         const name = 'a'.repeat(240)

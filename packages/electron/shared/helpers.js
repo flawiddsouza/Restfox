@@ -8,6 +8,13 @@ export function hashText(text) {
     return createHash('sha256').update(text).digest('hex')
 }
 
+// The version of a folder's settings: its headers and auth alone, the only ones a save from an older copy can write
+// over, so a pick of its environment or its sort order changes nothing. A folder without them, or with no file yet,
+// has the version of an empty one
+export function folderSettingsVersion(data) {
+    return hashText(JSON.stringify([data?.headers ?? null, data?.authentication ?? null]))
+}
+
 // The version of a request, socket or gRPC item's file: a save is refused when the file no longer holds what the screen
 // came from. Its sort order is left out, as only merges and creates write it, so a sidebar change made in another
 // window does not refuse that window's next save of the item. A text that is not JSON is taken whole

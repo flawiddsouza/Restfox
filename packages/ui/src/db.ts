@@ -50,7 +50,7 @@ const webStandaloneIPC = {
     deleteResponsesByCollectionId:      (workspace: any, collectionId: string) => callWebStandaloneAPI('deleteResponsesByCollectionId', { workspace, collectionId }),
     getWorkspacePlugins:                (workspace: any) => callWebStandaloneAPI('getWorkspacePlugins', { workspace }),
     createPlugin:                       (workspace: any, plugin: any) => callWebStandaloneAPI('createPlugin', { workspace, plugin }),
-    updatePlugin:                       (workspace: any, collectionId: string | null, pluginId: string, updatedFields: any) => callWebStandaloneAPI('updatePlugin', { workspace, collectionId, pluginId, updatedFields }),
+    updatePlugin:                       (workspace: any, collectionId: string | null, pluginId: string, updatedFields: any, expectedCode?: unknown) => callWebStandaloneAPI('updatePlugin', { workspace, collectionId, pluginId, updatedFields, expectedCode }),
     deletePlugin:                       (workspace: any, collectionId: string | null, pluginId: string) => callWebStandaloneAPI('deletePlugin', { workspace, collectionId, pluginId }),
     deletePluginsByWorkspace:           (workspace: any) => callWebStandaloneAPI('deletePluginsByWorkspace', { workspace }),
     deletePluginsByCollectionIds:       (workspace: any, collectionIds: string[]) => callWebStandaloneAPI('deletePluginsByCollectionIds', { workspace, collectionIds }),
@@ -423,7 +423,7 @@ function deserializeRequestResponseFiles(response: RequestFinalResponse) {
 }
 
 // version is what a save of a whole request, socket or gRPC item was made from, see utils/item-file-versions; a file workspace
-// refuses the save when its file holds anything else. Saves of one field merge into the file and leave it out.
+// refuses the save when its file holds anything else. Saves of one field merge into the file and leave it out, but for a folder's headers or auth, checked against the version of those.
 // onSending is called as the storage call starts, after a request's body files are read
 export async function updateCollection(workspaceId: string, collectionId: string, updatedFields: Partial<CollectionItem>, version?: string | null, onSending?: () => void): Promise<UpdateCollectionResult> {
     if(fileIPC) {
@@ -633,7 +633,7 @@ export async function createPlugin(plugin: Plugin, workspaceId: string | null = 
     await db.plugins.put(plugin)
 }
 
-export async function updatePlugin(pluginId: string, updatedFields: Partial<Plugin>, workspaceId: string | null = null, collectionId: string | null = null) {
+export async function updatePlugin(pluginId: string, updatedFields: Partial<Plugin>, workspaceId: string | null = null, collectionId: string | null = null, expectedCode?: unknown): Promise<{ error?: string | null, changedOutside?: boolean } | undefined> {
     console.log('updatePlugin', {
         pluginId,
         updatedFields,
@@ -644,7 +644,7 @@ export async function updatePlugin(pluginId: string, updatedFields: Partial<Plug
     if(fileIPC && workspaceId !== null) {
         const workspace = await db.workspaces.get(workspaceId)
         if (workspace._type === 'file') {
-            return fileIPC.updatePlugin(workspace, collectionId, pluginId, updatedFields)
+            return fileIPC.updatePlugin(workspace, collectionId, pluginId, updatedFields, expectedCode)
         }
     }
 

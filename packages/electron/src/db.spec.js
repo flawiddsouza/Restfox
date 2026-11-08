@@ -934,6 +934,123 @@ test('a sort order update writes in place, as it reaches every sibling, and is s
     expect(readJson('Item.json')).toMatchObject({ sortOrder: 3, headers: [{ name: 'X', value: '1' }] })
 })
 
+test('opening a workspace writes neither its settings nor a folder\'s when an environment has to stand in for the pick', async() => {
+    const config = path.join(workspace.location, 'restfox.json')
+    fs.writeFileSync(config, JSON.stringify({ version: 1, name: 'W' }))
+    fs.mkdirSync(path.join(workspace.location, 'Folder'))
+    const folderConfig = path.join(workspace.location, 'Folder', '_.json')
+    fs.writeFileSync(folderConfig, JSON.stringify({ sortOrder: 0, currentEnvironment: 'Gone' }))
+    const before = [fs.readFileSync(config, 'utf8'), fs.readFileSync(folderConfig, 'utf8')]
+
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+
+    expect([fs.readFileSync(config, 'utf8'), fs.readFileSync(folderConfig, 'utf8')]).toEqual(before)
+    expect(loaded.workspace.currentEnvironment).toBe('Default')
+    expect(loaded.collection.find(item => item.name === 'Folder').currentEnvironment).toBe('Default')
+})
+
+test('a folder duplicated or imported keeps its headers and auth', async() => {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const headers = [{ name: 'X-Folder', value: '1' }]
+    const authentication = { type: 'bearer', token: 't' }
+    const { results } = await db.createCollections(workspace, [{ _id: 'f', _type: 'request_group', name: 'Copy', parentId: null, workspaceId: workspace._id, headers, authentication }])
+
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    const folder = loaded.collection.find(item => item.name === 'Copy')
+    expect(folder.headers).toEqual(headers)
+    expect(folder.authentication).toEqual(authentication)
+    expect(results[0].version).toBe(loaded.versions[folder._id])
+})
+
+test('a script saved with no base, as it was typed before the page knew of it, is refused', async() => {
+    const { id } = await workspaceWithItem()
+    const code = { pre_request: 'file', post_request: '' }
+    await db.createPlugin(workspace, { _id: 'p1', type: 'script', name: null, code, collectionId: id, enabled: true })
+    await db.getCollectionForWorkspace(workspace, null)
+
+    expect((await db.updatePlugin(workspace, id, 'p1', { code: { pre_request: 'typed', post_request: '' } }, null)).changedOutside).toBe(true)
+    expect(JSON.parse(fs.readFileSync(path.join(workspace.location, 'Item.plugins.json'), 'utf8'))[0].code).toEqual(code)
+})
+
+test('a script\'s save reaches a request after the server restarted, and is refused for an id it cannot find', async() => {
+    const { id } = await workspaceWithItem()
+    const code = { pre_request: 'file', post_request: '' }
+    await db.createPlugin(workspace, { _id: 'p1', type: 'script', name: null, code, collectionId: id, enabled: true })
+    await db.getCollectionForWorkspace(workspace, null)
+    const restarted = createDatabase(fileUtils, dbHelpers, createRequire(import.meta.url)('dotenv'))
+    const typed = { pre_request: 'typed', post_request: '' }
+
+    expect((await restarted.updatePlugin(workspace, id, 'p1', { code: typed }, code))?.changedOutside).toBeFalsy()
+    expect(JSON.parse(fs.readFileSync(path.join(workspace.location, 'Item.plugins.json'), 'utf8'))[0].code).toEqual(typed)
+    expect((await restarted.updatePlugin(workspace, '/Gone.json', 'p1', { code: typed }, typed)).changedOutside).toBe(true)
+
+    const pluginsFile = path.join(workspace.location, 'Item.plugins.json')
+    const restartedOnce = () => createDatabase(fileUtils, dbHelpers, createRequire(import.meta.url)('dotenv'))
+    await restartedOnce().createPlugin(workspace, { _id: 'p2', type: 'script', name: null, code, collectionId: id, enabled: true })
+    expect(JSON.parse(fs.readFileSync(pluginsFile, 'utf8')).map(plugin => plugin._id)).toEqual(['p1', 'p2'])
+    await restartedOnce().deletePlugin(workspace, id, 'p2')
+    expect(JSON.parse(fs.readFileSync(pluginsFile, 'utf8')).map(plugin => plugin._id)).toEqual(['p1'])
+})
+
+test('a folder\'s headers and auth are checked against their version, which a pick, a sort order or a collapse leaves alone', async() => {
+    const { id: requestId } = await workspaceWithItem()
+    const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id })
+    expect(folder.version).toEqual(expect.any(String))
+    const file = path.join(workspace.location, 'Folder', '_.json')
+    fs.writeFileSync(file, '{}')
+    const id = folder.newCollectionId
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    const version = loaded.versions[id]
+    expect(version).toBe(folder.version)
+    const merge = async(fields, from) => db.updateCollection(workspace, id, fields, from)
+
+    expect((await merge({ currentEnvironment: 'Other' })).version).toBe(version)
+    expect((await merge({ sortOrder: 3 })).version).toBe(version)
+    const saved = await merge({ headers: [{ name: 'X', value: '1' }] }, version)
+    expect(saved.error).toBe(null)
+    expect(saved.versionBefore).toBe(version)
+    expect(saved.version).not.toBe(version)
+
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), authentication: { type: 'outside' } }))
+    const refused = await merge({ headers: [{ name: 'X', value: 'stale' }] }, saved.version)
+    expect(refused.changedOutside).toBe(true)
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).headers[0].value).toBe('1')
+    // sent without a version, by what is not an edit of them, they go through
+    expect((await merge({ headers: [{ name: 'X', value: 'unchecked' }] })).error).toBe(null)
+    // a request's file has no folder settings to compare
+    expect((await db.updateCollection(workspace, requestId, { sortOrder: 9 }, 'not a folder version')).error).toBe(null)
+})
+
+test('a script\'s code is checked against the code it was made from, and only its code', async() => {
+    await workspaceWithItem()
+    await db.createPlugin(workspace, { _id: 'p1', type: 'script', name: 's', code: { pre_request: 'page', post_request: '' }, enabled: true })
+    await db.createPlugin(workspace, { _id: 'p2', type: 'script', name: 't', code: { pre_request: 'other', post_request: '' }, enabled: true })
+    const file = path.join(workspace.location, fs.readdirSync(workspace.location).find(name => name.endsWith('plugins.json')))
+    const base = { pre_request: 'page', post_request: '' }
+
+    // another script of the file changed outside refuses nothing
+    const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'))
+    onDisk[1].code.pre_request = 'other changed outside'
+    fs.writeFileSync(file, JSON.stringify(onDisk))
+    await db.updatePlugin(workspace, null, 'p1', { code: { pre_request: 'typed', post_request: '' } }, base)
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))[0].code.pre_request).toBe('typed')
+
+    const changed = JSON.parse(fs.readFileSync(file, 'utf8'))
+    changed[0].code.pre_request = 'outside'
+    fs.writeFileSync(file, JSON.stringify(changed))
+    const refused = await db.updatePlugin(workspace, null, 'p1', { code: { pre_request: 'stale', post_request: '' } }, { pre_request: 'typed', post_request: '' })
+    expect(refused.changedOutside).toBe(true)
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))[0].code.pre_request).toBe('outside')
+
+    // a toggle is not a change to the code
+    await db.updatePlugin(workspace, null, 'p1', { enabled: false }, { pre_request: 'typed', post_request: '' })
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))[0].enabled).toBe(false)
+
+    // gone from the file
+    fs.writeFileSync(file, JSON.stringify(JSON.parse(fs.readFileSync(file, 'utf8')).slice(1)))
+    expect((await db.updatePlugin(workspace, null, 'p1', { code: { pre_request: 'x', post_request: '' } }, { pre_request: 'outside', post_request: '' })).changedOutside).toBe(true)
+})
+
 test('a save of an item whose name is near the limit on a file name goes through', async() => {
     const { id, version } = await workspaceWithItem(requestItem('a'.repeat(240)))
     await db.getCollectionForWorkspace(workspace, null)

@@ -725,7 +725,11 @@ export default {
             deep: true
         },
         scriptPlugin: {
-            handler() {
+            handler(plugin, previous) {
+                // a reload that brought the script unchanged, while its text may be being typed
+                if(plugin && previous && plugin._id === previous._id && JSON.stringify(plugin.code) === JSON.stringify(previous.code)) {
+                    return
+                }
                 if(this.scriptPlugin) {
                     if (this.script.pre_request !== this.scriptPlugin.code.pre_request) {
                         this.skipScriptUpdate = true
@@ -763,6 +767,8 @@ export default {
                             pre_request: this.script.pre_request,
                             post_request: this.script.post_request,
                         },
+                        basedOn: this.scriptPlugin?.code ?? null,
+                        typedInWorkspaceId: this.activeTab.workspaceId,
                     })
                 }
             },

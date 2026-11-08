@@ -810,7 +810,7 @@ app.post('/api/deleteResponsesByCollectionId',    apiRoute(({ workspace, collect
 // Plugin routes
 app.post('/api/getWorkspacePlugins',              apiRoute(({ workspace }) => db.getWorkspacePlugins(workspace)))
 app.post('/api/createPlugin',                     apiRoute(({ workspace, plugin }) => db.createPlugin(workspace, plugin)))
-app.post('/api/updatePlugin',                     apiRoute(({ workspace, collectionId, pluginId, updatedFields }) => db.updatePlugin(workspace, collectionId, pluginId, updatedFields)))
+app.post('/api/updatePlugin',                     apiRoute(({ workspace, collectionId, pluginId, updatedFields, expectedCode }) => db.updatePlugin(workspace, collectionId, pluginId, updatedFields, expectedCode)))
 app.post('/api/deletePlugin',                     apiRoute(({ workspace, collectionId, pluginId }) => db.deletePlugin(workspace, collectionId, pluginId)))
 app.post('/api/deletePluginsByWorkspace',         apiRoute(({ workspace }) => db.deletePluginsByWorkspace(workspace)))
 app.post('/api/deletePluginsByCollectionIds',     apiRoute(({ workspace, collectionIds }) => db.deletePluginsByCollectionIds(workspace, collectionIds)))

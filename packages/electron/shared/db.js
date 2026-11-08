@@ -83,11 +83,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
             if(getEnvironments) {
                 const envsDirPath = path.join(location, constants.FOLDERS.ENVIRONMENTS)
-                const { environments, environment, currentEnvironment, currentEnvironmentUnreadable } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
-
-                if(currentEnvironment !== workspaceData.currentEnvironment && !currentEnvironmentUnreadable) {
-                    await fileUtils.writeFileJson(path.join(location, constants.FILES.WORKSPACE_CONFIG), { ...workspaceData, currentEnvironment }, `Update workspace current environment`)
-                }
+                const { environments, environment, currentEnvironment } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
 
                 workspaceData.environments = environments
                 workspaceData.environment = environment
@@ -263,10 +259,21 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                     collectionToSave.sortOrder = collection.sortOrder
                 }
 
+                // as a duplicate or an import of a folder brings them
+                if (collection.headers !== undefined) {
+                    collectionToSave.headers = collection.headers
+                }
+
+                if (collection.authentication !== undefined) {
+                    collectionToSave.authentication = collection.authentication
+                }
+
                 if (Object.keys(collectionToSave).length > 0) {
                     await fileUtils.writeFileJsonNewOnly(path.join(collectionPath, constants.FILES.FOLDER_CONFIG), collectionToSave, `Create collection item folder config`)
                     console.log(`Created file: ${path.join(collectionPath, constants.FILES.FOLDER_CONFIG)}`)
                 }
+
+                version = helpers.folderSettingsVersion(collectionToSave)
             }
 
             // every type but a folder is one file, a type only a newer version knows too, so a duplicate or import made
@@ -314,7 +321,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 oldCollectionId,
                 newCollectionId: collectionPathWithoutWorkspaceLocation,
                 environmentsError,
-                // the item file's version, absent for a folder
+                // the version of the item's file, or of a folder's headers and auth
                 version,
             }
         } catch (err) {
@@ -420,7 +427,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
     // version is what a save of a whole request, socket or gRPC item was made from: its file's version when the screen
     // read or last saved it, or null when the screen has none. The save is refused when the file holds anything else, as
-    // it was changed outside Restfox since. Left out, as by a page from before versions, nothing is checked
+    // it was changed outside Restfox since. Left out, as by a page from before versions, nothing is checked. For a one-field
+    // save of a folder's headers or auth, it is the version of those instead
     async function updateCollection(workspace, collectionId, updatedFields, version) {
         logMethodCall('updateCollection', {
             workspace,
@@ -638,7 +646,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 throw err
             }
 
-            if (stats.isDirectory()) {
+            const isFolder = stats.isDirectory()
+            if (isFolder) {
                 collectionPathCopy = path.join(collectionPath, constants.FILES.FOLDER_CONFIG)
             }
 
@@ -655,6 +664,14 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 }
             }
 
+            // a folder's headers or auth from an older copy would otherwise replace what the file has now
+            if (isFolder && version !== undefined && helpers.folderSettingsVersion(collectionExisting) !== version) {
+                return {
+                    error: `Not saved, as ${collectionPathCopy} was changed outside Restfox`,
+                    changedOutside: true,
+                }
+            }
+
             // one field merged into the file as it is now, which keeps any change made outside Restfox
             const collectionUpdated = {
                 ...collectionExisting,
@@ -668,8 +685,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             // the screen takes the new version only where it held versionBefore, as the file then had no change it missed
             return {
                 error: null,
-                versionBefore: collectionExistingText === null ? null : helpers.itemFileVersion(collectionExistingText),
-                version: helpers.itemFileVersion(writtenText),
+                versionBefore: isFolder ? helpers.folderSettingsVersion(collectionExisting) : collectionExistingText === null ? null : helpers.itemFileVersion(collectionExistingText),
+                version: isFolder ? helpers.folderSettingsVersion(collectionUpdated) : helpers.itemFileVersion(writtenText),
             }
         }
 
@@ -1087,7 +1104,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         let pluginPath = ''
         if (plugin.collectionId) {
-            const collectionPath = idMap.get(plugin.collectionId)
+            const collectionPath = idMap.get(plugin.collectionId) ?? await resolveIdBeforeFirstScan(workspace, plugin.collectionId)
             const stats = await fs.stat(collectionPath)
             if (stats.isDirectory()) {
                 pluginPath = path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
@@ -1110,7 +1127,9 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         console.log(`Plugin created at: ${pluginPath}`)
     }
 
-    async function updatePlugin(workspace, collectionId, pluginId, updatedFields) {
+    // expectedCode is the script's code the save was made from, whose text it would otherwise replace. Left out, as by a
+    // page from before it or for a change that is not to the code, nothing is checked
+    async function updatePlugin(workspace, collectionId, pluginId, updatedFields, expectedCode) {
         logMethodCall('updatePlugin', {
             workspace,
             collectionId,
@@ -1120,7 +1139,15 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const idMap = getIdMap(workspace.location)
 
-        const collectionPath = idMap.get(collectionId)
+        const collectionPath = collectionId == null ? undefined : idMap.get(collectionId) ?? await resolveIdBeforeFirstScan(workspace, collectionId)
+
+        // renamed or deleted where this page has not seen it
+        if (collectionId != null && collectionPath === undefined && expectedCode !== undefined) {
+            return {
+                error: `Not saved, as ${collectionId} was changed outside Restfox`,
+                changedOutside: true,
+            }
+        }
 
         let pluginPath = null
 
@@ -1132,6 +1159,13 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const existingPlugins = await readFileJson(pluginPath, [])
         const pluginIndex = existingPlugins.findIndex(plugin => plugin._id === pluginId)
+
+        if (expectedCode !== undefined && 'code' in updatedFields && (pluginIndex === -1 || JSON.stringify(existingPlugins[pluginIndex].code) !== JSON.stringify(expectedCode))) {
+            return {
+                error: `Not saved, as the script in ${pluginPath} was changed outside Restfox`,
+                changedOutside: true,
+            }
+        }
 
         if (pluginIndex === -1) {
             throw new Error(`Plugin ${pluginId} not found for update in ${pluginPath}`)
@@ -1154,7 +1188,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const idMap = getIdMap(workspace.location)
 
-        const collectionPath = idMap.get(collectionId)
+        const collectionPath = collectionId === null ? undefined : idMap.get(collectionId) ?? await resolveIdBeforeFirstScan(workspace, collectionId)
         const pluginPath = collectionId === null
             ? path.join(workspace.location, constants.FILES.WORKSPACE_PLUGINS)
             : collectionPath.endsWith('.json') ? collectionPath.replace('.json', constants.FILES.PLUGINS) : path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)

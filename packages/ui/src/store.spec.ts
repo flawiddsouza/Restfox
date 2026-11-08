@@ -27,7 +27,7 @@ vi.mock('./db', () => ({
     modifyCollections: vi.fn(),
     deleteCollectionsByWorkspaceId: vi.fn(),
     getGlobalPlugins: vi.fn(),
-    getWorkspacePlugins: vi.fn(),
+    getWorkspacePlugins: vi.fn(async() => []),
     deleteCollectionsByIds: vi.fn(),
     createPlugin: vi.fn(),
     updatePlugin: vi.fn(),
@@ -117,6 +117,8 @@ describe('saveRequestScript', () => {
 
         const retried = store.dispatch('saveRequestScript', script('newer'))
         const edited = store.dispatch('saveRequestScript', script('newest'))
+        // a create waits its turn among the script's writes
+        await vi.waitFor(() => expect(createPlugin).toHaveBeenCalledTimes(2))
         finishCreate()
 
         expect(await retried).toBe(true)
@@ -206,6 +208,7 @@ describe('saveRequestScript', () => {
             },
         })
 
+        await vi.waitFor(() => expect(createPlugin).toHaveBeenCalledOnce())
         finishCreate?.()
         await Promise.all([firstSave, secondSave])
 
@@ -2942,10 +2945,12 @@ describe('a request whose file changed outside Restfox', () => {
 
     function held<T>() {
         let release!: (value: T) => void
-        const promise = new Promise<T>(resolve => {
+        let reject!: (error: Error) => void
+        const promise = new Promise<T>((resolve, fail) => {
             release = resolve
+            reject = fail
         })
-        return { promise, release }
+        return { promise, release, reject }
     }
 
     function open(...items: CollectionItem[]) {
@@ -2955,6 +2960,12 @@ describe('a request whose file changed outside Restfox', () => {
         store.state.activeTab = store.state.collection[0]
         store.state.skipPersistingActiveTab = false
         return store.state.collection
+    }
+
+    const flushPromises = async() => {
+        for(let index = 0; index < 50; index++) {
+            await Promise.resolve()
+        }
     }
 
     function errorToasts() {
@@ -3561,6 +3572,568 @@ describe('a request whose file changed outside Restfox', () => {
         expect(store.state.collection.filter(item => item._id === 'Login (2).json')).toHaveLength(1)
         expect(store.state.collection.find(item => item._id === 'Login (2).json')?.url).toBe('https://api.example/login')
         expect(store.state.tabs.map(tab => toRaw(tab))).not.toContain(toRaw(stale))
+    })
+
+    test('a folder\'s headers go from the version the page holds', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        open(folder)
+        setVersion('Folder', 'f1')
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, versionBefore: 'f1', version: 'f2' })
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }] })
+
+        expect(vi.mocked(updateCollection).mock.calls[0][3]).toBe('f1')
+        expect(versionOf('Folder')).toBe('f2')
+    })
+
+    test('a folder\'s auth refused as changed outside leaves the page as it was', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', authentication: { type: 'page' } } as unknown as CollectionItem
+        open(folder)
+        setVersion('Folder', 'f1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, authentication: { type: 'refused' } })
+
+        expect(store.state.collection[0].authentication).toEqual({ type: 'page' })
+    })
+
+    test('a folder\'s sort order goes with no version, as it replaces nothing else in the file', async() => {
+        const folder = (id: string, sortOrder: number) => ({ _id: id, _type: 'request_group', name: id, parentId: null, workspaceId: 'workspace-id', sortOrder }) as unknown as CollectionItem
+        const [first, second] = open(folder('A', 0), folder('B', 1))
+        store.state.collectionTree = [first, second]
+        setVersion('A', 'a1')
+        setVersion('B', 'b1')
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'B', parentId: null }, to: { id: 'A', parentId: null, type: 'request_group', cursorPosition: 'top' } })
+
+        const merges = vi.mocked(updateCollection).mock.calls.filter(call => 'sortOrder' in call[2])
+        expect(merges.length).toBeGreaterThan(0)
+        expect(merges.every(call => call[3] === undefined)).toBe(true)
+    })
+
+    test('a folder\'s headers refused as changed outside tell the user and reload', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        open(folder)
+        setVersion('Folder', 'f1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }] })
+
+        expect(errorToasts()).toEqual(['Folder changed outside Restfox and was reloaded. Your last edit to it was not saved.'])
+        expect(store.state.collection[0].headers).toEqual([])
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('a reload replaces a folder\'s object and takes the version it read, unless a save since holds a newer one', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id' } as unknown as CollectionItem
+        const [shown] = open(folder)
+        setVersion('Folder', 'f1')
+        // what a folder's version leaves out, such as its environments, can change with the version the same
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [{ ...folder, currentEnvironment: 'Outside' }], workspace: null, idMap: null, versions: { Folder: 'f1' } } as never)
+        await store.dispatch('refreshWorkspaceCollection')
+        expect(store.state.collection[0]).not.toBe(shown)
+        expect(store.state.collection[0].currentEnvironment).toBe('Outside')
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [{ ...folder }], workspace: null, idMap: null, versions: { Folder: 'outside' } } as never)
+        await store.dispatch('refreshWorkspaceCollection')
+        expect(versionOf('Folder')).toBe('outside')
+
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never)
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledTimes(2))
+        setVersion('Folder', 'saved-since')
+        // a save's fields go onto every open object of the item
+        shown.headers = [{ name: 'X-Typed', value: 'saved' }]
+        store.state.collection[0].headers = shown.headers
+        read.release({ collection: [{ ...folder, headers: [{ name: 'X-Read', value: 'older' }] }], workspace: null, idMap: null, versions: { Folder: 'outside' } })
+        await reload
+        expect(versionOf('Folder')).toBe('saved-since')
+        expect(store.state.collection[0].headers).toEqual([{ name: 'X-Typed', value: 'saved' }])
+        // a drag and Duplicate clone the raw items
+        expect(() => structuredClone(toRaw(store.state.collection[0]))).not.toThrow()
+    })
+
+    test('a folder\'s late reply leaves a tab of the same id in another workspace', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        open(folder)
+        setVersion('Folder', 'f1')
+        const save = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(save.promise)
+        const saving = store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }] })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+
+        const otherTab = { ...folder, workspaceId: 'other-workspace' }
+        store.state.tabs = [otherTab]
+        save.release({ error: null, versionBefore: 'f1', version: 'f2' })
+        await saving
+
+        expect(store.state.tabs[0].workspaceId).toBe('other-workspace')
+        expect(store.state.tabs[0].headers).toEqual([])
+    })
+
+    test('a reload waits for a folder\'s save asked for while it waited for an earlier one', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        open(folder)
+        setVersion('Folder', 'f1')
+        const first = held<UpdateCollectionResult>()
+        const second = held<UpdateCollectionResult>()
+        const third = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise)
+        const read = heldRead()
+        vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never)
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        let reloadEnded = false
+        reload.then(() => reloadEnded = true)
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        const typed = store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }] })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        read.release({ collection: [{ ...folder }], workspace: null, idMap: null, versions: { Folder: 'f1' } })
+        await flushPromises()
+        const typedMore = store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '12' }] })
+        await flushPromises()
+
+        first.release({ error: null, versionBefore: 'f1', version: 'f2' })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(2))
+        await flushPromises()
+        // replaced now, the Folder panel would go back to the text of the first save
+        expect(reloadEnded).toBe(false)
+        const typedLast = store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '123' }] })
+        await flushPromises()
+        second.release({ error: null, versionBefore: 'f2', version: 'f3' })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(3))
+        await flushPromises()
+        expect(reloadEnded).toBe(false)
+        third.release({ error: null, versionBefore: 'f3', version: 'f4' })
+        await reload
+        await typed
+        await typedMore
+        await typedLast
+
+        expect(store.state.collection[0].headers).toEqual([{ name: 'X', value: '123' }])
+        expect(versionOf('Folder')).toBe('f4')
+    })
+
+    test('a folder\'s refused keystrokes are one message and one reload', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        open(folder)
+        setVersion('Folder', 'f1')
+        vi.mocked(updateCollection).mockResolvedValue(changedOutside)
+        vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+        await store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }] })
+        await store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '12' }] })
+
+        expect(errorToasts()).toEqual(['Folder changed outside Restfox and was reloaded. Your last edit to it was not saved.'])
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('a folder\'s field asked for before a reload brought an outside change goes with the version it was made from', async() => {
+        const folder = { _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', headers: [] } as unknown as CollectionItem
+        const [, login] = open(folder, request('Login.json'))
+        setVersion('Folder', 'f1')
+        setVersion('Login.json', 'l1')
+        // a save of another item the reload waits for, so the folder's saves are asked for before it applies
+        const loginSave = held<UpdateCollectionResult>()
+        const headersSave = held<UpdateCollectionResult>()
+        vi.mocked(updateCollection).mockReturnValueOnce(loginSave.promise).mockReturnValueOnce(headersSave.promise).mockResolvedValue({ error: null })
+        store.dispatch('persistCollectionItem', login)
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledOnce())
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [{ ...folder }, request('Login.json')], workspace: null, idMap: null, versions: { Folder: 'outside', 'Login.json': 'l1' } } as never).mockReturnValue(pendingRead())
+        const reload = store.dispatch('refreshWorkspaceCollection')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        await flushPromises()
+        const headers = store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, headers: [{ name: 'X', value: '1' }] })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledTimes(2))
+        const authentication = store.dispatch('updateCollectionItem', { collectionId: 'Folder', name: 'Folder', parentId: null, authentication: { type: 'stale' } })
+        await flushPromises()
+        loginSave.release({ error: null, version: 'l1' })
+        await flushPromises()
+        headersSave.release({ error: null })
+        await reload
+        await headers
+        await authentication
+        await settled('Folder', 'Login.json')
+
+        expect(vi.mocked(updateCollection).mock.calls.filter(call => 'authentication' in call[2]).map(call => call[3])).toEqual(['f1'])
+    })
+
+    describe('a request\'s script in a file workspace', () => {
+        const code = (text: string) => ({ pre_request: text, post_request: '' })
+        const script = (text: string) => ({ _id: 'p1', type: 'script', name: null, code: code(text), workspaceId: null, collectionId: 'Login.json', enabled: true, createdAt: 0, updatedAt: 0 }) as unknown as Plugin
+
+        beforeEach(() => {
+            vi.mocked(updatePlugin).mockReset()
+            vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        })
+
+        test('a save goes from the code the text was typed on, and the next edit from what that save leaves', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const first = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('a'), basedOn: code('file') })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            expect(store.state.plugins.workspace[0].code).toEqual(code('a'))
+            const next = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('b'), basedOn: toRaw(store.state.plugins.workspace[0].code) })
+            await Promise.resolve()
+            expect(updatePlugin).toHaveBeenCalledOnce()
+            first.release(undefined)
+            await saving
+            await next
+
+            expect(vi.mocked(updatePlugin).mock.calls.map(call => call[4])).toEqual([code('file'), code('a')])
+        })
+
+        test('a refused save tells the user and reads the scripts again', async() => {
+            store.state.plugins.workspace = [script('file')]
+            vi.mocked(updatePlugin).mockResolvedValue({ error: 'x', changedOutside: true })
+
+            const saved = await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('stale'), basedOn: code('older') })
+
+            expect(saved).toBe(false)
+            expect(vi.mocked(updatePlugin).mock.calls[0][4]).toEqual(code('older'))
+            expect(errorToasts()).toEqual(['This script changed outside Restfox and was reloaded. Your last change to it was not saved.'])
+            await vi.waitFor(() => expect(getWorkspacePlugins).toHaveBeenCalled())
+        })
+
+        test('a failed save puts the code back', async() => {
+            store.state.plugins.workspace = [script('file')]
+            vi.mocked(updatePlugin).mockRejectedValue(new Error('EPERM'))
+
+            await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: code('file') })
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('file'))
+        })
+
+        test('a failed save leaves alone the text of a later edit', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const first = held<undefined>()
+            const second = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('a'), basedOn: code('file') })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            const next = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('b'), basedOn: code('a') })
+            first.reject(new Error('EPERM'))
+            await saving
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('b'))
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledTimes(2))
+            second.release(undefined)
+            await next
+        })
+
+        test('a save asked for while the scripts are read keeps its text over what was read', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const read = held<Plugin[]>()
+            vi.mocked(getWorkspacePlugins).mockReturnValueOnce(read.promise)
+            vi.mocked(updatePlugin).mockResolvedValue(undefined)
+
+            store.commit('loadWorkspacePlugins')
+            await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: code('file') })
+            read.release([script('file')])
+            await vi.waitFor(() => expect(toRaw(store.state.plugins.workspace[0])).not.toBe(undefined))
+            await flushPromises()
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('typed'))
+        })
+
+        test('a save already queued when the scripts are read reaches the storage before the read', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const first = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+            vi.mocked(getWorkspacePlugins).mockResolvedValue([script('second')])
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('first'), basedOn: code('file') })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            const next = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('second'), basedOn: code('first') })
+            store.commit('loadWorkspacePlugins')
+            await flushPromises()
+            expect(getWorkspacePlugins).not.toHaveBeenCalled()
+            first.release(undefined)
+            await saving
+            await next
+            await vi.waitFor(() => expect(getWorkspacePlugins).toHaveBeenCalledOnce())
+            await flushPromises()
+
+            expect(vi.mocked(updatePlugin).mock.calls.map(call => call[1].code)).toEqual([code('first'), code('second')])
+            expect(store.state.plugins.workspace[0].code).toEqual(code('second'))
+        })
+
+        test('a first script still being created when the scripts are read reaches the storage before the read', async() => {
+            store.state.plugins.workspace = []
+            const created = held<undefined>()
+            vi.mocked(createPlugin).mockReturnValueOnce(created.promise as never)
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('first') })
+            await vi.waitFor(() => expect(createPlugin).toHaveBeenCalledOnce())
+            const madePlugin = store.state.plugins.workspace[0]
+            store.commit('loadWorkspacePlugins')
+            await flushPromises()
+            expect(getWorkspacePlugins).not.toHaveBeenCalled()
+            vi.mocked(getWorkspacePlugins).mockResolvedValue([{ ...toRaw(madePlugin) }])
+            created.release(undefined)
+            await saving
+            await vi.waitFor(() => expect(getWorkspacePlugins).toHaveBeenCalledOnce())
+            await flushPromises()
+
+            expect(store.state.plugins.workspace.map(plugin => plugin.code)).toEqual([code('first')])
+        })
+
+        test('a script typed before the workspace was left is not saved into the one shown', async() => {
+            store.state.plugins.workspace = [script('file')]
+            vi.mocked(updatePlugin).mockResolvedValue(undefined)
+
+            const saved = await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: code('file'), typedInWorkspaceId: 'left' })
+
+            expect(saved).toBe(false)
+            expect(updatePlugin).not.toHaveBeenCalled()
+            expect(store.state.plugins.workspace[0].code).toEqual(code('file'))
+        })
+
+        test('a script typed before the workspaces list was opened is dropped without an error', async() => {
+            const workspace = store.state.activeWorkspace
+            store.state.activeWorkspace = null
+            const saved = await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: code('file'), typedInWorkspaceId: 'workspace-id' })
+            store.state.activeWorkspace = workspace
+            expect(saved).toBe(false)
+        })
+
+        test('a first script made while the scripts are read stays', async() => {
+            store.state.plugins.workspace = []
+            const read = held<Plugin[]>()
+            vi.mocked(getWorkspacePlugins).mockReturnValueOnce(read.promise)
+            vi.mocked(createPlugin).mockResolvedValue(undefined as never)
+
+            store.commit('loadWorkspacePlugins')
+            await flushPromises()
+            await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('first') })
+            read.release([])
+            await flushPromises()
+
+            expect(store.state.plugins.workspace.map(plugin => plugin.code)).toEqual([code('first')])
+        })
+
+        test('saves of a script stay in one queue across a load of the workspace', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const first = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('first'), basedOn: code('file') })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            loadItemVersions('workspace-id', {})
+            const next = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('second'), basedOn: code('first') })
+            await flushPromises()
+            expect(updatePlugin).toHaveBeenCalledOnce()
+            first.release(undefined)
+            await saving
+            await next
+        })
+
+        test('saves of a script stay in one queue when its request is renamed', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const first = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('first'), basedOn: code('file') })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            store.state.plugins.workspace[0].collectionId = 'Renamed.json'
+            const next = store.dispatch('saveRequestScript', { collectionId: 'Renamed.json', code: code('second'), basedOn: code('first') })
+            await flushPromises()
+            expect(updatePlugin).toHaveBeenCalledOnce()
+            first.release(undefined)
+            await saving
+            await next
+
+            expect(vi.mocked(updatePlugin).mock.calls.map(call => call[1].code)).toEqual([code('first'), code('second')])
+        })
+
+        test('an older read of the scripts ending after a newer one is dropped', async() => {
+            store.state.plugins.workspace = [script('file')]
+            const older = held<Plugin[]>()
+            const newer = held<Plugin[]>()
+            vi.mocked(getWorkspacePlugins).mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise)
+
+            store.commit('loadWorkspacePlugins')
+            store.commit('loadWorkspacePlugins')
+            await vi.waitFor(() => expect(getWorkspacePlugins).toHaveBeenCalledTimes(2))
+            newer.release([script('outside')])
+            await flushPromises()
+            older.release([script('file')])
+            await flushPromises()
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('outside'))
+        })
+
+        test.each(['the read ends first', 'the save ends first'])('a Plugins window save while the scripts are read keeps its code, %s', async(order) => {
+            store.state.plugins.workspace = [{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]
+            const read = held<Plugin[]>()
+            const save = held<undefined>()
+            vi.mocked(getWorkspacePlugins).mockReturnValueOnce(read.promise)
+            vi.mocked(updatePlugin).mockReturnValueOnce(save.promise).mockResolvedValue(undefined)
+
+            store.commit('loadWorkspacePlugins')
+            await vi.waitFor(() => expect(getWorkspacePlugins).toHaveBeenCalledOnce())
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('saved'), workspaceId: 'workspace-id' })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            const steps = [() => read.release([{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]), () => save.release(undefined)]
+            for(const step of order === 'the read ends first' ? steps : steps.reverse()) {
+                step()
+                await flushPromises()
+            }
+            expect(store.state.plugins.workspace[0].code).toEqual(code('saved'))
+
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('next'), workspaceId: 'workspace-id' })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledTimes(2))
+            expect(vi.mocked(updatePlugin).mock.calls[1][4]).toEqual(code('saved'))
+            await flushPromises()
+        })
+
+        test('a failed save from the Plugins window puts its code back', async() => {
+            store.state.plugins.workspace = [{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]
+            vi.mocked(updatePlugin).mockRejectedValue(new Error('EPERM'))
+
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('typed'), workspaceId: 'workspace-id' })
+            await vi.waitFor(() => expect(errorToasts()).toEqual(['EPERM']))
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('file'))
+        })
+
+        test('a second save from the Plugins window goes from what the first leaves', async() => {
+            store.state.plugins.workspace = [{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]
+            const first = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('a'), workspaceId: 'workspace-id' })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('b'), workspaceId: 'workspace-id' })
+            await flushPromises()
+            expect(updatePlugin).toHaveBeenCalledOnce()
+            first.release(undefined)
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledTimes(2))
+
+            expect(vi.mocked(updatePlugin).mock.calls[1][4]).toEqual(code('a'))
+        })
+
+        test('an earlier reply from the Plugins window leaves the code of a later save, and a third save goes from it', async() => {
+            store.state.plugins.workspace = [{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]
+            const first = held<undefined>()
+            const second = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockResolvedValue(undefined)
+
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('a'), workspaceId: 'workspace-id' })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('b'), workspaceId: 'workspace-id' })
+            first.release(undefined)
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledTimes(2))
+            await flushPromises()
+            expect(store.state.plugins.workspace[0].code).toEqual(code('b'))
+
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('c'), workspaceId: 'workspace-id' })
+            second.release(undefined)
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledTimes(3))
+            expect(vi.mocked(updatePlugin).mock.calls[2][4]).toEqual(code('b'))
+            await flushPromises()
+        })
+
+        test('a failed save from the Plugins window leaves the code of a later save', async() => {
+            store.state.plugins.workspace = [{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]
+            const first = held<undefined>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(first.promise).mockResolvedValue(undefined)
+
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('a'), workspaceId: 'workspace-id' })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('b'), workspaceId: 'workspace-id' })
+            first.reject(new Error('EPERM'))
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledTimes(2))
+            await flushPromises()
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('b'))
+        })
+
+        test('text typed before the page knew of the script goes with no base, so the file refuses it', async() => {
+            store.state.plugins.workspace = [script('file')]
+            vi.mocked(updatePlugin).mockResolvedValue({ error: 'x', changedOutside: true })
+
+            const saved = await store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: null })
+
+            expect(saved).toBe(false)
+            expect(vi.mocked(updatePlugin).mock.calls[0][4]).toBeNull()
+        })
+
+        test.each(['saveRequestScript', 'updatePlugin'])('%s that fails after a read replaced the script puts the code back on the script shown', async(path) => {
+            const shownBefore = path === 'updatePlugin' ? { ...script('file'), collectionId: null, workspaceId: 'workspace-id' } : script('file')
+            store.state.plugins.workspace = [shownBefore]
+            const read = held<Plugin[]>()
+            const save = held<undefined>()
+            vi.mocked(getWorkspacePlugins).mockReturnValueOnce(read.promise)
+            vi.mocked(updatePlugin).mockReturnValueOnce(save.promise)
+
+            store.commit('loadWorkspacePlugins')
+            await vi.waitFor(() => expect(getWorkspacePlugins).toHaveBeenCalledOnce())
+            if(path === 'updatePlugin') {
+                store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('typed'), workspaceId: 'workspace-id' })
+            } else {
+                store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: code('file') })
+            }
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            read.release([{ ...shownBefore, code: code('file') }])
+            await flushPromises()
+            expect(store.state.plugins.workspace[0].code).toEqual(code('typed'))
+            save.reject(new Error('EPERM'))
+            await flushPromises()
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('file'))
+        })
+
+        test('scripts read for a workspace left meanwhile are not shown', async() => {
+            const workspace = store.state.activeWorkspace
+            store.state.plugins.workspace = [script('other workspace')]
+            const read = held<Plugin[]>()
+            vi.mocked(getWorkspacePlugins).mockReturnValueOnce(read.promise)
+
+            store.commit('loadWorkspacePlugins')
+            store.state.activeWorkspace = { ...workspace, _id: 'other' } as Workspace
+            read.release([script('left')])
+            await flushPromises()
+            store.state.activeWorkspace = workspace
+
+            expect(store.state.plugins.workspace[0].code).toEqual(code('other workspace'))
+        })
+
+        test('a refusal after the workspace was left reads no scripts into the one shown', async() => {
+            const workspace = store.state.activeWorkspace
+            store.state.plugins.workspace = [script('file')]
+            const save = held<{ error: string, changedOutside: boolean }>()
+            vi.mocked(updatePlugin).mockReturnValueOnce(save.promise)
+
+            const saving = store.dispatch('saveRequestScript', { collectionId: 'Login.json', code: code('typed'), basedOn: code('file') })
+            await vi.waitFor(() => expect(updatePlugin).toHaveBeenCalledOnce())
+            store.state.activeWorkspace = { ...workspace, _id: 'other' } as Workspace
+            save.release({ error: 'x', changedOutside: true })
+            await saving
+            await flushPromises()
+            store.state.activeWorkspace = workspace
+
+            expect(getWorkspacePlugins).not.toHaveBeenCalled()
+            expect(errorToasts()).toEqual(['This script changed outside Restfox, so your last change to it was not saved.'])
+        })
+
+        test('the Plugins window saves from the code it holds, and a refusal leaves it unchanged', async() => {
+            store.state.plugins.workspace = [{ ...script('file'), collectionId: null, workspaceId: 'workspace-id' }]
+            vi.mocked(updatePlugin).mockResolvedValue({ error: 'x', changedOutside: true })
+            vi.mocked(getWorkspacePlugins).mockReturnValue(pendingRead() as never)
+
+            await store.commit('updatePlugin', { _id: 'p1', name: 'n', code: code('edited'), workspaceId: 'workspace-id' })
+
+            await vi.waitFor(() => expect(errorToasts()).toHaveLength(1))
+            expect(vi.mocked(updatePlugin).mock.calls[0][4]).toEqual(code('file'))
+            expect(store.state.plugins.workspace[0].code).toEqual(code('file'))
+        })
     })
 
     test('a rename holds leaving the page until the storage has answered it', async() => {
