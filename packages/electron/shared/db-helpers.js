@@ -6,7 +6,7 @@ import constants from './constants.js'
 export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
     // versions, when given, gets the version of each item file read, by item id, kept apart from the item so it is never
     // saved or exported
-    async function getCollectionItem(workspace, fullPath, idForCollectionitem, versions = null) {
+    async function getCollectionItem(workspace, fullPath, idForCollectionitem, versions = null, environmentVersions = null) {
         const isFolder = fullPath.endsWith('.json') === false
         const fileOrFolderName = path.basename(fullPath)
         const dir = path.dirname(fullPath)
@@ -30,10 +30,14 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
             try {
                 const collectionData = JSON.parse(await fs.readFile(path.join(fullPath, constants.FILES.FOLDER_CONFIG), 'utf8'))
 
-                const { environments, environment, currentEnvironment } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
+                const { environments, environment, currentEnvironment, version: environmentsVersion } = await getEnvironments(path.join(fullPath, constants.FOLDERS.ENVIRONMENTS), collectionData.currentEnvironment)
 
                 if (versions) {
                     versions[idForCollectionitem] = helpers.folderSettingsVersion(collectionData)
+                }
+
+                if (environmentVersions) {
+                    environmentVersions[idForCollectionitem] = environmentsVersion
                 }
 
                 collectionItem.currentEnvironment = currentEnvironment
@@ -88,7 +92,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         }
     }
 
-    async function getCollection(idMap, workspace, dir = workspace.location, versions = null) {
+    async function getCollection(idMap, workspace, dir = workspace.location, versions = null, environmentVersions = null) {
         let items = []
 
         try {
@@ -116,17 +120,17 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 const fullPathWithoutWorkspaceLocation = helpers.removePrefixFromString(fullPath, workspace.location)
 
                 if (fileOrFolder.isDirectory()) {
-                    const collection = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions)
+                    const collection = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions, environmentVersions)
 
                     if(collection) {
                         items.push(collection)
 
                         // Recursively get files and folders inside this directory
-                        const nestedItems = await getCollection(idMap, workspace, fullPath, versions)
+                        const nestedItems = await getCollection(idMap, workspace, fullPath, versions, environmentVersions)
                         items = items.concat(nestedItems)
                     }
                 } else {
-                    const collectionItem = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions)
+                    const collectionItem = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions, environmentVersions)
 
                     if(collectionItem) {
                         items.push(collectionItem)
@@ -196,24 +200,39 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         }
     }
 
+    // Every environment and color file of a set by name, with its text, or null for one that cannot be read. Another
+    // file kept beside them, such as a backup Prod.json.bak, is left out
+    async function readEnvironmentFiles(envsDirPath) {
+        const files = new Map()
+        for (const name of await fileUtils.readdirIgnoreError(envsDirPath)) {
+            if (name.endsWith('.json')) {
+                files.set(name, await fs.readFile(path.join(envsDirPath, name), 'utf8').catch(() => null))
+            }
+        }
+        return files
+    }
+
     async function getEnvironments(envsDirPath, currentEnvironment) {
         const environments = []
 
-        const envFiles = await fileUtils.readdirIgnoreError(envsDirPath)
+        // read once, so the version returned is of the very texts the environments come from
+        const files = await readEnvironmentFiles(envsDirPath)
 
-        for (const fileName of envFiles) {
-            // another file kept beside them, such as a backup Prod.json.bak, is not an environment
-            if (fileName.endsWith('.meta.json') || !fileName.endsWith('.json')) {
+        for (const [fileName, text] of files) {
+            if (fileName.endsWith('.meta.json')) {
                 continue
             }
 
             try {
-                const envData = JSON.parse(await fs.readFile(path.join(envsDirPath, fileName), 'utf8'))
+                if (text === null) {
+                    throw new Error('The file could not be read')
+                }
+
+                const envData = JSON.parse(text)
                 let envMeta = {}
 
                 try {
-                    const metaFileName = `${fileName.slice(0, -'.json'.length)}.meta.json`
-                    envMeta = JSON.parse(await fs.readFile(path.join(envsDirPath, metaFileName), 'utf8'))
+                    envMeta = JSON.parse(files.get(`${fileName.slice(0, -'.json'.length)}.meta.json`))
                 } catch {}
 
                 environments.push({
@@ -228,6 +247,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         }
 
         const returnData ={
+            version: helpers.environmentsVersion(files),
             environments: [],
             environment: {},
             currentEnvironment: currentEnvironment ?? constants.DEFAULT_ENVIRONMENT
@@ -266,7 +286,19 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         }
     }
 
-    async function saveEnvironments(envsDirPath, environments) {
+    // version is the one the page holds for this set of environments, whose save would otherwise write over each file and
+    // delete those missing from its list. Left out, as by a page from before versions, nothing is checked
+    async function saveEnvironments(envsDirPath, environments, version) {
+        // what the set holds as this save starts, which its reply's version is built from, along with what it writes and
+        // deletes, so a file added meanwhile by another program is not taken as seen
+        const files = await readEnvironmentFiles(envsDirPath)
+        if (version !== undefined && helpers.environmentsVersion(files) !== version) {
+            return {
+                error: `Not saved, as the environments in ${envsDirPath} were changed outside Restfox`,
+                changedOutside: true,
+            }
+        }
+
         try {
             await fileUtils.mkdir(envsDirPath, 'Create environments directory')
         } catch (err) {
@@ -340,6 +372,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 // this means the environment was removed
                 try {
                     await fileUtils.deleteFileOrFolder(path.join(envsDirPath, existingEnvironment), 'Deleting environment')
+                    files.delete(existingEnvironment)
 
                     const metaFileName = `${existingEnvironment.slice(0, -'.json'.length)}.meta.json`
                     const metaExists = existingEnvironments.includes(metaFileName)
@@ -348,6 +381,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                         console.error(`Not deleting environment meta file it cannot read: ${metaFileName}`)
                     } else if (metaExists) {
                         await fileUtils.deleteFileOrFolder(path.join(envsDirPath, metaFileName), 'Deleting environment meta')
+                        files.delete(metaFileName)
                     }
                 } catch (err) {
                     console.error(`Error removing environment file: ${existingEnvironment}`, err)
@@ -363,7 +397,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
             }
             const targetPath = path.join(envsDirPath, `${envName}.json`)
             try {
-                await fileUtils.writeFileJson(targetPath, env.environment, 'Saving environment')
+                files.set(`${envName}.json`, await fileUtils.writeFileJson(targetPath, env.environment, 'Saving environment'))
             } catch (err) {
                 console.error(`Error writing environment file: ${envName}.json`, err)
                 errors.push(`Not saved, as ${targetPath} could not be written: ${err.message}`)
@@ -385,7 +419,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                     continue
                 }
                 try {
-                    await fileUtils.writeFileJson(metaPath, { color: env.color }, 'Saving environment meta')
+                    files.set(`${envName}.meta.json`, await fileUtils.writeFileJson(metaPath, { color: env.color }, 'Saving environment meta'))
                 } catch (err) {
                     console.error(`Error writing environment file: ${envName}.meta.json`, err)
                     errors.push(`Not saved, as ${metaPath} could not be written: ${err.message}`)
@@ -403,6 +437,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         }
         return {
             error: errors.length > 0 ? `${errors.join('. ')}${keptFiles ? '. Nothing was deleted' : ''}` : null,
+            version: helpers.environmentsVersion(files),
         }
     }
 

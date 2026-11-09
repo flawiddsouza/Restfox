@@ -9,6 +9,7 @@ import { createRequire } from 'node:module'
 // the instance db.js requires, which a vitest import would load a second time
 const fileUtils = createRequire(import.meta.url)('./file-utils.js')
 import { platformLocation, createDatabase } from '../shared/db.js'
+import { createDbHelpers } from '../shared/db-helpers.js'
 import { hashText, itemFileVersion } from '../shared/helpers.js'
 
 let workspace
@@ -947,6 +948,116 @@ test('opening a workspace writes neither its settings nor a folder\'s when an en
     expect([fs.readFileSync(config, 'utf8'), fs.readFileSync(folderConfig, 'utf8')]).toEqual(before)
     expect(loaded.workspace.currentEnvironment).toBe('Default')
     expect(loaded.collection.find(item => item.name === 'Folder').currentEnvironment).toBe('Default')
+})
+
+test('a save of environments is checked against the version of the whole set, before anything is written or deleted', async() => {
+    await workspaceWithItem()
+    const envs = path.join(workspace.location, '_environments')
+    const first = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { token: 'page' } }] })
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    expect(first.version).toBe(loaded.environmentVersions[''])
+    expect(loaded.workspace.environmentsVersion).toBe(undefined)
+    const page = loaded.workspace.environments
+
+    const saved = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { token: 'typed' } }] }, first.version)
+    expect(saved.error).toBe(null)
+    expect(saved.version).not.toBe(first.version)
+    expect(JSON.parse(fs.readFileSync(path.join(envs, 'Default.json'), 'utf8')).token).toBe('typed')
+
+    // changed outside and added outside
+    fs.writeFileSync(path.join(envs, 'Default.json'), JSON.stringify({ token: 'outside' }))
+    fs.writeFileSync(path.join(envs, 'Staging.json'), JSON.stringify({ added: 'outside' }))
+    const refused = await db.updateWorkspace(workspace, { environments: page }, saved.version)
+    expect(refused.changedOutside).toBe(true)
+    expect(JSON.parse(fs.readFileSync(path.join(envs, 'Default.json'), 'utf8')).token).toBe('outside')
+    expect(fs.existsSync(path.join(envs, 'Staging.json'))).toBe(true)
+
+    // a page from before versions sends none and is not checked
+    await db.updateWorkspace(workspace, { environments: page })
+    expect(fs.existsSync(path.join(envs, 'Staging.json'))).toBe(false)
+})
+
+test('a load\'s version of a set is of the texts it read, so a change landing during the load is refused', async() => {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const file = path.join(workspace.location, '_environments', 'Default.json')
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ token: 'old' }))
+    const realRead = fsPromises.readFile.bind(fsPromises)
+    let changed = false
+    const spy = vi.spyOn(fsPromises, 'readFile').mockImplementation(async(target, ...rest) => {
+        const text = await realRead(target, ...rest)
+        if (!changed && String(target) === file) {
+            changed = true
+            fs.writeFileSync(file, JSON.stringify({ token: 'outside' }))
+        }
+        return text
+    })
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    spy.mockRestore()
+
+    const refused = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { token: 'stale' } }] }, loaded.environmentVersions[''])
+    expect(refused.changedOutside).toBe(true)
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ token: 'outside' })
+})
+
+test('a save\'s version is of what it wrote, so a file added outside during the save is not taken as seen', async() => {
+    const dir = path.join(workspace.location, 'Folder', '_environments')
+    fs.mkdirSync(dir, { recursive: true })
+    const added = path.join(dir, 'Staging.json')
+    let wrote = false
+    const helpers = createDbHelpers({
+        ...fileUtils,
+        writeFileJson: async(...args) => {
+            const text = await fileUtils.writeFileJson(...args)
+            if (!wrote) {
+                wrote = true
+                fs.writeFileSync(added, '{}')
+            }
+            return text
+        },
+    }, value => value)
+
+    const first = await helpers.saveEnvironments(dir, [{ name: 'Default', environment: { a: '1' } }])
+    const next = await helpers.saveEnvironments(dir, [{ name: 'Default', environment: { a: '2' } }], first.version)
+
+    expect(next.changedOutside).toBe(true)
+    expect(fs.existsSync(added)).toBe(true)
+})
+
+test('a save\'s version is the one a load then reads, with colors written and environments and colors deleted', async() => {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const save = environments => db.updateWorkspace(workspace, { environments })
+    const loadedVersion = async() => (await db.getCollectionForWorkspace(workspace, null)).environmentVersions['']
+
+    const both = await save([{ name: 'A', color: '#111', environment: { a: '1' } }, { name: 'B', color: '#222', environment: { b: '1' } }])
+    expect(both.version).toBe(await loadedVersion())
+    const one = await save([{ name: 'A', color: '#111', environment: { a: '1' } }])
+    expect(one.version).toBe(await loadedVersion())
+})
+
+test('a new folder\'s set has the version a load reads, with and without environments', async() => {
+    fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+    const empty = await db.createCollection(workspace, { _id: 'a', _type: 'request_group', name: 'Empty', parentId: null, workspaceId: workspace._id, sortOrder: 0 })
+    const filled = await db.createCollection(workspace, { _id: 'b', _type: 'request_group', name: 'Filled', parentId: null, workspaceId: workspace._id, environments: [{ name: 'Default', environment: { a: '1' } }], currentEnvironment: 'Default' })
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+
+    expect(empty.environmentsVersion).toBe(loaded.environmentVersions[empty.newCollectionId])
+    expect(filled.environmentsVersion).toBe(loaded.environmentVersions[filled.newCollectionId])
+    expect(empty.environmentsVersion).not.toBe(filled.environmentsVersion)
+})
+
+test('a folder\'s environments are checked the same way', async() => {
+    await workspaceWithItem()
+    const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id })
+    fs.writeFileSync(path.join(workspace.location, 'Folder', '_.json'), '{}')
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    const version = loaded.environmentVersions[folder.newCollectionId]
+    expect(version).toEqual(expect.any(String))
+    const saved = await db.updateCollection(workspace, folder.newCollectionId, { environments: [{ name: 'Default', environment: { a: 1 } }] }, version)
+    expect(saved.error).toBe(null)
+    fs.writeFileSync(path.join(workspace.location, 'Folder', '_environments', 'Default.json'), JSON.stringify({ a: 'outside' }))
+    expect((await db.updateCollection(workspace, folder.newCollectionId, { environments: [{ name: 'Default', environment: { a: 2 } }] }, saved.version)).changedOutside).toBe(true)
+    expect(JSON.parse(fs.readFileSync(path.join(workspace.location, 'Folder', '_environments', 'Default.json'), 'utf8')).a).toBe('outside')
 })
 
 test('a folder duplicated or imported keeps its headers and auth', async() => {

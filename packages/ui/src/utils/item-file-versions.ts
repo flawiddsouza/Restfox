@@ -27,6 +27,17 @@ export interface ItemFileEntry {
     sortOrderMerged: boolean
     // the load count when this page created the item, so a reload that began before it and read without it keeps it
     createdInLoad: number | null
+    // for a set of environments: saves the storage refused, so a pick asked for after one of them is not made, as it
+    // can name an environment that save would have added or renamed
+    refusals: number
+    // for a set of environments: scripts' values waiting for a save that may be refused, set again after its reload
+    retriesAfterRefusal: (() => void)[]
+    // for a set of environments: those of saves refused, waiting for the reload the first of them asked for
+    retriesAfterReload: (() => void)[]
+    // for a set of environments: its pick was saved since the current reload began, so the reload's read pick is older
+    currentEnvironmentPicked: boolean
+    // for a set of environments: a refusal was told and its reload has not ended, so the next is neither told nor reloads
+    reloadAsked: boolean
 }
 
 const entriesByWorkspace = new Map<string, Map<string, ItemFileEntry>>()
@@ -51,10 +62,24 @@ export function getItemEntry(workspaceId: string, id: string): ItemFileEntry {
     const entries = entriesOf(workspaceId)
     let entry = entries.get(id)
     if(!entry) {
-        entry = { id, version: null, history: [], generation: 0, chain: Promise.resolve(), wholeSaveQueued: null, deleting: false, savedWhileDeleting: null, sortOrderMerged: false, createdInLoad: null }
+        entry = { id, version: null, history: [], generation: 0, chain: Promise.resolve(), wholeSaveQueued: null, deleting: false, savedWhileDeleting: null, sortOrderMerged: false, createdInLoad: null, refusals: 0, retriesAfterRefusal: [], retriesAfterReload: [], reloadAsked: false, currentEnvironmentPicked: false }
         entries.set(id, entry)
     }
     return entry
+}
+
+// The entry of a workspace's environments, or a folder's, as a set: not an item id, as those are paths
+export function environmentsKey(collectionId: string | null | undefined) {
+    return `environments:${collectionId ?? ''}`
+}
+
+// the versions a load read, of items and of each set of environments, as one map of entries
+export function withEnvironmentVersions(versions: Record<string, string> | undefined, environmentVersions: Record<string, string> | undefined) {
+    const merged = { ...versions }
+    for(const [collectionId, version] of Object.entries(environmentVersions ?? {})) {
+        merged[environmentsKey(collectionId)] = version
+    }
+    return merged
 }
 
 export function peekItemEntry(workspaceId: string, id: string): ItemFileEntry | undefined {
@@ -142,6 +167,7 @@ export function beginItemReload(workspaceId: string): number {
     for(const entry of entriesOf(workspaceId).values()) {
         entry.history = entry.version === null ? [] : [entry.version]
         entry.sortOrderMerged = false
+        entry.currentEnvironmentPicked = false
     }
     return workspaceLoads
 }

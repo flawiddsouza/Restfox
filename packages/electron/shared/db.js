@@ -83,8 +83,9 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
             if(getEnvironments) {
                 const envsDirPath = path.join(location, constants.FOLDERS.ENVIRONMENTS)
-                const { environments, environment, currentEnvironment } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
+                const { environments, environment, currentEnvironment, version: environmentsVersion } = await dbHelpers.getEnvironments(envsDirPath, workspaceData.currentEnvironment)
 
+                workspaceData.environmentsVersion = environmentsVersion
                 workspaceData.environments = environments
                 workspaceData.environment = environment
                 workspaceData.currentEnvironment = currentEnvironment
@@ -105,7 +106,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         }
     }
 
-    async function updateWorkspace(workspace, updatedFields) {
+    async function updateWorkspace(workspace, updatedFields, version) {
         logMethodCall('updateWorkspace', {
             workspace,
             updatedFields,
@@ -126,6 +127,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const update = {}
         let environmentsError = null
+        let environmentsVersion
 
         if (updatedFields.name) {
             update.name = updatedFields.name
@@ -133,7 +135,11 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         if (updatedFields.environments) {
             const envsDirPath = path.join(workspacePath, constants.FOLDERS.ENVIRONMENTS)
-            ;({ error: environmentsError } = await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments))
+            const saved = await dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments, version)
+            if (saved.changedOutside) {
+                return saved
+            }
+            ;({ error: environmentsError, version: environmentsVersion } = saved)
         }
 
         if (updatedFields.currentEnvironment) {
@@ -144,6 +150,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             console.log('No fields to update for workspace')
             return {
                 error: environmentsError,
+                version: environmentsVersion,
             }
         }
 
@@ -157,6 +164,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         return {
             error: environmentsError,
+            version: environmentsVersion,
         }
     }
 
@@ -224,6 +232,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
 
         const oldCollectionId = collection._id
         const collectionName = fileUtils.encodeFilename(collection.name)
+        let environmentsVersion
         let environmentsError = null
         let version
 
@@ -245,13 +254,15 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 console.log(`Created directory: ${collectionPath}`)
 
                 const collectionToSave = {}
+                environmentsVersion = helpers.environmentsVersion(new Map())
 
                 if (collection.environments) {
                     const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
                     // an environment the save refuses, such as one whose name differs from another only in case, is
                     // told with the result, not as its error, which would stop an import or a duplicate there
-                    const { error } = await dbHelpers.saveEnvironments(envsDirPath, collection.environments)
+                    const { error, version: savedVersion } = await dbHelpers.saveEnvironments(envsDirPath, collection.environments)
                     environmentsError = error ? `${collection.name}: ${error}` : null
+                    environmentsVersion = savedVersion
                     collectionToSave.currentEnvironment = collection.currentEnvironment ?? 'Default'
                 }
 
@@ -321,6 +332,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
                 oldCollectionId,
                 newCollectionId: collectionPathWithoutWorkspaceLocation,
                 environmentsError,
+                // for a folder, the version of its set of environments
+                environmentsVersion,
                 // the version of the item's file, or of a folder's headers and auth
                 version,
             }
@@ -604,7 +617,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields || 'headers' in updatedFields || 'authentication' in updatedFields)) {
             if(updatedFields.environments) {
                 const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
-                return dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments)
+                return dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments, version)
             }
 
             if('collapsed' in updatedFields) {
@@ -1286,13 +1299,15 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         const idMap = getIdMap(workspace.location)
         // item id to the version of its file
         const versions = {}
+        // workspace's or folder's id, '' for the workspace, to the version of its environments, kept apart from them
+        const environmentVersions = {}
         let collection
         let workspaceData
         try {
             [ collection, workspaceData ] = await Promise.all([
                 // we do not want to modify the idMap if returning the request_group type
                 // this messes up the idMap - as ui and elecron will go out of sync
-                dbHelpers.getCollection(type === null ? idMap : new Map(), workspace, workspace.location, versions),
+                dbHelpers.getCollection(type === null ? idMap : new Map(), workspace, workspace.location, versions, environmentVersions),
                 getWorkspaceAtLocation(workspace.location, true),
             ])
         } catch (err) {
@@ -1309,6 +1324,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             clearedIdMaps.delete(workspace.location)
             scannedLocations.add(workspace.location)
         }
+        environmentVersions[''] = workspaceData.environmentsVersion
+        delete workspaceData.environmentsVersion
 
         // An id from before this scan, such as an item's before a rename, keeps reaching the path it had reached until
         // the next scan, so a save the screen sent with it while this scan ran still finds the file. Ids this scan read
@@ -1340,6 +1357,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             workspace: workspaceData,
             idMap: idMapBeforeClear,
             versions,
+            environmentVersions,
         }
     }
 

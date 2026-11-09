@@ -52,7 +52,7 @@ import { createCollection, createCollections, createPlugin, createPlugins, creat
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, SetEnvironmentVariableFunction, Workspace } from './global'
 import { store } from './store'
 import { getSocketItemCloses, noteSocketOpened, takeOpenedSocketKeys } from './utils/socket-connections'
-import { getItemEntry, getItemVersion, itemWritesPending, itemWritesSettled, loadItemVersions, setItemVersion } from './utils/item-file-versions'
+import { enqueueItemWrite, environmentsKey, getItemEntry, getItemVersion, itemWritesPending, itemWritesSettled, loadItemVersions, setItemVersion, withEnvironmentVersions } from './utils/item-file-versions'
 import { toRaw } from 'vue'
 import type { UpdateCollectionResult } from './db'
 import { emitter } from './event-bus'
@@ -1398,7 +1398,7 @@ describe('script environment writes belong to the request workspace', () => {
         store.commit('updateCollectionItemEnvironment', { workspaceId: 'A', collectionId: 'Auth', environment: { token: 'A' } })
         store.commit('updateCollectionItemEnvironments', { workspaceId: 'A', collectionId: 'Auth', environments: [{ name: 'Default', environment: { token: 'A' } }] })
         expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environment: { token: 'A' } })
-        expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environments: [{ name: 'Default', environment: { token: 'A' } }] })
+        await vi.waitFor(() => expect(updateCollection).toHaveBeenCalledWith('A', 'Auth', { environments: [{ name: 'Default', environment: { token: 'A' } }] }, undefined, expect.any(Function)))
     })
 
     test('an environments save the storage refuses, such as over a file it cannot read, shows its error', async() => {
@@ -2953,6 +2953,8 @@ describe('a request whose file changed outside Restfox', () => {
         return { promise, release, reject }
     }
 
+    const enqueueItemWriteHeld = (entry: ReturnType<typeof getItemEntry>, running: Promise<unknown>) => enqueueItemWrite(entry, () => running)
+
     function open(...items: CollectionItem[]) {
         store.commit('setCollection', items)
         store.state.tabs = [...store.state.collection]
@@ -3572,6 +3574,437 @@ describe('a request whose file changed outside Restfox', () => {
         expect(store.state.collection.filter(item => item._id === 'Login (2).json')).toHaveLength(1)
         expect(store.state.collection.find(item => item._id === 'Login (2).json')?.url).toBe('https://api.example/login')
         expect(store.state.tabs.map(tab => toRaw(tab))).not.toContain(toRaw(stale))
+    })
+
+    describe('environments of a file workspace', () => {
+        const environments = (token: string) => [{ name: 'Default', environment: { token } }]
+        const refused = { error: 'Not saved, as the environments were changed outside Restfox', changedOutside: true }
+        const key = environmentsKey(null)
+        const setEnvironmentsVersion = (version: string) => setItemVersion(getItemEntry('workspace-id', key), version)
+        const settledEnvironments = () => itemWritesSettled('workspace-id', key)
+
+        beforeEach(() => {
+            vi.mocked(updateWorkspace).mockReset()
+            vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+            vi.stubGlobal('document', { querySelector: () => null })
+        })
+
+        test('a save carries the version of the set and takes the one its reply gives', async() => {
+            setEnvironmentsVersion('v1')
+            vi.mocked(updateWorkspace).mockResolvedValue({ error: null, version: 'v2' })
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('a') })
+            await settledEnvironments()
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('b') })
+            await settledEnvironments()
+
+            expect(vi.mocked(updateWorkspace).mock.calls.map(call => call[3])).toEqual(['v1', 'v2'])
+        })
+
+        test('saves asked for while one waits are one save of the latest list', async() => {
+            setEnvironmentsVersion('v1')
+            const first = held<{ error: null, version: string }>()
+            vi.mocked(updateWorkspace).mockReturnValueOnce(first.promise).mockResolvedValue({ error: null, version: 'v3' })
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('a') })
+            await vi.waitFor(() => expect(updateWorkspace).toHaveBeenCalledOnce())
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('b') })
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('c') })
+            first.release({ error: null, version: 'v2' })
+            await vi.waitFor(() => expect(updateWorkspace).toHaveBeenCalledTimes(2))
+            await settledEnvironments()
+
+            expect(vi.mocked(updateWorkspace).mock.calls[1][1]).toEqual({ environments: environments('c') })
+            expect(vi.mocked(updateWorkspace).mock.calls[1][3]).toBe('v2')
+        })
+
+        test('a refused save tells the user, reloads, and sets a script\'s value again on what the reload brought', async() => {
+            setEnvironmentsVersion('v1')
+            vi.mocked(updateWorkspace).mockResolvedValueOnce(refused)
+            vi.mocked(getCollectionForWorkspace).mockResolvedValue({ collection: [], workspace: null, idMap: null, environmentVersions: { '': 'outside' } } as never)
+            const retry = vi.fn()
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('a'), retryAfterReload: retry })
+
+            await vi.waitFor(() => expect(retry).toHaveBeenCalledOnce())
+            expect(errorToasts()).toEqual(['Environments changed outside Restfox and were reloaded. Your last change to them was not saved.'])
+            expect(getItemVersion('workspace-id', key)).toBe('outside')
+        })
+
+        test('a pick asked for after a save that is refused is not made, as it can name an environment that save would have added', async() => {
+            setEnvironmentsVersion('v1')
+            vi.mocked(updateWorkspace).mockResolvedValueOnce(refused)
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('a') })
+            store.commit('updateWorkspaceCurrentEnvironment', { workspaceId: 'workspace-id', currentEnvironment: 'Renamed' })
+            await settledEnvironments()
+            await settledEnvironments()
+
+            expect(updateWorkspace).toHaveBeenCalledOnce()
+        })
+
+        test('a pick after a save that goes through is made', async() => {
+            setEnvironmentsVersion('v1')
+            vi.mocked(updateWorkspace).mockResolvedValue({ error: null, version: 'v2' })
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('a') })
+            store.commit('updateWorkspaceCurrentEnvironment', { workspaceId: 'workspace-id', currentEnvironment: 'Default' })
+            await vi.waitFor(() => expect(updateWorkspace).toHaveBeenCalledWith('workspace-id', { currentEnvironment: 'Default' }))
+        })
+
+        test('a reload that read an older version than a save of the page keeps the list of the page and its version', async() => {
+            const workspace = store.state.activeWorkspace as unknown as { environments: unknown, environment: unknown }
+            workspace.environment = { token: 'old' }
+            workspace.environments = environments('old')
+            setEnvironmentsVersion('v1')
+            const read = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(read.promise as never)
+            vi.mocked(updateWorkspace).mockResolvedValue({ error: null, version: 'v2' })
+            open(request('Login.json'))
+            setVersion('Login.json', 'l1')
+
+            const reload = store.dispatch('refreshWorkspaceCollection')
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            workspace.environments = environments('saved')
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: workspace.environments })
+            await settledEnvironments()
+            read.release({ collection: [request('Login.json')], workspace: { name: 'W', environment: { token: 'old' }, environments: environments('old'), currentEnvironment: 'Default', dotEnv: {} }, idMap: null, versions: { 'Login.json': 'l1' }, environmentVersions: { '': 'v1' } })
+            await reload
+
+            expect(workspace.environments).toEqual(environments('saved'))
+            expect(getItemVersion('workspace-id', key)).toBe('v2')
+        })
+
+        test('a reload that finds the set changed outside applies it and says so', async() => {
+            const workspace = store.state.activeWorkspace as unknown as { environments: unknown, environment: unknown }
+            workspace.environments = environments('old')
+            setEnvironmentsVersion('v1')
+            const heard = vi.fn()
+            emitter.on('environmentsChangedOutside', heard)
+            vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [], workspace: { name: 'W', environment: { token: 'outside' }, environments: environments('outside'), currentEnvironment: 'Default', dotEnv: {} }, idMap: null, versions: {}, environmentVersions: { '': 'outside' } } as never)
+
+            await store.dispatch('refreshWorkspaceCollection')
+            emitter.off('environmentsChangedOutside', heard)
+
+            expect(workspace.environments).toEqual(environments('outside'))
+            expect(heard).toHaveBeenCalledWith({ workspaceId: 'workspace-id', collectionId: null, read: { environment: { token: 'outside' }, environments: environments('outside'), currentEnvironment: 'Default' } })
+            expect(updateWorkspace).not.toHaveBeenCalled()
+        })
+
+        test('a save asked for before a load of the workspace read another version is not sent', async() => {
+            setEnvironmentsVersion('v1')
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+            const running = held<undefined>()
+            enqueueItemWriteHeld(getItemEntry('workspace-id', key), running.promise)
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('stale') })
+            loadItemVersions('workspace-id', { [key]: 'v2' })
+            running.release(undefined)
+            await settledEnvironments()
+
+            expect(updateWorkspace).not.toHaveBeenCalled()
+            expect(errorToasts()).toEqual(['Environments changed outside Restfox and were reloaded. Your last change to them was not saved.'])
+        })
+
+        const folderWithEnvironments = (token: string) => ({ _id: 'Folder', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: 'workspace-id', environments: environments(token), environment: { token }, currentEnvironment: 'Default' }) as unknown as CollectionItem
+
+        test('a folder\'s list kept over an older read stays with its pick, and can be cloned', async() => {
+            open(folderWithEnvironments('page'))
+            const folderKey = environmentsKey('Folder')
+            setItemVersion(getItemEntry('workspace-id', folderKey), 'e1')
+            const read = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never)
+            const reload = store.dispatch('refreshWorkspaceCollection')
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            setItemVersion(getItemEntry('workspace-id', folderKey), 'saved-since')
+            // the tab of a folder is a copy, and the window and scripts update the collection's
+            store.state.tabs = [{ ...toRaw(store.state.collection[0]), environments: environments('tab copy') }] as CollectionItem[]
+            store.state.activeTab = store.state.tabs[0]
+            Object.assign(store.state.collection[0], { currentEnvironment: 'Picked' })
+            read.release({ collection: [{ ...folderWithEnvironments('older'), currentEnvironment: 'Default' }], workspace: null, idMap: null, versions: {}, environmentVersions: { Folder: 'e1' } })
+            await reload
+
+            expect(store.state.collection[0].environments).toEqual(environments('page'))
+            expect(store.state.collection[0].currentEnvironment).toBe('Picked')
+            expect(() => structuredClone(toRaw(store.state.collection[0]))).not.toThrow()
+        })
+
+        test('a reload waits for a save of the set asked for while it waited for an earlier one', async() => {
+            setEnvironmentsVersion('e1')
+            const first = held<{ error: null, version: string }>()
+            const second = held<{ error: null, version: string }>()
+            vi.mocked(updateWorkspace).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+            const read = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never)
+            const reload = store.dispatch('refreshWorkspaceCollection')
+            let reloadEnded = false
+            reload.then(() => reloadEnded = true)
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('one') })
+            await vi.waitFor(() => expect(updateWorkspace).toHaveBeenCalledOnce())
+            read.release({ collection: [], workspace: { name: 'W', environment: { token: 'read' }, environments: environments('read'), currentEnvironment: 'Default', dotEnv: {} }, idMap: null, versions: {}, environmentVersions: { '': 'e1' } })
+            await flushPromises()
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('two') })
+            await flushPromises()
+
+            first.release({ error: null, version: 'e2' })
+            await vi.waitFor(() => expect(updateWorkspace).toHaveBeenCalledTimes(2))
+            await flushPromises()
+            expect(reloadEnded).toBe(false)
+            second.release({ error: null, version: 'e3' })
+            await reload
+        })
+
+        test('a .env changed outside is applied even when the environments read are older than a save', async() => {
+            setEnvironmentsVersion('e1')
+            const read = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never)
+            const reload = store.dispatch('refreshWorkspaceCollection')
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            setEnvironmentsVersion('saved-since')
+            read.release({ collection: [], workspace: { name: 'W', environment: { token: 'older' }, environments: environments('older'), currentEnvironment: 'Default', dotEnv: { KEY: 'new' } }, idMap: null, versions: {}, environmentVersions: { '': 'e1' } })
+            await reload
+
+            expect(store.state.activeWorkspace?.dotEnv).toEqual({ KEY: 'new' })
+            expect(store.state.activeWorkspace?.environments).not.toEqual(environments('older'))
+        })
+
+        test('a folder\'s set follows it to the id a rename gave it', async() => {
+            open(folderWithEnvironments('page'))
+            setItemVersion(getItemEntry('workspace-id', environmentsKey('Folder')), 'e1')
+            vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [{ ...folderWithEnvironments('page'), _id: 'Renamed' }], workspace: null, idMap: new Map([['Folder', 'Renamed']]), versions: {}, environmentVersions: { Renamed: 'e1' } } as never)
+
+            await store.dispatch('refreshWorkspaceCollection')
+
+            expect(getItemVersion('workspace-id', environmentsKey('Renamed'))).toBe('e1')
+            expect(getItemVersion('workspace-id', environmentsKey('Folder'))).toBeNull()
+        })
+
+        test('a folder gone from the files forgets its set and tells a window showing it', async() => {
+            open(folderWithEnvironments('page'))
+            setItemVersion(getItemEntry('workspace-id', environmentsKey('Folder')), 'e1')
+            const heard = vi.fn()
+            emitter.on('environmentsChangedOutside', heard)
+            vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [], workspace: null, idMap: new Map(), versions: {}, environmentVersions: {} } as never)
+
+            await store.dispatch('refreshWorkspaceCollection')
+            emitter.off('environmentsChangedOutside', heard)
+
+            expect(heard).toHaveBeenCalledWith({ workspaceId: 'workspace-id', collectionId: 'Folder', read: null })
+            expect(getItemVersion('workspace-id', environmentsKey('Folder'))).toBeNull()
+        })
+
+        test('saves refused until the reload applies are one message and one reload, and each value is set again', async() => {
+            setEnvironmentsVersion('v1')
+            const reload = held<unknown>()
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(reload.promise as never)
+            vi.mocked(updateWorkspace).mockResolvedValue(refused)
+            const firstValue = vi.fn()
+            const secondValue = vi.fn()
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('one'), retryAfterReload: firstValue })
+            await settledEnvironments()
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('two'), retryAfterReload: secondValue })
+            await settledEnvironments()
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            expect(errorToasts()).toHaveLength(1)
+            reload.release({ collection: [], workspace: null, idMap: null, versions: {}, environmentVersions: {} })
+            await vi.waitFor(() => expect(secondValue).toHaveBeenCalledOnce())
+            expect(firstValue).toHaveBeenCalledOnce()
+        })
+
+        test.each([
+            ['the read failed', () => {
+                vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ error: 'gone', collection: [], workspace: null, idMap: null } as never)
+            }],
+            ['the workspace was left', () => {
+                vi.mocked(getCollectionForWorkspace).mockImplementationOnce(async() => {
+                    store.state.activeWorkspace = { ...store.state.activeWorkspace, _id: 'other' } as Workspace
+                    return { collection: [], workspace: null, idMap: null, versions: {}, environmentVersions: {} } as never
+                })
+            }],
+        ])('a script\'s value is not set again when %s', async(_label, arrange) => {
+            const workspace = store.state.activeWorkspace
+            setEnvironmentsVersion('v1')
+            arrange()
+            vi.mocked(updateWorkspace).mockResolvedValue(refused)
+            const value = vi.fn()
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('one'), retryAfterReload: value })
+            await settledEnvironments()
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            await flushPromises()
+            store.state.activeWorkspace = workspace
+
+            expect(value).not.toHaveBeenCalled()
+        })
+
+        test('deleting a folder forgets its set, so a new folder of the name starts with none', async() => {
+            open(folderWithEnvironments('page'))
+            setItemVersion(getItemEntry('workspace-id', environmentsKey('Folder')), 'e1')
+            vi.mocked(deleteCollectionsByIds).mockResolvedValue({ error: null } as never)
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+            await store.dispatch('deleteCollectionItem', store.state.collection[0])
+
+            expect(getItemVersion('workspace-id', environmentsKey('Folder'))).toBeNull()
+        })
+
+        test('a new folder takes the version of its set from the create reply', async() => {
+            vi.mocked(createCollection).mockResolvedValue({ error: null, newCollectionId: 'New', version: 'f1', environmentsVersion: 'e-new' } as never)
+            vi.mocked(updateCollection).mockResolvedValue({ error: null })
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+            await store.dispatch('createCollectionItem', { type: 'request_group', name: 'New', parentId: null })
+
+            expect(getItemVersion('workspace-id', environmentsKey('New'))).toBe('e-new')
+        })
+
+        test.each([
+            ['the workspace', null],
+            ['a folder', 'Folder'],
+        ])('a pick of %s changed outside, with the set as it was, tells a window showing it', async(_label, collectionId) => {
+            open(folderWithEnvironments('page'))
+            const workspace = store.state.activeWorkspace as unknown as { currentEnvironment: string }
+            workspace.currentEnvironment = 'Default'
+            setItemVersion(getItemEntry('workspace-id', environmentsKey(collectionId)), 'e1')
+            const heard = vi.fn()
+            emitter.on('environmentsChangedOutside', heard)
+            const picked = (name: string, is: boolean) => is ? 'Prod' : name
+            vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({
+                collection: [{ ...folderWithEnvironments('page'), currentEnvironment: picked('Default', collectionId !== null) }],
+                workspace: { name: 'W', environment: { token: 'page' }, environments: environments('page'), currentEnvironment: picked('Default', collectionId === null), dotEnv: {} },
+                idMap: null,
+                versions: {},
+                environmentVersions: collectionId === null ? { '': 'e1' } : { Folder: 'e1' },
+            } as never)
+
+            await store.dispatch('refreshWorkspaceCollection')
+            emitter.off('environmentsChangedOutside', heard)
+
+            expect(heard).toHaveBeenCalledOnce()
+            expect(heard.mock.calls[0][0]).toMatchObject({ collectionId, read: { currentEnvironment: 'Prod' } })
+        })
+
+        test('a script\'s value is not set again when the reload that ended read another workspace', async() => {
+            const workspace = store.state.activeWorkspace
+            setEnvironmentsVersion('v1')
+            const emptyRead = { collection: [], workspace: null, idMap: null, versions: {}, environmentVersions: {} }
+            const first = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(first.promise as never).mockResolvedValue(emptyRead as never)
+            const earlier = store.dispatch('refreshWorkspaceCollection')
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+            vi.mocked(updateWorkspace).mockResolvedValue(refused)
+            const value = vi.fn()
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('one'), retryAfterReload: value })
+            await settledEnvironments()
+            store.state.activeWorkspace = { ...workspace, _id: 'other' } as Workspace
+            first.release(emptyRead)
+            await earlier
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledTimes(2))
+            await flushPromises()
+            store.state.activeWorkspace = workspace
+
+            expect(value).not.toHaveBeenCalled()
+        })
+
+        const twoEnvironments = [{ name: 'Default', environment: { token: 'default' } }, { name: 'Prod', environment: { token: 'prod' } }]
+
+        test.each([
+            ['the workspace', null],
+            ['a folder', 'Folder'],
+        ])('a pick of %s made while a reload reads stays, with its environment, and nothing is reported', async(_label, collectionId) => {
+            open({ ...folderWithEnvironments('page'), environments: twoEnvironments, environment: twoEnvironments[0].environment } as CollectionItem)
+            Object.assign(store.state.activeWorkspace as object, { environments: twoEnvironments, environment: twoEnvironments[0].environment, currentEnvironment: 'Default' })
+            setItemVersion(getItemEntry('workspace-id', environmentsKey(collectionId)), 'e1')
+            const heard = vi.fn()
+            emitter.on('environmentsChangedOutside', heard)
+            vi.mocked(updateWorkspace).mockResolvedValue({ error: null })
+            vi.mocked(updateCollection).mockResolvedValue({ error: null })
+            const read = heldRead()
+            vi.mocked(getCollectionForWorkspace).mockReturnValueOnce(read.promise as never)
+            const reload = store.dispatch('refreshWorkspaceCollection')
+            await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+
+            const owner = (collectionId === null ? store.state.activeWorkspace : store.state.collection[0]) as object
+            Object.assign(owner, { currentEnvironment: 'Prod', environment: twoEnvironments[1].environment })
+            if(collectionId === null) {
+                store.commit('updateWorkspaceCurrentEnvironment', { workspaceId: 'workspace-id', currentEnvironment: 'Prod' })
+            } else {
+                store.commit('updateCollectionItemCurrentEnvironment', { collectionId, currentEnvironment: 'Prod' })
+            }
+            await itemWritesSettled('workspace-id', environmentsKey(collectionId))
+            read.release({
+                collection: [{ ...folderWithEnvironments('read'), environments: twoEnvironments, environment: twoEnvironments[0].environment, currentEnvironment: 'Default' }],
+                workspace: { name: 'W', environment: twoEnvironments[0].environment, environments: twoEnvironments, currentEnvironment: 'Default', dotEnv: {} },
+                idMap: null,
+                versions: {},
+                environmentVersions: collectionId === null ? { '': 'e1' } : { Folder: 'e1' },
+            })
+            await reload
+            emitter.off('environmentsChangedOutside', heard)
+
+            const now = (collectionId === null ? store.state.activeWorkspace : store.state.collection[0]) as unknown as { currentEnvironment: string, environment: unknown }
+            expect(now.currentEnvironment).toBe('Prod')
+            expect(now.environment).toEqual({ token: 'prod' })
+            expect(heard).not.toHaveBeenCalled()
+        })
+
+        test('a pick from before a reload began does not hide one changed outside', async() => {
+            open(folderWithEnvironments('page'))
+            setItemVersion(getItemEntry('workspace-id', environmentsKey('Folder')), 'e1')
+            vi.mocked(updateCollection).mockResolvedValue({ error: null })
+            store.commit('updateCollectionItemCurrentEnvironment', { collectionId: 'Folder', currentEnvironment: 'Default' })
+            await itemWritesSettled('workspace-id', environmentsKey('Folder'))
+            const heard = vi.fn()
+            emitter.on('environmentsChangedOutside', heard)
+            vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [{ ...folderWithEnvironments('page'), currentEnvironment: 'Prod' }], workspace: null, idMap: null, versions: {}, environmentVersions: { Folder: 'e1' } } as never)
+
+            await store.dispatch('refreshWorkspaceCollection')
+            emitter.off('environmentsChangedOutside', heard)
+
+            expect(heard).toHaveBeenCalledOnce()
+        })
+
+        test('a value refused while its workspace was not shown is not set again by a later refusal there', async() => {
+            const workspace = store.state.activeWorkspace
+            setEnvironmentsVersion('v1')
+            vi.mocked(updateWorkspace).mockResolvedValue(refused)
+            const leftBehind = vi.fn()
+            const later = vi.fn()
+            store.state.activeWorkspace = { ...workspace, _id: 'other' } as Workspace
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('one'), retryAfterReload: leftBehind })
+            await settledEnvironments()
+            store.state.activeWorkspace = workspace
+            vi.mocked(getCollectionForWorkspace).mockResolvedValue({ collection: [], workspace: null, idMap: null, versions: {}, environmentVersions: {} } as never)
+
+            store.commit('updateWorkspaceEnvironments', { workspaceId: 'workspace-id', environments: environments('two'), retryAfterReload: later })
+            await vi.waitFor(() => expect(later).toHaveBeenCalledOnce())
+
+            expect(leftBehind).not.toHaveBeenCalled()
+        })
+
+        test('a duplicated folder takes the version of its set from the reply', async() => {
+            const [source] = open(folderWithEnvironments('page'))
+            store.state.collectionTree = [source]
+            vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+            vi.stubGlobal('document', { querySelector: () => null })
+            vi.mocked(createCollections).mockImplementationOnce(async(_workspaceId, collections) => ({ error: null, results: [{ error: null, oldCollectionId: collections[0]._id, newCollectionId: 'Copy', version: 'f1', environmentsVersion: 'e-copy' }] }) as never)
+            vi.mocked(updateCollection).mockResolvedValue({ error: null })
+            vi.mocked(getCollectionForWorkspace).mockReturnValue(pendingRead())
+
+            await store.dispatch('duplicateCollectionItem', toRaw(source))
+
+            expect(getItemVersion('workspace-id', environmentsKey('Copy'))).toBe('e-copy')
+        })
+
+        test('a load keeps the versions of the sets', () => {
+            loadItemVersions('workspace-id', withEnvironmentVersions({ 'Login.json': 'l1' }, { '': 'e1', '/Folder': 'f1' }))
+            expect(getItemVersion('workspace-id', key)).toBe('e1')
+            expect(getItemVersion('workspace-id', environmentsKey('/Folder'))).toBe('f1')
+            expect(getItemVersion('workspace-id', 'Login.json')).toBe('l1')
+        })
     })
 
     test('a folder\'s headers go from the version the page holds', async() => {

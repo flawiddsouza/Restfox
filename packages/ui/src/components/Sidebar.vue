@@ -38,7 +38,7 @@
     <AddSocketModal v-model:showModal="addSocketModalShow" :parent-id="addSocketModalParentId" />
     <AddGrpcRequestModal v-model:showModal="addGrpcRequestModalShow" :parent-id="addGrpcRequestModalParentId" />
     <AddFolderModal v-model:showModal="addFolderModalShow" :parent-id="addFolderModalParentId" />
-    <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item="environmentModalCollectionItem" />
+    <EnvironmentModal v-model:showModal="environmentModalShow" :collection-item-opened="environmentModalCollectionItem" />
     <PluginManagerModal v-model:showModal="pluginManagerShow" :collection-item="pluginManagerCollectionItem" />
     <SettingsModal :show-modal="settingsModalShow" :collection-item="settingsModalCollectionItem" @update:collection-item="updateCollectionItem" />
     <DuplicateCollectionItemModal v-model:showModal="showDuplicateCollectionItemModal" :collection-item-to-duplicate="collectionItemToDuplicate" />

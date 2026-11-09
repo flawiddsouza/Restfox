@@ -62,6 +62,8 @@ import {
     endItemReload,
     enqueueItemWrite,
     scriptWriteKey,
+    environmentsKey,
+    type ItemFileEntry,
     forgetItems,
     getItemEntry,
     holdUnloadWhile,
@@ -158,7 +160,7 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
         // a lost connection to web-standalone rejects where a storage failure answers with an error
         read = { error: error instanceof Error ? error.message : String(error), collection: [], workspace: null, idMap: null }
     }
-    const { error, collection, workspace, idMap, versions } = read
+    const { error, collection, workspace, idMap, versions, environmentVersions } = read
 
     // a read that failed, such as of a network share gone for a moment, leaves what the page shows and its versions as
     // they are
@@ -179,17 +181,28 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
         }
     }
     const previousIdOf = (id: string) => previousIdByNewId.get(id) ?? id
+    // a folder's set of environments follows the folder to a new id
+    const previousEnvironmentIds = new Map<string, string>()
+    for(const [previousId, newId] of idMap ?? []) {
+        if(previousId !== newId && peekItemEntry(activeWorkspaceId, environmentsKey(previousId)) !== undefined) {
+            previousEnvironmentIds.set(newId, previousId)
+        }
+    }
+    const previousEnvironmentIdOf = (id: string) => previousEnvironmentIds.get(id) ?? id
 
     // A save the server ran before the read was asked for before the read's reply came, so once the writes asked for
     // by now have ended, every version the files held before the read is in its entry's history
     await Promise.all(collection.map((item: CollectionItem) => itemWritesSettled(activeWorkspaceId, previousIdOf(item._id))))
 
-    // a folder's object is replaced, and the Folder panel with it, so its saves asked for during that wait go first, or
-    // the panel would go back to what the last reply left
-    const folderChains = () => collection.filter((item: CollectionItem) => item._type === 'request_group').map((item: CollectionItem) => peekItemEntry(activeWorkspaceId, previousIdOf(item._id))?.chain)
-    for(let chains = folderChains(); ; chains = folderChains()) {
+    // a folder's object is replaced, and the Folder panel with it, and a set of environments with the window showing it,
+    // so their saves asked for during that wait go first, or these would go back to what the last reply left
+    const chainsOfReplacedObjects = () => [
+        ...collection.filter((item: CollectionItem) => item._type === 'request_group').map((item: CollectionItem) => peekItemEntry(activeWorkspaceId, previousIdOf(item._id))?.chain),
+        ...Object.keys(environmentVersions ?? {}).map(id => peekItemEntry(activeWorkspaceId, environmentsKey(id && previousEnvironmentIdOf(id)))?.chain),
+    ]
+    for(let chains = chainsOfReplacedObjects(); ; chains = chainsOfReplacedObjects()) {
         await Promise.all(chains)
-        if(folderChains().every((chain: Promise<void> | undefined, index: number) => chain === chains[index])) {
+        if(chainsOfReplacedObjects().every((chain: Promise<void> | undefined, index: number) => chain === chains[index])) {
             break
         }
     }
@@ -213,11 +226,62 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
         }
     }
 
+    // Whether the read of a set of environments is what the page should show. One its entry held since the reload began
+    // is older than a save of the page or the same as it, so a save that came after the read stays on screen and is not
+    // written back over by what was read. Any other was changed outside Restfox, and replaces what the page held
+    const environmentsReadFromOutside: string[] = []
+    // a pick saved since this reload began is newer than the read's, which is put right along with its environment
+    const keepPickMadeSinceRead = (id: string, read: { currentEnvironment?: unknown, environment?: unknown, environments?: { name: string, environment: object }[] } | null | undefined, held: { currentEnvironment?: unknown } | null | undefined) => {
+        if(read && peekItemEntry(activeWorkspaceId, environmentsKey(id && previousEnvironmentIdOf(id)))?.currentEnvironmentPicked) {
+            const picked = read.environments?.find(environment => environment.name === held?.currentEnvironment)
+            if(picked) {
+                read.currentEnvironment = picked.name
+                read.environment = picked.environment
+            }
+        }
+    }
+    const environmentsReadApply = (id: string, currentEnvironmentRead?: unknown, currentEnvironmentHeld?: unknown) => {
+        const version = environmentVersions?.[id]
+        if(version === undefined) {
+            return true
+        }
+        const entry = getItemEntry(activeWorkspaceId, environmentsKey(id && previousEnvironmentIdOf(id)))
+        if(entry.history.includes(version)) {
+            // a pick is kept apart from the set, and a window showing one environment's text must not save it as another's
+            if(entry.version === version && currentEnvironmentHeld !== undefined && currentEnvironmentRead !== currentEnvironmentHeld) {
+                environmentsReadFromOutside.push(id)
+            }
+            return entry.version === version
+        }
+        if(entry.version !== null) {
+            environmentsReadFromOutside.push(id)
+        }
+        setItemVersion(entry, version)
+        return true
+    }
+    const objectsById = itemObjectsById(context.state, activeWorkspaceId)
+    for(const item of collection as CollectionItem[]) {
+        if(item._type !== 'request_group') {
+            continue
+        }
+        // the collection's object, last in the list, which the Environment window and scripts update, where a tab is a copy.
+        // Raw, as a drag and Duplicate clone the raw items
+        const previous = toRaw((objectsById.get(previousIdOf(item._id)) ?? objectsById.get(previousEnvironmentIdOf(item._id)))?.at(-1))
+        keepPickMadeSinceRead(item._id, item as never, previous)
+        if(!environmentsReadApply(item._id, item.currentEnvironment, previous?.currentEnvironment)) {
+            if(previous) {
+                item.environments = previous.environments
+                item.environment = previous.environment
+                item.currentEnvironment = previous.currentEnvironment
+            }
+        }
+    }
+    keepPickMadeSinceRead('', workspace as never, context.state.activeWorkspace)
+    const workspaceEnvironmentsApply = environmentsReadApply('', workspace?.currentEnvironment, context.state.activeWorkspace?.currentEnvironment)
     // An item whose file the reload read at a version its entry held since the reload began keeps its object, so what
     // the user typed while the files were read stays, as do the saves still to send, and keeps its entry's version,
     // which a save since may have moved on. Only an item whose file changed outside Restfox is replaced, and saves
     // asked for before then are not sent
-    const objectsById = itemObjectsById(context.state, activeWorkspaceId)
     const kept = collection.map((item: CollectionItem) => {
         const previousId = previousIdOf(item._id)
         const version = versions?.[item._id]
@@ -266,9 +330,14 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
     })
     // in the same turn as the ids change on the kept objects, before a save of one is asked for under its new id
     renameItemIds(activeWorkspaceId, previousIdByNewId)
+    const renamedEnvironmentKeys = new Map<string, string>()
+    previousEnvironmentIds.forEach((previousId, newId) => renamedEnvironmentKeys.set(environmentsKey(newId), environmentsKey(previousId)))
+    renameItemIds(activeWorkspaceId, renamedEnvironmentKeys)
     const readIds = new Set(collection.map((item: CollectionItem) => item._id))
     const renamedIds = new Set(previousIdByNewId.values())
-    forgetItems(activeWorkspaceId, previousIds.filter(id => !readIds.has(id) && !renamedIds.has(id)))
+    const goneIds = previousIds.filter(id => !readIds.has(id) && !renamedIds.has(id))
+    const goneEnvironmentIds = goneIds.filter(id => ![...previousEnvironmentIds.values()].includes(id) && peekItemEntry(activeWorkspaceId, environmentsKey(id)) !== undefined)
+    forgetItems(activeWorkspaceId, [...goneIds, ...goneEnvironmentIds.map(environmentsKey)])
     // items this page created after the read began, which it did not see
     const createdMeanwhile = context.state.collection.filter(item => !readIds.has(item._id) && createdSince(activeWorkspaceId, item._id, load))
     collection.splice(0, collection.length, ...kept, ...createdMeanwhile)
@@ -293,13 +362,25 @@ async function applyWorkspaceReload(context: ActionContext<State, State>, active
     if(workspace) {
         context.state.activeWorkspace.name = workspace.name
         if(workspace.environment) {
-            context.state.activeWorkspace.environment = workspace.environment
-            context.state.activeWorkspace.environments = workspace.environments
-            context.state.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+            if(workspaceEnvironmentsApply) {
+                context.state.activeWorkspace.environment = workspace.environment
+                context.state.activeWorkspace.environments = workspace.environments
+                context.state.activeWorkspace.currentEnvironment = workspace.currentEnvironment
+            }
             context.state.activeWorkspace.dotEnv = workspace.dotEnv
             emitter.emit('dotenv', 'reloaded')
         }
     }
+
+    // once the page holds them, for a window showing one of these sets
+    for(const id of environmentsReadFromOutside) {
+        const owner = id ? collection.find((item: CollectionItem) => item._id === id) : workspace
+        if(owner?.environment) {
+            const { environment, environments, currentEnvironment } = owner
+            emitter.emit('environmentsChangedOutside', { workspaceId: activeWorkspaceId, collectionId: id ? previousEnvironmentIdOf(id) : null, read: { environment, environments, currentEnvironment } })
+        }
+    }
+    goneEnvironmentIds.forEach(id => emitter.emit('environmentsChangedOutside', { workspaceId: activeWorkspaceId, collectionId: id, read: null }))
     return true
 }
 
@@ -460,6 +541,91 @@ function reportItemChangedOutside(context: ActionContext<State, State>, item: Co
     if(shown) {
         context.dispatch('refreshWorkspace')
     }
+}
+
+// A set of environments changed outside Restfox: what the page held is replaced by the reload, and a script's value
+// waiting on this save is set again on what the reload brought
+function environmentsChangedOutside(entry: ItemFileEntry, workspaceId: string, retries: (() => void)[]) {
+    entry.retriesAfterReload.push(...retries)
+    if(entry.reloadAsked) {
+        return
+    }
+    const shown = store.state.activeWorkspace?._id === workspaceId
+    const message = shown
+        ? 'Environments changed outside Restfox and were reloaded. Your last change to them was not saved.'
+        : 'Environments changed outside Restfox, so your last change to them was not saved.'
+    console.warn(message)
+    emitter.emit('error', message)
+    if(!shown) {
+        entry.retriesAfterReload.length = 0
+        return
+    }
+    entry.reloadAsked = true
+    const reloadEnded = (applied: unknown) => {
+        entry.reloadAsked = false
+        const waiting = entry.retriesAfterReload.splice(0)
+        // a value set on what the reload brought, and only there. A reload that was given up sets none, nor does one that
+        // read another workspace opened meanwhile, as a script's value is written to the workspace shown
+        if(applied === true && store.state.activeWorkspace?._id === workspaceId) {
+            waiting.forEach(retry => retry())
+        }
+    }
+    store.dispatch('refreshWorkspace').then(reloadEnded, () => reloadEnded(false))
+}
+
+// Saves one set of environments, a folder's or the workspace's, one at a time and from the version the page holds, as
+// a save writes every file of the set and deletes those missing from its list. The list is read when the save runs, so
+// a save waiting for another takes in every change since. retryAfterReload is for a value a script set, with no user
+// to tell
+function saveEnvironmentsOfSet(workspaceId: string, collectionId: string | null, environments: unknown[], retryAfterReload?: () => void) {
+    const entry = getItemEntry(workspaceId, environmentsKey(collectionId))
+    if(retryAfterReload) {
+        entry.retriesAfterRefusal.push(retryAfterReload)
+    }
+    queueWholeItemSave(entry, { environments }, async(save, generation, sent) => {
+        const retries = entry.retriesAfterRefusal.splice(0)
+        // a load of the workspace read another version since this save was asked for
+        if(entry.generation > generation) {
+            environmentsChangedOutside(entry, workspaceId, retries)
+            return
+        }
+        const environmentsToSave = JSON.parse(JSON.stringify(save.environments))
+        const version = entry.version ?? undefined
+        let result: { error: string | null, changedOutside?: boolean, version?: string }
+        try {
+            result = collectionId
+                ? await updateCollection(workspaceId, collectionId, { environments: environmentsToSave }, version, sent)
+                : await updateWorkspace(workspaceId, { environments: environmentsToSave }, false, version, sent)
+        } catch(error) {
+            // a failed write, which nothing awaiting a mutation would see, shown as a refused one is
+            console.error(collectionId ? 'Error saving folder environments' : 'Error saving workspace environments', error)
+            emitter.emit('error', error instanceof Error ? error.message : String(error))
+            return
+        }
+        if(result.changedOutside) {
+            entry.refusals++
+            environmentsChangedOutside(entry, workspaceId, retries)
+            return
+        }
+        reportUpdateError(result)
+        if(result.version !== undefined) {
+            setItemVersion(entry, result.version)
+        }
+    }, () => undefined)
+}
+
+// A pick of the current environment, in turn with its set's saves, and not made when a save of the set asked for before
+// it was refused, as it can name an environment that save would have added or renamed
+function saveCurrentEnvironmentPick(workspaceId: string, collectionId: string | null, write: () => Promise<void>) {
+    const entry = getItemEntry(workspaceId, environmentsKey(collectionId))
+    const refusals = entry.refusals
+    enqueueItemWrite(entry, async(_entry, sent) => {
+        sent()
+        if(entry.refusals === refusals) {
+            await write()
+            entry.currentEnvironmentPicked = true
+        }
+    })
 }
 
 // A script's code changed outside Restfox: the workspace's scripts are read again, and the editor shows the file's code
@@ -949,44 +1115,43 @@ export const store = createStore<State>({
                 await updateWorkspace(workspaceId, { environment: JSON.parse(JSON.stringify(environment)) })
             }
         },
-        async updateCollectionItemEnvironments(state, { collectionId, environments, workspaceId = state.activeWorkspace?._id }) {
+        updateCollectionItemEnvironments(state, { collectionId, environments, workspaceId = state.activeWorkspace?._id, retryAfterReload }) {
             if(environments) {
                 if(!workspaceId) {
                     throw new Error('activeWorkspace is null')
                 }
 
-                try {
-                    reportUpdateError(await updateCollection(workspaceId, collectionId, { environments: JSON.parse(JSON.stringify(environments)) }))
-                } catch(error) {
-                    // a failed write, which nothing awaiting a mutation would see, shown as a refused one is
-                    console.error('Error saving folder environments', error)
-                    emitter.emit('error', error instanceof Error ? error.message : String(error))
-                }
+                saveEnvironmentsOfSet(workspaceId, collectionId, environments, retryAfterReload)
             }
         },
-        async updateWorkspaceEnvironments(_state, { workspaceId, environments }) {
+        updateWorkspaceEnvironments(_state, { workspaceId, environments, retryAfterReload }) {
             if(environments) {
-                reportUpdateError(await updateWorkspace(workspaceId, { environments: JSON.parse(JSON.stringify(environments)) }))
+                saveEnvironmentsOfSet(workspaceId, null, environments, retryAfterReload)
             }
         },
-        async updateCollectionItemCurrentEnvironment(state, { collectionId, currentEnvironment }) {
+        updateCollectionItemCurrentEnvironment(state, { collectionId, currentEnvironment }) {
             if(currentEnvironment) {
                 if(state.activeWorkspace === null) {
                     throw new Error('activeWorkspace is null')
                 }
 
-                try {
-                    reportUpdateError(await updateCollection(state.activeWorkspace._id, collectionId, { currentEnvironment: currentEnvironment }))
-                } catch(error) {
-                    // a failed write, which nothing awaiting a mutation would see, shown as a refused one is
-                    console.error('Error saving folder environment pick', error)
-                    emitter.emit('error', error instanceof Error ? error.message : String(error))
-                }
+                const workspaceId = state.activeWorkspace._id
+                saveCurrentEnvironmentPick(workspaceId, collectionId, async() => {
+                    try {
+                        reportUpdateError(await updateCollection(workspaceId, collectionId, { currentEnvironment: currentEnvironment }))
+                    } catch(error) {
+                        // a failed write, which nothing awaiting a mutation would see, shown as a refused one is
+                        console.error('Error saving folder environment pick', error)
+                        emitter.emit('error', error instanceof Error ? error.message : String(error))
+                    }
+                })
             }
         },
-        async updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
+        updateWorkspaceCurrentEnvironment(_state, { workspaceId, currentEnvironment }) {
             if(currentEnvironment) {
-                reportUpdateError(await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment }))
+                saveCurrentEnvironmentPick(workspaceId, null, async() => {
+                    reportUpdateError(await updateWorkspace(workspaceId, { currentEnvironment: currentEnvironment }))
+                })
             }
         },
         setWorkspaces(state, workspaces) {
@@ -1387,7 +1552,7 @@ export const store = createStore<State>({
             // the ids the items have now, as a reload that read before the delete, such as one a rename asked for, may
             // have moved them to new ones while it waited
             const deletedIds = deleting.map(entry => entry.id)
-            forgetItems(workspaceId, deletedIds)
+            forgetItems(workspaceId, [...deletedIds, ...deletedIds.map(environmentsKey)])
             noteItemsDeleted(workspaceId, deletedIds)
 
             // the sidebar, tabs and responses shown now are another workspace's, and this one's are loaded again when
@@ -1553,6 +1718,9 @@ export const store = createStore<State>({
                 if(collectionItemResult.newCollectionId) {
                     dropObjectsReplacedByCreate(context, collectionItem.workspaceId, collectionItemResult.newCollectionId)
                     noteItemCreated(collectionItem.workspaceId, collectionItemResult.newCollectionId)
+                    if(collectionItemResult.environmentsVersion !== undefined) {
+                        setItemVersion(getItemEntry(collectionItem.workspaceId, environmentsKey(collectionItemResult.newCollectionId)), collectionItemResult.environmentsVersion)
+                    }
                 }
                 if(collectionItemResult.newCollectionId && collectionItemResult.version !== undefined) {
                     setItemVersion(getItemEntry(collectionItem.workspaceId, collectionItemResult.newCollectionId), collectionItemResult.version)
@@ -1704,6 +1872,9 @@ export const store = createStore<State>({
 
             dropObjectsReplacedByCreate(context, newCollectionItem.workspaceId, newCollectionItem._id)
             noteItemCreated(newCollectionItem.workspaceId, newCollectionItem._id)
+            if(result.environmentsVersion !== undefined) {
+                setItemVersion(getItemEntry(newCollectionItem.workspaceId, environmentsKey(newCollectionItem._id)), result.environmentsVersion)
+            }
             if(result.version !== undefined) {
                 setItemVersion(getItemEntry(newCollectionItem.workspaceId, newCollectionItem._id), result.version)
             }
@@ -2608,10 +2779,11 @@ export const store = createStore<State>({
             return inReloadTurn(async() => {
                 // the collection reload gives up when the user opened another workspace while it read, and so do the tabs
                 if(await reloadWorkspaceCollection(context) === false) {
-                    return
+                    return false
                 }
                 await context.dispatch('refreshWorkspaceTabs')
                 context.commit('loadWorkspacePlugins')
+                return true
             })
         },
         async updateCollectionItemName(context, collectionItem) {

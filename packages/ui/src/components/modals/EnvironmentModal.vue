@@ -99,7 +99,7 @@ import { jsonStringify } from '@/helpers'
 export default {
     props: {
         showModal: Boolean,
-        collectionItem: Object,
+        collectionItemOpened: Object,
         workspace: Object
     },
     components: {
@@ -111,6 +111,7 @@ export default {
         return {
             environment: '{}',
             environmentToSave: {},
+            environmentLoadedNotEdited: false,
             parseError: '',
             clickedContextMenuEnvironment: { name: '' },
             showEnvironmentContextMenuPopup: false,
@@ -126,6 +127,14 @@ export default {
         }
     },
     computed: {
+        // the folder as the store holds it now, as a reload replaces its object, and what is edited here has to reach the
+        // object requests read from
+        collectionItem() {
+            if(!this.collectionItemOpened) {
+                return this.collectionItemOpened
+            }
+            return this.$store.state.collection?.find(item => item._id === this.collectionItemOpened._id) ?? this.collectionItemOpened
+        },
         showModalComp: {
             get() {
                 return this.showModal
@@ -178,11 +187,14 @@ export default {
         }
     },
     watch: {
-        collectionItem() {
-            this.environment = this.collectionItem.environment ? jsonStringify(this.collectionItem.environment) : '{}'
+        collectionItem(now, before) {
+            // a reload replaced the object of the same folder, whose text stays unless it changed outside
+            if(now?._id !== before?._id) {
+                this.showSavedEnvironment()
+            }
         },
         workspace() {
-            this.environment = this.workspace.environment ? jsonStringify(this.workspace.environment) : '{}'
+            this.showSavedEnvironment()
         },
         environment() {
             let environment = {}
@@ -190,6 +202,11 @@ export default {
                 environment = JSON.parse(this.environment)
                 this.parseError = ''
                 this.environmentToSave = environment
+                // put there from what is saved, which is no edit to save
+                if(this.environmentLoadedNotEdited) {
+                    this.environmentLoadedNotEdited = false
+                    return
+                }
                 console.log('environment changed', environment)
                 this.saveEnvironment()
             } catch(e) {
@@ -199,13 +216,7 @@ export default {
         showModal() {
             this.envLoad = null
             if(this.showModal) {
-                this.parseError = ''
-                if(this.collectionItem) {
-                    this.environment = this.collectionItem.environment ? jsonStringify(this.collectionItem.environment) : '{}'
-                }
-                if(this.workspace) {
-                    this.environment = this.workspace.environment ? jsonStringify(this.workspace.environment) : '{}'
-                }
+                this.showSavedEnvironment()
                 nextTick(() => {
                     this.$refs['environment-' + this.currentEnvironment][0].scrollIntoView({
                         behavior: 'auto',
@@ -249,6 +260,9 @@ export default {
                 }
             }
 
+            // a reload while the dialog was open may have removed the one to merge with
+            isMerge = isMerge && this.environments.some(environment => environment.name === newEnvironmentName)
+
             let environment = { name: newEnvironmentName, color: environmentColor || constants.DEFAULT_ENVIRONMENT.color, environment: {} }
 
             if(!isMerge) {
@@ -281,6 +295,9 @@ export default {
                     }
                     this.workspace.environments.push(environment)
                 }
+
+                // before the pick below, which names it, so a refused save drops the pick too
+                this.saveEnvironments()
             } else {
                 const existingEnvironment = this.environments.find(environment => environment.name === newEnvironmentName)
                 existingEnvironment.environment = { ...existingEnvironment.environment, ...environmentObject }
@@ -392,6 +409,46 @@ export default {
                 this.$store.commit('updateWorkspaceCurrentEnvironment',  { workspaceId: this.workspace._id, currentEnvironment: this.currentEnvironment })
             }
         },
+        showSavedEnvironment() {
+            this.parseError = ''
+            const owner = this.collectionItem ?? this.workspace
+            if(owner) {
+                const environment = owner.environment ? jsonStringify(owner.environment) : '{}'
+                this.environmentLoadedNotEdited = environment !== this.environment
+                this.environment = environment
+            }
+        },
+        // What this window holds was read before the change, so it takes what was loaded, as a later save writes its list
+        // over the files. read is null when the folder it shows is gone
+        handleEnvironmentsChangedOutside({ workspaceId, collectionId, read }) {
+            if(!this.showModal) {
+                return
+            }
+            const shown = this.collectionItem
+                ? this.collectionItem.workspaceId === workspaceId && this.collectionItem._id === collectionId
+                : this.workspace?._id === workspaceId && collectionId === null
+            if(!shown) {
+                return
+            }
+            if(read === null) {
+                this.$toast.info('This folder was removed outside Restfox')
+                this.$emit('update:showModal', false)
+                return
+            }
+            this.showSavedEnvironment()
+            this.loadEnvVariables()
+            this.$toast.info('These environments changed outside Restfox and were reloaded')
+        },
+        // the menu's environment as the list holds it now, as a reload while a dialog was open replaces every one
+        takeMenuEnvironmentFromList() {
+            const environment = this.environments.find(item => item.name === this.clickedContextMenuEnvironment.name)
+            if(!environment) {
+                this.hideEnvironmentContextMenu()
+                return false
+            }
+            this.clickedContextMenuEnvironment = environment
+            return true
+        },
         showEnvironmentContextMenu(event, environment) {
             if(this.clickedContextMenuEnvironment.name === environment.name && this.showEnvironmentContextMenuPopup === true) {
                 this.hideEnvironmentContextMenu()
@@ -420,6 +477,10 @@ export default {
 
             if(!newEnvironmentName || newEnvironmentName.trim() === '') {
                 this.hideEnvironmentContextMenu()
+                return
+            }
+
+            if(!this.takeMenuEnvironmentFromList()) {
                 return
             }
 
@@ -458,6 +519,15 @@ export default {
         async changeEnvironmentColor() {
             const newEnvironmentColor = await window.createPrompt('Choose another color for your environment', this.clickedContextMenuEnvironment.color)
 
+            if(newEnvironmentColor === null) {
+                this.hideEnvironmentContextMenu()
+                return
+            }
+
+            if(!this.takeMenuEnvironmentFromList()) {
+                return
+            }
+
             this.clickedContextMenuEnvironment.color = newEnvironmentColor
 
             if(this.workspace && 'environments' in this.workspace === false) {
@@ -480,6 +550,17 @@ export default {
             }
 
             if(!await window.createConfirm('Are you sure you want to delete this environment?')) {
+                this.hideEnvironmentContextMenu()
+                return
+            }
+
+            if(!this.takeMenuEnvironmentFromList()) {
+                return
+            }
+
+            // a reload while the dialog was open may have left only this one
+            if(this.environments.length === 1) {
+                this.$toast.error('Cannot delete environment as there\'s only one environment left')
                 this.hideEnvironmentContextMenu()
                 return
             }
@@ -586,13 +667,6 @@ export default {
                 this.showModalComp = false
             }
         },
-        handleEnvironmentEvent(event) {
-            // close open environment modal if the environment is added, updated or deleted
-            // doesn't matter for which collection item or if workspace
-            if(event.name === 'added' || event.name === 'updated' || event.name === 'deleted') {
-                this.showModalComp = false
-            }
-        },
         handleDotEnvEvent(event) {
             if(event === 'reloaded') {
                 this.loadEnvVariables()
@@ -606,13 +680,13 @@ export default {
     },
     created() {
         emitter.on('collectionItem', this.handleCollectionItemEvent)
-        emitter.on('environment', this.handleEnvironmentEvent)
         emitter.on('dotenv', this.handleDotEnvEvent)
+        emitter.on('environmentsChangedOutside', this.handleEnvironmentsChangedOutside)
     },
     beforeUnmount() {
         emitter.off('collectionItem', this.handleCollectionItemEvent)
-        emitter.off('environment', this.handleEnvironmentEvent)
         emitter.off('dotenv', this.handleDotEnvEvent)
+        emitter.off('environmentsChangedOutside', this.handleEnvironmentsChangedOutside)
     }
 }
 </script>

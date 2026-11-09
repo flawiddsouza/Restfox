@@ -782,6 +782,21 @@ test('opening a workspace writes neither its settings nor a folder\'s when an en
     })
 })
 
+test('a save of environments is checked against the version of the whole set, before anything is written or deleted', async() => {
+    await withWorkspace(async(workspace) => {
+        const envs = path.join(workspace.location, '_environments')
+        const first = await db.updateWorkspace(workspace, { environments: [{ name: 'Default', environment: { token: 'page' } }] })
+        const loaded = await db.getCollectionForWorkspace(workspace, null)
+        assert.equal(first.version, loaded.environmentVersions[''])
+        fs.writeFileSync(path.join(envs, 'Default.json'), JSON.stringify({ token: 'outside' }))
+        fs.writeFileSync(path.join(envs, 'Staging.json'), JSON.stringify({ added: 'outside' }))
+        const refused = await db.updateWorkspace(workspace, { environments: loaded.workspace.environments }, first.version)
+        assert.equal(refused.changedOutside, true)
+        assert.equal(JSON.parse(fs.readFileSync(path.join(envs, 'Default.json'), 'utf8')).token, 'outside')
+        assert.equal(fs.existsSync(path.join(envs, 'Staging.json')), true)
+    })
+})
+
 test('a folder duplicated or imported keeps its headers and auth in web-standalone too', () => withWorkspace(async workspace => {
     const headers = [{ name: 'X-Folder', value: '1' }]
     await db.createCollections(workspace, [{ _id: 'f', _type: 'request_group', name: 'Copy', parentId: null, workspaceId: workspace._id, headers }])

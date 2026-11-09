@@ -41,6 +41,8 @@ import {
     humanFriendlyRunningTime,
     humanFriendlyTime,
     methodSendsBody,
+    setEnvironmentVariable,
+    setParentEnvironmentVariable,
 } from './helpers'
 import { store as requestStore } from './store'
 import { getResponsesByCollectionId } from './db'
@@ -3443,4 +3445,94 @@ test('a script preparing disabled and unnamed response-tag headers never sends t
         requestStore.state.activeWorkspace = originalWorkspace
         requestStore.state.collection = originalCollection
     }
+})
+
+test('a folder variable set again after a reload is dropped when the folder is gone, and does not reach the workspace', () => {
+    const folder = { _id: 'f', _type: 'request_group', environment: {}, currentEnvironment: 'Default', environments: [{ name: 'Default', environment: {} }] }
+    const commit = vi.fn()
+    const store = { state: { collectionTree: [folder], activeWorkspace: { _id: 'w', environment: {}, environments: [{ name: 'Default', environment: {} }], currentEnvironment: 'Default' } }, commit, dispatch: vi.fn() }
+    setParentEnvironmentVariable(store as never, 'token', 'value', { parentId: 'f' } as never, true)
+    const call = commit.mock.calls.find(([name]) => name === 'updateCollectionItemEnvironments')
+    store.state.collectionTree = []
+    commit.mockClear()
+
+    call?.[1].retryAfterReload()
+
+    expect(commit).not.toHaveBeenCalled()
+})
+
+function scriptStore(activeWorkspace: Record<string, unknown>, collectionTree: Record<string, unknown>[] = []) {
+    const commit = vi.fn()
+    return { state: { collectionTree, activeWorkspace }, commit, dispatch: vi.fn() }
+}
+
+const retryOf = (commit: ReturnType<typeof vi.fn>, mutation: string) => commit.mock.calls.find(([name]) => name === mutation)?.[1].retryAfterReload
+
+test.each([
+    ['unchanged', 'Default', 1],
+    ['changed', 'Prod', 0],
+])('a workspace variable is set again after a reload only on the environment it was set on, pick %s', (_label, pickAfter, saves) => {
+    const activeWorkspace = { _id: 'w', _type: 'file', environment: {}, currentEnvironment: 'Default', environments: [{ name: 'Default', environment: {} }, { name: 'Prod', environment: { token: 'prod' } }] }
+    const store = scriptStore(activeWorkspace)
+    setEnvironmentVariable(store as never, 'token', 'value', true)
+    const retry = retryOf(store.commit, 'updateWorkspaceEnvironments')
+    store.commit.mockClear()
+    activeWorkspace.currentEnvironment = pickAfter
+
+    retry()
+
+    expect(store.commit.mock.calls.filter(([name]) => name === 'updateWorkspaceEnvironments')).toHaveLength(saves)
+})
+
+test.each([
+    ['unchanged', 'Default', 1],
+    ['changed', 'Prod', 0],
+])('a folder variable is set again after a reload only on the environment it was set on, pick %s', (_label, pickAfter, saves) => {
+    const folder = { _id: 'f', _type: 'request_group', environment: {}, currentEnvironment: 'Default', environments: [{ name: 'Default', environment: {} }, { name: 'Prod', environment: { token: 'prod' } }] }
+    const store = scriptStore({ _id: 'w', _type: 'file' }, [folder])
+    setParentEnvironmentVariable(store as never, 'token', 'value', { parentId: 'f' } as never, true)
+    const retry = retryOf(store.commit, 'updateCollectionItemEnvironments')
+    store.commit.mockClear()
+    folder.currentEnvironment = pickAfter
+
+    retry()
+
+    expect(store.commit.mock.calls.filter(([name]) => name === 'updateCollectionItemEnvironments')).toHaveLength(saves)
+})
+
+test.each([
+    ['a file workspace', 'file', 1],
+    ['a browser workspace', 'local', 0],
+])('a script setting a variable on a folder with no environments yet in %s', (_label, type, saves) => {
+    const folder: Record<string, unknown> = { _id: 'f', _type: 'request_group' }
+    const store = scriptStore({ _id: 'w', _type: type }, [folder])
+
+    setParentEnvironmentVariable(store as never, 'token', 'value', { parentId: 'f' } as never, true)
+
+    expect(store.commit.mock.calls.filter(([name]) => name === 'updateCollectionItemEnvironments')).toHaveLength(saves)
+    if(saves) {
+        expect(folder.environments).toEqual([expect.objectContaining({ environment: { token: 'value' } })])
+    }
+})
+
+test('a value set again after a reload never replaces a newer one of that variable, and other variables are not held back', () => {
+    const activeWorkspace = { _id: 'w', _type: 'file', environment: {}, currentEnvironment: 'Default', environments: [{ name: 'Default', environment: {} }] }
+    const store = scriptStore(activeWorkspace)
+    const setAndGetRetry = (name: string, value: string) => {
+        store.commit.mockClear()
+        setEnvironmentVariable(store as never, name, value, true)
+        return retryOf(store.commit, 'updateWorkspaceEnvironments')
+    }
+    const older = setAndGetRetry('token', 'older')
+    const other = setAndGetRetry('other', 'kept')
+    const newer = setAndGetRetry('token', 'newer')
+    store.commit.mockClear()
+
+    older()
+    expect(store.commit).not.toHaveBeenCalled()
+    other()
+    expect(store.commit).toHaveBeenCalled()
+    store.commit.mockClear()
+    newer()
+    expect(store.commit).toHaveBeenCalled()
 })

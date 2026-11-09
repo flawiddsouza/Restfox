@@ -13,7 +13,7 @@ import ReloadPrompt from '@/components/ReloadPrompt.vue'
 
 <script>
 import { getCollectionForWorkspace, fileIPC } from './db'
-import { allItemWritesSettled, itemWritesPending, loadItemVersions, workspaceWritesSettled } from '@/utils/item-file-versions'
+import { allItemWritesSettled, itemWritesPending, loadItemVersions, withEnvironmentVersions, workspaceWritesSettled } from '@/utils/item-file-versions'
 import constants from './constants'
 import {
     checkHotkeyAgainstKeyEvent,
@@ -143,7 +143,7 @@ export default {
             if(load !== workspaceLoadCount) {
                 return
             }
-            const { error, collection: collections, workspace, versions } = await getCollectionForWorkspace(workspaceId, null, true)
+            const { error, collection: collections, workspace, versions, environmentVersions } = await getCollectionForWorkspace(workspaceId, null, true)
             if(load !== workspaceLoadCount) {
                 return
             }
@@ -183,7 +183,7 @@ export default {
 
             if(collections.length >= 0) {
                 // the items saved from now on are these objects, read at these versions
-                loadItemVersions(workspaceId, versions)
+                loadItemVersions(workspaceId, withEnvironmentVersions(versions, environmentVersions))
                 this.$store.commit('setCollection', collections)
             }
 

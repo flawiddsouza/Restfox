@@ -8,6 +8,12 @@ export function hashText(text) {
     return createHash('sha256').update(text).digest('hex')
 }
 
+// The version of a workspace's or folder's environments as a set, from every environment and color file by name and
+// text, in an order that does not depend on the file system
+export function environmentsVersion(files) {
+    return hashText(JSON.stringify([...files].sort(([a], [b]) => (a < b ? -1 : 1))))
+}
+
 // The version of a folder's settings: its headers and auth alone, the only ones a save from an older copy can write
 // over, so a pick of its environment or its sort order changes nothing. A folder without them, or with no file yet,
 // has the version of an empty one

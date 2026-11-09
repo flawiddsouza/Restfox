@@ -2550,12 +2550,25 @@ export function generateId() {
     return nanoid()
 }
 
+// the latest value a script set for each variable of a set, so one set again after a reload never replaces a newer one
+let scriptVariablesSet = 0
+const latestScriptVariableSet = new Map<string, number>()
+
+function noteScriptVariableSet(setKey: string, objectPath: string) {
+    const key = `${setKey}\n${objectPath}`
+    const thisSet = ++scriptVariablesSet
+    latestScriptVariableSet.set(key, thisSet)
+    return () => latestScriptVariableSet.get(key) === thisSet
+}
+
 export function setEnvironmentVariable(store: ActionContext<State, State>, objectPath: string, value: string, save = true) {
     try {
         if(store.state.activeWorkspace === null) {
             throw new Error('activeWorkspace is null')
         }
 
+        const currentEnvironmentWhenSet = store.state.activeWorkspace.currentEnvironment
+        const isLatestSetOfVariable = noteScriptVariableSet(store.state.activeWorkspace._id, objectPath)
         const environmentToModify = store.state.activeWorkspace.environment ?? {}
         const environmentsToModify = store.state.activeWorkspace.environments ?? [
             {
@@ -2577,7 +2590,13 @@ export function setEnvironmentVariable(store: ActionContext<State, State>, objec
         if(save) {
             store.commit('updateWorkspaceEnvironments',  {
                 workspaceId: store.state.activeWorkspace._id,
-                environments: environmentsToModify
+                environments: environmentsToModify,
+                // only on the environment it was set on, as the reload may have brought another pick
+                retryAfterReload: () => {
+                    if(isLatestSetOfVariable() && store.state.activeWorkspace?.currentEnvironment === currentEnvironmentWhenSet) {
+                        setEnvironmentVariable(store, objectPath, value, true)
+                    }
+                },
             })
         }
     } catch(e) {
@@ -2612,6 +2631,7 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
             return
         }
 
+        const isLatestSetOfVariable = noteScriptVariableSet(targetFolderId, objectPath)
         const folderEnvironment = targetFolder.environment ?? {}
         setObjectPathValue(folderEnvironment, objectPath, value)
         targetFolder.environment = folderEnvironment
@@ -2623,6 +2643,11 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
             })
         }
 
+        // in a file workspace a folder's variables reach the files only through this list, which a new folder has none of
+        if(!targetFolder.environments && store.state.activeWorkspace?._type === 'file') {
+            targetFolder.environments = [{ name: constants.DEFAULT_ENVIRONMENT.name, environment: folderEnvironment, color: constants.DEFAULT_ENVIRONMENT.color }]
+        }
+
         if(targetFolder.environments) {
             const currentEnvironmentName = targetFolder.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name
             const currentEnvironment = targetFolder.environments.find((env: any) => env.name === currentEnvironmentName) as any
@@ -2631,7 +2656,15 @@ export function setParentEnvironmentVariable(store: ActionContext<State, State>,
                 if(save) {
                     store.commit('updateCollectionItemEnvironments', {
                         collectionId: targetFolderId,
-                        environments: targetFolder.environments
+                        environments: targetFolder.environments,
+                        // not when the folder has gone, as the value would fall back to the workspace's environment, and only
+                        // on the environment it was set on, as the reload may have brought another pick
+                        retryAfterReload: () => {
+                            const folderNow = targetFolderId === null ? null : findItemInTreeById(store.state.collectionTree, targetFolderId)
+                            if(isLatestSetOfVariable() && folderNow && (folderNow.currentEnvironment ?? constants.DEFAULT_ENVIRONMENT.name) === currentEnvironmentName) {
+                                setParentEnvironmentVariable(store, objectPath, value, currentCollectionItem, true)
+                            }
+                        },
                     })
                 }
             }

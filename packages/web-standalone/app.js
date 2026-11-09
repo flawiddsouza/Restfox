@@ -788,7 +788,7 @@ app.post('/grpc/call/:callId/cancel', grpcCallRoute(call => call.cancel()))
 
 // Workspace / collection routes
 app.post('/api/getWorkspaceAtLocation',           apiRoute(({ location, getEnvironments }) => db.getWorkspaceAtLocation(location, getEnvironments)))
-app.post('/api/updateWorkspace',                  apiRoute(({ workspace, updatedFields }) => db.updateWorkspace(workspace, updatedFields)))
+app.post('/api/updateWorkspace',                  apiRoute(({ workspace, updatedFields, version }) => db.updateWorkspace(workspace, updatedFields, version)))
 app.post('/api/ensureEmptyFolderOrEmptyWorkspace',apiRoute(({ location }) => db.ensureEmptyFolderOrEmptyWorkspace(location)))
 app.post('/api/getCollectionForWorkspace',        apiRoute(({ workspace, type }) => db.getCollectionForWorkspace(workspace, type)))
 app.post('/api/getCollectionById',                apiRoute(({ workspace, collectionId }) => db.getCollectionById(workspace, collectionId)))

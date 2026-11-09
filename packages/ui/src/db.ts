@@ -32,7 +32,7 @@ async function callWebStandaloneAPI(method: string, args: Record<string, unknown
 
 const webStandaloneIPC = {
     getWorkspaceAtLocation:             (location: string, getEnvironments = false) => callWebStandaloneAPI('getWorkspaceAtLocation', { location, getEnvironments }),
-    updateWorkspace:                    (workspace: any, updatedFields: any) => callWebStandaloneAPI('updateWorkspace', { workspace, updatedFields }),
+    updateWorkspace:                    (workspace: any, updatedFields: any, version?: string) => callWebStandaloneAPI('updateWorkspace', { workspace, updatedFields, version }),
     ensureEmptyFolderOrEmptyWorkspace:  (location: string) => callWebStandaloneAPI('ensureEmptyFolderOrEmptyWorkspace', { location }),
     getCollectionForWorkspace:          (workspace: any, type: any, watch: boolean) => callWebStandaloneAPI('getCollectionForWorkspace', { workspace, type, watch }),
     getCollectionById:                  (workspace: any, collectionId: string) => callWebStandaloneAPI('getCollectionById', { workspace, collectionId }),
@@ -163,8 +163,11 @@ export async function putWorkspace(workspace: Workspace) {
 }
 
 // The error a file workspace's storage returns for a write it refused, such as environments over a file it cannot read
-export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>, skipUpdateForFileWorkspace = false): Promise<{ error: string | null }> {
+// version is what a save of environments was made from, as updateCollection's is; onSending as there too
+export async function updateWorkspace(workspaceId: string, updatedFields: Partial<Workspace>, skipUpdateForFileWorkspace = false, version?: string, onSending?: () => void): Promise<{ error: string | null, changedOutside?: boolean, version?: string }> {
     let error: string | null = null
+    let changedOutside: boolean | undefined
+    let savedVersion: string | undefined
     if(fileIPC && !skipUpdateForFileWorkspace) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -173,7 +176,11 @@ export async function updateWorkspace(workspaceId: string, updatedFields: Partia
             // error is not told: the location is saved below all the same, which is how the user fixes it
             const locationChanged = updatedFields.location !== undefined && updatedFields.location !== workspace.location
             try {
-                const result = await fileIPC.updateWorkspace(workspace, updatedFields)
+                const sending = fileIPC.updateWorkspace(workspace, updatedFields, version)
+                onSending?.()
+                const result = await sending
+                changedOutside = result?.changedOutside
+                savedVersion = result?.version
                 if(result?.error) {
                     console.warn('Error updating file workspace', result.error)
                     error = locationChanged ? null : result.error
@@ -197,11 +204,11 @@ export async function updateWorkspace(workspaceId: string, updatedFields: Partia
     }
 
     if(Object.keys(updatedFields).length === 0) {
-        return { error }
+        return { error, changedOutside, version: savedVersion }
     }
 
     await db.workspaces.update(workspaceId, updatedFields)
-    return { error }
+    return { error, changedOutside, version: savedVersion }
 }
 
 export async function deleteWorkspace(workspaceId: string) {
@@ -217,7 +224,7 @@ export async function getAllCollectionIdsForGivenWorkspace(workspaceId: string) 
 // watch is for loading the workspace the window shows, which Electron then watches for changes made outside Restfox.
 // Leave it off for anything else, such as an export, so the watcher stays on the open workspace
 // versions holds the version of each request, socket and gRPC item's file in a file workspace, by id
-export async function getCollectionForWorkspace(workspaceId: string, type = null, watch = false): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null, idMap: Map<string, string> | null, versions?: Record<string, string> }> {
+export async function getCollectionForWorkspace(workspaceId: string, type = null, watch = false): Promise<{ error: string | null, collection: CollectionItem[], workspace: FileWorkspace | null, idMap: Map<string, string> | null, versions?: Record<string, string>, environmentVersions?: Record<string, string> }> {
     if(fileIPC) {
         const workspace = await db.workspaces.get(workspaceId)
         if(workspace._type === 'file') {
@@ -272,6 +279,7 @@ interface CreateCollectionResult {
     newCollectionId: string | null,
     // a file workspace's refusal of some of a folder's environments, which the folder is made without
     environmentsError?: string | null
+    environmentsVersion?: string
     // file workspace: the version of a created item's file
     version?: string
 }
