@@ -2,17 +2,26 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { Plugin } from './global'
 
-// every workspace is a file workspace, whose history goes through window.electronIPC
+// every workspace is a file workspace, whose history goes through window.electronIPC, unless a test gives browser
+// rows, which make workspace-1 a browser workspace whose collections are those rows
+const browserRows = vi.hoisted(() => ({ collections: null as Map<string, any> | null, workspaceRemoved: false }))
 vi.mock('dexie', () => {
     class Dexie {
         version() {
             return {
                 stores: (schema: Record<string, string>) => {
                     for(const table of Object.keys(schema)) {
-                        (this as any)[table] = { get: async() => ({ _id: 'workspace-1', _type: 'file', location: '/w' }), update: async() => 1 }
+                        (this as any)[table] = {
+                            get: async(id: string) => browserRows.collections === null ? { _id: 'workspace-1', _type: 'file', location: '/w' } : table === 'collections' ? structuredClone(browserRows.collections.get(id)) : browserRows.workspaceRemoved ? undefined : { _id: 'workspace-1', _type: 'browser' },
+                            put: async(row: any) => browserRows.collections?.set(row._id, structuredClone(row)),
+                            update: async() => 1,
+                        }
                     }
                 },
             }
+        }
+        transaction(_mode: string, _table: unknown, run: () => Promise<unknown>) {
+            return run()
         }
     }
     return { default: Dexie }
@@ -189,4 +198,47 @@ test('a save calls onSending once its body files are read and its data handed to
     expect(electronIPC.updateCollection.mock.invocationCallOrder[0]).toBeLessThan(onSending.mock.invocationCallOrder[0])
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
+})
+
+test('OAuth 2.0 tokens go to a file workspace as one merge, sent without a version', async() => {
+    const { saveOAuthTokens } = await importDb()
+    electronIPC.updateCollection.mockResolvedValue({ error: null, versionBefore: 'v1', version: 'v2' })
+    const onSending = vi.fn()
+    expect(await saveOAuthTokens('workspace-1', '/R.json', { token: 't', refreshToken: null }, onSending)).toEqual({ error: null, versionBefore: 'v1', version: 'v2' })
+    expect(electronIPC.updateCollection).toHaveBeenCalledWith(expect.objectContaining({ _id: 'workspace-1' }), '/R.json', { oauthTokens: { token: 't', refreshToken: null } }, undefined)
+    expect(onSending).toHaveBeenCalledOnce()
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+})
+
+test('OAuth 2.0 tokens are set into the auth a browser workspace row has now', async() => {
+    const { saveOAuthTokens } = await importDb()
+    const oauth = { type: 'oauth2', clientId: 'id', scope: 'edited meanwhile', token: 'old', refreshToken: 'old-refresh' }
+    browserRows.collections = new Map([['r', { _id: 'r', name: 'R', workspaceId: 'workspace-1', url: 'https://api.example', authentication: oauth }]])
+    try {
+        // left out, as a Refresh Token reply without one, the refresh token stays
+        expect(await saveOAuthTokens('workspace-1', 'r', { token: 'new' })).toEqual({ error: null })
+        expect(browserRows.collections.get('r')).toEqual({ _id: 'r', name: 'R', workspaceId: 'workspace-1', url: 'https://api.example', authentication: { ...oauth, token: 'new' } })
+        // null, as a Get Token reply without one, removes it rather than saving null
+        await saveOAuthTokens('workspace-1', 'r', { token: 'newer', refreshToken: null })
+        expect('refreshToken' in browserRows.collections.get('r').authentication).toBe(false)
+        await saveOAuthTokens('workspace-1', 'r', { token: 'newest', refreshToken: 'new-refresh' })
+        expect(browserRows.collections.get('r').authentication).toEqual({ ...oauth, token: 'newest', refreshToken: 'new-refresh' })
+
+        browserRows.collections.set('r', { ...browserRows.collections.get('r'), authentication: { type: 'bearer', token: 'typed' } })
+        expect(await saveOAuthTokens('workspace-1', 'r', { token: 'late' })).toEqual({ error: null, notOAuth2: true })
+        expect(browserRows.collections.get('r').authentication).toEqual({ type: 'bearer', token: 'typed' })
+        // deleted, such as in another browser tab
+        expect((await saveOAuthTokens('workspace-1', 'gone', { token: 'late' })).changedOutside).toBe(true)
+        expect(browserRows.collections.has('gone')).toBe(false)
+        // a file workspace removed from the list, whose items have no rows
+        browserRows.workspaceRemoved = true
+        expect((await saveOAuthTokens('workspace-1', '/R.json', { token: 'late' })).changedOutside).toBe(true)
+        expect(electronIPC.updateCollection).not.toHaveBeenCalled()
+    } finally {
+        browserRows.collections = null
+        browserRows.workspaceRemoved = false
+        vi.unstubAllEnvs()
+        vi.unstubAllGlobals()
+    }
 })

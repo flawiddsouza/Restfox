@@ -614,7 +614,7 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             }
         }
 
-        if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields || 'headers' in updatedFields || 'authentication' in updatedFields)) {
+        if (Object.keys(updatedFields).length === 1 && ('sortOrder' in updatedFields || 'currentEnvironment' in updatedFields || 'environments' in updatedFields || 'collapsed' in updatedFields || 'headers' in updatedFields || 'authentication' in updatedFields || 'oauthTokens' in updatedFields)) {
             if(updatedFields.environments) {
                 const envsDirPath = path.join(collectionPath, constants.FOLDERS.ENVIRONMENTS)
                 return dbHelpers.saveEnvironments(envsDirPath, updatedFields.environments, version)
@@ -686,9 +686,34 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             }
 
             // one field merged into the file as it is now, which keeps any change made outside Restfox
-            const collectionUpdated = {
+            let collectionUpdated = {
                 ...collectionExisting,
                 ...updatedFields,
+            }
+
+            // the token a Get Token or Refresh Token reply brought, set into the auth the file has now, so an edit of
+            // the auth saved while the reply was awaited is kept
+            if (fieldToUpdate === 'oauthTokens') {
+                const authentication = collectionExisting.authentication
+                if (authentication?.type !== 'oauth2') {
+                    return {
+                        error: null,
+                        notOAuth2: true,
+                    }
+                }
+                // a refresh token of null is one the reply did not bring, which goes, as left out it stays as it is.
+                // The same merge as a browser workspace's in the page's db.ts
+                const { token, refreshToken } = updatedFields.oauthTokens
+                const authenticationUpdated = { ...authentication, token }
+                if (refreshToken === null) {
+                    delete authenticationUpdated.refreshToken
+                } else if (refreshToken !== undefined) {
+                    authenticationUpdated.refreshToken = refreshToken
+                }
+                collectionUpdated = {
+                    ...collectionExisting,
+                    authentication: authenticationUpdated,
+                }
             }
 
             const write = fieldToUpdate === 'sortOrder' ? fileUtils.writeFileJsonInPlace : fileUtils.writeFileJson

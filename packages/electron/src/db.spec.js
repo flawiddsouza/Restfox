@@ -1132,6 +1132,45 @@ test('a folder\'s headers and auth are checked against their version, which a pi
     expect((await db.updateCollection(workspace, requestId, { sortOrder: 9 }, 'not a folder version')).error).toBe(null)
 })
 
+test('OAuth 2.0 tokens are set into the auth a request or folder file has now', async() => {
+    const oauth = { type: 'oauth2', grantType: 'client_credentials', clientId: 'id', token: 'old', refreshToken: 'old-refresh' }
+    const { id: requestId, version } = await workspaceWithItem({ ...requestItem(), authentication: oauth })
+    const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Folder', parentId: null, workspaceId: workspace._id, authentication: oauth })
+    const folderFile = path.join(workspace.location, 'Folder', '_.json')
+    const loaded = await db.getCollectionForWorkspace(workspace, null)
+    const save = (id, oauthTokens) => db.updateCollection(workspace, id, { oauthTokens })
+
+    // an edit of the auth saved meanwhile, here outside Restfox, is kept
+    const requestFile = path.join(workspace.location, 'Item.json')
+    fs.writeFileSync(requestFile, JSON.stringify({ ...readJson('Item.json'), authentication: { ...oauth, scope: 'edited' } }))
+    const editedVersion = fileVersion('Item.json')
+    const saved = await save(requestId, { token: 'new', refreshToken: 'new-refresh' })
+    expect(saved).toEqual({ error: null, versionBefore: editedVersion, version: fileVersion('Item.json') })
+    expect(editedVersion).not.toBe(version)
+    expect(readJson('Item.json').authentication).toEqual({ ...oauth, scope: 'edited', token: 'new', refreshToken: 'new-refresh' })
+    // a reply without a refresh token: null removes it, left out it stays
+    await save(requestId, { token: 'newer', refreshToken: null })
+    expect(readJson('Item.json').authentication).toEqual({ ...oauth, scope: 'edited', token: 'newer', refreshToken: undefined })
+    expect('refreshToken' in readJson('Item.json').authentication).toBe(false)
+
+    const folderSaved = await save(folder.newCollectionId, { token: 'folder-token' })
+    expect(folderSaved.versionBefore).toBe(loaded.versions[folder.newCollectionId])
+    expect(folderSaved.version).not.toBe(folderSaved.versionBefore)
+    expect(JSON.parse(fs.readFileSync(folderFile, 'utf8')).authentication).toEqual({ ...oauth, token: 'folder-token' })
+
+    // an auth changed to another type since the click takes nothing
+    fs.writeFileSync(requestFile, JSON.stringify({ ...readJson('Item.json'), authentication: { type: 'bearer', token: 'typed' } }))
+    const before = fs.readFileSync(requestFile, 'utf8')
+    expect(await save(requestId, { token: 'late' })).toEqual({ error: null, notOAuth2: true })
+    expect(fs.readFileSync(requestFile, 'utf8')).toBe(before)
+
+    // a file gone, and an id the server does not know, are changed outside
+    fs.rmSync(requestFile)
+    expect((await save(requestId, { token: 'late' })).changedOutside).toBe(true)
+    expect(fs.existsSync(requestFile)).toBe(false)
+    expect((await save('/Gone.json', { token: 'late' })).changedOutside).toBe(true)
+})
+
 test('a script\'s code is checked against the code it was made from, and only its code', async() => {
     await workspaceWithItem()
     await db.createPlugin(workspace, { _id: 'p1', type: 'script', name: 's', code: { pre_request: 'page', post_request: '' }, enabled: true })

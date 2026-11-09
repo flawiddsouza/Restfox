@@ -667,6 +667,37 @@ function requestItem(workspace, name = 'Item') {
     return { _id: 'new', _type: 'request', name, parentId: null, workspaceId: workspace._id, method: 'GET', url: 'https://api.example/a', body: { mimeType: 'No Body' } }
 }
 
+test('the updateCollection route sets OAuth 2.0 tokens into the auth the file has now', () => withWorkspace(async workspace => {
+    const server = await new Promise(resolve => {
+        const listening = app.listen(0, '127.0.0.1', () => resolve(listening))
+    })
+    const post = async(name, body) => (await (await fetch(`http://127.0.0.1:${server.address().port}/api/${name}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    })).json()).result
+    try {
+        const oauth = { type: 'oauth2', clientId: 'id', token: 'old', refreshToken: 'old-refresh' }
+        const { newCollectionId: id } = await post('createCollection', { workspace, collection: { ...requestItem(workspace), authentication: oauth } })
+        const file = path.join(workspace.location, 'Item.json')
+        fs.writeFileSync(file, JSON.stringify({ ...readJson(workspace, 'Item.json'), authentication: { ...oauth, scope: 'edited' } }))
+        const before = itemFileVersion(fs.readFileSync(file, 'utf8'))
+
+        // left out, as a Refresh Token reply without one, the refresh token stays
+        const saved = await post('updateCollection', { workspace, collectionId: id, updatedFields: { oauthTokens: { token: 'new' } } })
+        assert.deepEqual(saved, { error: null, versionBefore: before, version: itemFileVersion(fs.readFileSync(file, 'utf8')) })
+        assert.deepEqual(readJson(workspace, 'Item.json').authentication, { ...oauth, scope: 'edited', token: 'new' })
+        // null, as a Get Token reply without one, removes it
+        await post('updateCollection', { workspace, collectionId: id, updatedFields: { oauthTokens: { token: 'newer', refreshToken: null } } })
+        assert.deepEqual(readJson(workspace, 'Item.json').authentication, { type: 'oauth2', clientId: 'id', scope: 'edited', token: 'newer' })
+
+        fs.writeFileSync(file, JSON.stringify({ ...readJson(workspace, 'Item.json'), authentication: { type: 'bearer', token: 'typed' } }))
+        assert.deepEqual(await post('updateCollection', { workspace, collectionId: id, updatedFields: { oauthTokens: { token: 'late' } } }), { error: null, notOAuth2: true })
+        assert.deepEqual(readJson(workspace, 'Item.json').authentication, { type: 'bearer', token: 'typed' })
+    } finally {
+        server.closeAllConnections()
+        await new Promise(resolve => server.close(resolve))
+    }
+}))
+
 function fileText(workspace, name) {
     return fs.readFileSync(path.join(workspace.location, name), 'utf8')
 }

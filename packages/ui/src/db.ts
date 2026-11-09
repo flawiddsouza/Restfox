@@ -8,6 +8,7 @@ import {
     RequestFinalResponse,
     Workspace,
 } from './global'
+import { type OAuthTokens, setOAuthTokens } from '@/utils/oauth-tokens'
 
 async function callWebStandaloneAPI(method: string, args: Record<string, unknown>) {
     const res = await fetch(`/api/${method}`, {
@@ -291,6 +292,8 @@ export interface UpdateCollectionResult {
     // file workspace: the item file's version after the write, and before it for a merge of one field
     version?: string
     versionBefore?: string | null
+    // saveOAuthTokens: the item's auth is no longer OAuth 2.0, so nothing was written
+    notOAuth2?: boolean
 }
 
 export async function createCollection(workspaceId: string, collection: CollectionItem): Promise<CreateCollectionResult> {
@@ -452,6 +455,37 @@ export async function updateCollection(workspaceId: string, collectionId: string
     return {
         error: null,
     }
+}
+
+// Sets the tokens into the item's auth as storage holds it now, so an edit of the auth saved while the reply was
+// awaited is kept. An item gone is reported as changed outside, as a merge of one field into a file workspace's is
+export async function saveOAuthTokens(workspaceId: string, collectionId: string, oauthTokens: OAuthTokens, onSending?: () => void): Promise<UpdateCollectionResult> {
+    if(fileIPC) {
+        // a workspace removed meanwhile has no row, and its items none either
+        const workspace = await db.workspaces.get(workspaceId)
+        if(workspace?._type === 'file') {
+            const sending = fileIPC.updateCollection(workspace, collectionId, { oauthTokens }, undefined)
+            onSending?.()
+            return sending
+        }
+    }
+
+    // read and written in one transaction, so a save of the item that another browser tab makes meanwhile is kept too
+    const saving = db.transaction('rw', db.collections, async(): Promise<UpdateCollectionResult> => {
+        const item: CollectionItem | undefined = await db.collections.get(collectionId)
+        if(item === undefined) {
+            return { error: `Not saved, as ${collectionId} was not found`, changedOutside: true }
+        }
+        if(item.authentication?.type !== 'oauth2') {
+            return { error: null, notOAuth2: true }
+        }
+        const authentication = { ...item.authentication }
+        setOAuthTokens(authentication, oauthTokens)
+        await db.collections.put({ ...item, authentication })
+        return { error: null }
+    })
+    onSending?.()
+    return saving
 }
 
 export async function modifyCollections(workspaceId: string) {

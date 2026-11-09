@@ -36,6 +36,7 @@ import {
     createCollection,
     createCollections,
     updateCollection,
+    saveOAuthTokens,
     createResponse,
     updateResponse,
     deleteResponsesByCollectionIds,
@@ -96,6 +97,7 @@ import {
     ResponseStream,
 } from './global'
 import * as queryParamsSync from '@/utils/query-params-sync'
+import { type OAuthTokens, setOAuthTokens } from '@/utils/oauth-tokens'
 import { computeTargetIndex, isDropIntoOwnSubtree } from '@/utils/sidebar-drop'
 import { BODY_INCOMPLETE_MESSAGES, getStreamView, isSendReplaced, markSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
@@ -1661,6 +1663,102 @@ export const store = createStore<State>({
                     setItemVersion(entry, result.version)
                 }
             }, collectionItem => reportItemChangedOutside(context, collectionItem))
+        },
+        // A Get Token or Refresh Token reply, saved into the item clicked, whatever is shown when it arrives, in its own
+        // workspace. clicked is the item's entry taken at the click, which a reload that finds the item renamed moves to
+        // its new id. Returns whether the tokens were saved
+        async saveOAuthTokens(context, { workspaceId, clicked, name, tokens }: { workspaceId: string, clicked: ItemFileEntry, name: string, tokens: OAuthTokens }): Promise<boolean> {
+            const notSaved = (message: string) => {
+                console.warn(message)
+                emitter.emit('error', message)
+                return false
+            }
+            // also when the delete then fails, so the user knows to ask again
+            const deletedMessage = `${name} was being deleted, so its token was not saved.`
+            if(clicked.deleting) {
+                return notSaved(deletedMessage)
+            }
+            // a load forgets a browser workspace's entries, and those of files it did not read, such as one that came
+            // back after a reload missed it
+            const entry = peekItemEntry(workspaceId, clicked.id) === clicked ? clicked : getItemEntry(workspaceId, clicked.id)
+            // after every save of the item asked for before it, and a load or reload of its workspace waits for it
+            return enqueueItemWrite(entry, async(entry, sent) => {
+                if(entry.deleting) {
+                    sent()
+                    return notSaved(deletedMessage)
+                }
+                // closed or deleted from the workspace list while the reply was awaited
+                if(!context.state.workspaces.some(workspace => workspace._id === workspaceId)) {
+                    sent()
+                    return notSaved(`${name}'s workspace was removed, so its token was not saved.`)
+                }
+                // read here, as a reload may have moved the entry while the write waited
+                let result: UpdateCollectionResult
+                try {
+                    result = await saveOAuthTokens(workspaceId, entry.id, tokens, sent)
+                } catch(error) {
+                    result = { error: error instanceof Error ? error.message : String(error) }
+                }
+                if(result.changedOutside) {
+                    if(context.state.activeWorkspace?._id === workspaceId) {
+                        context.dispatch('refreshWorkspace')
+                    }
+                    return notSaved(`${name} no longer exists, so its token was not saved.`)
+                }
+                if(result.error) {
+                    const message = `The token for ${name} could not be saved: ${result.error}`
+                    console.error(message)
+                    emitter.emit('error', message)
+                    return false
+                }
+                if(result.notOAuth2) {
+                    // the page still shows OAuth 2.0, so the auth changed outside Restfox or in another browser tab, which the
+                    // reload shows. One the user changed here is already shown
+                    if(context.state.activeWorkspace?._id === workspaceId && itemObjectsForId(context.state, workspaceId, entry.id).some(object => object.authentication?.type === 'oauth2')) {
+                        context.dispatch('refreshWorkspace')
+                    }
+                    return notSaved(`${name} no longer uses OAuth 2.0, so its token was not saved.`)
+                }
+                // the objects take the tokens only where the page held the version the file had before, as one held from
+                // another version would be refused when saved whole. The file then changed outside Restfox, and the
+                // reload brings the tokens with that change
+                let held = entry.version === null || result.version === undefined
+                if(!held && entry.version === result.versionBefore) {
+                    setItemVersion(entry, result.version!)
+                    held = true
+                }
+                if(!held) {
+                    if(entry.version !== result.version && context.state.activeWorkspace?._id === workspaceId) {
+                        context.dispatch('refreshWorkspace')
+                    }
+                    return true
+                }
+                // read again, as a reload that did not wait for this write may have moved the entry and the objects
+                // while it ran. Set here, before the step ends, so a whole save queued behind it sends them
+                const objects = itemObjectsForId(context.state, workspaceId, entry.id)
+                const activeTab = toRaw(context.state.activeTab)
+                let activeTabSet = false
+                for(const object of objects) {
+                    if(object.authentication?.type === 'oauth2') {
+                        // the active tab now holds what storage holds, so its watcher does not save it whole, which in a
+                        // browser workspace would write back what another browser tab saved meanwhile
+                        if(toRaw(object) === activeTab) {
+                            context.state.skipPersistingActiveTab = true
+                            activeTabSet = true
+                        }
+                        setOAuthTokens(object.authentication, tokens)
+                    }
+                }
+                if(activeTabSet) {
+                    clearSkipPersistingActiveTabAfterUpdate(context.state)
+                }
+                // the workspace shown has no item of that id, such as one renamed by a reload the page gave up when
+                // another workspace was opened: the reload finds it, with the version the write gave its file
+                if(objects.length === 0 && result.version !== undefined && context.state.activeWorkspace?._id === workspaceId) {
+                    context.dispatch('refreshWorkspace')
+                }
+                return true
+            })
         },
         async duplicateCollectionItem(context, collectionItem) {
             const newCollectionItem = structuredClone(collectionItem)

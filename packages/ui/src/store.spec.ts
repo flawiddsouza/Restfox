@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
 
 vi.mock('./db', () => ({
     fileIPC: vi.fn(),
@@ -16,6 +16,7 @@ vi.mock('./db', () => ({
     createCollection: vi.fn(),
     createCollections: vi.fn(),
     updateCollection: vi.fn(),
+    saveOAuthTokens: vi.fn(),
     createResponse: vi.fn(),
     updateResponse: vi.fn(),
     deleteResponsesByCollectionIds: vi.fn(),
@@ -48,11 +49,11 @@ const grpcTransport = vi.hoisted(() => ({
 
 vi.mock('./utils/grpc-transport', () => grpcTransport)
 
-import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, deleteResponsesByCollectionIds, getAllCollectionIdsForGivenWorkspace, getAllWorkspaces, getCollectionById, getCollectionForWorkspace, getFileWorkspace, getResponsesByCollectionId, getWorkspacePlugins, updateCollection, updatePlugin, updateResponse, updateWorkspace } from './db'
+import { createCollection, createCollections, createPlugin, createPlugins, createResponse, deleteCollectionsByIds, deletePlugin, deleteResponse, deleteResponsesByCollectionId, deleteResponsesByCollectionIds, getAllCollectionIdsForGivenWorkspace, getAllWorkspaces, getCollectionById, getCollectionForWorkspace, getFileWorkspace, getResponsesByCollectionId, getWorkspacePlugins, saveOAuthTokens, updateCollection, updatePlugin, updateResponse, updateWorkspace } from './db'
 import type { CollectionItem, Plugin, ResponseHead, ResponseProgress, ResponseProgressHandler, SetEnvironmentVariableFunction, Workspace } from './global'
 import { store } from './store'
 import { getSocketItemCloses, noteSocketOpened, takeOpenedSocketKeys } from './utils/socket-connections'
-import { enqueueItemWrite, environmentsKey, getItemEntry, getItemVersion, itemWritesPending, itemWritesSettled, loadItemVersions, setItemVersion, withEnvironmentVersions } from './utils/item-file-versions'
+import { enqueueItemWrite, environmentsKey, forgetItems, getItemEntry, getItemVersion, itemWritesPending, itemWritesSettled, loadItemVersions, peekItemEntry, renameItemIds, setItemVersion, withEnvironmentVersions, workspaceWritesSettled } from './utils/item-file-versions'
 import { toRaw } from 'vue'
 import type { UpdateCollectionResult } from './db'
 import { emitter } from './event-bus'
@@ -5170,5 +5171,364 @@ describe('a request whose file changed outside Restfox', () => {
         expect(getCollectionForWorkspace).toHaveBeenCalledWith('workspace-id', null, true)
         expect(toRaw(store.state.collection[0])).toBe(toRaw(tab))
         expect(toRaw(store.state.tabs[0])).toBe(toRaw(tab))
+    })
+})
+
+describe('the tokens of a Get Token or Refresh Token reply', () => {
+    const W = 'workspace-id'
+    const item = (id: string, type: 'request' | 'request_group' = 'request', token = 'own', workspaceId = W) => ({
+        _id: id, _type: type, name: id.replace('.json', ''), parentId: null, workspaceId, method: 'GET', url: 'https://api.example', body: { mimeType: 'No Body' },
+        authentication: { type: 'oauth2', grantType: 'client_credentials', token, refreshToken: `${token}-refresh` },
+    }) as CollectionItem
+    const tokens = { token: 'new', refreshToken: 'new-refresh' }
+    const save = (id: string, given: { token: string, refreshToken?: string | null } = tokens, clicked = getItemEntry(W, id)) => store.dispatch('saveOAuthTokens', { workspaceId: W, clicked, name: id.replace('.json', ''), tokens: given })
+
+    function held<T>() {
+        let release!: (value: T) => void
+        const promise = new Promise<T>(resolve => {
+            release = resolve
+        })
+        return { promise, release }
+    }
+
+    function open(...items: CollectionItem[]) {
+        store.commit('setCollection', items)
+        store.state.tabs = [...store.state.collection]
+        store.state.detachedTabs = []
+        store.state.activeTab = store.state.collection[0]
+        store.state.skipPersistingActiveTab = false
+        return store.state.collection
+    }
+
+    const flushPromises = async() => {
+        for(let index = 0; index < 50; index++) {
+            await Promise.resolve()
+        }
+    }
+
+    const errorToasts = () => (vi.mocked(emitter.emit).mock.calls as unknown[][]).filter(call => call[0] === 'error').map(call => call[1])
+
+    // a reload's read left waiting holds every later reload until it ends, so each ends with its test
+    const pendingReads: ((value: unknown) => void)[] = []
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(saveOAuthTokens).mockReset()
+        vi.mocked(updateCollection).mockReset()
+        vi.mocked(getCollectionForWorkspace).mockReset()
+        vi.mocked(getCollectionForWorkspace).mockImplementation(() => new Promise(resolve => pendingReads.push(resolve)) as never)
+        vi.mocked(getWorkspacePlugins).mockResolvedValue([])
+        vi.spyOn(emitter, 'emit')
+        vi.spyOn(console, 'error').mockImplementation(() => undefined)
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        store.state.activeWorkspace = { _id: W, _type: 'file', name: 'Workspace' } as Workspace
+        store.state.workspaces = [store.state.activeWorkspace, { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace]
+        store.state.plugins.workspace = []
+        store.state.idMap = null
+        loadItemVersions(W, {})
+    })
+
+    afterEach(async() => {
+        store.state.activeWorkspace = { _id: 'workspace-after-test', _type: 'file', name: 'After' } as Workspace
+        pendingReads.splice(0).forEach(resolve => resolve({ collection: [], workspace: null, idMap: null }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        vi.restoreAllMocks()
+    })
+
+    for(const type of ['request', 'request_group'] as const) {
+        test(`of a ${type}, are saved into the one clicked while another is shown, and only they change`, async() => {
+            const [asked, other] = open(item('Asked.json', type), item('Other.json', type))
+            store.state.activeTab = other
+            // a tab opened as a copy of the item
+            store.state.tabs = [JSON.parse(JSON.stringify(asked)), other]
+            setItemVersion(getItemEntry(W, 'Asked.json'), 'v1')
+            vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, versionBefore: 'v1', version: 'v2' })
+
+            expect(await save('Asked.json')).toBe(true)
+
+            expect(saveOAuthTokens).toHaveBeenCalledWith(W, 'Asked.json', tokens, expect.any(Function))
+            for(const object of [asked, store.state.tabs[0]]) {
+                expect(object.authentication).toEqual({ type: 'oauth2', grantType: 'client_credentials', token: 'new', refreshToken: 'new-refresh' })
+            }
+            expect(other.authentication).toMatchObject({ token: 'own', refreshToken: 'own-refresh' })
+            expect(getItemVersion(W, 'Asked.json')).toBe('v2')
+            expect(updateCollection).not.toHaveBeenCalled()
+            expect(errorToasts()).toEqual([])
+        })
+    }
+
+    test('wait for a save of the item asked for before them, and go to the id a rename meanwhile gave it', async() => {
+        const [asked] = open(item('Asked.json'))
+        setItemVersion(getItemEntry(W, 'Asked.json'), 'v1')
+        const earlier = held<void>()
+        enqueueItemWrite(getItemEntry(W, 'Asked.json'), () => earlier.promise)
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, versionBefore: 'v1', version: 'v2' })
+
+        const saving = save('Asked.json')
+        await flushPromises()
+        expect(saveOAuthTokens).not.toHaveBeenCalled()
+        // a reload found the file renamed, which moves the entry and the objects to the new id
+        renameItemIds(W, new Map([['Renamed.json', 'Asked.json']]))
+        asked._id = 'Renamed.json'
+        earlier.release()
+
+        expect(await saving).toBe(true)
+        expect(saveOAuthTokens).toHaveBeenCalledWith(W, 'Renamed.json', tokens, expect.any(Function))
+        expect(asked.authentication?.token).toBe('new')
+    })
+
+    test('a whole save asked for while they are written sends them, from the version their write gave', async() => {
+        const [asked] = open(item('Asked.json'))
+        setItemVersion(getItemEntry(W, 'Asked.json'), 'v1')
+        const written = held<UpdateCollectionResult>()
+        vi.mocked(saveOAuthTokens).mockReturnValue(written.promise)
+        vi.mocked(updateCollection).mockResolvedValue({ error: null, version: 'v3' })
+
+        const saving = save('Asked.json')
+        await vi.waitFor(() => expect(saveOAuthTokens).toHaveBeenCalledOnce())
+        asked.url += '/typed'
+        store.dispatch('persistCollectionItem', asked)
+        written.release({ error: null, versionBefore: 'v1', version: 'v2' })
+        await saving
+        await itemWritesSettled(W, 'Asked.json')
+
+        expect(updateCollection).toHaveBeenCalledOnce()
+        const [, , sent, version] = vi.mocked(updateCollection).mock.calls[0]
+        expect(sent).toMatchObject({ url: 'https://api.example/typed', authentication: { token: 'new', refreshToken: 'new-refresh' } })
+        expect(version).toBe('v2')
+        expect(errorToasts()).toEqual([])
+    })
+
+    test('a file changed outside Restfox meanwhile gets them, and the objects wait for the reload with no refused save told', async() => {
+        const [asked] = open(item('Asked.json'))
+        setItemVersion(getItemEntry(W, 'Asked.json'), 'v1')
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, versionBefore: 'outside', version: 'v2' })
+
+        expect(await save('Asked.json')).toBe(true)
+        expect(asked.authentication?.token).toBe('own')
+        expect(getItemVersion(W, 'Asked.json')).toBe('v1')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        expect(errorToasts()).toEqual([])
+    })
+
+    test('a write whose version the page already holds, as a reload took it meanwhile, asks no reload', async() => {
+        open(item('Asked.json'))
+        setItemVersion(getItemEntry(W, 'Asked.json'), 'v2')
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, versionBefore: 'v1', version: 'v2' })
+
+        expect(await save('Asked.json')).toBe(true)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+        expect(errorToasts()).toEqual([])
+    })
+
+    test('an item gone is told, and the workspace shown reloads', async() => {
+        const [asked] = open(item('Asked.json'))
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: 'Not saved, as Asked.json was changed outside Restfox', changedOutside: true })
+
+        expect(await save('Asked.json')).toBe(false)
+        expect(errorToasts()).toEqual(['Asked no longer exists, so its token was not saved.'])
+        expect(asked.authentication?.token).toBe('own')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('an item gone from a workspace no longer shown is told, and the one shown does not reload', async() => {
+        open(item('Asked.json', 'request', 'shown', 'other-workspace'))
+        store.state.activeWorkspace = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: 'Not saved, as Asked.json was changed outside Restfox', changedOutside: true })
+
+        expect(await save('Asked.json')).toBe(false)
+        expect(errorToasts()).toEqual(['Asked no longer exists, so its token was not saved.'])
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+    })
+
+    test('an auth no longer OAuth 2.0 takes nothing, and one changed outside Restfox is shown by a reload', async() => {
+        const [asked] = open(item('Asked.json'))
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, notOAuth2: true })
+
+        expect(await save('Asked.json')).toBe(false)
+        expect(errorToasts()).toEqual(['Asked no longer uses OAuth 2.0, so its token was not saved.'])
+        expect(asked.authentication?.token).toBe('own')
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+    })
+
+    test('an auth the user changed here, already shown, asks no reload', async() => {
+        const [asked] = open(item('Asked.json'))
+        asked.authentication = { type: 'bearer', token: 'typed' }
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, notOAuth2: true })
+
+        expect(await save('Asked.json')).toBe(false)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+        expect(asked.authentication).toEqual({ type: 'bearer', token: 'typed' })
+    })
+
+    test('a write that fails is told and reaches Logs, and nothing is set', async() => {
+        const [asked] = open(item('Asked.json'))
+        vi.mocked(saveOAuthTokens)
+            .mockRejectedValueOnce(new Error('EACCES: permission denied'))
+            .mockResolvedValueOnce({ error: 'Not saved, as Asked.json cannot be read' })
+
+        expect(await save('Asked.json')).toBe(false)
+        expect(await save('Asked.json')).toBe(false)
+        const told = ['The token for Asked could not be saved: EACCES: permission denied', 'The token for Asked could not be saved: Not saved, as Asked.json cannot be read']
+        expect(errorToasts()).toEqual(told)
+        expect(vi.mocked(console.error).mock.calls.map(call => call[0])).toEqual(told)
+        expect(asked.authentication?.token).toBe('own')
+    })
+
+    test('an item deleted, or being deleted while they wait, takes nothing', async() => {
+        open(item('Asked.json'), item('Other.json'))
+        // a delete that ended forgets the entry it marked
+        const clicked = getItemEntry(W, 'Asked.json')
+        clicked.deleting = true
+        forgetItems(W, ['Asked.json'])
+        expect(await save('Asked.json', tokens, clicked)).toBe(false)
+
+        const earlier = held<void>()
+        enqueueItemWrite(getItemEntry(W, 'Other.json'), () => earlier.promise)
+        const saving = save('Other.json')
+        await flushPromises()
+        getItemEntry(W, 'Other.json').deleting = true
+        earlier.release()
+        expect(await saving).toBe(false)
+
+        expect(saveOAuthTokens).not.toHaveBeenCalled()
+        expect(errorToasts()).toEqual(['Asked was being deleted, so its token was not saved.', 'Other was being deleted, so its token was not saved.'])
+    })
+
+    test('an entry a load forgot, as a browser workspace\'s, is replaced by the one a load of the workspace waits for', async() => {
+        store.state.activeWorkspace = { _id: W, _type: 'browser', name: 'Workspace' } as Workspace
+        const [asked] = open(item('r'))
+        const clicked = getItemEntry(W, 'r')
+        loadItemVersions(W, {})
+        const written = held<UpdateCollectionResult>()
+        vi.mocked(saveOAuthTokens).mockReturnValue(written.promise)
+
+        const saving = save('r', tokens, clicked)
+        let loadMayRead = false
+        workspaceWritesSettled(W).then(() => loadMayRead = true)
+        await flushPromises()
+        expect(peekItemEntry(W, 'r')).not.toBe(clicked)
+        expect(loadMayRead).toBe(false)
+        written.release({ error: null })
+
+        expect(await saving).toBe(true)
+        await flushPromises()
+        expect(loadMayRead).toBe(true)
+        expect(asked.authentication?.token).toBe('new')
+    })
+
+    test('of a workspace no longer shown are saved there, and an item of the same id shown is left alone', async() => {
+        const [shown] = open(item('Asked.json', 'request', 'shown', 'other-workspace'))
+        store.state.activeWorkspace = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+        setItemVersion(getItemEntry(W, 'Asked.json'), 'v1')
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, versionBefore: 'outside', version: 'v2' })
+
+        expect(await save('Asked.json')).toBe(true)
+        expect(saveOAuthTokens).toHaveBeenCalledWith(W, 'Asked.json', tokens, expect.any(Function))
+        expect(shown.authentication?.token).toBe('shown')
+        await flushPromises()
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+    })
+
+    test('go to the objects a reload that did not wait for the write moved to a new id while it ran', async() => {
+        const [asked] = open(item('Asked.json'))
+        setItemVersion(getItemEntry(W, 'Asked.json'), 'v1')
+        const written = held<UpdateCollectionResult>()
+        vi.mocked(saveOAuthTokens).mockReturnValue(written.promise)
+
+        const saving = save('Asked.json')
+        await vi.waitFor(() => expect(saveOAuthTokens).toHaveBeenCalledWith(W, 'Asked.json', tokens, expect.any(Function)))
+        renameItemIds(W, new Map([['Renamed.json', 'Asked.json']]))
+        asked._id = 'Renamed.json'
+        written.release({ error: null, versionBefore: 'v1', version: 'v2' })
+
+        expect(await saving).toBe(true)
+        expect(asked.authentication?.token).toBe('new')
+        expect(getItemVersion(W, 'Renamed.json')).toBe('v2')
+    })
+
+    test('a workspace shown with no item of the id written reloads, as the page lost track of a rename, and one not shown does not', async() => {
+        open(item('Other.json'))
+        const clicked = getItemEntry(W, 'Asked.json')
+        // the load after the user came back read the file under its new name
+        loadItemVersions(W, { 'Other.json': 'v1' })
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null, versionBefore: 'v1', version: 'v2' })
+
+        expect(await save('Asked.json', tokens, clicked)).toBe(true)
+        await vi.waitFor(() => expect(getCollectionForWorkspace).toHaveBeenCalledOnce())
+        // that reload ends, as a later one would wait for it
+        pendingReads.splice(0).forEach(resolve => resolve({ collection: [], workspace: null, idMap: null }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        vi.mocked(getCollectionForWorkspace).mockClear()
+
+        store.state.activeWorkspace = { _id: 'other-workspace', _type: 'file', name: 'Other' } as Workspace
+        await save('Gone.json')
+        await new Promise(resolve => setTimeout(resolve, 0))
+        expect(getCollectionForWorkspace).not.toHaveBeenCalled()
+        expect(errorToasts()).toEqual([])
+    })
+
+    test('of a workspace closed or deleted while they wait are not written', async() => {
+        open(item('Asked.json'))
+        store.state.workspaces = store.state.workspaces.filter(workspace => workspace._id !== W)
+
+        expect(await save('Asked.json')).toBe(false)
+        expect(saveOAuthTokens).not.toHaveBeenCalled()
+        expect(errorToasts()).toEqual(['Asked\'s workspace was removed, so its token was not saved.'])
+    })
+
+    test('the active tab showing them is not saved whole again, as storage holds them, and an edit after is', async() => {
+        store.state.activeWorkspace = { _id: W, _type: 'browser', name: 'Workspace' } as Workspace
+        const [asked] = open(item('Asked.json'))
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null })
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        // as Tab.vue saves the tab it shows on every change
+        const stop = watch(() => store.state.activeTab, (tab, previous) => {
+            if(tab && previous && tab._id === previous._id) {
+                store.dispatch('persistCollectionItem', tab)
+            }
+        }, { deep: true })
+        try {
+            expect(await save('Asked.json')).toBe(true)
+            await nextTick()
+            await itemWritesSettled(W, 'Asked.json')
+            expect(asked.authentication?.token).toBe('new')
+            // a whole save would write back what the page held for the other fields, such as an edit another browser
+            // tab saved while the reply was awaited
+            expect(updateCollection).not.toHaveBeenCalled()
+
+            asked.url += '/typed'
+            await nextTick()
+            await itemWritesSettled(W, 'Asked.json')
+            expect(updateCollection).toHaveBeenCalledOnce()
+            expect(vi.mocked(updateCollection).mock.calls[0][2]).toMatchObject({ url: 'https://api.example/typed', authentication: { token: 'new' } })
+        } finally {
+            stop()
+        }
+    })
+
+    test('the skip of the active tab\'s save ends with that update, when no save took it, so the next edit is saved', async() => {
+        // a folder's tab, which Tab.vue does not save whole
+        open(item('Folder', 'request_group'))
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null })
+        expect(await save('Folder')).toBe(true)
+        await nextTick()
+        expect(store.state.skipPersistingActiveTab).toBe(false)
+    })
+
+    test('a refresh token of null is removed from the objects, left out it stays, and a copy of another auth type is left alone', async() => {
+        const [asked] = open(item('Asked.json'))
+        store.state.tabs = [{ ...JSON.parse(JSON.stringify(asked)), authentication: { type: 'bearer', token: 'typed' } }]
+        vi.mocked(saveOAuthTokens).mockResolvedValue({ error: null })
+
+        await save('Asked.json', { token: 'a' })
+        expect(asked.authentication).toMatchObject({ token: 'a', refreshToken: 'own-refresh' })
+        await save('Asked.json', { token: 'b', refreshToken: null })
+        expect(asked.authentication?.token).toBe('b')
+        expect('refreshToken' in (asked.authentication ?? {})).toBe(false)
+        expect(store.state.tabs[0].authentication).toEqual({ type: 'bearer', token: 'typed' })
     })
 })

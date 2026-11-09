@@ -48,6 +48,7 @@ import RequestPanelAuth from '@/components/RequestPanelAuth.vue'
 import EditTagModal from '@/components/modals/EditTagModal.vue'
 import { deepClone } from '@/helpers'
 import { toRaw } from 'vue'
+import { setOAuthTokens } from '@/utils/oauth-tokens'
 
 export default {
     directives: {
@@ -92,6 +93,8 @@ export default {
             handler() {
                 this.loadEnvVariables()
                 this.collectionItemToEdit = deepClone(this.collectionItem)
+                // not reactive, read only by takeOAuthTokens
+                this.collectionItemToEditFrom = toRaw(this.collectionItem)
             }
         },
         collectionItemToEdit: {
@@ -101,9 +104,28 @@ export default {
                     this.updateCollectionItem(this.collectionItemToEdit)
                 }
             }
-        }
+        },
+        'collectionItem.authentication.token'() {
+            this.takeOAuthTokens()
+        },
+        'collectionItem.authentication.refreshToken'() {
+            this.takeOAuthTokens()
+        },
     },
     methods: {
+        // the tokens of a Get Token or Refresh Token reply, which the store sets on the folder's objects, not on this copy
+        // the panel edits, whichever panel the click came from. Only into a copy of the object given now: when another
+        // folder is opened, or a reload replaces this one, the copy is made again, and these watchers can run first.
+        // And only a folder's: the panel stays mounted, hidden, while a request is shown, and its copy of that request,
+        // never edited, would otherwise save the request's old auth
+        takeOAuthTokens() {
+            const saved = this.collectionItem?.authentication
+            const edited = this.collectionItemToEdit?.authentication
+            if(toRaw(this.collectionItem) !== this.collectionItemToEditFrom || this.collectionItem?._type !== 'request_group' || saved?.type !== 'oauth2' || edited?.type !== 'oauth2') {
+                return
+            }
+            setOAuthTokens(edited, { token: saved.token, refreshToken: saved.refreshToken ?? null })
+        },
         async loadEnvVariables() {
             const load = {}
             this.envLoad = load

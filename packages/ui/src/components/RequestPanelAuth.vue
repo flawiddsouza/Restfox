@@ -473,6 +473,8 @@ import constants from '@/constants'
 import { createOAuthTokenRequest, describeOAuthTokenError, fetchWrapper, getAuthenticationType, getMissingOAuthTokenFieldsMessage, getSavedRequestTimeout, INHERITED_AUTHENTICATION_TYPE, parseOAuthTokenResponse, SendResolver } from '@/helpers'
 import { useToast } from '@/utils/toast'
 import { bufferToString } from '@/utils/response'
+import { getItemEntry } from '@/utils/item-file-versions'
+import type { OAuthTokens } from '@/utils/oauth-tokens'
 
 const toast = useToast()
 
@@ -694,14 +696,19 @@ function generateRandomState(): string {
 }
 
 // the fields of one token request are one send for prompt tags: a prompt used twice asks once, cancelling stops it.
-// The fields are sent, never saved
-async function runWithPromptSend(action: (auth: RequestAuthentication | undefined, send: SendResolver, env: any) => Promise<void>) {
+// The fields are sent, never saved. The tokens of its reply are saved into the item clicked, which the panel may no
+// longer show when it arrives
+async function runWithPromptSend(action: (auth: RequestAuthentication | undefined, send: SendResolver, env: any, saveTokens: (tokens: OAuthTokens) => Promise<boolean>) => Promise<void>) {
     const collectionItem = props.collectionItem
     const auth = collectionItem?.authentication
-    const send = new SendResolver(collectionItem.workspaceId, 'send')
+    const workspaceId = collectionItem.workspaceId
+    const name = collectionItem.name
+    const clicked = getItemEntry(workspaceId, collectionItem._id)
+    const saveTokens = (tokens: OAuthTokens): Promise<boolean> => store.dispatch('saveOAuthTokens', { workspaceId, clicked, name, tokens })
+    const send = new SendResolver(workspaceId, 'send')
     try {
         const { environment } = await resolveEnvironmentForRequest(store, collectionItem, 'send', { includeSelf: collectionItem._type === 'request_group' })
-        await action(auth, send, environment)
+        await action(auth, send, environment, saveTokens)
     } catch (error: any) {
         if (error?.cause === 'display-error') {
             toast.error(error.message)
@@ -714,10 +721,13 @@ async function runWithPromptSend(action: (auth: RequestAuthentication | undefine
 
 async function openAuthorizationUrl() {
     const auth = props.collectionItem?.authentication
-    // PKCE is taken as it is at the click, when the item it is saved into is still the one shown
+    // PKCE and the state are taken as they are at the click, when the item they are saved into is still the one shown
     const usePKCE = !!auth?.usePKCE
     if (auth && usePKCE && !auth.codeVerifier) {
         auth.codeVerifier = generateRandomString(50)
+    }
+    if (auth && !auth.state) {
+        auth.state = generateRandomState()
     }
     await runWithPromptSend((auth, send, env) => openAuthorizationUrlForSend(auth, send, env, usePKCE))
 }
@@ -735,12 +745,8 @@ async function openAuthorizationUrlForSend(auth: RequestAuthentication | undefin
                 return
             }
 
-            // Generate a random state if not provided
-            let state = auth.state || generateRandomState()
-            if (!auth.state) {
-                auth.state = state
-            }
-            state = await send.resolve(env, state, 'unsaved')
+            // set at the click, unless cleared since
+            const state = await send.resolve(env, auth.state || generateRandomState(), 'unsaved')
 
             // Build authorization URL
             const params = new URLSearchParams({
@@ -795,7 +801,7 @@ async function requestOAuthToken() {
     await runWithPromptSend(requestOAuthTokenForSend)
 }
 
-async function requestOAuthTokenForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any) {
+async function requestOAuthTokenForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any, saveTokens: (tokens: OAuthTokens) => Promise<boolean>) {
     if (auth) {
         // a field that was never filled in is undefined and would otherwise be sent as the text 'undefined'
         const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
@@ -861,11 +867,10 @@ async function requestOAuthTokenForSend(auth: RequestAuthentication | undefined,
                 return
             }
 
-            if (auth && props.collectionItem && props.collectionItem.authentication) {
-                props.collectionItem.authentication.token = res.access_token
-                props.collectionItem.authentication.refreshToken = res.refresh_token
+            // a reply without a refresh token leaves the item without one
+            if (await saveTokens({ token: res.access_token, refreshToken: res.refresh_token ?? null })) {
+                toast.success('OAuth token obtained successfully!')
             }
-            toast.success('OAuth token obtained successfully!')
 
         } catch (error) {
             couldNotFetchTokenError(error, accessTokenUrl)
@@ -877,7 +882,7 @@ async function refreshOAuthToken() {
     await runWithPromptSend(refreshOAuthTokenForSend)
 }
 
-async function refreshOAuthTokenForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any) {
+async function refreshOAuthTokenForSend(auth: RequestAuthentication | undefined, send: SendResolver, env: any, saveTokens: (tokens: OAuthTokens) => Promise<boolean>) {
     if(auth) {
         const clientId: string = await send.resolve(env, auth.clientId ?? '', 'unsaved')
         const clientSecret: string = await send.resolve(env, auth.clientSecret ?? '', 'unsaved')
@@ -912,13 +917,11 @@ async function refreshOAuthTokenForSend(auth: RequestAuthentication | undefined,
                 return
             }
 
-            if(props.collectionItem && props.collectionItem.authentication) {
-                props.collectionItem.authentication.token = res.access_token
-                if('refresh_token' in res) {
-                    props.collectionItem.authentication.refreshToken = res.refresh_token
-                }
+            // a reply without a refresh token keeps the one saved, as the server goes on taking it
+            const tokens: OAuthTokens = 'refresh_token' in res ? { token: res.access_token, refreshToken: res.refresh_token ?? null } : { token: res.access_token }
+            if(await saveTokens(tokens)) {
+                toast.success('OAuth token refreshed successfully!')
             }
-            toast.success('OAuth token refreshed successfully!')
 
         } catch (error) {
             couldNotFetchTokenError(error, accessTokenUrl)
