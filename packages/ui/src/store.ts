@@ -99,6 +99,7 @@ import {
 import * as queryParamsSync from '@/utils/query-params-sync'
 import { type OAuthTokens, setOAuthTokens } from '@/utils/oauth-tokens'
 import { computeTargetIndex, isDropIntoOwnSubtree } from '@/utils/sidebar-drop'
+import { appendInSortOrder, placeInSortOrder } from '@/utils/sort-order'
 import { BODY_INCOMPLETE_MESSAGES, getStreamView, isSendReplaced, markSendReplaced } from '@/utils/response-stream'
 import { getResponseContentType } from '@/utils/response'
 import { forgetGrpcCallsForItems, forgetGrpcCallsForWorkspace, moveGrpcCallsToNewItemIds } from '@/utils/grpc-calls'
@@ -423,6 +424,23 @@ function itemObjectsForId(state: State, workspaceId: string, id: string): Collec
         }
     }
     return objects
+}
+
+// The list the sidebar shows an item in, and that list's folder, null for the top. Not the folder the item's parentId
+// names: a move into another folder whose write still runs gives every copy of the item the new folder at once, while
+// a file workspace's sidebar shows it in the old one until that move ends, so a drag of it, or a drop beside it, goes
+// from where it is shown
+function shownInSidebar(list: CollectionItem[], id: string, folderId: string | null = null): { list: CollectionItem[], folderId: string | null } | undefined {
+    if(list.some(item => item._id === id)) {
+        return { list, folderId }
+    }
+    for(const item of list) {
+        const found = item.children ? shownInSidebar(item.children, id, item._id) : undefined
+        if(found) {
+            return found
+        }
+    }
+    return undefined
 }
 
 // A new item took the id of one the page still shows, whose file was deleted outside Restfox: the old objects go, tabs
@@ -1836,18 +1854,14 @@ export const store = createStore<State>({
                 }
                 const childIndex = parentCollection.children.findIndex(item => item._id === collectionItem._id)
                 parentCollection.children.splice(childIndex + 1, 0, newCollectionItem)
-                // new sort order for new item and its siblings
-                parentCollection.children.forEach((item, index) => {
-                    item.sortOrder = index
-                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
+                placeInSortOrder(parentCollection.children, childIndex + 1).forEach(item => {
+                    mergeIntoItemFile(context, item, { sortOrder: item.sortOrder }).then(reportUpdateError)
                 })
             } else {
                 const childIndex = context.state.collectionTree.findIndex(item => item._id === collectionItem._id)
                 context.state.collectionTree.splice(childIndex + 1, 0, newCollectionItem)
-                // new sort order for new item and its siblings
-                context.state.collectionTree.forEach((item, index) => {
-                    item.sortOrder = index
-                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
+                placeInSortOrder(context.state.collectionTree, childIndex + 1).forEach(item => {
+                    mergeIntoItemFile(context, item, { sortOrder: item.sortOrder }).then(reportUpdateError)
                 })
             }
 
@@ -1988,17 +2002,13 @@ export const store = createStore<State>({
                     throw new Error('Parent collection children not found')
                 }
                 parentCollection.children.splice(0, 0, newCollectionItem)
-                // new sort order for new item and its siblings
-                parentCollection.children.forEach((item, index) => {
-                    item.sortOrder = index
-                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
+                placeInSortOrder(parentCollection.children, 0).forEach(item => {
+                    mergeIntoItemFile(context, item, { sortOrder: item.sortOrder }).then(reportUpdateError)
                 })
             } else {
                 context.state.collectionTree.splice(0, 0, newCollectionItem)
-                // new sort order for new item and its siblings
-                context.state.collectionTree.forEach((item, index) => {
-                    item.sortOrder = index
-                    mergeIntoItemFile(context, item, { sortOrder: index }).then(reportUpdateError)
+                placeInSortOrder(context.state.collectionTree, 0).forEach(item => {
+                    mergeIntoItemFile(context, item, { sortOrder: item.sortOrder }).then(reportUpdateError)
                 })
             }
 
@@ -2022,20 +2032,24 @@ export const store = createStore<State>({
                 return
             }
 
+            // the folder the item goes into: the one dropped on, for its lower half (the pink highlight), the list's own for
+            // a list's padding, or else the one the sidebar shows the item dropped beside in
+            const droppedBeside = payload.to.id === undefined ? undefined : shownInSidebar(context.state.collectionTree, payload.to.id)
+            const targetParentId: string | null = payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom'
+                ? payload.to.id
+                : droppedBeside
+                    ? droppedBeside.folderId
+                    : payload.to.parentId ?? null
+
             // don't allow an item to be dropped into its own nested list or a descendant's nested list
-            if(isDropIntoOwnSubtree(context.state.collectionTree, payload.from.id, payload.to.parentId)) {
+            if(isDropIntoOwnSubtree(context.state.collectionTree, payload.from.id, targetParentId ?? undefined)) {
                 return
             }
 
             const workspaceId = context.state.activeWorkspace?._id
 
-            let targetKey = 'parentId'
-            if(payload.to.type === 'request_group' && payload.to.cursorPosition === 'bottom') { // dropping an item into a folder, bottom = pink highlight
-                targetKey = 'id'
-            }
-
-            let sourceParentCollection = !payload.from.parentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.from.parentId)?.children
-            let targetParentCollection = !payload.to[targetKey] ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, payload.to[targetKey])?.children
+            let sourceParentCollection = shownInSidebar(context.state.collectionTree, payload.from.id)?.list
+            let targetParentCollection = !targetParentId ? context.state.collectionTree : findItemInTreeById(context.state.collectionTree, targetParentId)?.children
 
             if(context.state.activeWorkspace?._type === 'file') {
                 if(sourceParentCollection === targetParentCollection) {
@@ -2060,7 +2074,7 @@ export const store = createStore<State>({
             // the folder each open object of the item is in before the move, taken before any of them changes
             const movedObjects = itemObjectsForId(context.state, sourceItem.workspaceId, sourceItem._id).map(object => ({ object, parentId: object.parentId }))
             sourceParentCollection.splice(sourceIndex, 1)
-            sourceItem.parentId = payload.to[targetKey] ?? null
+            sourceItem.parentId = targetParentId
 
             const targetIndex = computeTargetIndex(targetParentCollection, {
                 id: payload.to.id,
@@ -2101,14 +2115,11 @@ export const store = createStore<State>({
                 return
             }
 
-            const sortOrderUpdates: Promise<{ error: string | null }>[] = []
-
-            targetParentCollection.forEach((item, index) => {
-                item.sortOrder = index
-                sortOrderUpdates.push(mergeIntoItemFile(context, item, { sortOrder: index }))
-            })
-
-            const sortOrderResults = await Promise.all(sortOrderUpdates)
+            // where the item went in, as the drop's index is -1 for the upper half of a folder's list beside its items,
+            // which puts it before the last one. Not there when a later move in a browser workspace, which moves the
+            // sidebar's own lists, took it elsewhere while this one's write ran, and that move places it
+            const placedIndex = targetParentCollection.indexOf(sourceItem)
+            const sortOrderResults = placedIndex === -1 ? [] : await Promise.all(placeInSortOrder(targetParentCollection, placedIndex).map(item => mergeIntoItemFile(context, item, { sortOrder: item.sortOrder })))
             sortOrderResults.forEach(reportUpdateError)
 
             // the reload reads the workspace shown, which the user may have left while the files were written
@@ -2117,6 +2128,9 @@ export const store = createStore<State>({
             }
 
             if(context.state.activeWorkspace?._type === 'file') {
+                // the sidebar shows the move at once, from the folder and sort order just saved, as a file workspace moved
+                // copies of its lists, and a drag made before the reload ends is placed from what the sidebar shows
+                context.commit('setCollection', context.state.collection)
                 context.dispatch('refreshWorkspace')
             } else {
                 context.dispatch('refreshWorkspaceTabs')
@@ -2762,6 +2776,8 @@ export const store = createStore<State>({
                 throw new Error('activeWorkspace is null')
             }
 
+            const imported = collectionTree
+            let siblings: CollectionItem[]
             if(parentId) {
                 const parentCollection = findItemInTreeById(context.state.collectionTree, parentId)
                 if(parentCollection === null) {
@@ -2770,14 +2786,17 @@ export const store = createStore<State>({
                 if(parentCollection.children === undefined) {
                     throw new Error('Parent collection children not found')
                 }
-                collectionTree = parentCollection.children.concat(collectionTree)
+                siblings = parentCollection.children
             } else {
-                collectionTree = context.state.collectionTree.concat(collectionTree)
+                siblings = context.state.collectionTree
             }
+            collectionTree = siblings.concat(imported)
 
             // the order each item had, so only items the import moved merge a new one
             const sortOrderBefore = new Map(context.state.collection.map(item => [item._id, item.sortOrder]))
-            addSortOrderToTree(collectionTree)
+            // the imported items go after the ones there, whose own items keep their order
+            appendInSortOrder(siblings, imported)
+            imported.forEach(item => addSortOrderToTree(item.children ?? []))
 
             const flattenedCollectionTree: CollectionItem[] = JSON.parse(JSON.stringify(flattenTree(collectionTree)))
             // an item already in the workspace only takes its new sort order, merged into its file after its own writes,

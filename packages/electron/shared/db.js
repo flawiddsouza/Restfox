@@ -1083,8 +1083,6 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             workspace,
         })
 
-        const idMap = getIdMap(workspace.location)
-
         const items = []
 
         // Workspace Plugins
@@ -1100,34 +1098,8 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
             // If there is no plugins file for a workspace, it's fine, just continue
         }
 
-        // Collection and Folder Plugins
-        const collectionItems = await dbHelpers.getCollection(idMap, workspace)
-        for (const item of collectionItems) {
-            const collectionPath = idMap.get(item._id)
-            if (item._type === 'request_group') {
-                const collectionPluginsPath = path.join(collectionPath, constants.FILES.FOLDER_PLUGINS)
-                try {
-                    const collectionPluginsData = JSON.parse(await fs.readFile(collectionPluginsPath, 'utf8'))
-                    collectionPluginsData.forEach((plugin) => {
-                        plugin.collectionId = item._id
-                    })
-                    items.push(...collectionPluginsData)
-                } catch (err) {
-                    // If there is no plugins file for a collection, it's fine, just continue
-                }
-            } else {
-                const itemPluginsPath = collectionPath.replace('.json', constants.FILES.PLUGINS)
-                try {
-                    const itemPluginsData = JSON.parse(await fs.readFile(itemPluginsPath, 'utf8'))
-                    itemPluginsData.forEach((plugin) => {
-                        plugin.collectionId = item._id
-                    })
-                    items.push(...itemPluginsData)
-                } catch (err) {
-                    // If there is no plugins file for an item, it's fine, just continue
-                }
-            }
-        }
+        // Collection and Folder Plugins, from the script files there are, so a reload does not read every item again
+        items.push(...await dbHelpers.getCollectionPlugins(workspace))
 
         return items
     }
@@ -1329,12 +1301,18 @@ export function createDatabase(fileUtils, dbHelpers, dotenv, getWorkspaceWatcher
         let collection
         let workspaceData
         try {
-            [ collection, workspaceData ] = await Promise.all([
+            // both end before the ids are put back on a failure, as an item read still running would set its id again
+            const results = await Promise.allSettled([
                 // we do not want to modify the idMap if returning the request_group type
                 // this messes up the idMap - as ui and elecron will go out of sync
                 dbHelpers.getCollection(type === null ? idMap : new Map(), workspace, workspace.location, versions, environmentVersions),
                 getWorkspaceAtLocation(workspace.location, true),
             ])
+            const failed = results.find(result => result.status === 'rejected')
+            if (failed) {
+                throw failed.reason
+            }
+            [ collection, workspaceData ] = results.map(result => result.value)
         } catch (err) {
             const cleared = clearedIdMaps.get(workspace.location)
             if (type === null && cleared) {

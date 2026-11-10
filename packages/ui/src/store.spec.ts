@@ -1837,9 +1837,12 @@ describe('writes the storage refuses, such as to a file holding merge conflict m
 
     afterEach(() => vi.restoreAllMocks())
 
+    // a sibling with no sort order, as in a file written by hand, has the folder numbered again, which writes the sibling
+    const unordered = (id: string) => ({ ...folder(id, 0), sortOrder: undefined }) as CollectionItem
+
     test('a sibling\'s sort order on creating an item is reported', async() => {
-        store.state.collection = [folder('Conflicted', 0)]
-        store.state.collectionTree = [folder('Conflicted', 0)]
+        store.state.collection = [unordered('Conflicted')]
+        store.state.collectionTree = [unordered('Conflicted')]
         vi.mocked(createCollection).mockResolvedValueOnce({ error: null } as never)
         vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId) => collectionId === 'Conflicted' ? refused : { error: null })
 
@@ -1849,8 +1852,8 @@ describe('writes the storage refuses, such as to a file holding merge conflict m
     })
 
     test('a sibling\'s sort order on duplicating an item is reported, and the duplicate still gets its scripts', async() => {
-        store.state.collection = [folder('Conflicted', 0), folder('Source', 1)]
-        store.state.collectionTree = [folder('Conflicted', 0), folder('Source', 1)]
+        store.state.collection = [unordered('Conflicted'), folder('Source', 1)]
+        store.state.collectionTree = [unordered('Conflicted'), folder('Source', 1)]
         store.state.plugins.workspace = [{ _id: 'script', type: 'script', name: null, code: { pre_request: '', post_request: '' }, workspaceId: null, collectionId: 'Source', enabled: true, createdAt: 1, updatedAt: 1 }]
         vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
         vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId) => collectionId === 'Conflicted' ? refused : { error: null })
@@ -1877,8 +1880,8 @@ describe('writes the storage refuses, such as to a file holding merge conflict m
     })
 
     test('a sibling\'s sort order on moving an item is reported', async() => {
-        store.state.collection = [folder('Conflicted', 0), folder('Moved', 1)]
-        store.state.collectionTree = [folder('Conflicted', 0), folder('Moved', 1)]
+        store.state.collection = [unordered('Conflicted'), folder('Moved', 1)]
+        store.state.collectionTree = [unordered('Conflicted'), folder('Moved', 1)]
         vi.mocked(updateCollection).mockImplementation(async(_workspaceId, collectionId, fields) => collectionId === 'Conflicted' && 'sortOrder' in fields ? refused : { error: null })
         vi.mocked(getCollectionForWorkspace).mockResolvedValue({ collection: store.state.collection } as never)
 
@@ -4709,8 +4712,10 @@ describe('a request whose file changed outside Restfox', () => {
 
         await store.dispatch('reorderCollectionItem', { from: { id: 'B.json', parentId: null }, to: { id: 'A.json', parentId: null, type: 'request', cursorPosition: 'top' } })
 
-        expect([first.sortOrder, second.sortOrder, secondTab.sortOrder]).toEqual([1, 0, 0])
-        expect(versionOf('B.json')).toBe('B.json-0')
+        // the dragged item alone is written, before the first
+        expect([first.sortOrder, second.sortOrder, secondTab.sortOrder]).toEqual([0, -1, -1])
+        expect(versionOf('B.json')).toBe('B.json--1')
+        expect(vi.mocked(updateCollection).mock.calls.filter(call => 'sortOrder' in call[2]).map(call => call[1])).toEqual(['B.json'])
     })
 
     test('a drag into another folder in a browser workspace moves the item\'s open tab too, whose whole save would otherwise put it back', async() => {
@@ -4874,7 +4879,7 @@ describe('a request whose file changed outside Restfox', () => {
         read.release(readResult([{ ...request('A.json'), sortOrder: 0 }, { ...request('B.json'), sortOrder: 1 }] as CollectionItem[], { 'A.json': 'a1', 'B.json': 'b1' }))
         await reload
 
-        expect(store.state.collection.map(item => [item._id, item.sortOrder])).toEqual([['A.json', 1], ['B.json', 0]])
+        expect(store.state.collection.map(item => [item._id, item.sortOrder])).toEqual([['A.json', 0], ['B.json', -1]])
     })
 
     test('a reload keeps the tab the user opened again while it read, with what was typed there', async() => {
@@ -5530,5 +5535,191 @@ describe('the tokens of a Get Token or Refresh Token reply', () => {
         expect(asked.authentication?.token).toBe('b')
         expect('refreshToken' in (asked.authentication ?? {})).toBe(false)
         expect(store.state.tabs[0].authentication).toEqual({ type: 'bearer', token: 'typed' })
+    })
+})
+
+describe('the place of a new, duplicated, moved or imported item, so a file workspace in git changes in that item alone', () => {
+    const item = (id: string, sortOrder: number | undefined, parentId: string | null = 'F') => ({ _id: id, _type: 'request', name: id, method: 'GET', url: '', body: { mimeType: 'No Body' }, parentId, workspaceId: 'workspace-id', sortOrder }) as CollectionItem
+    const folderWith = (children: CollectionItem[]) => ({ _id: 'F', _type: 'request_group', name: 'F', parentId: null, workspaceId: 'workspace-id', sortOrder: 0, children }) as unknown as CollectionItem
+    const sortOrderWrites = () => vi.mocked(updateCollection).mock.calls.filter(call => 'sortOrder' in call[2]).map(call => [call[1], call[2].sortOrder])
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'file', name: 'Workspace', dotEnv: {} } as unknown as Workspace
+        store.state.workspaces = [store.state.activeWorkspace]
+        store.state.plugins.workspace = []
+        store.state.tabs = []
+        vi.mocked(updateCollection).mockResolvedValue({ error: null })
+        // the reload a move or import ends with, which reloads run one at a time behind, gives up at once
+        vi.mocked(getCollectionForWorkspace).mockResolvedValue({ error: 'not read in this test', collection: [], workspace: null, idMap: null })
+        // a new or duplicated request opens in a tab, which loads its history and scrolls the tab bar
+        vi.mocked(getResponsesByCollectionId).mockResolvedValue([])
+        vi.stubGlobal('document', { querySelector: () => null })
+    })
+
+    afterEach(() => vi.unstubAllGlobals())
+
+    test('a new request first in its folder takes a number before the lowest, and no sibling is written', async() => {
+        const siblings = [item('a', 0), item('b', 1), item('c', 2)]
+        store.state.collectionTree = [folderWith(siblings)]
+        store.state.collection = [store.state.collectionTree[0], ...siblings]
+        vi.mocked(createCollection).mockResolvedValueOnce({ error: null } as never)
+
+        await store.dispatch('createCollectionItem', { type: 'request', name: 'New', method: 'GET', mimeType: 'No Body', parentId: 'F' })
+
+        await vi.waitFor(() => expect(sortOrderWrites()).toHaveLength(1))
+        expect(sortOrderWrites()[0][1]).toBe(-1)
+        expect(['a', 'b', 'c'].map(id => store.state.collection.find(sibling => sibling._id === id)?.sortOrder)).toEqual([0, 1, 2])
+    })
+
+    test('a duplicate goes between its source and the next item, and no sibling is written', async() => {
+        const siblings = [item('a', 0), item('b', 1), item('c', 2)]
+        store.state.collectionTree = [folderWith(siblings)]
+        store.state.collection = [store.state.collectionTree[0], ...siblings]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+
+        await store.dispatch('duplicateCollectionItem', siblings[1])
+
+        await vi.waitFor(() => expect(sortOrderWrites()).toHaveLength(1))
+        expect(sortOrderWrites()[0][1]).toBe(1.5)
+        expect(['a', 'b', 'c'].map(id => store.state.collection.find(sibling => sibling._id === id)?.sortOrder)).toEqual([0, 1, 2])
+    })
+
+    test('a move between two items takes a number between theirs, and no sibling is written', async() => {
+        const siblings = [item('a', 0), item('b', 1), item('c', 2)]
+        store.state.collectionTree = [folderWith(siblings)]
+        store.state.collection = [store.state.collectionTree[0], ...siblings]
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'c', parentId: 'F' }, to: { id: 'b', parentId: 'F', type: 'request', cursorPosition: 'top' } })
+
+        expect(sortOrderWrites()).toEqual([['c', 0.5]])
+    })
+
+    // the drop's index there is -1, which puts the item before the last one, as it did before
+    test('a move dropped on the upper half of a folder\'s list, beside its items, is numbered where it went in', async() => {
+        const siblings = [item('a', 0), item('b', 1), item('c', 2)]
+        const moved = item('x', 1, null)
+        store.state.collectionTree = [folderWith(siblings), moved]
+        store.state.collection = [store.state.collectionTree[0], ...siblings, moved]
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'x', parentId: null }, to: { id: undefined, parentId: 'F', type: 'sidebar-list', cursorPosition: 'top' } })
+
+        expect(sortOrderWrites()).toEqual([['x', 1.5]])
+    })
+
+    // a file workspace moves copies of the sidebar's lists, and a drag before the reload ends is placed from what it shows
+    test('the sidebar shows a move in a file workspace once its sort order is saved, before the reload reads it back', async() => {
+        const siblings = [item('a', 0), item('b', 1), item('c', 2)]
+        const other = { _id: 'G', _type: 'request_group', name: 'G', parentId: null, workspaceId: 'workspace-id', sortOrder: 1, children: [] } as unknown as CollectionItem
+        store.state.collectionTree = [folderWith(siblings), other]
+        store.state.collection = [...store.state.collectionTree, ...siblings]
+        const shown = () => store.state.collectionTree.map(node => [node._id, (node.children ?? []).map(child => child._id)])
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'c', parentId: 'F' }, to: { id: 'a', parentId: 'F', type: 'request', cursorPosition: 'top' } })
+        expect(shown()).toEqual([['F', ['c', 'a', 'b']], ['G', []]])
+
+        await store.dispatch('reorderCollectionItem', { from: { id: 'a', parentId: 'F' }, to: { id: 'G', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+        expect(shown()).toEqual([['F', ['c', 'b']], ['G', ['a']]])
+    })
+
+    // the row shown in its old folder already names the new one, as a move gives every open copy its folder at once
+    test('a second drag of an item whose move into another folder is still being written moves it from where the sidebar shows it', async() => {
+        const siblings = [item('a', 0), item('b', 1)]
+        const other = { _id: 'G', _type: 'request_group', name: 'G', parentId: null, workspaceId: 'workspace-id', sortOrder: 1, children: [] } as unknown as CollectionItem
+        store.state.collectionTree = [folderWith(siblings), other]
+        store.state.collection = [...store.state.collectionTree, ...siblings]
+        let releaseFirst: (() => void) | undefined
+        vi.mocked(updateCollection).mockImplementationOnce(() => new Promise(resolve => {
+            releaseFirst = () => resolve({ error: null })
+        }))
+
+        const first = store.dispatch('reorderCollectionItem', { from: { id: 'a', parentId: 'F' }, to: { id: 'G', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+        await vi.waitFor(() => expect(releaseFirst).toBeDefined())
+        const row = store.state.collection.find(sibling => sibling._id === 'a')!
+        const second = store.dispatch('reorderCollectionItem', { from: { id: 'a', parentId: row.parentId }, to: { id: 'b', parentId: 'F', type: 'request', cursorPosition: 'bottom' } })
+        releaseFirst!()
+        await first
+        await second
+
+        expect(vi.mocked(updateCollection).mock.calls.filter(call => 'parentId' in call[2]).map(call => call[2].parentId)).toEqual(['G', 'F'])
+    })
+
+    // the row of an item whose move is still being written names the folder it goes to, while the sidebar shows it in
+    // the old one, beside which the user drops
+    test.each([
+        ['in a folder', 'F'],
+        ['at the top', null],
+    ])('a drop beside an item %s whose move into another folder is still being written goes where the sidebar shows that item', async(_, shownIn) => {
+        const other = { _id: 'G', _type: 'request_group', name: 'G', parentId: null, workspaceId: 'workspace-id', sortOrder: 1, children: [] } as unknown as CollectionItem
+        // t, which moves, in the folder or at the top, and b, which is dropped beside it, in the other place
+        const siblings = shownIn === 'F' ? [item('a', 0), item('t', 1)] : [item('a', 0), item('b', 1)]
+        const atTop = shownIn === 'F' ? item('b', 2, null) : item('t', 2, null)
+        store.state.collectionTree = [folderWith(siblings), other, atTop]
+        store.state.collection = [...store.state.collectionTree, ...siblings]
+        let releaseFirst: (() => void) | undefined
+        vi.mocked(updateCollection).mockImplementationOnce(() => new Promise(resolve => {
+            releaseFirst = () => resolve({ error: null })
+        }))
+
+        const first = store.dispatch('reorderCollectionItem', { from: { id: 't', parentId: 'F' }, to: { id: 'G', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+        await vi.waitFor(() => expect(releaseFirst).toBeDefined())
+        const row = store.state.collection.find(sibling => sibling._id === 't')!
+        const second = store.dispatch('reorderCollectionItem', { from: { id: 'b', parentId: shownIn === 'F' ? null : 'F' }, to: { id: 't', parentId: row.parentId, type: 'request', cursorPosition: 'top' } })
+        releaseFirst!()
+        await first
+        await second
+
+        expect(vi.mocked(updateCollection).mock.calls.filter(call => 'parentId' in call[2]).map(call => [call[1], call[2].parentId])).toEqual([['t', 'G'], ['b', shownIn]])
+    })
+
+    // a browser workspace moves the sidebar's own lists, which the second move takes the item from
+    test('a move whose item a second move took elsewhere before the first\'s write ended is placed by the second alone', async() => {
+        store.state.activeWorkspace = { _id: 'workspace-id', _type: 'local', name: 'Browser', dotEnv: {} } as unknown as Workspace
+        const siblings = [item('a', 0), item('b', 1)]
+        const other = { _id: 'G', _type: 'request_group', name: 'G', parentId: null, workspaceId: 'workspace-id', sortOrder: 1, children: [] } as unknown as CollectionItem
+        store.state.collectionTree = [folderWith(siblings), other]
+        store.state.collection = [...store.state.collectionTree, ...siblings]
+        let releaseFirst: (() => void) | undefined
+        vi.mocked(updateCollection).mockImplementationOnce(() => new Promise(resolve => {
+            releaseFirst = () => resolve({ error: null })
+        }))
+
+        const first = store.dispatch('reorderCollectionItem', { from: { id: 'a', parentId: 'F' }, to: { id: 'b', parentId: 'F', type: 'request', cursorPosition: 'bottom' } })
+        await vi.waitFor(() => expect(releaseFirst).toBeDefined())
+        await store.dispatch('reorderCollectionItem', { from: { id: 'a', parentId: 'F' }, to: { id: 'G', parentId: null, type: 'request_group', cursorPosition: 'bottom' } })
+        releaseFirst!()
+        await first
+
+        expect(sortOrderWrites()).toEqual([['a', 0]])
+    })
+
+    test('the items inside an imported folder are numbered in their order', async() => {
+        store.state.collectionTree = []
+        store.state.collection = []
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: [] } as never)
+        vi.mocked(getWorkspacePlugins).mockResolvedValueOnce([])
+        const imported = { ...folderWith([item('first', undefined, 'F'), item('second', 7, 'F')]), sortOrder: undefined } as CollectionItem
+
+        await store.dispatch('setCollectionTree', { collectionTree: [imported], parentId: null })
+
+        expect(vi.mocked(createCollections).mock.calls[0][1].map((created: CollectionItem) => [created._id, created.sortOrder])).toEqual([['F', 0], ['first', 0], ['second', 1]])
+    })
+    test('an import goes after the items there and writes none of them, nor the items inside a folder already there', async() => {
+        const inner = [item('inner-a', 0.5), item('inner-b', -1)]
+        const existingFolder = { ...folderWith(inner), sortOrder: -2 } as CollectionItem
+        const existing = [existingFolder, item('x', 3.25, null)]
+        store.state.collectionTree = existing
+        store.state.collection = [...existing, ...inner]
+        vi.mocked(createCollections).mockResolvedValueOnce({ error: null, results: [] } as never)
+        // the import ends with a reload, which reads the workspace and its scripts back
+        vi.mocked(getCollectionForWorkspace).mockResolvedValueOnce({ collection: store.state.collection } as never)
+        vi.mocked(getWorkspacePlugins).mockResolvedValueOnce([])
+
+        await store.dispatch('setCollectionTree', { collectionTree: [item('Imported', 9, null)], parentId: null })
+
+        expect(sortOrderWrites()).toEqual([])
+        expect(vi.mocked(createCollections).mock.calls[0][1].map((created: CollectionItem) => [created._id, created.sortOrder])).toEqual([['Imported', 4]])
+        expect(inner.map(sibling => sibling.sortOrder)).toEqual([0.5, -1])
     })
 })

@@ -886,6 +886,62 @@ test('a scan whose read fails leaves the ids the page holds reaching their files
     expect(savedAgain.error).toBe(null)
 })
 
+// an item read still running when the workspace's own read fails, as on a .env that cannot be read, ends before the ids
+// are put back, so it cannot point a renamed item's id at a file that took its old name since
+test.each(['the item read', 'the .env read'])('a scan whose workspace read fails while an item read runs leaves a renamed item\'s id reaching its file, %s ending first', async(first) => {
+    const { id, version } = await workspaceWithItem()
+    await db.getCollectionForWorkspace(workspace, null)
+    await db.updateCollection(workspace, id, { name: 'Renamed' })
+    // a file given the old name outside Restfox, the same as the renamed one
+    fs.copyFileSync(path.join(workspace.location, 'Renamed.json'), path.join(workspace.location, 'Item.json'))
+    fs.writeFileSync(path.join(workspace.location, '.env'), 'A=1')
+    const readFile = fsPromises.readFile.bind(fsPromises)
+    const held = {}
+    const reached = {}
+    const ended = {}
+    for (const name of ['Item.json', '.env']) {
+        held[name] = Promise.withResolvers()
+        reached[name] = Promise.withResolvers()
+        ended[name] = Promise.withResolvers()
+    }
+    vi.spyOn(fsPromises, 'readFile').mockImplementation(async(...args) => {
+        const name = path.basename(String(args[0]))
+        if (path.dirname(String(args[0])) !== workspace.location || !held[name]) {
+            return readFile(...args)
+        }
+        reached[name].resolve()
+        await held[name].promise
+        try {
+            if (name === '.env') {
+                throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+            }
+            return await readFile(...args)
+        } finally {
+            ended[name].resolve()
+        }
+    })
+    // what follows a read's end, such as the ids put back after the failure, runs before the next step
+    const afterEnd = async name => {
+        await ended[name].promise
+        await new Promise(resolve => setImmediate(resolve))
+    }
+
+    const scan = db.getCollectionForWorkspace(workspace, null)
+    await Promise.all([reached['Item.json'].promise, reached['.env'].promise])
+    const order = first === 'the item read' ? ['Item.json', '.env'] : ['.env', 'Item.json']
+    held[order[0]].resolve()
+    await afterEnd(order[0])
+    held[order[1]].resolve()
+    await afterEnd(order[1])
+    expect((await scan).error).not.toBe(null)
+    vi.mocked(fsPromises.readFile).mockRestore()
+
+    const saved = await db.updateCollection(workspace, id, { ...requestItem(), url: 'https://api.example/after-failed-scan' }, version)
+    expect(saved.error).toBe(null)
+    expect(readJson('Renamed.json').url).toBe('https://api.example/after-failed-scan')
+    expect(readJson('Item.json').url).not.toBe('https://api.example/after-failed-scan')
+})
+
 test('a save from a page whose ids came from before the server started reaches the file, still checked against its version', async() => {
     const { id, version } = await workspaceWithItem()
     await db.getCollectionForWorkspace(workspace, null)
@@ -1412,4 +1468,285 @@ describe('the watcher', () => {
             fs.rmSync(other.location, { recursive: true, force: true })
         }
     }, 20000)
+    test('a reload of the workspace shown keeps its watcher, which still reports a change made outside Restfox', async() => {
+        const chokidar = createRequire(import.meta.url)('chokidar')
+        const watch = vi.spyOn(chokidar, 'watch')
+        await watchWithItem()
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.getCollectionForWorkspace(workspace, null, true)
+        // the afterEach moves it to the spare workspace, and the first load made it
+        expect(watch).toHaveBeenCalledOnce()
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        })
+    }, 20000)
+
+    test('the workspace\'s folder deleted and made again, as by a sync tool, is watched anew by the next read', async() => {
+        const chokidar = createRequire(import.meta.url)('chokidar')
+        const watch = vi.spyOn(chokidar, 'watch')
+        await watchWithItem()
+        const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'restfox-db-spec-copy-'))
+        try {
+            fs.cpSync(workspace.location, copy, { recursive: true })
+            fs.rmSync(workspace.location, { recursive: true, force: true, maxRetries: 10 })
+            await vi.waitFor(() => expect(events.some(event => event.event === 'unlinkDir' && event.path === workspace.location)).toBe(true), { timeout: 10000 })
+            fs.cpSync(copy, workspace.location, { recursive: true })
+        } finally {
+            fs.rmSync(copy, { recursive: true, force: true })
+        }
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.whenWorkspaceWatcherReady()
+        expect(watch).toHaveBeenCalledTimes(2)
+
+        await expectOutsideChangeReported('Item.json', () => {
+            fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        })
+    }, 20000)
+
+    // as the app sends every reload through the queue, which a change seen after it waits behind
+    test('a change seen while a reload waits in the queue, whose check runs after it, is left to the reload', async() => {
+        await watchWithItem()
+        let releaseQueue
+        queued(() => new Promise(resolve => {
+            releaseQueue = resolve
+        }))
+        // the reload, which reads the change
+        const reload = queued(() => db.getCollectionForWorkspace(workspace, null, true))
+        const enqueue = vi.spyOn(db.operationQueue, 'enqueue')
+        const from = eventsFor('Item.json').length
+        fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        await vi.waitFor(() => expect(enqueue).toHaveBeenCalled(), { timeout: 10000 })
+        releaseQueue()
+        await reload
+        await queued(async() => undefined)
+
+        expect(eventsFor('Item.json').slice(from)).toEqual([])
+    }, 20000)
+
+    test('a change made while a reload reads is reported, as the read may have passed its file', async() => {
+        await watchWithItem()
+        const readFile = fsPromises.readFile.bind(fsPromises)
+        let readHeld
+        const held = new Promise(resolve => {
+            readHeld = resolve
+        })
+        let releaseRead
+        const release = new Promise(resolve => {
+            releaseRead = resolve
+        })
+        // the reload's read of the item, held once
+        vi.spyOn(fsPromises, 'readFile').mockImplementation(async(...args) => {
+            if (String(args[0]) === path.join(workspace.location, 'Item.json') && readHeld) {
+                const hold = readHeld
+                readHeld = null
+                const text = await readFile(...args)
+                hold()
+                await release
+                return text
+            }
+            return readFile(...args)
+        })
+        const reload = queued(() => db.getCollectionForWorkspace(workspace, null, true))
+        await held
+        const enqueue = vi.spyOn(db.operationQueue, 'enqueue')
+        const from = eventsFor('Item.json').length
+        fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        await vi.waitFor(() => expect(enqueue).toHaveBeenCalled(), { timeout: 10000 })
+        releaseRead()
+        await reload
+
+        await vi.waitFor(() => expect(eventsFor('Item.json').slice(from).at(-1)?.controlledChange).toBe(false), { timeout: 10000 })
+    }, 20000)
+
+    test('a change whose check waited behind a read of another workspace, for an export or a copy, is still reported', async() => {
+        await watchWithItem()
+        let releaseQueue
+        queued(() => new Promise(resolve => {
+            releaseQueue = resolve
+        }))
+        const enqueue = vi.spyOn(db.operationQueue, 'enqueue')
+        const from = eventsFor('Item.json').length
+        fs.writeFileSync(path.join(workspace.location, 'Item.json'), JSON.stringify({ ...readJson('Item.json'), url: 'https://api.example/outside' }, null, 4))
+        await vi.waitFor(() => expect(enqueue).toHaveBeenCalled(), { timeout: 10000 })
+        await db.getCollectionForWorkspace(spareWorkspace, null)
+        releaseQueue()
+
+        await vi.waitFor(() => expect(eventsFor('Item.json').slice(from).at(-1)?.controlledChange).toBe(false), { timeout: 10000 })
+    }, 20000)
+    // a folder with folders inside is renamed by a copy there, and the watcher told to stop watching its old path
+    test.runIf(process.platform === 'win32')('a folder given the name of one renamed by a copy is watched once the workspace is read again', async() => {
+        fs.writeFileSync(path.join(workspace.location, 'restfox.json'), JSON.stringify({ version: 1, name: 'W' }))
+        const folder = await db.createCollection(workspace, { _id: 'f', _type: 'request_group', name: 'Old', parentId: null, workspaceId: workspace._id })
+        const inner = await db.createCollection(workspace, { _id: 'i', _type: 'request_group', name: 'Inner', parentId: folder.newCollectionId, workspaceId: workspace._id })
+        await db.createCollection(workspace, { ...requestItem('Deep'), parentId: inner.newCollectionId })
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.whenWorkspaceWatcherReady()
+        await queued(() => db.updateCollection(workspace, folder.newCollectionId, { name: 'New' }))
+        await db.getCollectionForWorkspace(workspace, null, true)
+        await db.whenWorkspaceWatcherReady()
+
+        // another program makes a folder of the old name, such as a checkout of an older branch
+        fs.mkdirSync(path.join(workspace.location, 'Old', 'Again'), { recursive: true })
+        fs.writeFileSync(path.join(workspace.location, 'Old', '_.json'), '{}')
+        fs.writeFileSync(path.join(workspace.location, 'Old', 'Again', '_.json'), '{}')
+        fs.writeFileSync(path.join(workspace.location, 'Old', 'Again', 'Back.json'), JSON.stringify(requestItem('Back')))
+        await expectOutsideChangeReported(path.join('Old', 'Again', 'Back.json'), () => {
+            fs.writeFileSync(path.join(workspace.location, 'Old', 'Again', 'Back.json'), JSON.stringify({ ...requestItem('Back'), url: 'https://api.example/changed' }))
+        })
+    }, 30000)
+})
+
+describe('reading a workspace', () => {
+    const request = url => ({ _type: 'request', method: 'GET', url, body: { mimeType: 'No Body' } })
+    const script = id => [{ _id: id, type: 'script', name: null, code: { pre_request: `// ${id}`, post_request: '' }, enabled: true }]
+
+    function write(relativePath, data) {
+        const fullPath = path.join(workspace.location, relativePath)
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true })
+        fs.writeFileSync(fullPath, typeof data === 'string' ? data : JSON.stringify(data))
+    }
+
+    function writeWorkspace() {
+        write('restfox.json', { version: 1, name: 'W' })
+        write('_.plugins.json', script('workspace'))
+        write('A/_.json', {})
+        write('A/_.plugins.json', script('folder-a'))
+        write('A/One.json', request('1'))
+        write('A/One.plugins.json', script('one'))
+        write('A/Sub/_.json', {})
+        write('A/Sub/Two.json', request('2'))
+        write('A/Sub/Two.plugins.json', script('two'))
+        write('B.json', request('b'))
+        // a folder whose settings cannot be read is left out, with its items and their scripts
+        write('Broken/Three.json', request('3'))
+        write('Broken/Three.plugins.json', script('three'))
+        // an item whose file cannot be read is left out, with its script
+        write('Conflict.json', '<<<<<<< HEAD')
+        write('Conflict.plugins.json', script('conflict'))
+    }
+
+    // the order of the folders' listings, each folder followed by its items, as a read one file after another gave
+    function listingOrder(dir = workspace.location) {
+        return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+            if (entry.isDirectory()) {
+                const folder = path.join(dir, entry.name)
+                return fs.existsSync(path.join(folder, '_.json')) ? [entry.name, ...listingOrder(folder)] : []
+            }
+            return entry.name.endsWith('.json') && !entry.name.includes('.plugins.') && entry.name !== 'restfox.json' && entry.name !== '_.json' && entry.name !== 'Conflict.json' ? [entry.name.replace('.json', '')] : []
+        })
+    }
+
+    // counts the files open for reading at once, each held a moment so reads overlap as they would on a slow disk
+    function countOpenReads(counted = () => true) {
+        const readFile = fsPromises.readFile.bind(fsPromises)
+        const counts = { open: 0, most: 0, paths: [] }
+        vi.spyOn(fsPromises, 'readFile').mockImplementation(async(...args) => {
+            counts.paths.push(String(args[0]))
+            if (!counted(String(args[0]))) {
+                return readFile(...args)
+            }
+            counts.open++
+            counts.most = Math.max(counts.most, counts.open)
+            try {
+                await new Promise(resolve => setTimeout(resolve, 2))
+                return await readFile(...args)
+            } finally {
+                counts.open--
+            }
+        })
+        return counts
+    }
+
+    test('items come in the order of each folder\'s listing, a folder before its items', async() => {
+        writeWorkspace()
+        const { collection, error } = await db.getCollectionForWorkspace(workspace, null)
+        expect(error).toBe(null)
+        expect(collection.map(item => item.name)).toEqual(listingOrder())
+    })
+
+    test('item files are read many at once, never more than 32', async() => {
+        write('restfox.json', { version: 1, name: 'W' })
+        for (let index = 0; index < 100; index++) {
+            write(`R${index}.json`, request(String(index)))
+        }
+        // the workspace's own restfox.json is read beside them
+        const counts = countOpenReads(readPath => /R\d+\.json$/.test(readPath))
+        const { collection } = await db.getCollectionForWorkspace(workspace, null)
+        expect(collection).toHaveLength(100)
+        expect(counts.most).toBeGreaterThan(1)
+        expect(counts.most).toBeLessThanOrEqual(32)
+    })
+
+    test('more folders than the reads allowed at once are read, as a folder holds no place while its items are read', async() => {
+        write('restfox.json', { version: 1, name: 'W' })
+        for (let index = 0; index < 40; index++) {
+            write(`F${index}/_.json`, {})
+            write(`F${index}/Inner/_.json`, {})
+            write(`F${index}/Inner/R.json`, request(String(index)))
+        }
+        const { collection } = await db.getCollectionForWorkspace(workspace, null)
+        expect(collection).toHaveLength(120)
+    }, 20000)
+
+    test('a folder that cannot be listed fails the read once every other read has ended', async() => {
+        writeWorkspace()
+        for (let index = 0; index < 50; index++) {
+            write(`R${index}.json`, request(String(index)))
+        }
+        const counts = countOpenReads()
+        const readdir = fsPromises.readdir.bind(fsPromises)
+        vi.spyOn(fsPromises, 'readdir').mockImplementation(async(dir, ...rest) => String(dir).endsWith(`${path.sep}Sub`)
+            ? Promise.reject(Object.assign(new Error('EIO: i/o error'), { code: 'EIO' }))
+            : readdir(dir, ...rest))
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        const { error } = await db.getCollectionForWorkspace(workspace, null)
+        expect(error).toBeTruthy()
+        expect(counts.open).toBe(0)
+    })
+
+    test('scripts come from the script files there are, in the order of their items, reading no item that has none', async() => {
+        writeWorkspace()
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        const counts = countOpenReads()
+        const plugins = await db.getWorkspacePlugins(workspace)
+        // ids are paths with forward slashes on every system
+        const id = relativePath => `/${relativePath}`
+        expect(plugins.map(plugin => [plugin._id, plugin.collectionId])).toEqual([
+            ['workspace', null],
+            ...listingOrder().flatMap(name => ({
+                A: [['folder-a', id('A')]],
+                One: [['one', id('A/One.json')]],
+                Two: [['two', id('A/Sub/Two.json')]],
+            })[name] ?? []),
+        ])
+        expect(counts.paths.some(readPath => readPath.endsWith('B.json'))).toBe(false)
+        expect(counts.paths.some(readPath => readPath.endsWith(`Sub${path.sep}_.json`))).toBe(true)
+    })
+
+    // where a name's case does not matter to the disk, an item renamed outside Restfox in its case alone still opens its
+    // script file
+    test.runIf(process.platform === 'win32' || process.platform === 'darwin')('a script file named in another case than its item or folder is read', async() => {
+        write('restfox.json', { version: 1, name: 'W' })
+        write('A/_.json', {})
+        write('A/_.Plugins.json', script('folder-a'))
+        write('A/Login.json', request('1'))
+        write('A/login.plugins.json', script('login'))
+        const plugins = await db.getWorkspacePlugins(workspace)
+        expect(plugins.map(plugin => plugin._id)).toEqual(['folder-a', 'login'])
+    })
+
+    // a script or responses file named in another case than Restfox writes, or a list the user keeps there, is no item,
+    // which a save of its sort order would turn into one, losing the scripts
+    test('a file that holds a list, not an item, is left out of the items', async() => {
+        write('restfox.json', { version: 1, name: 'W' })
+        write('A/_.json', {})
+        write('A/_.Plugins.json', script('folder-a'))
+        write('A/Login.json', request('1'))
+        write('A/Login.Responses.json', [])
+        const { collection, error } = await db.getCollectionForWorkspace(workspace, null)
+        expect(error).toBe(null)
+        expect(collection.map(item => item.name)).toEqual(['A', 'Login'])
+    })
 })

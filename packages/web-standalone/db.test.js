@@ -8,6 +8,7 @@ import * as db from './src/db.js'
 import app from './app.js'
 import { itemFileVersion } from '../electron/shared/helpers.js'
 import { createDatabase } from '../electron/shared/db.js'
+import { createDbHelpers } from '../electron/shared/db-helpers.js'
 import dotenv from 'dotenv'
 import * as dbHelpers from './src/db-helpers.js'
 import * as fileUtils from './src/file-utils.js'
@@ -924,5 +925,25 @@ test('an id kept from before a rename that a new item takes stays that item\'s a
 
         const loaded = await db.getCollectionForWorkspace(workspace, null)
         assert.deepEqual(new Map(loaded.idMap).get(id), id)
+    })
+})
+
+test('the adapter passes on every helper the shared code makes, which the shared storage code calls', () => {
+    const made = Object.keys(createDbHelpers(fileUtils, buffer => buffer))
+    assert.deepEqual(made.filter(name => !(name in dbHelpers)), [])
+})
+
+test('a request\'s and a folder\'s scripts are read from their files', async() => {
+    await withWorkspace(async(workspace) => {
+        const script = id => [{ _id: id, type: 'script', name: null, code: { pre_request: '', post_request: '' }, enabled: true }]
+        fs.mkdirSync(path.join(workspace.location, 'Folder'))
+        fs.writeFileSync(path.join(workspace.location, 'Folder', '_.json'), '{}')
+        fs.writeFileSync(path.join(workspace.location, 'Folder', '_.plugins.json'), JSON.stringify(script('folder-script')))
+        fs.writeFileSync(path.join(workspace.location, 'Folder', 'A.json'), JSON.stringify({ _type: 'request', method: 'GET', url: 'https://api.example.test/a', body: { mimeType: 'No Body' } }))
+        fs.writeFileSync(path.join(workspace.location, 'Folder', 'A.plugins.json'), JSON.stringify(script('a-script')))
+
+        const plugins = await db.getWorkspacePlugins(workspace)
+
+        assert.deepEqual(plugins.map(plugin => [plugin._id, plugin.collectionId]), [['folder-script', '/Folder'], ['a-script', '/Folder/A.json']])
     })
 })

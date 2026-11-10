@@ -3,6 +3,34 @@ import path from 'path'
 import * as helpers from './helpers.js'
 import constants from './constants.js'
 
+// Item files read at once by one workspace read. Each read keeps one file open at a time, a socket's messages read after
+// its item, and macOS lets a process keep 256 open by default
+const READ_LIMIT = 32
+
+// Runs the tasks given to it no more than limit at a time, in the order they were given
+function createReadLimit(limit = READ_LIMIT) {
+    let running = 0
+    const waiting = []
+    return async task => {
+        if (running < limit) {
+            running++
+        } else {
+            // a task that ends hands its place to this one
+            await new Promise(resolve => waiting.push(resolve))
+        }
+        try {
+            return await task()
+        } finally {
+            const next = waiting.shift()
+            if (next) {
+                next()
+            } else {
+                running--
+            }
+        }
+    }
+}
+
 export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
     // versions, when given, gets the version of each item file read, by item id, kept apart from the item so it is never
     // saved or exported
@@ -59,6 +87,13 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
                 const collectionItemText = await fs.readFile(fullPath, 'utf8')
                 let collectionItem = JSON.parse(collectionItemText)
 
+                // an item's file holds an object. A list, as a script or responses file named in another case than
+                // Restfox writes holds, is no item, and a save of its sort order would make it one
+                if (collectionItem === null || typeof collectionItem !== 'object' || Array.isArray(collectionItem)) {
+                    console.log(`Skipping ${fullPath}, it holds no item`)
+                    return
+                }
+
                 if (collectionItem._type === 'socket') {
                     const messagesPath = fullPath.replace('.json', constants.FILES.MESSAGES)
                     if (await fileUtils.pathExists(messagesPath)) {
@@ -92,59 +127,115 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
         }
     }
 
-    async function getCollection(idMap, workspace, dir = workspace.location, versions = null, environmentVersions = null) {
-        let items = []
+    // Whether a file or folder of a workspace is an item, a folder's items read further. Scripts, responses, messages and
+    // settings beside them are not
+    function isItemEntry(fileOrFolder) {
+        return !(
+            fileOrFolder.name.startsWith('.') ||
+            fileOrFolder.name === constants.FOLDERS.ENVIRONMENTS ||
+            fileOrFolder.name.endsWith(constants.FILES.PLUGINS) ||
+            fileOrFolder.name.endsWith(constants.FILES.RESPONSES) ||
+            fileOrFolder.name.endsWith(constants.FILES.MESSAGES) ||
+            fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG ||
+            fileOrFolder.name === constants.FILES.FOLDER_CONFIG ||
+            fileOrFolder.name === constants.FILES.COLLAPSED ||
+            // just to be on the safer side, we only allow .json get through if fileOrFolder is a file
+            // this way if the user creates random files that are not related to restfox, they will be ignored
+            // as long as they are not json
+            (fileOrFolder.isDirectory() === false && fileOrFolder.name.endsWith('.json') === false)
+        )
+    }
 
+    async function getCollection(idMap, workspace, dir = workspace.location, versions = null, environmentVersions = null, readLimit = createReadLimit()) {
         try {
-            const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
+            const filesAndFolders = (await fs.readdir(dir, { withFileTypes: true })).filter(isItemEntry)
 
-            for (let fileOrFolder of filesAndFolders) {
-                if (
-                    fileOrFolder.name.startsWith('.') ||
-                    fileOrFolder.name === constants.FOLDERS.ENVIRONMENTS ||
-                    fileOrFolder.name.endsWith(constants.FILES.PLUGINS) ||
-                    fileOrFolder.name.endsWith(constants.FILES.RESPONSES) ||
-                    fileOrFolder.name.endsWith(constants.FILES.MESSAGES) ||
-                    fileOrFolder.name === constants.FILES.WORKSPACE_CONFIG ||
-                    fileOrFolder.name === constants.FILES.FOLDER_CONFIG ||
-                    fileOrFolder.name === constants.FILES.COLLAPSED ||
-                    // just to be on the safer side, we only allow .json get through if fileOrFolder is a file
-                    // this way if the user creates random files that are not related to restfox, they will be ignored
-                    // as long as they are not json
-                    (fileOrFolder.isDirectory() === false && fileOrFolder.name.endsWith('.json') === false)
-                ) {
-                    continue
-                }
-
+            // Every file and folder at once, up to the limit, as a large workspace read one file after another spends
+            // most of its time waiting on the disk. Each ends before this returns, also when one fails, so nothing is
+            // still writing into idMap or versions once the caller has them
+            const results = await Promise.allSettled(filesAndFolders.map(async fileOrFolder => {
                 const fullPath = path.join(dir, fileOrFolder.name)
                 const fullPathWithoutWorkspaceLocation = helpers.removePrefixFromString(fullPath, workspace.location)
-
-                if (fileOrFolder.isDirectory()) {
-                    const collection = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions, environmentVersions)
-
-                    if(collection) {
-                        items.push(collection)
-
-                        // Recursively get files and folders inside this directory
-                        const nestedItems = await getCollection(idMap, workspace, fullPath, versions, environmentVersions)
-                        items = items.concat(nestedItems)
+                try {
+                    const collectionItem = await readLimit(() => getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions, environmentVersions))
+                    if (!collectionItem) {
+                        return []
                     }
-                } else {
-                    const collectionItem = await getCollectionItem(workspace, fullPath, fullPathWithoutWorkspaceLocation, versions, environmentVersions)
-
-                    if(collectionItem) {
-                        items.push(collectionItem)
+                    if (fileOrFolder.isDirectory()) {
+                        // a folder's items after it, read outside the limit, so a folder never holds a place its own
+                        // items wait for
+                        return [collectionItem, ...await getCollection(idMap, workspace, fullPath, versions, environmentVersions, readLimit)]
                     }
+                    return [collectionItem]
+                } finally {
+                    idMap.set(fullPathWithoutWorkspaceLocation, fullPath)
                 }
+            }))
 
-                idMap.set(fullPathWithoutWorkspaceLocation, fullPath)
+            const failed = results.find(result => result.status === 'rejected')
+            if (failed) {
+                throw failed.reason
             }
+            // in the order of the folder's listing, each folder followed by its items, as when read one by one
+            return results.flatMap(result => result.value)
         } catch (err) {
             console.error(err)
             throw new Error(`Error getting collection for workspace at location: ${dir}`)
         }
+    }
 
-        return items
+    async function readPluginsFile(pluginsPath, collectionId) {
+        try {
+            const plugins = JSON.parse(await fs.readFile(pluginsPath, 'utf8'))
+            plugins.forEach((plugin) => {
+                plugin.collectionId = collectionId
+            })
+            return plugins
+        } catch {
+            // no scripts for the item, or a file that cannot be read, which leaves it with none
+            return []
+        }
+    }
+
+    // The scripts of the folders and items under dir, in the order getCollection gives the items. Only the script files
+    // there are get read, not every item's file: a folder getCollection leaves out, as one whose _.json cannot be read,
+    // is left out with its items, and an item's script only when the item's file can be read
+    async function getCollectionPlugins(workspace, dir = workspace.location, readLimit = createReadLimit()) {
+        const filesAndFolders = await fs.readdir(dir, { withFileTypes: true })
+        // in any case, as a disk where case does not matter opens a script file named in another case than the path
+        // asked for, such as after an item was renamed outside Restfox in its case alone. Where case matters, the read of
+        // a name in another case finds no file
+        const names = new Set(filesAndFolders.map(fileOrFolder => fileOrFolder.name.toLowerCase()))
+        const listed = name => names.has(name.toLowerCase())
+        // a folder's own scripts first, as getCollection gives a folder before its items. The workspace's, at the top,
+        // are read by getWorkspacePlugins
+        const folderPlugins = dir !== workspace.location && listed(constants.FILES.FOLDER_PLUGINS)
+            ? await readLimit(() => readPluginsFile(path.join(dir, constants.FILES.FOLDER_PLUGINS), helpers.removePrefixFromString(dir, workspace.location)))
+            : []
+        const results = await Promise.allSettled(filesAndFolders.filter(isItemEntry).map(async fileOrFolder => {
+            const fullPath = path.join(dir, fileOrFolder.name)
+            const collectionId = helpers.removePrefixFromString(fullPath, workspace.location)
+            if (fileOrFolder.isDirectory()) {
+                if (!await readLimit(() => getCollectionItem(workspace, fullPath, collectionId))) {
+                    return []
+                }
+                return getCollectionPlugins(workspace, fullPath, readLimit)
+            }
+            // where the script's file sits, by the rule its saves use
+            const pluginsPath = fullPath.replace('.json', constants.FILES.PLUGINS)
+            if (path.dirname(pluginsPath) === dir && !listed(path.basename(pluginsPath))) {
+                return []
+            }
+            if (!await readLimit(() => getCollectionItem(workspace, fullPath, collectionId))) {
+                return []
+            }
+            return readLimit(() => readPluginsFile(pluginsPath, collectionId))
+        }))
+        const failed = results.find(result => result.status === 'rejected')
+        if (failed) {
+            throw failed.reason
+        }
+        return [...folderPlugins, ...results.flatMap(result => result.value)]
     }
 
     async function initRestfoxCollection(workspace) {
@@ -523,6 +614,7 @@ export function createDbHelpers(fileUtils, deserializeResponseBuffer) {
     return {
         getCollectionItem,
         getCollection,
+        getCollectionPlugins,
         ensureRestfoxCollection,
         getEnvironments,
         saveEnvironments,

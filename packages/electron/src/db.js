@@ -14,7 +14,18 @@ let workspaceWatcher = null
 let workspaceWatcherLocation = null
 // settles once the watcher has read the folder, before which it reports no change
 let workspaceWatcherReady = Promise.resolve()
-const database = createDatabase(fileUtils, dbHelpers, dotenv, () => workspaceWatcher)
+// the reads of the workspace shown so far, so a change reported before one of them is left to it
+let watchedReads = 0
+// the watcher stopped watching a path that may come back, which only a new watcher undoes: one it was told to stop
+// watching, as a folder renamed by a copy is, so a folder given that name again is watched, or the workspace's folder,
+// deleted, so the folder made again is
+let workspaceWatcherMissesPaths = false
+const database = createDatabase(fileUtils, dbHelpers, dotenv, () => workspaceWatcher && {
+    unwatch: paths => {
+        workspaceWatcherMissesPaths = true
+        workspaceWatcher.unwatch(paths)
+    },
+})
 const { getIdMap } = database
 
 // every file workspace call runs here one at a time, and so does the watcher's check of a change, which then never
@@ -58,6 +69,10 @@ async function forgetOwnWritesChangedSince(location) {
     }
 }
 
+function isWorkspaceFolder(changedPath, location) {
+    return path.resolve(changedPath) === path.resolve(location)
+}
+
 // watch is for the workspace the window shows: a read for anything else, such as an export, the Edit Tag list or a
 // duplicate's copy, leaves the watcher on the open workspace
 async function getCollectionForWorkspace(workspace, type, watch = false) {
@@ -80,6 +95,13 @@ async function getCollectionForWorkspace(workspace, type, watch = false) {
             // the watcher comes from another folder or none, so changes to this one went unseen meanwhile
             const watcherMoves = watch && workspaceWatcherLocation !== workspace.location
             if (watch) {
+                // this read covers every change reported before it
+                watchedReads++
+            }
+            // The watcher stays on while the same folder is read again, as a new one would watch every file anew, which
+            // holds up the app on a large workspace
+            const watcherReplaced = watch && (watcherMoves || workspaceWatcherMissesPaths)
+            if (watcherReplaced) {
                 if (workspaceWatcher) {
                     await workspaceWatcher.close()
                     workspaceWatcher = null
@@ -87,10 +109,11 @@ async function getCollectionForWorkspace(workspace, type, watch = false) {
                 }
             }
 
-            if (watch) {
+            if (watcherReplaced) {
                 if (watcherMoves) {
                     await forgetOwnWritesChangedSince(workspace.location)
                 }
+                workspaceWatcherMissesPaths = false
                 const watcher = chokidar.watch(workspace.location, {
                     ignored: (path) => /(^|[\/\\])\../.test(path) && !/\.env$/.test(path), // ignore dotfiles except .env
                     ignoreInitial: true, // (default: false) if set to false then add/addDir events are also emitted for matching paths while instantiating the watching as chokidar discovers these file paths (before the ready event)
@@ -100,6 +123,11 @@ async function getCollectionForWorkspace(workspace, type, watch = false) {
                     }, // was getting an add & change event even thought there was only one fs.writeFile wx call - this seems to fix it
                 }).on('all', (event, path) => {
                     console.log(event, path)
+                    // chokidar can stop watching the folder once it is deleted, so the next read watches it anew
+                    if (event === 'unlinkDir' && workspaceWatcher === watcher && isWorkspaceFolder(path, workspace.location)) {
+                        workspaceWatcherMissesPaths = true
+                    }
+                    const readsBefore = watchedReads
                     operationQueue.enqueue(async() => {
                         const ownWrite = await isOwnChange(event, path)
                         // once another program changed the path, text Restfox wrote there before, such as a branch checked
@@ -108,8 +136,9 @@ async function getCollectionForWorkspace(workspace, type, watch = false) {
                         if (ownWrite === null) {
                             fileUtils.ownWrites.delete(path)
                         }
-                        // the watcher that replaced this one, or the reload that started it, covers the page from here
-                        if (workspaceWatcher !== watcher) {
+                        // a read since, of a reload or another workspace, or the watcher that replaced this one, covers the
+                        // page from here
+                        if (workspaceWatcher !== watcher || watchedReads !== readsBefore) {
                             return
                         }
                         globalThis.electronApplicationWindow.webContents.send('workspaceChanged', event, path, ownWrite !== null, ownWrite?.reason ?? null)

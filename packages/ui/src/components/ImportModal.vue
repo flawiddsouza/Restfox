@@ -101,7 +101,6 @@ import { convertPostmanExportToRestfoxCollection, isPostmanDataDump, isPostmanVa
 import { convertInsomniaGrpcMessage, isGrpcAvailable } from '@/utils/grpc-transport'
 import yaml from 'js-yaml'
 import Modal from '@/components/Modal.vue'
-import { getCollectionForWorkspace } from '@/db'
 import { emitter } from '@/event-bus'
 import { flattenTree, sortTree, toTree, prependParentTitleToChildTitle } from '../helpers'
 import { mergeArraysByProperty } from '@/utils/array'
@@ -121,7 +120,6 @@ export default {
     },
     data() {
         return {
-            activeWorkspaceFolders: [],
             filesToImport: [],
             urlToImport: '',
             importFrom: 'Restfox',
@@ -165,6 +163,17 @@ export default {
         activeWorkspace() {
             return this.$store.state.activeWorkspace
         },
+        // from the folders the page holds, as the form is drawn only while the dialog is open, so the dialog reads no
+        // storage. Copies, as the tree and the titles are built on the items
+        activeWorkspaceFolders() {
+            let activeWorkspaceFolders = this.$store.state.collection
+                .filter(item => item._type === 'request_group')
+                .map(item => ({ _id: item._id, _type: item._type, name: item.name, parentId: item.parentId, sortOrder: item.sortOrder }))
+            activeWorkspaceFolders = toTree(activeWorkspaceFolders)
+            sortTree(activeWorkspaceFolders)
+            prependParentTitleToChildTitle(activeWorkspaceFolders)
+            return flattenTree(activeWorkspaceFolders)
+        },
         collectionTree() {
             return this.$store.state.collectionTree
         },
@@ -191,13 +200,7 @@ export default {
         }
     },
     methods: {
-        async handleActiveWorkspace() {
-            let { collection: activeWorkspaceFolders } = await getCollectionForWorkspace(this.activeWorkspace._id, 'request_group')
-            activeWorkspaceFolders = toTree(activeWorkspaceFolders)
-            sortTree(activeWorkspaceFolders)
-            prependParentTitleToChildTitle(activeWorkspaceFolders)
-            activeWorkspaceFolders = flattenTree(activeWorkspaceFolders)
-            this.activeWorkspaceFolders = activeWorkspaceFolders
+        handleActiveWorkspace() {
             this.selectedRequestGroupId = null
         },
 
