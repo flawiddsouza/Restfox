@@ -115,8 +115,7 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
     try {
         const urlValue = getPairValue(
             pairsByName,
-            // values of options Restfox does not import (-o out.json, -m 10, -A agent) are left in singletons too
-            ((singletons.find(singleton => typeof singleton === 'string' && /^https?:\/\//i.test(singleton)) ?? singletons[0]) as string) || '',
+            (singletons[0] as string) || '',
             ['url'],
         )
         const { searchParams, href, search } = new URL(urlValue)

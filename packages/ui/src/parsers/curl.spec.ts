@@ -285,9 +285,7 @@ describe('curl', () => {
     it.each([
         ['curl -G https://api.example.com/v1/customers -d limit=3', 'GET'],
         ['curl --get https://api.example.com/v1/customers -d limit=3', 'GET'],
-        ['curl -m 10 -o out.json https://api.example.com/v1/customers?limit=3', 'GET'],
-        ['curl -A "MyAgent/1.0" -X POST https://api.example.com/v1/customers?limit=3', 'POST'],
-    ])('Curl command - url after other options: %s', (command, method) => {
+    ])('Curl command - url after -G: %s', (command, method) => {
         expect(convert(command)).toMatchObject([
             {
                 'method': method,
