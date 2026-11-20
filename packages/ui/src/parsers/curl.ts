@@ -418,6 +418,47 @@ const getPairValue = <T extends string | boolean>(
     return defaultValue
 }
 
+const ANSI_C_ESCAPES: Record<string, string> = { n: '\n', r: '\r', t: '\t', '\\': '\\', '\'': '\'', '"': '"' }
+
+function decodeAnsiCString(value: string) {
+    return value.replace(/\\(u[0-9a-fA-F]{4}|x[0-9a-fA-F]{1,2}|.)/g, (match, escape: string) => {
+        if(escape.length > 1) {
+            return String.fromCharCode(parseInt(escape.slice(1), 16))
+        }
+        return ANSI_C_ESCAPES[escape] ?? match
+    })
+}
+
+// shell-quote does not know bash's $'...' strings, which Chrome's "Copy as cURL" writes for any value with a quote,
+// newline or "!", so they are decoded here and quoted again as plain '...' strings. A $' inside quotes is plain text.
+function expandAnsiCStrings(command: string) {
+    let result = ''
+    let quote: string | null = null
+    for (let i = 0; i < command.length; i++) {
+        const char = command[i]
+        if (quote === null && char === '$' && command[i + 1] === '\'') {
+            const match = /^\$'((?:[^'\\]|\\.)*)'/.exec(command.slice(i))
+            if (match) {
+                result += `'${decodeAnsiCString(match[1]).replace(/'/g, `'\\''`)}'`
+                i += match[0].length - 1
+                continue
+            }
+        }
+        if (char === '\\' && quote !== '\'') {
+            result += char + (command[i + 1] ?? '')
+            i++
+            continue
+        }
+        if (char === quote) {
+            quote = null
+        } else if (quote === null && (char === '\'' || char === '"')) {
+            quote = char
+        }
+        result += char
+    }
+    return result
+}
+
 export const convert: Converter = rawData => {
     requestCount = 1
 
@@ -425,8 +466,7 @@ export const convert: Converter = rawData => {
         return null
     }
 
-    const cleanedRawData = convertCurlCmdToBash(rawData)
-        .replace(/\n/g, ' ')
+    const cleanedRawData = expandAnsiCStrings(convertCurlCmdToBash(rawData).replace(/\n/g, ' '))
 
     // Parse the whole thing into one big tokenized list
     const parseEntries = parse(cleanedRawData)
@@ -440,11 +480,7 @@ export const convert: Converter = rawData => {
 
     for (const parseEntry of parseEntries) {
         if (typeof parseEntry === 'string') {
-            if (parseEntry.startsWith('$')) {
-                currentCommand.push(parseEntry.slice(1, Infinity))
-            } else {
-                currentCommand.push(parseEntry)
-            }
+            currentCommand.push(parseEntry)
             continue
         }
 
@@ -452,21 +488,13 @@ export const convert: Converter = rawData => {
             continue
         }
 
-        // a control operator, 'glob' or a $'...' literal that shell-quote passes through as an op
+        // a control operator or 'glob'
         const { op } = parseEntry as { op: string }
 
         // `;` separates commands
         if (op === ';') {
             commands.push(currentCommand)
             currentCommand = []
-            continue
-        }
-
-        if (op?.startsWith('$')) {
-            // Handle the case where literal like -H $'Header: \'Some Quoted Thing\''
-            const str = op.slice(2, op.length - 1).replace(/\\'/g, '\'')
-
-            currentCommand.push(str)
             continue
         }
 

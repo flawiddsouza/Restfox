@@ -282,6 +282,35 @@ describe('curl', () => {
         }])
     })
 
+    it('Curl command - Chrome $\'...\' body with a quote, newlines and !', () => {
+        // Chrome's "Copy as cURL (bash)" writes these values as $'...' strings
+        const chromeCurlCmd = `curl 'https://api.example.com/v1/items' \\
+  -H 'content-type: application/json' \\
+  --data-raw $'{\\n  "note": "it\\'s fine",\\n  "msg": "Hi\\u0021"\\n}'`
+        const result = convert(chromeCurlCmd)
+
+        expect(result).toMatchObject([
+            {
+                'body': {
+                    'mimeType': 'application/json',
+                    'text': '{\n  "note": "it\'s fine",\n  "msg": "Hi!"\n}',
+                },
+                'url': 'https://api.example.com/v1/items',
+            },
+        ])
+    })
+
+    it('Curl command - single quoted value ending with $', () => {
+        const result = convert(`curl 'https://api.example.com/v1/items' -d 'price=5$' -H 'x-test: 1'`)
+
+        expect(result).toMatchObject([
+            {
+                'body': { 'text': 'price=5$' },
+                'headers': [{ 'name': 'x-test', 'value': '1' }],
+            },
+        ])
+    })
+
     it('Curl command - GQL request', () => {
         const chromeCurlCmd = `curl 'https://app.argos-ci.com/graphql' \\
   -H 'accept: */*' \\
@@ -298,7 +327,7 @@ describe('curl', () => {
                 'authentication': {},
                 'body': {
                     'mimeType': 'application/graphql',
-                    'text': '{"operationName":"AccountBreadcrumb_account","variables":{"slug":"kobenguyent"},"query":"query AccountBreadcrumb_account($slug: String!) {\\\\n  account(slug: $slug) {\\\\n    id\\\\n    slug\\\\n    name\\\\n    avatar {\\\\n      ...AccountAvatarFragment\\\\n      __typename\\\\n    }\\\\n    ...AccountPlanChip_Account\\\\n    __typename\\\\n  }\\\\n}\\\\n\\\\nfragment AccountAvatarFragment on AccountAvatar {\\\\n  url(size: 64)\\\\n  color\\\\n  initial\\\\n  __typename\\\\n}\\\\n\\\\nfragment AccountPlanChip_Account on Account {\\\\n  subscriptionStatus\\\\n  plan {\\\\n    id\\\\n    displayName\\\\n    __typename\\\\n  }\\\\n  __typename\\\\n}"}',
+                    'text': '{"operationName":"AccountBreadcrumb_account","variables":{"slug":"kobenguyent"},"query":"query AccountBreadcrumb_account($slug: String!) {\\n  account(slug: $slug) {\\n    id\\n    slug\\n    name\\n    avatar {\\n      ...AccountAvatarFragment\\n      __typename\\n    }\\n    ...AccountPlanChip_Account\\n    __typename\\n  }\\n}\\n\\nfragment AccountAvatarFragment on AccountAvatar {\\n  url(size: 64)\\n  color\\n  initial\\n  __typename\\n}\\n\\nfragment AccountPlanChip_Account on Account {\\n  subscriptionStatus\\n  plan {\\n    id\\n    displayName\\n    __typename\\n  }\\n  __typename\\n}"}',
                 },
                 'headers': [
                     {

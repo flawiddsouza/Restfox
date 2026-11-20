@@ -2024,10 +2024,7 @@ export async function convertCurlCommandToRestfoxCollection(curlCommand: string,
 
     if('body' in insomniaExport[0]) {
         if('text' in insomniaExport[0].body) {
-            if (insomniaExport[0].body.mimeType !== constants.MIME_TYPE.GRAPHQL) {
-                // for some reason we get \\n instead of \n in the text field
-                insomniaExport[0].body.text = insomniaExport[0].body.text.replaceAll('\\n', '\n')
-            } else {
+            if (insomniaExport[0].body.mimeType === constants.MIME_TYPE.GRAPHQL) {
                 const parsedBody = JSON.parse(insomniaExport[0].body.text)
                 parsedBody.query = parsedBody.query.replaceAll('\\n', '\n')
                 insomniaExport[0].body.text = JSON.stringify(parsedBody)
