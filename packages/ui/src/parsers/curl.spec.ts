@@ -282,6 +282,19 @@ describe('curl', () => {
         }])
     })
 
+    it.each([
+        ['curl -G https://api.example.com/v1/customers -d limit=3', 'GET'],
+        ['curl --get https://api.example.com/v1/customers -d limit=3', 'GET'],
+    ])('Curl command - url after -G: %s', (command, method) => {
+        expect(convert(command)).toMatchObject([
+            {
+                'method': method,
+                'url': 'https://api.example.com/v1/customers',
+                'parameters': [{ 'name': 'limit', 'value': '3' }],
+            },
+        ])
+    })
+
     it('Curl command - GQL request', () => {
         const chromeCurlCmd = `curl 'https://app.argos-ci.com/graphql' \\
   -H 'accept: */*' \\
