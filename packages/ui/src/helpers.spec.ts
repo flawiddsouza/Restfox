@@ -21,6 +21,7 @@ import {
     convertRestfoxExportToRestfoxCollection,
     convertInsomniaExportToRestfoxCollection,
     convertInsomniaFileToRestfoxCollection,
+    convertCurlCommandToRestfoxCollection,
     deepClone,
     INHERITED_AUTHENTICATION_TYPE,
     createOAuthTokenRequest,
@@ -2775,6 +2776,19 @@ describe('Insomnia import', () => {
 
     test('a file that is not an Insomnia export says so', async() => {
         await expect(convertInsomniaFileToRestfoxCollection(file('info:\n  name: something else\n'), 'w')).rejects.toThrow('Not an Insomnia export')
+    })
+})
+
+describe('cURL import', () => {
+    test('a $\'...\' inside double quotes stays as text', async() => {
+        const [request] = await convertCurlCommandToRestfoxCollection(`curl https://example.test/ -H 'content-type: text/plain' --data-raw "say $'hello' again"`, 'w')
+        expect(request.body).toMatchObject({ text: 'say $\'hello\' again' })
+    })
+
+    test('a \\n escape in a JSON string body stays an escape', async() => {
+        const [request] = await convertCurlCommandToRestfoxCollection(`curl https://example.test/ -H 'content-type: application/json' --data-raw $'{"note":"it\\'s line one\\\\nline two"}'`, 'w')
+        expect(request.body).toMatchObject({ text: '{"note":"it\'s line one\\nline two"}' })
+        expect(JSON.parse(request.body!.text!)).toEqual({ note: 'it\'s line one\nline two' })
     })
 })
 

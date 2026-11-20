@@ -429,6 +429,36 @@ function decodeAnsiCString(value: string) {
     })
 }
 
+// shell-quote does not know bash's $'...' strings, which Chrome's "Copy as cURL" writes for any value with a quote,
+// newline or "!", so they are decoded here and quoted again as plain '...' strings. A $' inside quotes is plain text.
+function expandAnsiCStrings(command: string) {
+    let result = ''
+    let quote: string | null = null
+    for (let i = 0; i < command.length; i++) {
+        const char = command[i]
+        if (quote === null && char === '$' && command[i + 1] === '\'') {
+            const match = /^\$'((?:[^'\\]|\\.)*)'/.exec(command.slice(i))
+            if (match) {
+                result += `'${decodeAnsiCString(match[1]).replace(/'/g, `'\\''`)}'`
+                i += match[0].length - 1
+                continue
+            }
+        }
+        if (char === '\\' && quote !== '\'') {
+            result += char + (command[i + 1] ?? '')
+            i++
+            continue
+        }
+        if (char === quote) {
+            quote = null
+        } else if (quote === null && (char === '\'' || char === '"')) {
+            quote = char
+        }
+        result += char
+    }
+    return result
+}
+
 export const convert: Converter = rawData => {
     requestCount = 1
 
@@ -436,11 +466,7 @@ export const convert: Converter = rawData => {
         return null
     }
 
-    const cleanedRawData = convertCurlCmdToBash(rawData)
-        .replace(/\n/g, ' ')
-        // shell-quote does not know bash's $'...' strings, which Chrome's "Copy as cURL" writes for any value with a
-        // quote, newline or "!", so they are decoded here and quoted again as plain '...' strings
-        .replace(/(?<=^|\s)\$'((?:[^'\\]|\\.)*)'/g, (_match, value: string) => `'${decodeAnsiCString(value).replace(/'/g, `'\\''`)}'`)
+    const cleanedRawData = expandAnsiCStrings(convertCurlCmdToBash(rawData).replace(/\n/g, ' '))
 
     // Parse the whole thing into one big tokenized list
     const parseEntries = parse(cleanedRawData)
