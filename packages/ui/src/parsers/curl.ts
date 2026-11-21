@@ -83,6 +83,9 @@ const importCommand = (parseEntries: ParseEntry[]): ImportRequest => {
                 // Handle squished arguments like -XPOST
                 value = name.slice(1)
                 name = name.slice(0, 1)
+            } else if (name === 'G' || name === 'get') {
+                // -G takes no value, the next entry is usually the URL
+                value = true
             } else if (typeof nextEntry === 'string' && !nextEntry.startsWith('-')) {
                 // Next arg is not a flag, so assign it as the value
                 value = nextEntry
